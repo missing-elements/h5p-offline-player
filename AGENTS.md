@@ -45,7 +45,9 @@ src/
   jobs/
     jobs-worker.ts        downloads and extractions; the only long-running code
     chunk-writer.ts       a WritableStream that lands bytes in the chunk store and publishes a watermark
-scripts/                  sync-h5p-assets, build-workers, copy-frame-assets, build-fixtures
+scripts/                  sync-h5p-assets, build-workers, copy-frame-assets, build-fixtures,
+                          normalize-h5p (the package rewriter; scripts/lib/ holds its zip writer,
+                          mp4 remux and policy)
 demo/ + index.html        the hosted player page; demo/index.html is the examples index, the rest
                           are the individual embedding demos, all sharing demo/player-page.css
 tests/unit/               pure logic, node environment
@@ -65,6 +67,7 @@ npm run test:unit      # fast, no browser
 npm run test:browser
 npm run typecheck      # tsc -b plus the tests project
 npm run build          # types, element, both workers, frame assets
+npm run normalize -- course.h5p   # rewrite a package so it streams: media stored, mp4 index first
 ```
 
 `npm run dev` and `npm test` both run `prepare:dev` first, which vendors the h5p-standalone
@@ -291,6 +294,75 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   another survives a quota squeeze caused by a third. Both workers install the same policy through
   `installEvictionPolicy`; before that the Jobs worker — where the large writes, and so the quota
   errors, actually are — had no policy and evicted whichever cache the browser listed first.
+- **An archive from a host that ignores `Range` is indexed as it downloads.** The central
+  directory is at the end, so a download that has to complete before it can be read holds every
+  entry hostage — including the libraries that arrived in the first second. `LocalHeaderScanner`
+  (`forward-index.ts`) walks the local headers off the same bytes on their way to the chunk store;
+  the Jobs worker publishes what it has found as a `ForwardIndexSnapshot` beside the watermark,
+  announced on the same channel; the Service Worker builds a `partial` `PackageReader` from it and
+  serves from that until the archive is whole, when a reader from the central directory — the
+  authority — replaces it. Three rules keep a partial index honest:
+  - **An entry is in the snapshot only once its bytes have all arrived.** Recording it off its
+    header alone would let the worker reach for data that is not there yet.
+  - **The element boots only when `bootReady()` holds:** `h5p.json` has arrived and every
+    dependency it declares resolves to a folder that is present *and finished arriving* — a
+    folder has finished once an entry of a later folder has arrived, since exporters write a
+    folder's files together. An index the scanner had to give up on never says ready.
+  - **On a partial reader a miss waits; it does not 404.** h5p-standalone treats a 404 as a fact
+    about the package. `awaitEntry` wakes on each index publish and each move of the archive
+    watermark until the entry appears, the reader can prove it absent (`provablyAbsent`: its folder
+    has finished arriving, or it is the versioned probe on a library the package keeps
+    unversioned), or the real index answers. The stall bound watches the *archive* watermark: the
+    index stands still for the whole of a large entry while bytes keep coming, and a healthy
+    200 MB download must not read as a dead one. A stall answers 503, never a wrong 404.
+
+  Two facts about real packages shape this, both measured, not assumed. A PHP-style export
+  (`boardgame.h5p`) puts libraries before content and uses no data descriptors: it boots after
+  about a hundred entries with 40 MB of media still to come. An h5p.com export
+  (`interactive-video-2-618.h5p`) sets bit 3 on *every* entry — sizes after the data, all stored —
+  so a walker that trusts local-header sizes gets nothing from it; the scanner resolves those by
+  finding the descriptor signature and accepting it only where its compressed size equals the
+  bytes seen since the data began. h5p-standalone probes the *versioned* folder name first, so on
+  a modern export the boot never issues the one 404 a partial index would have to wait on.
+  `zip.js`'s own `ZipReaderStream` is not an option here: it buffers the entire input into a Blob
+  and then reads the central directory from the end (`getEntriesGenerator` → `streamToBlob`) —
+  a streaming surface over whole-archive buffering.
+
+## The normalizer
+
+`npm run normalize -- course.h5p` rewrites a package once so that it streams. It is the fix for
+the deflated, non-faststart video above, applied where it belongs — to the package, by whoever
+publishes it. `scripts/lib/normalize.mjs` holds the policy, `mp4-faststart.mjs` the remux and
+`zip-writer.mjs` the output side; `scripts/normalize-h5p.mjs` is the command. Four things about
+it that the code does not say by itself:
+
+- **It writes the zip itself.** zip.js reads the input — descriptors, zip64, inflate, all
+  handled — but its `ZipWriter`, asked not to write a data descriptor, buffers the whole entry
+  until it knows the sizes (`!dataDescriptor && !emptyEntry` takes the buffered path in
+  `zip-writer.js`). The normalizer always knows them — stored bytes the source measured, or bytes
+  it has counted itself — so `StreamingZipWriter` puts a complete local header in front of each
+  entry and never buffers. No descriptors also means the forward scanner reads an entry's size
+  off its header instead of hunting for a descriptor signature through 200 MB of video.
+- **Faststart is a remux, not a re-encode.** Only the `stco`/`co64` chunk offset tables inside
+  `moov` change, by `moov`'s own length, and only for positions that lay between `mdat` and
+  `moov`; an atom after `moov` keeps its position. Anything the walker does not understand — a
+  fragmented file, a compressed `cmov`, an offset that would outgrow `stco` — is left exactly as
+  it was. A deflated mp4 is inflated to a temp file first, because `moov` is at the end and a
+  deflate stream cannot be seeked; a stored one is read in place in the source archive.
+- **Library folders stay whole; only `content/` media moves to the end.** The forward index
+  treats a folder as finished once a later folder has begun, so a library's own png pulled to the
+  end would be reported absent after its library had "arrived".
+- **It drops what the player would drop.** Directory entries, names that are not plain relative
+  paths, duplicates after normalisation — read with `filenameValidation: 'tolerant'` for the same
+  reason the player uses it. `plainRelativeName` is a copy of `normalizeEntryName`, because the
+  scripts cannot import TypeScript; keep the two in step.
+
+Measured on the fixtures: `boardgame.h5p` grows 38.1 → 38.8 MB with 158 media entries inflated to
+stored (its mp4s were already faststart); the h5p.com export keeps its media as it was and only
+has its two stored JSON files deflated, 17 → 5 kB. `unzip -t` is the independent check on an
+output. What the script cannot do is make a host that ignores `Range` serve a video before the
+video has arrived: an entry enters the forward index only once it is complete, so on such a host
+a normalized package gains the early boot and the seekable video, and still waits for the bytes.
 
 ## The element's own box
 
@@ -356,7 +428,9 @@ bundle that no longer matches the source — a genuinely confusing hour.
 ## Testing
 
 Unit tests cover the pure logic: name normalisation, range parsing, chunk arithmetic, strategy
-selection, the CSP and the generated frame document. They are fast and are where a rule belongs.
+selection, the CSP and the generated frame document, and the normalizer's writer, remux and
+policy. They are fast and are where a rule belongs. `tsconfig.test.json` has `allowJs` so the
+tests can import `scripts/lib/*.mjs`; the scripts are typed through JSDoc and not checked.
 
 Browser tests drive the real element in chromium. They are the only place the interesting parts
 exist at all — a worker serving a `206` assembled out of cache chunks has no meaningful behaviour
@@ -399,10 +473,15 @@ The architecture and setup documents predate the code. These are deliberate addi
   `Range`, and the design's original `503` there kept a cold video from ever starting. The `503`
   with `Retry-After: 1` survives only for an entry whose extraction has produced no bytes at all
   within the stall window.
+- A host that ignores `Range` no longer means "download everything, then index". The archive is
+  still downloaded whole — the design's `chunked` adapter — but it is indexed from its local
+  headers as it arrives, and the frame boots as soon as the runtime's libraries are present.
 - Eviction is lock-aware across tabs, not only "never the package currently being served". The
   design's rule protected the package doing the writing; a Web Lock under `h5p:<pkgId>:` — held
   by a writing job or a playing element anywhere on the origin — now protects any package in use.
 - Generated types live in `types/`, not `dist/index.d.ts`.
+- A normalizer script. The design leaves the package's layout to whoever built it; the script
+  is how they get the layout the player streams best.
 
 ## Not built yet
 

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   ChunkStore,
+  FORWARD_INDEX_ENTRY,
   QuotaError,
   onWatermark,
   setEvictionListener,
@@ -110,6 +111,41 @@ describe('ChunkStore writes', () => {
     // Only its own entry, and heard at all: a BroadcastChannel never delivers to the object that
     // posted, which is why the announcer and the listener are two of them.
     expect(heard).toEqual([{ size: 10, available: 5, complete: false }])
+  })
+
+  it('keeps the forward index beside the archive and announces each publish of it', async () => {
+    const fake = fakeCaches(false)
+    // A match that answers what was put, since the index is read back.
+    const puts = new Map<string, Uint8Array<ArrayBuffer>>()
+    const cache = await fake.caches.open()
+    const originalPut = cache.put.bind(cache)
+    cache.put = async (key: string, response: Response) => {
+      const copy = response.clone()
+      await originalPut(key, response)
+      puts.set(key, new Uint8Array(await copy.arrayBuffer()))
+    }
+    cache.match = (async (key: string) => {
+      const bytes = puts.get(key)
+      return bytes ? new Response(bytes) : undefined
+    }) as never
+    vi.stubGlobal('caches', fake.caches)
+
+    const heard: unknown[] = []
+    const stop = onWatermark('pkg', FORWARD_INDEX_ENTRY, (meta) => heard.push(meta))
+    const store = new ChunkStore('pkg')
+    const snapshot = {
+      entries: [{ name: 'h5p.json', directory: false, method: 8, encrypted: false, crc32: 1, compressedSize: 10, uncompressedSize: 12, headerOffset: 0, dataStart: 38 }],
+      parsedTo: 48,
+      done: false,
+      stopped: null
+    }
+
+    await store.setForwardIndex(snapshot)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    stop()
+
+    expect(await store.getForwardIndex()).toEqual(snapshot)
+    expect(heard).toEqual([{ size: null, available: 48, complete: false }])
   })
 
   it('gives up with a QuotaError when nothing is left to evict', async () => {

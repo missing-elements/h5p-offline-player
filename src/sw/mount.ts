@@ -1,4 +1,5 @@
 import {
+  ARCHIVE_ENTRY,
   COLD_ENTRY_WAIT_MS,
   JOB_REQUEST_DEDUPE_MS,
   VERSION,
@@ -6,6 +7,7 @@ import {
 } from '../shared/constants'
 import {
   ChunkStore,
+  FORWARD_INDEX_ENTRY,
   QuotaError,
   deleteStaleCaches,
   onWatermark,
@@ -126,15 +128,19 @@ class VirtualServer {
           return
 
         case 'index': {
-          const reader = await this.reader(message.pkgId)
-          await db.updatePackage(message.pkgId, { status: 'indexed', lastPlayed: Date.now() })
+          const reader = await this.refresh(message.pkgId, await this.reader(message.pkgId))
+          if (!reader.partial) {
+            await db.updatePackage(message.pkgId, { status: 'indexed', lastPlayed: Date.now() })
+          }
           reply({
             ok: true,
             type: 'indexed',
             pkgId: message.pkgId,
             entryCount: reader.entries.size,
             title: reader.title,
-            prefetch: reader.prefetchable()
+            prefetch: reader.prefetchable(),
+            partial: reader.partial || undefined,
+            ready: reader.partial ? reader.bootReady() : undefined
           })
           return
         }
@@ -228,8 +234,18 @@ class VirtualServer {
     const name = normalizeRequestPath(rawPath)
     if (name === null) return text('Bad entry path', 400)
 
-    const reader = await this.reader(pkgId)
-    const located = reader.get(name)
+    let reader = await this.reader(pkgId)
+    let located = reader.get(name)
+
+    if (!located && reader.partial) {
+      // On a partial index a miss is ambiguous: absent, or not arrived yet. Wait for the index to
+      // grow until the entry appears or the answer becomes certain.
+      const outcome = await this.awaitEntry(pkgId, reader, name)
+      if (outcome === 'stalled') return retryLater(`The download has stalled before ${name}`)
+      reader = outcome.reader
+      located = outcome.located
+    }
+
     // A 404 here is load-bearing: h5p-standalone probes for `library.json` under both the
     // versioned and unversioned folder names and picks the shape that answers.
     if (!located) return new Response(null, { status: 404 })
@@ -389,6 +405,59 @@ class VirtualServer {
     })
   }
 
+  /**
+   * Waits, on a partial reader, for an entry that may not have arrived yet.
+   *
+   * Woken by each publish of the forward index and each move of the archive's watermark, polling
+   * as the fallback, until the entry appears, the reader can prove it absent, or the archive is
+   * whole and the real index answers. The stall bound watches the archive watermark, not the
+   * index: the index stands still for the whole of a large entry while the bytes keep coming, and
+   * a healthy download of a 200 MB video must not read as a dead one. Only a download that stops
+   * moving gives up, and it gives up with a retry rather than a wrong 404 — h5p-standalone treats
+   * a 404 as a fact about the package.
+   */
+  private async awaitEntry(
+    pkgId: string,
+    reader: PackageReader,
+    name: string
+  ): Promise<{ reader: PackageReader; located: LocatedEntry | undefined } | 'stalled'> {
+    const store = new ChunkStore(pkgId)
+    let wake: (() => void) | null = null
+    const stopIndex = onWatermark(pkgId, FORWARD_INDEX_ENTRY, () => wake?.())
+    const stopArchive = onWatermark(pkgId, ARCHIVE_ENTRY, () => wake?.())
+    let lastAvailable = -1
+    let lastAdvanceAt = Date.now()
+
+    try {
+      for (;;) {
+        const current = await this.refresh(pkgId, reader)
+        const located = current.get(name)
+        if (located || !current.partial || current.provablyAbsent(name)) return { reader: current, located }
+
+        const available = (await store.getArchiveMeta())?.available ?? 0
+        if (available !== lastAvailable) {
+          lastAvailable = available
+          lastAdvanceAt = Date.now()
+        } else if (Date.now() - lastAdvanceAt >= COLD_ENTRY_WAIT_MS) {
+          return 'stalled'
+        }
+
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, WATERMARK_POLL_MS)
+          wake = () => {
+            clearTimeout(timer)
+            resolve()
+          }
+        })
+        wake = null
+        reader = current
+      }
+    } finally {
+      stopIndex()
+      stopArchive()
+    }
+  }
+
   /* ---------------------------------------------------------------- job requests */
 
   /**
@@ -442,6 +511,26 @@ class VirtualServer {
     if (!record) throw new UnknownPackageError(pkgId)
 
     const file = record.source.type === 'file' ? await this.fileFor(pkgId) : undefined
+
+    // An archive still downloading is served from its forward index — what the local headers
+    // have given up so far — until it is whole and the central directory can take over.
+    if (record.source.type === 'chunked') {
+      const store = new ChunkStore(pkgId)
+      const meta = await store.getArchiveMeta()
+      if (!meta?.complete) {
+        const snapshot = (await store.getForwardIndex()) ?? {
+          entries: [],
+          parsedTo: 0,
+          done: false,
+          stopped: null
+        }
+        const partialHandle = await openSource(pkgId, record.source, file, { partial: true })
+        const partial = await PackageReader.fromForwardIndex(pkgId, partialHandle, snapshot)
+        if (record.libraryPkgId) partial.use(await this.reader(record.libraryPkgId))
+        return partial
+      }
+    }
+
     const handle = await openSource(pkgId, record.source, file)
 
     // Validation waits until any attached bundle is in place; a bundle registered to supply
@@ -457,6 +546,25 @@ class VirtualServer {
     const { title } = reader
     if (title && title !== record.title) await db.updatePackage(pkgId, { title })
 
+    return reader
+  }
+
+  /**
+   * Brings a partial reader up to date with the latest forward index, or — once the archive is
+   * whole — drops it for a reader built from the central directory, which is the authority.
+   */
+  private async refresh(pkgId: string, reader: PackageReader): Promise<PackageReader> {
+    if (!reader.partial) return reader
+
+    const store = new ChunkStore(pkgId)
+    const meta = await store.getArchiveMeta()
+    if (meta?.complete) {
+      this.readers.delete(pkgId)
+      return this.reader(pkgId)
+    }
+
+    const snapshot = await store.getForwardIndex()
+    if (snapshot) await reader.absorb(snapshot)
     return reader
   }
 

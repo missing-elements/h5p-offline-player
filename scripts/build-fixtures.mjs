@@ -72,6 +72,7 @@ const GENERATED = [
   'basic.h5p',
   'large-deflated.h5p',
   'large-stored.h5p',
+  'streamed.h5p',
   'traversal.h5p',
   'not-h5p.h5p',
   'content-only.h5p',
@@ -127,6 +128,29 @@ built.push([
       )
     )
     await writer.add('content/media/big.bin', new Uint8ArrayReader(randomBytes()), { level: 0 })
+  })
+])
+
+// 3c. Every entry with a data descriptor — the layout a writer that streams produces, and what
+//     h5p.com's exporter ships: sizes after the data, nothing in the local header to skip by.
+//     Libraries first and media last, so a host that ignores Range can boot it before the media
+//     lands, which is the forward index's whole point.
+built.push([
+  'streamed.h5p',
+  await writeArchive('streamed.h5p', async (writer) => {
+    const streamed = (bytes) => new Blob([bytes]).stream()
+    const ordered = [...baseFiles]
+      .filter(({ entryName }) => entryName !== 'content/content.json')
+      .sort((a, b) => Number(a.entryName.startsWith('content/')) - Number(b.entryName.startsWith('content/')))
+    for (const { entryName, path } of ordered) {
+      await writer.add(entryName, streamed(new Uint8Array(await readFile(path))), { dataDescriptor: true })
+    }
+    await writer.add(
+      'content/content.json',
+      streamed(new TextEncoder().encode(JSON.stringify({ message: 'Streamed archive', media: { path: 'media/big.bin' } }))),
+      { dataDescriptor: true }
+    )
+    await writer.add('content/media/big.bin', streamed(compressibleBytes()), { dataDescriptor: true })
   })
 ])
 

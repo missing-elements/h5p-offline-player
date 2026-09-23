@@ -2,6 +2,7 @@ import { ARCHIVE_ENTRY, CACHE_PREFIX, CHUNK_KEY_ORIGIN, CHUNK_SIZE } from './con
 import type { ByteRange } from './range'
 import { sliceStream } from './stream-utils'
 import { busyPackages } from './locks'
+import type { ForwardIndexSnapshot } from './forward-index'
 
 /**
  * The chunk store: one Cache API cache per package. Small entries are stored whole; archives and
@@ -22,6 +23,14 @@ export interface ChunkMeta {
 }
 
 const META_MARKER = '/__meta__'
+const FORWARD_INDEX_MARKER = '/__forward__'
+
+/**
+ * The name a forward index is announced under on the watermark channel, so a request waiting for
+ * an entry that has not arrived yet wakes when the index grows, the way one waiting for bytes
+ * wakes when the watermark moves.
+ */
+export const FORWARD_INDEX_ENTRY = '__forward_index__'
 
 /** How many evictions one write may trigger before it gives up. */
 const MAX_EVICTIONS_PER_WRITE = 32
@@ -44,6 +53,10 @@ function chunkKey(pkgId: string, entry: string, index: number): string {
 
 function metaKey(pkgId: string, entry: string): string {
   return `${CHUNK_KEY_ORIGIN}${pkgId}/chunk/${encodeEntry(entry)}${META_MARKER}`
+}
+
+function forwardIndexKey(pkgId: string): string {
+  return `${CHUNK_KEY_ORIGIN}${pkgId}/chunk/${encodeEntry(ARCHIVE_ENTRY)}${FORWARD_INDEX_MARKER}`
 }
 
 function isQuotaError(error: unknown): boolean {
@@ -254,6 +267,35 @@ export class ChunkStore {
 
   getArchiveMeta(): Promise<ChunkMeta | undefined> {
     return this.getMeta(ARCHIVE_ENTRY)
+  }
+
+  /**
+   * The entries of a downloading archive that are already readable, from its local headers. The
+   * Jobs worker publishes this as it downloads; the Service Worker serves from it until the whole
+   * archive — and with it the central directory, the real index — is present.
+   */
+  async getForwardIndex(): Promise<ForwardIndexSnapshot | undefined> {
+    const cache = await this.cache()
+    const response = await cache.match(forwardIndexKey(this.pkgId))
+    if (!response) return undefined
+    try {
+      return (await response.json()) as ForwardIndexSnapshot
+    } catch {
+      return undefined
+    }
+  }
+
+  async setForwardIndex(snapshot: ForwardIndexSnapshot): Promise<void> {
+    const cache = await this.cache()
+    await cache.put(
+      forwardIndexKey(this.pkgId),
+      new Response(JSON.stringify(snapshot), { headers: { 'content-type': 'application/json' } })
+    )
+    announceWatermark({
+      pkgId: this.pkgId,
+      entry: FORWARD_INDEX_ENTRY,
+      meta: { size: null, available: snapshot.parsedTo, complete: snapshot.done }
+    })
   }
 
   readArchiveRange(range: ByteRange): Promise<Uint8Array> {

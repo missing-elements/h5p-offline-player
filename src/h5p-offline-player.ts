@@ -296,23 +296,71 @@ export class H5PPlayerElement extends HTMLElement {
         await this.send({ type: 'file', pkgId, file: this.currentFile })
       }
 
+      const frameUrl = `${routes.frame}${pkgId}`
+      let prefetch: PrefetchEntry[]
+
       if (descriptor.type === 'chunked') {
         this.setState('downloading')
-        await this.runDownload(pkgId, descriptor, signal)
-        if (signal.aborted) return
+        prefetch = await this.downloadAndIndex(pkgId, descriptor, signal, frameUrl)
+      } else {
+        this.setState('indexing')
+        prefetch = await this.index(pkgId, signal)
       }
-
-      this.setState('indexing')
-      this.prefetchQueue = (await this.index(pkgId, signal)).map((each) => each.entry)
       if (signal.aborted) return
 
-      // The registration has to be `activated` before this navigation, or it reaches the server
-      // and 404s — there is no such file.
-      this.iframe.src = `${routes.frame}${pkgId}`
+      this.prefetchQueue = prefetch.map((each) => each.entry)
+      // A download that booted early already has its frame; the final index only swapped the
+      // worker onto the real one. Otherwise: the registration has to be `activated` before this
+      // navigation, or it reaches the server and 404s — there is no such file.
+      if (this.iframe.getAttribute('src') !== frameUrl) this.iframe.src = frameUrl
+      else if (this.internalState === 'ready') this.advancePrefetch()
     } catch (error) {
       if (signal.aborted) return
       this.fail(error)
     }
+  }
+
+  /**
+   * Downloads a package from a host that ignores `Range`, and boots as soon as the worker's
+   * forward index says the runtime has what it needs — for a libraries-first export, long before
+   * the media has finished. Each progress report is a chance to ask; a "not yet" is not an error.
+   * The final index after the download is the real one, from the central directory: it swaps the
+   * worker onto it, and is where a package missing libraries is found out.
+   */
+  private async downloadAndIndex(
+    pkgId: string,
+    source: SourceDescriptor,
+    signal: AbortSignal,
+    frameUrl: string
+  ): Promise<PrefetchEntry[]> {
+    let booted = false
+    let attempt: Promise<void> | null = null
+
+    const tryBoot = () => {
+      if (booted || attempt || signal.aborted) return
+      attempt = this.send({ type: 'index', pkgId })
+        .then((reply) => {
+          if (signal.aborted || booted) return
+          if (reply.ok && reply.type === 'indexed' && reply.ready !== false) {
+            booted = true
+            this.iframe.src = frameUrl
+          }
+        })
+        .catch(() => {
+          // Too early to index, or the index cannot yet boot: the next progress report asks again.
+        })
+        .finally(() => {
+          attempt = null
+        })
+    }
+
+    await this.runDownload(pkgId, source, signal, 'download', tryBoot)
+    if (signal.aborted) return []
+    if (attempt) await attempt
+
+    // A frame already up keeps its state; the rest of this is the worker's bookkeeping.
+    if (!booted) this.setState('indexing')
+    return this.index(pkgId, signal)
   }
 
   /**
@@ -457,7 +505,8 @@ export class H5PPlayerElement extends HTMLElement {
     pkgId: string,
     source: SourceDescriptor,
     signal: AbortSignal,
-    phase: 'download' | 'libraries' = 'download'
+    phase: 'download' | 'libraries' = 'download',
+    onProgress?: () => void
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       const jobs = this.ensureJobs()
@@ -473,6 +522,7 @@ export class H5PPlayerElement extends HTMLElement {
             total: message.total,
             fraction: message.total ? message.loaded / message.total : null
           })
+          onProgress?.()
           return
         }
 

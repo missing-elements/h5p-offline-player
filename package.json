@@ -46,6 +46,7 @@
   "scripts": {
     "sync:assets": "node scripts/sync-h5p-assets.mjs",
     "fixtures": "node scripts/build-fixtures.mjs",
+    "normalize": "node scripts/normalize-h5p.mjs",
     "prepare:dev": "npm run sync:assets && npm run fixtures",
     "dev": "npm run prepare:dev && vite",
     "build": "npm run sync:assets && tsc -b && vite build && node scripts/build-workers.mjs && node scripts/copy-frame-assets.mjs",

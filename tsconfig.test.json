@@ -5,6 +5,7 @@
     "declaration": false,
     "emitDeclarationOnly": false,
     "noEmit": true,
+    "allowJs": true,
     "rootDir": ".",
     "types": ["vite/client", "node"]
   },

@@ -1,10 +1,11 @@
 import { ZipReader, type Entry, type FileEntry } from '@zip.js/zip.js'
 import { INLINE_MAX_SIZE } from '../shared/constants'
-import { indexEntryNames } from '../shared/entry-names'
+import { indexEntryNames, normalizeEntryName } from '../shared/entry-names'
 import { isTextEntry } from '../shared/mime'
 import { PlayerError, type MissingLibraries, type PrefetchEntry } from '../shared/protocol'
 import { SourceReader, type SourceHandle } from '../shared/source'
 import type { ByteRange } from '../shared/range'
+import type { ForwardEntry, ForwardIndexSnapshot } from '../shared/forward-index'
 
 /**
  * The package reader: a zip central directory turned into a name → entry index, plus the decision
@@ -46,7 +47,11 @@ export interface IndexedEntry {
   compressedSize: number
   method: number
   strategy: Strategy
-  zip: FileEntry
+  /** The zip.js entry, for an index read from the central directory. Absent for a forward entry. */
+  zip?: FileEntry
+  /** Where the compressed bytes begin, when the local header has already been read. */
+  dataStart?: number
+  encrypted?: boolean
 }
 
 /**
@@ -62,7 +67,20 @@ export class PackageReader {
   readonly pkgId: string
   readonly entries: Map<string, IndexedEntry>
   readonly rejected: string[]
-  readonly manifest: PackageManifest
+  manifest: PackageManifest
+  /**
+   * Built from the forward index of an archive still downloading. Entries arrive as the download
+   * does — `absorb()` takes them in — and every answer is provisional until the archive is whole
+   * and a reader from its central directory replaces this one.
+   */
+  readonly partial: boolean
+  /** For a partial reader: how far the archive is accounted for, and whether its index is complete. */
+  parsedTo = 0
+  forwardDone = false
+  private forwardStopped = false
+  private absorbed = 0
+  /** Top-level folder of the newest entry: the one folder that may still be receiving files. */
+  private lastTopFolder: string | null = null
 
   /** Archives consulted, in order, for an entry this one does not have. */
   private readonly fallbacks: PackageReader[] = []
@@ -76,12 +94,14 @@ export class PackageReader {
     private readonly handle: SourceHandle,
     entries: Map<string, IndexedEntry>,
     rejected: string[],
-    manifest: PackageManifest
+    manifest: PackageManifest,
+    partial = false
   ) {
     this.pkgId = pkgId
     this.entries = entries
     this.rejected = rejected
     this.manifest = manifest
+    this.partial = partial
   }
 
   get title(): string | undefined {
@@ -131,6 +151,105 @@ export class PackageReader {
     if (options.requireLibraries !== false) reader.assertLibrariesPresent()
 
     return reader
+  }
+
+  /**
+   * A reader over an archive that is still downloading, from the entries its local headers have
+   * given up so far. Nothing is asserted here: what is missing may simply not have arrived.
+   */
+  static async fromForwardIndex(
+    pkgId: string,
+    handle: SourceHandle,
+    snapshot: ForwardIndexSnapshot
+  ): Promise<PackageReader> {
+    const reader = new PackageReader(pkgId, handle, new Map(), [], {}, true)
+    await reader.absorb(snapshot)
+    return reader
+  }
+
+  /**
+   * Takes in the entries a newer snapshot has and this reader does not. Snapshots are cumulative
+   * and in archive order, so only the tail is new; the same first-occurrence rule as the full
+   * index applies, so a later duplicate can never shadow an entry already served.
+   */
+  async absorb(snapshot: ForwardIndexSnapshot): Promise<boolean> {
+    if (!this.partial) return false
+    const fresh = snapshot.entries.slice(this.absorbed)
+    this.absorbed = snapshot.entries.length
+    this.parsedTo = snapshot.parsedTo
+    this.forwardDone = snapshot.done
+    this.forwardStopped = snapshot.stopped !== null && !snapshot.done
+
+    let manifestArrived = false
+    for (const forward of fresh) {
+      if (forward.directory) continue
+      const name = normalizeEntryName(forward.name)
+      if (name === null || this.entries.has(name)) {
+        this.rejected.push(forward.name)
+        continue
+      }
+      this.entries.set(name, entryFromForward(name, forward))
+      this.lastTopFolder = topFolderOf(name)
+      if (name === 'h5p.json') manifestArrived = true
+    }
+
+    if (fresh.length > 0) this.librariesByName = null
+    if (manifestArrived) this.manifest = await readManifest(this)
+    return fresh.length > 0
+  }
+
+  /**
+   * For a partial reader: whether the runtime could boot from what has arrived — `h5p.json`, and
+   * for every dependency it declares a folder that is present and finished arriving. A folder has
+   * finished once an entry of a later folder has been seen, since exporters write a folder's files
+   * together; only the newest folder may still be growing. An index the scanner had to give up on
+   * never says ready: what it could not see must wait for the central directory.
+   */
+  bootReady(): boolean {
+    if (!this.partial) return true
+    if (this.forwardStopped || !this.entries.has('h5p.json')) return false
+
+    const dependencies = this.manifest.preloadedDependencies
+    if (!Array.isArray(dependencies) || dependencies.length === 0) return false
+
+    const names = this.entryNames()
+    const available = this.availableLibraries()
+    return dependencies.every((dependency) => {
+      const folder =
+        libraryFolderNames(dependency).find((each) => names.has(`${each}/library.json`)) ??
+        resolveLibraryFolder(available, {
+          machineName: dependency.machineName,
+          major: Number(dependency.majorVersion),
+          minor: Number(dependency.minorVersion)
+        })
+      return folder !== undefined && this.folderComplete(folder)
+    })
+  }
+
+  /**
+   * For a partial reader: a miss that can be answered without waiting for more of the archive.
+   * True when the entry's top-level folder has already finished arriving, or when the request
+   * is h5p-standalone's versioned probe on a package that keeps that library unversioned.
+   */
+  provablyAbsent(name: string): boolean {
+    if (!this.partial || this.forwardDone) return true
+    const top = topFolderOf(name)
+    if (top === null) return false
+
+    if (this.hasFolder(top)) return this.folderComplete(top)
+
+    const wanted = parseLibraryFolder(top)
+    return wanted !== null && this.hasFolder(wanted.machineName) && this.folderComplete(wanted.machineName)
+  }
+
+  private folderComplete(folder: string): boolean {
+    return this.forwardDone || this.lastTopFolder !== folder
+  }
+
+  private hasFolder(folder: string): boolean {
+    const prefix = `${folder}/`
+    for (const name of this.entries.keys()) if (name.startsWith(prefix)) return true
+    return false
   }
 
   /** Adds an archive to consult for entries this one does not carry. */
@@ -279,8 +398,14 @@ export class PackageReader {
   /**
    * Inflates an entry into a stream. The stream is handed straight to `cache.put()` or to a
    * `Response`, so the entry never sits in memory as a whole.
+   *
+   * An entry from the central directory goes through zip.js. A forward entry has no zip.js object
+   * behind it and is inflated directly: its compressed span is known from its local header, and
+   * `DecompressionStream` does the rest — the same codec zip.js would have used.
    */
   inflate(entry: IndexedEntry): ReadableStream<Uint8Array> {
+    if (!entry.zip) return this.inflateDirect(entry)
+
     if (entry.zip.encrypted) {
       throw new PlayerError('bad-archive', `${entry.name} is encrypted`)
     }
@@ -309,9 +434,10 @@ export class PackageReader {
   }
 
   /**
-   * Byte range of a stored entry's data inside the archive. The central directory records where
-   * the *local* header starts, and the local header's own name and extra fields are what stand
-   * between it and the bytes, so the header has to be read to find them.
+   * Byte range of an entry's compressed data inside the archive. The central directory records
+   * where the *local* header starts, and the local header's own name and extra fields are what
+   * stand between it and the bytes, so the header has to be read to find them — unless a forward
+   * entry already knows, having come from that very header.
    *
    * Read once per entry and kept as a promise: a media element opens with a burst of range
    * requests, and every one of them used to pay a round trip for the same thirty bytes — over
@@ -328,10 +454,25 @@ export class PackageReader {
     return reading
   }
 
-  private async readDataRange(entry: IndexedEntry): Promise<ByteRange> {
-    if (entry.method !== STORED) {
-      throw new PlayerError('bad-archive', `${entry.name} is not stored, so it cannot be sliced`)
+  private inflateDirect(entry: IndexedEntry): ReadableStream<Uint8Array> {
+    if (entry.encrypted) throw new PlayerError('bad-archive', `${entry.name} is encrypted`)
+    if (entry.method !== STORED && entry.method !== DEFLATE) {
+      throw new PlayerError('bad-archive', `${entry.name} uses compression method ${entry.method}`)
     }
+    if (entry.compressedSize === 0) return new Blob([]).stream()
+
+    const raw = deferredStream(() => this.sliceStream(entry, { start: 0, end: entry.compressedSize - 1 }))
+    if (entry.method === STORED) return raw
+    // The lib types the codec's input as `BufferSource`, stricter than the plain views it gets.
+    const inflate = new DecompressionStream('deflate-raw') as unknown as ReadableWritablePair<Uint8Array, Uint8Array>
+    return raw.pipeThrough(inflate)
+  }
+
+  private async readDataRange(entry: IndexedEntry): Promise<ByteRange> {
+    if (entry.dataStart !== undefined) {
+      return { start: entry.dataStart, end: entry.dataStart + entry.compressedSize - 1 }
+    }
+    if (!entry.zip) throw new PlayerError('bad-archive', `${entry.name} has no known location`)
 
     const header = await this.handle.read({
       start: entry.zip.offset,
@@ -350,7 +491,7 @@ export class PackageReader {
     return { start, end: start + entry.compressedSize - 1 }
   }
 
-  /** Streams a range of a stored entry straight out of the source. No extraction, no storage. */
+  /** Streams a range of an entry's compressed bytes straight out of the source. No storage. */
   async sliceStream(entry: IndexedEntry, range: ByteRange): Promise<ReadableStream<Uint8Array>> {
     const data = await this.dataRange(entry)
     return this.handle.stream({
@@ -364,7 +505,10 @@ export class PackageReader {
  * Serving strategy for one entry. Size decides first, then compression method: only a large
  * deflated entry is worth the cost of a background extraction.
  */
-export function chooseStrategy(name: string, entry: Entry): Strategy {
+export function chooseStrategy(
+  name: string,
+  entry: { uncompressedSize: number; compressionMethod: number }
+): Strategy {
   if (isTextEntry(name)) return { kind: 'inline' }
   if (entry.uncompressedSize <= INLINE_MAX_SIZE) return { kind: 'inline' }
   if (entry.compressionMethod === STORED) return { kind: 'slice' }
@@ -375,6 +519,45 @@ export function chooseStrategy(name: string, entry: Entry): Strategy {
 }
 
 /* ------------------------------------------------------------------ manifest and libraries */
+
+function entryFromForward(name: string, forward: ForwardEntry): IndexedEntry {
+  return {
+    name,
+    size: forward.uncompressedSize,
+    compressedSize: forward.compressedSize,
+    method: forward.method,
+    strategy: chooseStrategy(name, {
+      uncompressedSize: forward.uncompressedSize,
+      compressionMethod: forward.method
+    }),
+    dataStart: forward.dataStart,
+    encrypted: forward.encrypted
+  }
+}
+
+function topFolderOf(name: string): string | null {
+  const slash = name.indexOf('/')
+  return slash < 0 ? null : name.slice(0, slash)
+}
+
+/** A stream that opens its source on the first pull, so building it costs nothing until it is read. */
+function deferredStream(open: () => Promise<ReadableStream<Uint8Array>>): ReadableStream<Uint8Array> {
+  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
+  return new ReadableStream<Uint8Array>(
+    {
+      async pull(controller) {
+        reader ??= (await open()).getReader()
+        const { done, value } = await reader.read()
+        if (done) controller.close()
+        else controller.enqueue(value)
+      },
+      async cancel(reason) {
+        await reader?.cancel(reason)
+      }
+    },
+    { highWaterMark: 0 }
+  )
+}
 
 async function readManifest(reader: PackageReader): Promise<PackageManifest> {
   const { entry } = reader.get('h5p.json')!

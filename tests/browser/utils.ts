@@ -15,8 +15,12 @@ export const FIXTURES = {
   traversal: '/fixtures/traversal.h5p',
   notH5P: '/fixtures/not-h5p.h5p',
   corrupt: '/fixtures/corrupt.h5p',
+  /** Every entry carrying a data descriptor, as a writer that streams — h5p.com's — lays them out. */
+  streamed: '/fixtures/streamed.h5p',
   /** The same archives from a host that ignores `Range`, forcing the chunked adapter. */
   noRangeBasic: '/no-range/basic.h5p',
+  noRangeLargeStored: '/no-range/large-stored.h5p',
+  noRangeStreamed: '/no-range/streamed.h5p',
   /** A genuine 404. The dev server answers a missing `/fixtures/…` with its HTML fallback. */
   missing: '/no-range/missing.h5p',
   /** A URL that answers 200 with a page instead of an archive — a login wall, in the wild. */

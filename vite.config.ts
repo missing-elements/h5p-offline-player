@@ -1,5 +1,6 @@
 /// <reference types="vitest/config" />
 import { readFile } from 'node:fs/promises'
+import type { ServerResponse } from 'node:http'
 import { resolve } from 'node:path'
 import { defineConfig, type Plugin } from 'vite'
 import { build as esbuild } from 'esbuild'
@@ -99,6 +100,16 @@ function devServiceWorkerPlugin(): Plugin {
  * adapter — the common case in the wild, and the one that downloads before it can index — would
  * never be exercised.
  */
+async function sendThrottled(res: ServerResponse, body: Buffer, bytesPerSecond: number): Promise<void> {
+  const slice = 64 * 1024
+  for (let at = 0; at < body.length; at += slice) {
+    const piece = body.subarray(at, Math.min(at + slice, body.length))
+    if (!res.write(piece)) await new Promise((resolve) => res.once('drain', resolve))
+    await new Promise((resolve) => setTimeout(resolve, (piece.length / bytesPerSecond) * 1000))
+  }
+  res.end()
+}
+
 function noRangeFixturesPlugin(): Plugin {
   const prefix = '/no-range/'
 
@@ -106,14 +117,17 @@ function noRangeFixturesPlugin(): Plugin {
     name: 'h5p-no-range-fixtures',
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        const url = req.url?.split('?')[0]
-        if (!url?.startsWith(prefix)) return next()
+        const url = new URL(req.url ?? '/', 'http://localhost')
+        if (!url.pathname.startsWith(prefix)) return next()
 
-        const name = url.slice(prefix.length)
+        const name = url.pathname.slice(prefix.length)
         if (name.includes('/') || name.includes('..')) {
           res.statusCode = 400
           return res.end('bad fixture name')
         }
+        // `?throttle=<bytes per second>` paces the body, so a test can watch the player boot from
+        // the forward index while the rest of the archive is still on its way.
+        const throttle = Number(url.searchParams.get('throttle') ?? 0)
 
         readFile(resolve(import.meta.dirname, 'public/fixtures', name)).then(
           (body) => {
@@ -122,7 +136,8 @@ function noRangeFixturesPlugin(): Plugin {
             res.setHeader('cache-control', 'no-store')
             // Deliberately no `accept-ranges`, and the `range` header on the request is ignored.
             res.statusCode = 200
-            res.end(body)
+            if (throttle > 0) void sendThrottled(res, body, throttle)
+            else res.end(body)
           },
           () => {
             res.statusCode = 404

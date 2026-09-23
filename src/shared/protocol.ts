@@ -147,6 +147,10 @@ export type WorkerReply =
       entryCount: number
       title?: string
       prefetch?: PrefetchEntry[]
+      /** Built from the forward index of an archive still downloading, not its central directory. */
+      partial?: boolean
+      /** For a partial index: whether everything the runtime needs to boot has arrived. */
+      ready?: boolean
     }
   | { ok: true; type: 'ack' }
   | { ok: false; code: ErrorCode; message: string; missingLibraries?: MissingLibraries }

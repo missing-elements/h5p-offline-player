@@ -52,7 +52,9 @@ player.addEventListener('statechange', (event) => {
 
 player.addEventListener('progress', (event) => {
   const { fraction, phase, entry } = event.detail
-  bar.hidden = false
+  // A download from a host that ignores Range keeps going after the content is up: the bar shows
+  // it, and goes away when it is done.
+  bar.hidden = fraction === 1
   if (fraction === null) bar.removeAttribute('value')
   else bar.value = fraction
 

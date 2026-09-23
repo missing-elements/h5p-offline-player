@@ -198,7 +198,15 @@ class FileHandle implements SourceHandle {
 export async function openSource(
   pkgId: string,
   descriptor: SourceDescriptor,
-  file?: Blob
+  file?: Blob,
+  options: {
+    /**
+     * Open a chunked archive that is still downloading. Only the forward index can address such
+     * a handle — its size is what has arrived so far — so this is for the reader built from that,
+     * never for zip.js, which needs the end of the file.
+     */
+    partial?: boolean
+  } = {}
 ): Promise<SourceHandle> {
   switch (descriptor.type) {
     case 'range-http':
@@ -206,10 +214,10 @@ export async function openSource(
 
     case 'chunked': {
       const meta = await new ChunkStore(pkgId).getArchiveMeta()
-      if (!meta?.complete || meta.size === null) {
+      if (!meta || (!meta.complete && !options.partial)) {
         throw new PlayerError('bad-archive', 'Archive has not finished downloading')
       }
-      return new ChunkedHandle(descriptor, meta.size, pkgId)
+      return new ChunkedHandle(descriptor, meta.size ?? meta.available, pkgId)
     }
 
     case 'file': {

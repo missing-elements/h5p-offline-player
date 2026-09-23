@@ -3,6 +3,7 @@ import { configure } from '@zip.js/zip.js'
 import { ARCHIVE_ENTRY, CHUNK_SIZE } from '../shared/constants'
 import { ChunkStore, QuotaError } from '../shared/chunk-store'
 import { installEvictionPolicy } from '../shared/eviction'
+import { LocalHeaderScanner } from '../shared/forward-index'
 import { packageLockName, packageLockPrefix } from '../shared/locks'
 import {
   PlayerError,
@@ -182,16 +183,51 @@ async function downloadArchive(
   const declared = response.headers.get('content-length')
   const totalSize = declared ? Number(declared) + startOffset : source.size
 
-  await response.body.pipeTo(
+  // Index the archive as it passes: a host that ignores `Range` would otherwise keep every entry
+  // hostage until the central directory arrives, at the very end. The scanner reads the local
+  // headers off the same bytes on their way to the chunk store, and what it has found is
+  // published beside the watermark so the Service Worker can start serving from it.
+  const scanner = new LocalHeaderScanner()
+  if (startOffset > 0) {
+    // A resumed download starts mid-archive; the scanner has to have seen the prefix.
+    await store.readRange(ARCHIVE_ENTRY, { start: 0, end: startOffset - 1 }).pipeTo(
+      new WritableStream({ write: (chunk) => scanner.push(chunk) })
+    )
+  }
+
+  let published = -1
+  let publishing: Promise<void> = Promise.resolve()
+  const publishIndex = (final: boolean) => {
+    if (final) scanner.finish()
+    const snapshot = scanner.snapshot()
+    if (!final && snapshot.entries.length === published) return publishing
+    published = snapshot.entries.length
+    // Serialised: two snapshots racing to the same record could land the older one last.
+    publishing = publishing.then(() => store.setForwardIndex(snapshot))
+    return publishing
+  }
+
+  const indexer = new TransformStream<Uint8Array, Uint8Array>({
+    transform(chunk, controller) {
+      scanner.push(chunk)
+      controller.enqueue(chunk)
+    }
+  })
+
+  await response.body.pipeThrough(indexer).pipeTo(
     createChunkWriter({
       store,
       entry: ARCHIVE_ENTRY,
       totalSize,
       startOffset,
-      onProgress: (loaded) => send({ type: 'progress', pkgId, loaded, total: totalSize })
+      onProgress: (loaded) => {
+        send({ type: 'progress', pkgId, loaded, total: totalSize })
+        void publishIndex(false)
+      }
     }),
     { signal }
   )
+  await publishIndex(true)
 
   const meta = await store.getArchiveMeta()
   send({ type: 'done', pkgId, size: meta?.size ?? meta?.available ?? 0 })
