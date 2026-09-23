@@ -1,5 +1,8 @@
 # @missing-elements/h5p-offline-player
 
+[![npm](https://img.shields.io/npm/v/%40missing-elements%2Fh5p-offline-player)](https://www.npmjs.com/package/@missing-elements/h5p-offline-player)
+[![licence](https://img.shields.io/npm/l/%40missing-elements%2Fh5p-offline-player)](LICENSE)
+
 > **Not production ready.** This is an early release under active development. The API, the
 > worker protocol and the cache layout can still change between versions, and the browser
 > coverage is Chromium first. Try it, report what breaks, but do not put it in front of learners
@@ -21,10 +24,6 @@ The player is three things: the element (`h5p-player.js`, an ES module), a Servi
 (`h5p-sw.js`) and a folder of H5P runtime files (`frame-assets/`). The worker is the one file that
 has to be served from **your own origin**, because browsers refuse to register a worker from
 anywhere else. The other two can come from your bundle or from a CDN.
-
-> The package is being published to npm. Until it lands, build it from source: `git clone`,
-> `npm install`, `npm run build`, and serve `dist/` where the snippets below say the package's
-> files go.
 
 **A · With a bundler** (Vite, webpack 5, Rollup):
 
