@@ -187,13 +187,21 @@ npm run dev     # the demo player page on http://localhost:5173
 npm test        # unit tests plus the browser suite
 npm run build
 npm run normalize -- course.h5p   # rewrite a package so it streams (see above)
+npm run build:demo                # the hosted demo, as Vercel builds it, into dist-demo/
+npm run preview:demo              # serve it locally with the production headers
+npm run demo:content              # rebuild the demo's content packages from their sources
 ```
 
-`npm run dev` serves a player page with sample archives covering each path the player takes: a
-host that honours `Range`, one that does not, 20 MB of deflated media, 20 MB of stored media, an
-archive with hostile entry names, and a file that is not an H5P package at all. `/demo/` is the
-two-line integration, with the other ways to embed it — xAPI, a file from disk, an iframe, two
-players on one page — linked from there.
+`npm run dev` serves the player page with real content — a quiz, an interactive video, an
+accordion and dialog cards, built from H5P hub libraries around text written for this player —
+plus, in dev only, generated test archives under `/fixtures/` covering each path the player
+takes: a host that honours `Range` and one that does not, 20 MB of deflated and of stored media,
+hostile entry names, a file that is not an H5P package. `/demo/` is the two-line integration,
+with the other ways to embed it — xAPI, a file from disk, an iframe, two players on one page —
+linked from there.
+
+The demo site deploys to Vercel from `vercel.json`: the pages, the element, its worker and the
+frame assets as static files, plus one function that plays a host without `Range` support.
 
 Working on the code? Start with [AGENTS.md](AGENTS.md).
 

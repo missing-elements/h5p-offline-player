@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { build } from 'esbuild'
+import { buildMountModule, buildServiceWorker } from './lib/worker-bundle.mjs'
 
 /**
  * Builds the two artefacts Vite's library build cannot produce.
@@ -14,28 +14,8 @@ import { build } from 'esbuild'
 const rootDir = resolve(import.meta.dirname, '..')
 const distDir = resolve(rootDir, 'dist')
 
-const shared = {
-  bundle: true,
-  platform: 'browser',
-  target: 'es2022',
-  minify: true,
-  legalComments: 'none',
-  define: { 'import.meta.env.DEV': 'false' }
-}
-
-await build({
-  ...shared,
-  entryPoints: [resolve(rootDir, 'src/sw/sw-entry.ts')],
-  outfile: resolve(distDir, 'h5p-sw.js'),
-  format: 'iife'
-})
-
-await build({
-  ...shared,
-  entryPoints: [resolve(rootDir, 'src/sw/mount.ts')],
-  outfile: resolve(distDir, 'h5p-sw-mount.js'),
-  format: 'esm'
-})
+await buildServiceWorker(resolve(distDir, 'h5p-sw.js'))
+await buildMountModule(resolve(distDir, 'h5p-sw-mount.js'))
 
 const sizeOf = async (name) => {
   const contents = await readFile(resolve(distDir, name))

@@ -1,0 +1,43 @@
+{
+  "title": "<p>Words this player uses</p>",
+  "mode": "normal",
+  "description": "<p>Six terms from the player&rsquo;s design. Turn a card for the meaning.</p>",
+  "dialogs": [
+    {
+      "text": "<p>Range request</p>",
+      "answer": "<p>An HTTP request for part of a file, such as <code>Range: bytes=0-1023</code>. The player reads a zip&rsquo;s index from its tail with one, and slices stored media out of the archive with more.</p>",
+      "tips": {}
+    },
+    {
+      "text": "<p>Stored, or deflated</p>",
+      "answer": "<p>The two ways a zip keeps a file. <em>Stored</em> is the bytes as they are, readable at any offset. <em>Deflated</em> is compressed, readable only from the front.</p>",
+      "tips": {}
+    },
+    {
+      "text": "<p>Service Worker</p>",
+      "answer": "<p>A script the browser runs between a page and the network. Here it is the file server: it answers the H5P runtime&rsquo;s requests from the archive.</p>",
+      "tips": {}
+    },
+    {
+      "text": "<p>Watermark</p>",
+      "answer": "<p>How far an extraction has got. A request below it is answered at once; one above it waits, and follows the extraction as it moves.</p>",
+      "tips": {}
+    },
+    {
+      "text": "<p>faststart</p>",
+      "answer": "<p>An mp4 whose index, the <code>moov</code> atom, comes before its data, so the first frame decodes from the first kilobytes. Without it, nothing plays until the last byte has arrived.</p>",
+      "tips": {}
+    },
+    {
+      "text": "<p>Chunk store</p>",
+      "answer": "<p>The browser&rsquo;s Cache API, holding an archive or an extracted file in 8&nbsp;MB pieces, so a video can be served while the rest of it is still on its way.</p>",
+      "tips": {}
+    }
+  ],
+  "behaviour": {
+    "enableRetry": true,
+    "disableBackwardsNavigation": false,
+    "scaleTextNotCard": false,
+    "randomCards": false
+  }
+}

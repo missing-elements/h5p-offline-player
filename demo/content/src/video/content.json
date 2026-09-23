@@ -1,0 +1,213 @@
+{
+  "interactiveVideo": {
+    "video": {
+      "files": [
+        {
+          "path": "videos/big-buck-bunny.mp4",
+          "mime": "video/mp4",
+          "copyright": {
+            "license": "CC BY",
+            "version": "3.0",
+            "author": "Blender Foundation",
+            "title": "Big Buck Bunny",
+            "source": "https://peach.blender.org/"
+          }
+        }
+      ],
+      "startScreenOptions": {
+        "title": "Ten seconds of Big Buck Bunny",
+        "hideStartTitle": false,
+        "shortStartDescription": "The clip is stored inside the .h5p and served to the player with Range requests, straight out of the archive."
+      },
+      "textTracks": {
+        "videoTrack": []
+      }
+    },
+    "assets": {
+      "interactions": [
+        {
+          "x": 4,
+          "y": 8,
+          "width": 10,
+          "height": 10,
+          "duration": {
+            "from": 0.5,
+            "to": 4
+          },
+          "libraryTitle": "Label",
+          "action": {
+            "library": "H5P.Nil 1.0",
+            "params": {},
+            "subContentId": "4fdf7a45-83e0-444b-b570-a7a384acc932",
+            "metadata": {
+              "contentType": "Label",
+              "license": "U",
+              "title": "Label"
+            }
+          },
+          "pause": false,
+          "displayType": "button",
+          "buttonOnMobile": false,
+          "label": "<p>Served straight out of the zip</p>",
+          "visuals": {
+            "backgroundColor": "rgb(255, 255, 255)",
+            "boxShadow": true
+          }
+        },
+        {
+          "x": 62,
+          "y": 8,
+          "width": 10,
+          "height": 10,
+          "duration": {
+            "from": 2,
+            "to": 6
+          },
+          "libraryTitle": "Text",
+          "action": {
+            "library": "H5P.Text 1.1",
+            "params": {
+              "text": "<p>Every byte of this clip is fetched from inside the archive when the player asks for it. Seek anywhere: the player answers with the slice that position needs.</p>"
+            },
+            "subContentId": "906679c8-dad3-4c98-bb40-b7a47bee8bcf",
+            "metadata": {
+              "contentType": "Text",
+              "license": "U",
+              "title": "Text"
+            }
+          },
+          "pause": false,
+          "displayType": "button",
+          "buttonOnMobile": false,
+          "label": "",
+          "visuals": {
+            "backgroundColor": "rgb(255, 255, 255)",
+            "boxShadow": true
+          }
+        },
+        {
+          "x": 30,
+          "y": 20,
+          "width": 40,
+          "height": 40,
+          "duration": {
+            "from": 6,
+            "to": 9
+          },
+          "libraryTitle": "Multiple Choice",
+          "action": {
+            "library": "H5P.MultiChoice 1.16",
+            "params": {
+              "question": "<p>How did the player get this video?</p>",
+              "answers": [
+                {
+                  "text": "<div>It downloaded the whole package first</div>",
+                  "correct": false,
+                  "tipsAndFeedback": {
+                    "tip": "",
+                    "chosenFeedback": "It did not have to: the video is stored in the archive, so any part of it can be read directly.",
+                    "notChosenFeedback": ""
+                  }
+                },
+                {
+                  "text": "<div>It read the bytes it needed, when they were needed</div>",
+                  "correct": true,
+                  "tipsAndFeedback": {
+                    "tip": "",
+                    "chosenFeedback": "Yes. Stored media is sliced out of the archive with Range requests.",
+                    "notChosenFeedback": ""
+                  }
+                },
+                {
+                  "text": "<div>It streamed it from a video site</div>",
+                  "correct": false,
+                  "tipsAndFeedback": {
+                    "tip": "",
+                    "chosenFeedback": "The clip is inside the .h5p file.",
+                    "notChosenFeedback": ""
+                  }
+                }
+              ],
+              "behaviour": {
+                "type": "single",
+                "singlePoint": true,
+                "randomAnswers": true,
+                "enableRetry": true,
+                "enableSolutionsButton": true,
+                "enableCheckButton": true,
+                "showSolutionsRequiresInput": true,
+                "confirmCheckDialog": false,
+                "confirmRetryDialog": false,
+                "autoCheck": false,
+                "passPercentage": 100,
+                "showScorePoints": true
+              },
+              "overallFeedback": [
+                {
+                  "from": 0,
+                  "to": 100,
+                  "feedback": ""
+                }
+              ]
+            },
+            "subContentId": "8da55525-3c0c-46a5-a78b-69a31f24933c",
+            "metadata": {
+              "contentType": "Multiple Choice",
+              "license": "U",
+              "title": "Multiple Choice"
+            }
+          },
+          "pause": true,
+          "displayType": "button",
+          "buttonOnMobile": false,
+          "label": "",
+          "visuals": {
+            "backgroundColor": "rgb(255, 255, 255)",
+            "boxShadow": true
+          }
+        }
+      ],
+      "bookmarks": [],
+      "endscreens": []
+    },
+    "summary": {
+      "task": {
+        "library": "H5P.Summary 1.10",
+        "params": {
+          "intro": "Choose the correct statement.",
+          "summaries": [
+            {
+              "subContentId": "5b10d6ae-4230-4685-b8fa-a14e83213d36",
+              "summary": [
+                "The player read this clip out of the zip archive with Range requests.",
+                "The player uploaded this clip to a server before playing it."
+              ],
+              "tip": ""
+            }
+          ],
+          "overallFeedback": [
+            {
+              "from": 0,
+              "to": 100
+            }
+          ]
+        },
+        "subContentId": "c1acbf25-a574-4ae2-894e-7d7d03fa173b",
+        "metadata": {
+          "contentType": "Summary",
+          "license": "U",
+          "title": "Summary"
+        }
+      },
+      "displayAt": 3
+    }
+  },
+  "override": {
+    "autoplay": false,
+    "loop": false,
+    "showBookmarksmenuOnLoad": false,
+    "showRewind10": false,
+    "preventSkippingMode": "none",
+    "deactivateSound": false
+  }
+}

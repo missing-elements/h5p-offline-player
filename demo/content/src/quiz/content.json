@@ -1,0 +1,204 @@
+{
+  "introPage": {
+    "showIntroPage": true,
+    "title": "<p>Do you know what just happened?</p>",
+    "startButtonText": "Start",
+    "introduction": "<p>Four short questions about the player you are using right now. Every file in this quiz came out of a zip archive that was never unpacked.</p>"
+  },
+  "progressType": "dots",
+  "passPercentage": 50,
+  "disableBackwardsNavigation": false,
+  "randomQuestions": false,
+  "questions": [
+    {
+      "library": "H5P.MultiChoice 1.16",
+      "params": {
+        "question": "<p>Where was this quiz unpacked?</p>",
+        "answers": [
+          {
+            "text": "<div>On the server that hosts it</div>",
+            "correct": false,
+            "tipsAndFeedback": {
+              "tip": "",
+              "chosenFeedback": "There is no server-side code at all. The host is a plain file server.",
+              "notChosenFeedback": ""
+            }
+          },
+          {
+            "text": "<div>In your browser, straight out of the zip</div>",
+            "correct": true,
+            "tipsAndFeedback": {
+              "tip": "",
+              "chosenFeedback": "Right. The archive is read in place, and a Service Worker serves its files to the H5P runtime.",
+              "notChosenFeedback": ""
+            }
+          },
+          {
+            "text": "<div>Nowhere: an H5P package is not an archive</div>",
+            "correct": false,
+            "tipsAndFeedback": {
+              "tip": "",
+              "chosenFeedback": "It is. A <code>.h5p</code> file is a zip with a manifest, the content and its libraries.",
+              "notChosenFeedback": ""
+            }
+          },
+          {
+            "text": "<div>In a cloud service the player calls</div>",
+            "correct": false,
+            "tipsAndFeedback": {
+              "tip": "",
+              "chosenFeedback": "Nothing leaves the browser. That is the point.",
+              "notChosenFeedback": ""
+            }
+          }
+        ],
+        "behaviour": {
+          "type": "single",
+          "singlePoint": true,
+          "randomAnswers": true,
+          "enableRetry": true,
+          "enableSolutionsButton": true,
+          "enableCheckButton": true,
+          "showSolutionsRequiresInput": true,
+          "confirmCheckDialog": false,
+          "confirmRetryDialog": false,
+          "autoCheck": false,
+          "passPercentage": 100,
+          "showScorePoints": true
+        },
+        "overallFeedback": [
+          {
+            "from": 0,
+            "to": 100,
+            "feedback": ""
+          }
+        ]
+      },
+      "subContentId": "8837f719-5886-4dc3-8681-08631dccacbe",
+      "metadata": {
+        "contentType": "Where was this quiz unpacked?",
+        "license": "U",
+        "title": "Where was this quiz unpacked?"
+      }
+    },
+    {
+      "library": "H5P.TrueFalse 1.8",
+      "params": {
+        "question": "<p>A Service Worker is serving this quiz&rsquo;s scripts, styles and images to the H5P runtime right now.</p>",
+        "correct": "true",
+        "behaviour": {
+          "enableRetry": true,
+          "enableSolutionsButton": true,
+          "enableCheckButton": true,
+          "confirmCheckDialog": false,
+          "confirmRetryDialog": false,
+          "autoCheck": false,
+          "feedbackOnCorrect": "It answers every request the runtime makes under a virtual path, from the archive.",
+          "feedbackOnWrong": "It is. The runtime asks for URLs, and the worker answers them from the archive."
+        }
+      },
+      "subContentId": "fea59657-eed7-490b-8e15-37bf614b9392",
+      "metadata": {
+        "contentType": "A Service Worker serves this quiz",
+        "license": "U",
+        "title": "A Service Worker serves this quiz"
+      }
+    },
+    {
+      "library": "H5P.Blanks 1.14",
+      "params": {
+        "text": "<p>Fill in the missing words.</p>",
+        "questions": [
+          "<p>A video that is *stored* in the archive can be served with a single *Range* request, and plays and seeks at once.</p>",
+          "<p>A video that is *compressed/deflated* has to be inflated from the *front/start/beginning*, so the player serves the part that exists and lets the rest follow.</p>"
+        ],
+        "behaviour": {
+          "enableRetry": true,
+          "enableSolutionsButton": true,
+          "enableCheckButton": true,
+          "autoCheck": false,
+          "caseSensitive": false,
+          "showSolutionsRequiresInput": true,
+          "separateLines": true,
+          "confirmCheckDialog": false,
+          "confirmRetryDialog": false,
+          "acceptSpellingErrors": true
+        },
+        "overallFeedback": [
+          {
+            "from": 0,
+            "to": 100,
+            "feedback": ""
+          }
+        ]
+      },
+      "subContentId": "1ef16e9f-be5a-4ac9-a7fb-a5b82452fc23",
+      "metadata": {
+        "contentType": "Stored and compressed",
+        "license": "U",
+        "title": "Stored and compressed"
+      }
+    },
+    {
+      "library": "H5P.DragText 1.10",
+      "params": {
+        "taskDescription": "<p>Three parts make up the player. Drag each one to what it does.</p>",
+        "textField": "The *page* holds the file you picked and owns the workers.\nThe *Service Worker* answers the runtime&rsquo;s requests from the archive.\nThe *Jobs worker* downloads and inflates, for as long as the tab lives.",
+        "distractors": "*server*",
+        "behaviour": {
+          "enableRetry": true,
+          "enableSolutionsButton": true,
+          "enableCheckButton": true,
+          "instantFeedback": false
+        },
+        "overallFeedback": [
+          {
+            "from": 0,
+            "to": 100,
+            "feedback": ""
+          }
+        ]
+      },
+      "subContentId": "e0a7fde1-a43e-447d-ad65-070925f55f89",
+      "metadata": {
+        "contentType": "Who does what",
+        "license": "U",
+        "title": "Who does what"
+      }
+    }
+  ],
+  "endGame": {
+    "showResultPage": true,
+    "showSolutionButton": true,
+    "showRetryButton": true,
+    "noResultMessage": "Finished",
+    "message": "Your result:",
+    "scoreBarLabel": "You got @finals out of @totals points",
+    "overallFeedback": [
+      {
+        "from": 0,
+        "to": 49,
+        "feedback": "Have a look at the &ldquo;How it works&rdquo; example, then try again."
+      },
+      {
+        "from": 50,
+        "to": 99,
+        "feedback": "Most of it. The rest is in the &ldquo;How it works&rdquo; example."
+      },
+      {
+        "from": 100,
+        "to": 100,
+        "feedback": "You could have written the README."
+      }
+    ],
+    "solutionButtonText": "Show solution",
+    "retryButtonText": "Retry",
+    "finishButtonText": "Finish",
+    "submitButtonText": "Submit",
+    "showAnimations": false,
+    "skippable": false
+  },
+  "override": {
+    "checkButton": true
+  }
+}

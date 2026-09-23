@@ -337,7 +337,9 @@ h5p-player {
 .embed-frame {
   display: block;
   width: 100%;
-  height: clamp(20rem, 60vh, 32rem);
+  /* A starting height only: the embedded page reports its own, and the listener applies it. */
+  height: 20rem;
+  transition: height 0.15s ease-out;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);

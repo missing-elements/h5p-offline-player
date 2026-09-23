@@ -1,6 +1,7 @@
 import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { resolve, relative, sep } from 'node:path'
 import { BlobWriter, TextReader, Uint8ArrayReader, ZipWriter } from '@zip.js/zip.js'
+import { GENERATED_FIXTURES } from './lib/fixture-names.mjs'
 
 /**
  * Builds the `.h5p` archives the browser tests play. They are generated rather than committed
@@ -63,24 +64,10 @@ const randomBytes = () => {
   return bytes
 }
 
-/**
- * Only the archives this script owns are cleared. `public/fixtures/` is where a real `.h5p` gets
- * dropped to try it against the demo, and wiping the directory would delete it on the next
- * `npm run dev`.
- */
-const GENERATED = [
-  'basic.h5p',
-  'large-deflated.h5p',
-  'large-stored.h5p',
-  'streamed.h5p',
-  'traversal.h5p',
-  'not-h5p.h5p',
-  'content-only.h5p',
-  'needs-libraries.h5p',
-  'libraries.h5p',
-  'unversioned.h5p',
-  'corrupt.h5p'
-]
+// Only the archives this script owns are cleared. `public/fixtures/` is where a real `.h5p`
+// gets dropped to try against the demo, and wiping the directory would delete it on the next
+// `npm run dev`.
+const GENERATED = GENERATED_FIXTURES
 
 await mkdir(outDir, { recursive: true })
 for (const name of GENERATED) {

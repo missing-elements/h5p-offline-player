@@ -50,6 +50,14 @@ scripts/                  sync-h5p-assets, build-workers, copy-frame-assets, bui
                           mp4 remux and policy)
 demo/ + index.html        the hosted player page; demo/index.html is the examples index, the rest
                           are the individual embedding demos, all sharing demo/player-page.css
+embed.html                the embeddable page, /embed: the element alone, driven by the query
+                          string (demo/embed-page.js); demo/embed.html is the site that embeds it
+demo/content/             the packages the demo plays, committed; built from demo/content/src/ by
+                          scripts/build-demo-content.mjs
+api/no-range.js           the Vercel function that stands in for a host without Range on the demo
+vite.plugins.ts           the dev, preview and build plugins both Vite configs share
+vite.demo.config.ts       the hosted demo: the pages plus dist/'s layout at the site root -> dist-demo/
+vercel.json               the deployment: build command, the /no-range rewrite, caching and security headers
 tests/unit/               pure logic, node environment
 tests/browser/            the real element against the real worker, chromium via vitest browser mode
 tests/fixtures/src/       the source of the generated .h5p archives
@@ -68,6 +76,9 @@ npm run test:browser
 npm run typecheck      # tsc -b plus the tests project
 npm run build          # types, element, both workers, frame assets
 npm run normalize -- course.h5p   # rewrite a package so it streams: media stored, mp4 index first
+npm run build:demo     # the hosted demo into dist-demo/, what Vercel runs
+npm run demo:content   # rebuild demo/content/*.h5p from their sources; needs the H5P hub
+npm run preview:demo   # serves dist-demo/ with the production headers and the /no-range route
 ```
 
 `npm run dev` and `npm test` both run `prepare:dev` first, which vendors the h5p-standalone
@@ -378,6 +389,9 @@ Three things about the shadow CSS that are easy to undo by accident:
   resolves to auto.
 - **`:host([hidden])` needs `!important`**, for the same cascade reason: a host's `display` beats
   the shadow tree's, and the UA `[hidden]` rule loses to both.
+- **The styles are adopted (`adoptedStyleSheets`), not an inline `<style>`.** A host page with
+  `style-src 'self'` blocks the inline element silently and the frame drops to 150px; the
+  constructable sheet is CSSOM and passes. See the hosted-demo section.
 
 H5P's fullscreen targets the frame, which the browser sizes itself — the iframe matches
 `:fullscreen`, the host does not. `:host(:fullscreen)` is there for a host page calling
@@ -414,6 +428,7 @@ Three artefacts, built three different ways, because they are consumed three dif
 | `dist/h5p-sw.js` | esbuild, IIFE | Registered by URL; has to run on a site with no build step |
 | `dist/h5p-sw-mount.js` | esbuild, ESM | For hosts that enforce one worker per origin |
 | `dist/frame-assets/` | copied verbatim | h5p-standalone, unmodified |
+| `dist-demo/` | `scripts/build-demo.mjs` | The hosted demo: the pages, and `dist/`'s layout at the site root |
 
 The Jobs worker is not an artefact: `vite.config.ts` bundles it with esbuild into a string behind
 `virtual:h5p-jobs-worker`, and the element spawns it from a `blob:` URL. One fewer file for a host
@@ -424,6 +439,71 @@ In dev the same plugin file serves the Service Worker at any path ending in `/h5
 bundles both workers behind Vite's back**, so the plugin has a `handleHotUpdate` that invalidates
 the virtual module when anything under `src/` changes. Without it the page keeps running a worker
 bundle that no longer matches the source — a genuinely confusing hour.
+
+## The hosted demo
+
+`vercel.json` deploys `dist-demo/` — the output of `npm run build:demo` — as a static site plus
+one function. The site root has the layout of the package's `dist/`: `h5p-player.js` unhashed
+(an explicit entry of `vite.demo.config.ts`, named without a hash), with `h5p-sw.js` and
+`frame-assets/` beside it, so the pages set neither `sw` nor `assets-base` and the element finds
+both the way it does in any app that serves `dist/` statically. The worker's scope is therefore
+`/h5p/`, and a request that reaches Vercel under it is a 404 rather than a page — the
+SPA-fallback trap described above cannot happen there.
+
+- **`/no-range/<fixture>` is a function, `api/no-range.js`.** Vercel's static files honour
+  `Range`, so the host-that-ignores-Range case — the common one in the wild — would otherwise not
+  exist on the demo at all. The function fetches the fixture back from the deployment's own
+  static files and answers `200` with the whole body and no `Accept-Ranges`. Behind deployment
+  protection that internal fetch gets the login page; `VERCEL_AUTOMATION_BYPASS_SECRET` on the
+  project makes it send the bypass header. The `?throttle=` pacing is dev and preview only.
+- **The CSP header is real, and it reaches more than the pages.** `connect-src 'self' https:`
+  because the page and the blob Jobs worker fetch whatever package URL a visitor pastes;
+  `worker-src blob:` for that worker; `frame-src 'self'` for the frame. The same header lands on
+  `/h5p-sw.js` and so becomes the Service Worker's own policy, which is the second reason
+  `connect-src` has to cover the package hosts. It does not reach the frame document — the worker
+  synthesizes that response, and its policy is the `<meta>` in `frame-document.ts`. `vite
+  preview` applies the same headers (`vite.demo.config.ts` reads them out of `vercel.json`), so a
+  violation shows up locally before it ships.
+- **The element's shadow styles are a constructable stylesheet because of that header.** Under
+  `style-src 'self'` an inline `<style>` in the shadow root is blocked without a word, and the
+  frame collapses to an iframe's intrinsic height with the content otherwise working — found by
+  driving the built demo under the production CSP. `CSSStyleSheet.replaceSync` is CSSOM and is
+  not subject to it; the `<style>` element remains only as the fallback for a browser without
+  `adoptedStyleSheets`.
+- **`/embed` is Setup C, and it is a page of its own.** The element alone, `auto-resize`, and
+  the query string for `src`, `libraries`, `preload` and `xapi`. Three decisions in
+  `demo/embed-page.js`: it speaks H5P's resizer protocol *upward* — `hello`, then `resize` with
+  `scrollHeight` — so a site that already includes h5p.org's `h5p-resizer.js` for its h5p.org
+  embeds resizes this frame with no code of its own; it relays xAPI only when `xapi=` names the
+  parent's origin and posts to that origin only, which is the opt-in the frame-to-element channel
+  cannot have; and it detects the Safari case by the `no-worker` error inside a frame rather than
+  by sniffing the user agent, and answers with a `target="_top"` link to itself. The height it
+  reports is the body's own, not `documentElement.scrollHeight`, for the reason the element
+  measures `#h5p-root` and not the document. `/embed` without `.html` is a Vercel rewrite in
+  production and Vite's own html fallback locally.
+- **What a public demo means.** The frame is same-origin by design, and a package's libraries
+  are JavaScript, so `/?src=<any url>` runs a stranger's code on the demo's origin. That is the
+  architecture — a host chooses what it plays — not a flaw in it, and it is why the demo origin
+  must hold nothing: no cookies, no accounts, no storage worth reading.
+- **Caching.** Hashed files under `/assets/` are immutable; `h5p-sw.js` is `no-cache`;
+  `frame-assets/` and `fixtures/` revalidate hourly. Fixtures also carry permissive CORS with
+  `Range` allowed and `Content-Range` exposed, so another player instance can be pointed at them.
+- **The demo plays real content; the fixtures never ship.** `public/fixtures/` is the test
+  suite's stub library saying "Served from the archive, never extracted to disk", which is right
+  for a test and wrong for a visitor. The site plays four packages from `demo/content/`: a
+  Question Set, an Interactive Video on a ten-second Big Buck Bunny clip, an Accordion on how the
+  player works, and Dialog Cards for its vocabulary. They are built by
+  `scripts/build-demo-content.mjs` from `demo/content/src/<name>/` — our `content.json` and a
+  `manifest.json` naming the content type — with the libraries taken from the H5P hub's bundle
+  for that type, exactly what `libraries="hub"` fetches at runtime. The script keeps only the
+  dependency closure the content needs (walked from `library.json`, plus every sub-content
+  library the params name), drops the editor libraries the hub ships, and runs the result through
+  the normalizer, so each package is also an example of what the normalizer produces. The outputs
+  are committed, 5.2 MB for the four, because a deploy should need neither the hub nor the video
+  host; `npm run demo:content` regenerates them. Provenance: the libraries are MIT, the text is
+  ours under CC0, and the clip is Big Buck Bunny, © Blender Foundation, CC BY 3.0, credited in the
+  package metadata and on the player page. The `/no-range/` route serves this content on the site,
+  and this content or a fixture locally, which is what the browser tests need.
 
 ## Testing
 

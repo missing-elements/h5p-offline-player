@@ -49,14 +49,20 @@ Download `https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player/dist
 
 ## Setup C — iframe embed (nothing on the host)
 
-For sites that cannot host even one file, embed the hosted player page:
+For sites that cannot host even one file, embed the player page:
 
 ```html
-<iframe src="https://player.example/embed?src=https://host.example/course.h5p"
-        allowfullscreen></iframe>
+<iframe src="https://player.example/embed?src=https://host.example/course.h5p&xapi=https://your-site.example"
+        allow="fullscreen" style="width: 100%; border: 0"></iframe>
 ```
 
-Storage lives on the player's origin, partitioned per embedding site. Safari blocks Service Workers in cross-origin iframes and the player cannot run without one, so on Safari the embed shows an "Open player" link to the page itself.
+Query parameters: `src` (required), `libraries` (`hub` or a URL, as the attribute), `preload=auto`, and `xapi`, your page's origin.
+
+**Sizing.** The page speaks H5P's resizer protocol upward — the `hello` / `resize` exchange h5p.org's embed code uses — so the `h5p-resizer.js` that code includes resizes this iframe as it is. Without it, answer the messages yourself: reply to `{ context: 'h5p', action: 'hello' }` with the same message, and on `{ context: 'h5p', action: 'resize', scrollHeight }` set the iframe's height.
+
+**xAPI.** Relayed to the parent only when `xapi=` names the parent's origin, and posted to that origin only, as `{ context: 'h5p-offline-player', action: 'xapi', verb, statement }` and, at the end, `action: 'finished'` with the final statement. Check `event.origin` against the player's origin and `event.source` against your iframe before trusting one.
+
+**Limits.** Storage lives on the player's origin, partitioned per embedding site, so nothing is shared between two sites that embed the same package. Safari blocks Service Workers in cross-origin iframes and the player cannot run without one: there the embedded page shows a link that opens the player on its own instead of the content. The player's origin runs whatever package it is given, so it must hold nothing else — no accounts, no cookies.
 
 ## Element API
 

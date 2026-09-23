@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>h5p-offline-player — xAPI</title>
+    <link rel="icon" type="image/svg+xml" href="/demo/favicon.svg" />
     <link rel="stylesheet" href="/demo/player-page.css" />
     <script type="module" src="/src/h5p-offline-player.ts"></script>
   </head>
@@ -21,11 +22,11 @@
       <h1>xAPI</h1>
       <p class="lede">
         Every statement the content emits arrives as a DOM event. Nothing is stored and nothing is
-        posted anywhere: if these should reach an LRS, this listener is where that happens. Press
-        <strong>Complete</strong> in the content below.
+        posted anywhere: if these should reach an LRS, this listener is where that happens. Answer
+        a question below and watch the statements arrive.
       </p>
 
-      <h5p-player src="/fixtures/basic.h5p" auto-resize></h5p-player>
+      <h5p-player src="/demo/content/quiz.h5p" auto-resize></h5p-player>
 
       <h2>Statements</h2>
       <pre class="log" id="log"></pre>

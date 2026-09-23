@@ -1,6 +1,8 @@
 node_modules
 dist
+dist-demo
 types
+.vercel
 
 # Generated: `npm run sync:assets` vendors the h5p-standalone runtime here, and
 # `npm run fixtures` builds the test archives here. Both are reproducible from source.

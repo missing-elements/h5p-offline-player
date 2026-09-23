@@ -1,0 +1,20 @@
+{
+  "title": "Ten seconds of Big Buck Bunny",
+  "mainLibrary": "H5P.InteractiveVideo",
+  "license": "CC BY",
+  "licenseVersion": "3.0",
+  "authors": [
+    {
+      "name": "Blender Foundation",
+      "role": "Originator"
+    },
+    {
+      "name": "missing-elements",
+      "role": "Author"
+    }
+  ],
+  "source": "https://peach.blender.org/",
+  "fetch": {
+    "videos/big-buck-bunny.mp4": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4"
+  }
+}

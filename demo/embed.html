@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>h5p-offline-player — iframe embed</title>
+    <link rel="icon" type="image/svg+xml" href="/demo/favicon.svg" />
     <link rel="stylesheet" href="/demo/player-page.css" />
   </head>
 
@@ -20,44 +21,71 @@
       <h1>Embedding the player page</h1>
       <p class="lede">
         For a site that cannot host even one file. The player runs on its own origin, so a hostile
-        archive reaches the player's data and not the embedding site's. Storage is partitioned per
-        embedding site.
+        archive reaches the player&rsquo;s data and not the embedding site&rsquo;s, and storage is
+        partitioned per embedding site. The embedding page hears what it asks for: the frame&rsquo;s
+        height always, and the xAPI statements when the address names the page&rsquo;s own origin.
       </p>
 
-      <p class="message hint" id="safari-note" hidden>
-        Safari blocks Service Workers in cross-origin iframes and the player cannot run without
-        one, so on Safari the embed degrades to a link.
-      </p>
-
-      <iframe
-        id="embed"
-        title="H5P player"
-        class="embed-frame"
-        src="/?src=/fixtures/basic.h5p"
-        allow="fullscreen"
-      ></iframe>
+      <iframe id="embed" title="H5P player" class="embed-frame" allow="fullscreen"></iframe>
 
       <h2>Markup</h2>
-      <pre class="code">&lt;iframe src="https://player.example/embed?src=https://host.example/course.h5p"
-        allow="fullscreen"&gt;&lt;/iframe&gt;</pre>
+      <pre class="code">&lt;iframe src="https://player.example/embed?src=https://host.example/course.h5p&amp;xapi=https://your-site.example"
+        allow="fullscreen" style="width: 100%; border: 0"&gt;&lt;/iframe&gt;
+
+&lt;!-- Sizing: the page speaks H5P's resizer protocol upward, so the script
+     h5p.org's own embed code includes resizes this frame as it is&hellip; --&gt;
+&lt;script src="https://h5p.org/sites/all/modules/h5p/library/js/h5p-resizer.js"&gt;&lt;/script&gt;
+
+&lt;!-- &hellip;or answer it yourself, and hear the statements: --&gt;
+&lt;script&gt;
+  const frame = document.querySelector('iframe')
+  addEventListener('message', ({ source, origin, data }) =&gt; {
+    if (source !== frame.contentWindow || origin !== 'https://player.example') return
+    if (data.context === 'h5p' &amp;&amp; data.action === 'hello') source.postMessage({ context: 'h5p', action: 'hello' }, origin)
+    if (data.context === 'h5p' &amp;&amp; data.action === 'resize') frame.style.height = data.scrollHeight + 'px'
+    if (data.context === 'h5p-offline-player' &amp;&amp; data.action === 'xapi') console.log(data.verb, data.statement)
+  })
+&lt;/script&gt;</pre>
+
+      <h2>What this page received</h2>
+      <pre class="log" id="log"></pre>
+
+      <p class="message hint">
+        Safari does not give a cross-origin iframe a Service Worker, and the player cannot run
+        without one. There the embedded page shows a link that opens the player on its own.
+      </p>
 
       <footer><a href="/demo/">All examples</a> · <a href="/">Player page</a></footer>
     </main>
 
     <script type="module">
-      // A cross-origin iframe on Safari never gets a controller, so the embed cannot work there.
-      // Detecting the engine is the honest check: the failure is a policy, not a missing API.
-      const isWebKit =
-        /^((?!chrome|android).)*safari/i.test(navigator.userAgent) &&
-        !/chrome|chromium|edg/i.test(navigator.userAgent)
-
-      if (isWebKit) {
-        const frame = document.querySelector('#embed')
-        const link = document.createElement('p')
-        link.innerHTML = '<a href="/?src=/fixtures/basic.h5p">Open the player</a>'
-        frame.replaceWith(link)
-        document.querySelector('#safari-note').hidden = false
+      const frame = document.querySelector('#embed')
+      const log = document.querySelector('#log')
+      const write = (line) => {
+        const stamp = new Date().toLocaleTimeString([], { hour12: false })
+        log.textContent = `${stamp}  ${line}\n${log.textContent}`.slice(0, 20000)
       }
+
+      // The embedding site names itself, so the relay goes to this origin and to no other.
+      frame.src = `/embed?src=${encodeURIComponent('/demo/content/quiz.h5p')}&xapi=${encodeURIComponent(location.origin)}`
+
+      addEventListener('message', ({ source, origin, data }) => {
+        if (source !== frame.contentWindow || origin !== location.origin || !data) return
+        if (data.context === 'h5p') {
+          if (data.action === 'hello') source.postMessage({ context: 'h5p', action: 'hello' }, origin)
+          if (data.action === 'resize') {
+            frame.style.height = `${data.scrollHeight}px`
+            write(`resize  ${data.scrollHeight}px`)
+          }
+        }
+        if (data.context === 'h5p-offline-player') {
+          if (data.action === 'xapi') write(`xapi  ${data.verb ?? '(no verb)'}`)
+          if (data.action === 'finished') {
+            const result = data.statement?.result
+            write(`finished  score ${result?.score?.raw ?? '?'} / ${result?.score?.max ?? '?'}`)
+          }
+        }
+      })
     </script>
   </body>
 </html>

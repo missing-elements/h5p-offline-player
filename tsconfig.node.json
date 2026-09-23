@@ -12,5 +12,5 @@
     "outDir": "./types/node",
     "skipLibCheck": true
   },
-  "include": ["vite.config.ts", "scripts/**/*.mjs"]
+  "include": ["vite.config.ts", "vite.plugins.ts", "vite.demo.config.ts", "scripts/**/*.mjs"]
 }

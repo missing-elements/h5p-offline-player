@@ -1,0 +1,11 @@
+{
+  "title": "How this player works",
+  "mainLibrary": "H5P.Accordion",
+  "license": "CC0 1.0",
+  "authors": [
+    {
+      "name": "missing-elements",
+      "role": "Author"
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "hTag": "h3",
+  "panels": [
+    {
+      "title": "Nothing is unpacked on a server",
+      "content": {
+        "library": "H5P.AdvancedText 1.1",
+        "params": {
+          "text": "<p>The package you are reading is a <code>.h5p</code> file, which is a zip archive. It sits on a plain file host and is <strong>read in place</strong>: the player fetches the archive&rsquo;s index from its tail with one <code>Range</code> request, and then asks for exactly the bytes each file needs.</p><p>There is no server-side code, no extraction step, and nothing to install on the host beyond static files.</p>"
+        },
+        "subContentId": "2738db74-20c8-4b01-8142-455db90097b8",
+        "metadata": {
+          "contentType": "Text",
+          "license": "U",
+          "title": "Nothing is unpacked on a server"
+        }
+      }
+    },
+    {
+      "title": "A Service Worker is the file server",
+      "content": {
+        "library": "H5P.AdvancedText 1.1",
+        "params": {
+          "text": "<p>The H5P runtime expects to load scripts, styles and media from URLs. A Service Worker answers those URLs from the archive, so to the runtime this looks like an ordinary H5P site.</p><p>The worker keeps no state of its own. A browser may stop it between two requests, and it rebuilds what it needs from a small record in IndexedDB each time.</p>"
+        },
+        "subContentId": "11a1a127-af35-4c80-a5a3-a5a129ca1c51",
+        "metadata": {
+          "contentType": "Text",
+          "license": "U",
+          "title": "A Service Worker is the file server"
+        }
+      }
+    },
+    {
+      "title": "Long work runs beside the page",
+      "content": {
+        "library": "H5P.AdvancedText 1.1",
+        "params": {
+          "text": "<p>Downloading an archive from a host that ignores <code>Range</code>, or inflating a large compressed video, can take minutes. A Service Worker is not allowed to run that long, so a second worker owned by the page does it and hands the result over in 8&nbsp;MB pieces through the browser&rsquo;s Cache API.</p><p>While that download is still running, the player already indexes the archive from the local headers as they arrive, and starts the content as soon as its libraries are in.</p>"
+        },
+        "subContentId": "4774fea8-aba6-463d-b5f0-a9002b7ec2e0",
+        "metadata": {
+          "contentType": "Text",
+          "license": "U",
+          "title": "Long work runs beside the page"
+        }
+      }
+    },
+    {
+      "title": "Video starts before it has arrived",
+      "content": {
+        "library": "H5P.AdvancedText 1.1",
+        "params": {
+          "text": "<p>A video that is <em>stored</em> in the zip is served with <code>Range</code> requests straight out of the archive, so it plays and seeks at once. One that is <em>compressed</em> has to be inflated from the front; the player serves the prefix that exists and lets the rest follow.</p><p>The one case nothing can shorten is a compressed mp4 whose index sits at its end. The repository ships a script that rewrites such a package once, storing the media and moving the index to the front.</p>"
+        },
+        "subContentId": "311b7c07-d269-4061-a081-4d48bf4fd1e9",
+        "metadata": {
+          "contentType": "Text",
+          "license": "U",
+          "title": "Video starts before it has arrived"
+        }
+      }
+    },
+    {
+      "title": "Hostile archives are expected",
+      "content": {
+        "library": "H5P.AdvancedText 1.1",
+        "params": {
+          "text": "<p>Any zip can be handed to this player, so entry names that try to escape the package root are rejected rather than repaired, every file is served with the right <code>Content-Type</code>, and the frame the content runs in carries a Content Security Policy that names the few origins real content types reach.</p>"
+        },
+        "subContentId": "bcda8546-c3ce-4f8b-96ef-556377fc86b4",
+        "metadata": {
+          "contentType": "Text",
+          "license": "U",
+          "title": "Hostile archives are expected"
+        }
+      }
+    }
+  ]
+}

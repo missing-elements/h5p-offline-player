@@ -1,0 +1,11 @@
+{
+  "title": "Do you know what just happened?",
+  "mainLibrary": "H5P.QuestionSet",
+  "license": "CC0 1.0",
+  "authors": [
+    {
+      "name": "missing-elements",
+      "role": "Author"
+    }
+  ]
+}

@@ -8,6 +8,7 @@
       name="description"
       content="Browser-only H5P player. Plays a .h5p archive from a URL or from disk, with no server-side extraction."
     />
+    <link rel="icon" type="image/svg+xml" href="/demo/favicon.svg" />
     <link rel="stylesheet" href="/demo/player-page.css" />
     <script type="module" src="/src/h5p-offline-player.ts"></script>
     <script type="module" src="/demo/player-page.js"></script>
@@ -53,14 +54,11 @@
       </label>
 
       <div class="samples">
-        <button type="button" data-src="/fixtures/basic.h5p">Basic</button>
-        <button type="button" data-src="/no-range/basic.h5p">Host without Range</button>
-        <button type="button" data-src="/fixtures/large-deflated.h5p">20 MB, deflated</button>
-        <button type="button" data-src="/fixtures/large-stored.h5p">20 MB, stored</button>
-        <button type="button" data-src="/fixtures/traversal.h5p">Hostile entry names</button>
-        <button type="button" data-src="/fixtures/content-only.h5p">Export without libraries</button>
-        <button type="button" data-src="/fixtures/needs-libraries.h5p" data-libraries="/fixtures/libraries.h5p">Stripped export + bundle</button>
-        <button type="button" data-src="/fixtures/not-h5p.h5p">Not an H5P package</button>
+        <button type="button" data-src="/demo/content/quiz.h5p">Quiz</button>
+        <button type="button" data-src="/demo/content/video.h5p">Interactive video</button>
+        <button type="button" data-src="/demo/content/how-it-works.h5p">How it works</button>
+        <button type="button" data-src="/demo/content/glossary.h5p">Glossary cards</button>
+        <button type="button" data-src="/no-range/video.h5p">Interactive video · host without Range</button>
       </div>
 
       <div class="status">
@@ -85,6 +83,10 @@
         <a href="/demo/local-file.html">local file</a> ·
         <a href="/demo/embed.html">iframe embed</a> ·
         <a href="/demo/two-players.html">two on one page</a>
+        <br />
+        The sample content was written for this player; its libraries come from the
+        <a href="https://h5p.org/content-types-and-applications">H5P hub</a> (MIT). The video is
+        <a href="https://peach.blender.org/">Big Buck Bunny</a>, © Blender Foundation, CC BY 3.0.
       </footer>
     </main>
   </body>
