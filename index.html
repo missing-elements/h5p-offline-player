@@ -3,13 +3,43 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>@missing-elements/h5p-offline-player</title>
-    <meta
-      name="description"
-      content="Browser-only H5P player. Plays a .h5p archive from a URL or from disk, with no server-side extraction."
-    />
+    <title>h5p-offline-player — play H5P packages in the browser, no server</title>
+    <meta name="description" content="A browser-only H5P player as one web component. It plays a .h5p file from a URL or from disk with no server-side extraction: the archive is read in place and a Service Worker serves it to the H5P runtime." />
+    <link rel="canonical" href="%SITE_URL%/" />
+    <meta name="theme-color" content="#2f6df6" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="h5p-offline-player" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:title" content="h5p-offline-player — play H5P packages in the browser, no server" />
+    <meta property="og:description" content="A browser-only H5P player as one web component. It plays a .h5p file from a URL or from disk with no server-side extraction: the archive is read in place and a Service Worker serves it to the H5P runtime." />
+    <meta property="og:url" content="%SITE_URL%/" />
+    <meta property="og:image" content="%SITE_URL%/demo/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="h5p-offline-player: play H5P packages in the browser, with no server" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="h5p-offline-player — play H5P packages in the browser, no server" />
+    <meta name="twitter:description" content="A browser-only H5P player as one web component. It plays a .h5p file from a URL or from disk with no server-side extraction: the archive is read in place and a Service Worker serves it to the H5P runtime." />
+    <meta name="twitter:image" content="%SITE_URL%/demo/og-image.png" />
     <link rel="icon" type="image/svg+xml" href="/demo/favicon.svg" />
     <link rel="stylesheet" href="/demo/player-page.css" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "h5p-offline-player",
+        "alternateName": "@missing-elements/h5p-offline-player",
+        "description": "A browser-only H5P player as one web component. It plays a .h5p file from a URL or from disk with no server-side extraction: the archive is read in place and a Service Worker serves it to the H5P runtime.",
+        "url": "%SITE_URL%/",
+        "applicationCategory": "EducationalApplication",
+        "operatingSystem": "Any",
+        "browserRequirements": "A browser with Service Worker support",
+        "isAccessibleForFree": true,
+        "license": "https://opensource.org/license/mit",
+        "sameAs": ["https://github.com/missing-elements/h5p-offline-player"],
+        "author": { "@type": "Organization", "name": "missing-elements", "url": "https://github.com/missing-elements" }
+      }
+    </script>
     <script type="module" src="/src/h5p-offline-player.ts"></script>
     <script type="module" src="/demo/player-page.js"></script>
   </head>
@@ -19,7 +49,9 @@
       <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">H5</span>h5p-offline-player</a>
       <nav aria-label="Site">
         <a href="/" aria-current="page">Player</a>
+        <a href="/demo/setup.html">Setup</a>
         <a href="/demo/">Examples</a>
+        <a href="https://github.com/missing-elements/h5p-offline-player" rel="noopener">GitHub</a>
       </nav>
     </header>
 
@@ -77,16 +109,20 @@
       <pre class="log" id="log"></pre>
 
       <footer>
-        More ways to embed it:
-        <a href="/demo/">the whole integration</a> ·
-        <a href="/demo/xapi.html">xAPI</a> ·
-        <a href="/demo/local-file.html">local file</a> ·
-        <a href="/demo/embed.html">iframe embed</a> ·
-        <a href="/demo/two-players.html">two on one page</a>
-        <br />
-        The sample content was written for this player; its libraries come from the
-        <a href="https://h5p.org/content-types-and-applications">H5P hub</a> (MIT). The video is
-        <a href="https://peach.blender.org/">Big Buck Bunny</a>, © Blender Foundation, CC BY 3.0.
+        <p>
+          <a href="/demo/setup.html">Setting it up</a> ·
+          <a href="/demo/">the whole integration</a> ·
+          <a href="/demo/xapi.html">xAPI</a> ·
+          <a href="/demo/local-file.html">local file</a> ·
+          <a href="/demo/embed.html">iframe embed</a> ·
+          <a href="/demo/two-players.html">two on one page</a> ·
+          <a href="https://github.com/missing-elements/h5p-offline-player" rel="noopener">source on GitHub</a>
+        </p>
+        <p class="credit">
+          The sample content was written for this player; its libraries come from the
+          <a href="https://h5p.org/content-types-and-applications" rel="noopener">H5P hub</a> (MIT). The video is
+          <a href="https://peach.blender.org/" rel="noopener">Big Buck Bunny</a>, © Blender Foundation, CC BY 3.0.
+        </p>
       </footer>
     </main>
   </body>

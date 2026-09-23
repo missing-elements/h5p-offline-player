@@ -15,6 +15,68 @@ or from disk — no server-side extraction, no backend, nothing to unpack ahead 
 
 Setting `src` loads, the way it does on `<video>`.
 
+## Getting started
+
+The player is three things: the element (`h5p-player.js`, an ES module), a Service Worker script
+(`h5p-sw.js`) and a folder of H5P runtime files (`frame-assets/`). The worker is the one file that
+has to be served from **your own origin**, because browsers refuse to register a worker from
+anywhere else. The other two can come from your bundle or from a CDN.
+
+> The package is being published to npm. Until it lands, build it from source: `git clone`,
+> `npm install`, `npm run build`, and serve `dist/` where the snippets below say the package's
+> files go.
+
+**A · With a bundler** (Vite, webpack 5, Rollup):
+
+```bash
+npm i @missing-elements/h5p-offline-player
+```
+
+```js
+import '@missing-elements/h5p-offline-player'
+```
+
+```html
+<h5p-player src="https://host.example/course.h5p" auto-resize></h5p-player>
+```
+
+That is all. The element finds its worker and runtime files with
+`new URL('./h5p-sw.js', import.meta.url)`, which these bundlers copy into the build and rewrite.
+A bundler that does not follow that pattern, esbuild among them, leaves the files behind: then
+serve the package's `dist/` folder from a static path and set `sw` and `assets-base` to it.
+
+**B · No build step:**
+
+```html
+<script type="module"
+  src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player/dist/h5p-player.js"></script>
+<h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js" auto-resize></h5p-player>
+```
+
+Copy `dist/h5p-sw.js` from the same CDN path onto your site and point `sw` at it. The frame assets
+keep loading from the CDN. At the root its scope is `/h5p/`, not `/`, so an existing site worker
+is left alone.
+
+**C · An iframe, nothing on your site:** frame the hosted player page,
+`/embed?src=<package url>`. It sizes itself through H5P's own resizer protocol and relays xAPI
+statements to your page on request. See Setup C in the setup guide.
+
+Requirements: the page is on `https://` or `localhost`, and the package's host sends CORS
+headers. `Range` support on the host is optional; without it the archive is downloaded once and
+played from the browser's cache.
+
+```js
+const player = document.querySelector('h5p-player')
+player.addEventListener('xapi', (event) => send(event.detail.statement))
+player.addEventListener('error', (event) => {
+  if (event.detail.code === 'no-cors') offerFilePicker()
+})
+input.addEventListener('change', () => { player.file = input.files[0] })
+```
+
+The full guide, with single-worker hosts and troubleshooting, is
+[h5p-player-setup.md](h5p-player-setup.md).
+
 ## How it works
 
 An `.h5p` file is a zip. Normally a server unpacks it and serves the files; here a Service Worker

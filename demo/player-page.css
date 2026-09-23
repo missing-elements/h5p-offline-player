@@ -400,11 +400,72 @@ footer {
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+/* A footer with more than a row of links keeps each line in a paragraph that takes the whole
+   row, so a sentence wraps as a sentence rather than as flex items. */
+footer p {
+  flex: 1 1 100%;
+  margin: 0;
+}
+
+footer .credit {
+  font-size: 0.8125rem;
+}
+
+/* ---------------------------------------------------------------- prose tables and lists */
+
+.table {
+  width: 100%;
+  margin: 0 0 1.25rem;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.table th,
+.table td {
+  padding: 0.6rem 0.75rem;
+  border-top: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.table thead th {
+  border-top: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.table td:first-child code {
+  white-space: nowrap;
+}
+
+.table td span {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.list {
+  margin: 0 0 1.25rem;
+  padding-left: 1.25rem;
+  line-height: 1.6;
+}
+
+.list li + li {
+  margin-top: 0.4rem;
 }
 
 /* ---------------------------------------------------------------- narrow screens */
 
 @media (max-width: 40rem) {
+  .table thead { display: none; }
+  .table tr { display: block; padding: 0.5rem 0; border-top: 1px solid var(--line); }
+  .table td { display: block; padding: 0.15rem 0; border: 0; }
   .controls { flex-direction: column; align-items: stretch; }
   .controls input[type="text"], .controls button, .controls label.file { flex: none; width: 100%; }
   .controls .badge { align-self: flex-start; }

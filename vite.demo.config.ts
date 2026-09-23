@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineConfig } from 'vite'
-import { jobsWorkerPlugin, noRangeFixturesPlugin } from './vite.plugins'
+import { jobsWorkerPlugin, noRangeFixturesPlugin, siteUrlPlugin } from './vite.plugins'
 
 /**
  * The hosted demo: the player page and the examples under `demo/`, built as a static site into
@@ -22,7 +22,8 @@ const siteHeaders = Object.fromEntries(
 )
 
 export default defineConfig({
-  plugins: [jobsWorkerPlugin(), noRangeFixturesPlugin()],
+  // `SITE_URL` is set by `scripts/build-demo.mjs`; alone, this config builds for a local preview.
+  plugins: [jobsWorkerPlugin(), noRangeFixturesPlugin(), siteUrlPlugin(process.env.SITE_URL ?? 'http://localhost:4173')],
 
   // Not `public/` wholesale: it also holds whatever real packages were dropped in to try against
   // the dev server. The build script copies the frame assets and the generated fixtures by name.
@@ -38,6 +39,7 @@ export default defineConfig({
         index: resolve(rootDir, 'index.html'),
         embed: resolve(rootDir, 'embed.html'),
         demo: resolve(rootDir, 'demo/index.html'),
+        setup: resolve(rootDir, 'demo/setup.html'),
         xapi: resolve(rootDir, 'demo/xapi.html'),
         'local-file': resolve(rootDir, 'demo/local-file.html'),
         'demo-embed': resolve(rootDir, 'demo/embed.html'),

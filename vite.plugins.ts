@@ -163,3 +163,20 @@ export function noRangeFixturesPlugin(): Plugin {
     }
   }
 }
+
+/**
+ * Replaces `%SITE_URL%` in the pages. Canonical links and social-card URLs have to be absolute,
+ * and the origin is only known where the site is built — Vercel's production URL, or localhost.
+ * It runs before Vite's own `%ENV%` pass, which would otherwise warn about a name it does not
+ * know.
+ */
+export function siteUrlPlugin(siteUrl: string): Plugin {
+  const origin = siteUrl.replace(/\/$/, '')
+  return {
+    name: 'h5p-site-url',
+    transformIndexHtml: {
+      order: 'pre',
+      handler: (html) => html.replaceAll('%SITE_URL%', origin)
+    }
+  }
+}

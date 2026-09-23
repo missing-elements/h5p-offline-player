@@ -2,7 +2,7 @@
 import { resolve } from 'node:path'
 import { defineConfig } from 'vite'
 import { playwright } from '@vitest/browser-playwright'
-import { devServiceWorkerPlugin, jobsWorkerPlugin, noRangeFixturesPlugin } from './vite.plugins'
+import { devServiceWorkerPlugin, jobsWorkerPlugin, noRangeFixturesPlugin, siteUrlPlugin } from './vite.plugins'
 
 /**
  * The library build, the dev server and the test runner. The plugins live in `vite.plugins.ts`
@@ -10,7 +10,7 @@ import { devServiceWorkerPlugin, jobsWorkerPlugin, noRangeFixturesPlugin } from 
  */
 
 export default defineConfig({
-  plugins: [jobsWorkerPlugin(), devServiceWorkerPlugin(), noRangeFixturesPlugin()],
+  plugins: [jobsWorkerPlugin(), devServiceWorkerPlugin(), noRangeFixturesPlugin(), siteUrlPlugin('http://localhost:5173')],
 
   build: {
     target: 'es2022',

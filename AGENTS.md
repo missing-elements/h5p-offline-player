@@ -48,8 +48,9 @@ src/
 scripts/                  sync-h5p-assets, build-workers, copy-frame-assets, build-fixtures,
                           normalize-h5p (the package rewriter; scripts/lib/ holds its zip writer,
                           mp4 remux and policy)
-demo/ + index.html        the hosted player page; demo/index.html is the examples index, the rest
-                          are the individual embedding demos, all sharing demo/player-page.css
+demo/ + index.html        the hosted player page; demo/index.html is the examples index,
+                          demo/setup.html the setup page for integrators, the rest are the
+                          individual embedding demos, all sharing demo/player-page.css
 embed.html                the embeddable page, /embed: the element alone, driven by the query
                           string (demo/embed-page.js); demo/embed.html is the site that embeds it
 demo/content/             the packages the demo plays, committed; built from demo/content/src/ by
@@ -78,8 +79,12 @@ npm run build          # types, element, both workers, frame assets
 npm run normalize -- course.h5p   # rewrite a package so it streams: media stored, mp4 index first
 npm run build:demo     # the hosted demo into dist-demo/, what Vercel runs
 npm run demo:content   # rebuild demo/content/*.h5p from their sources; needs the H5P hub
+npm run demo:og        # re-render the social card, demo/og-image.png
 npm run preview:demo   # serves dist-demo/ with the production headers and the /no-range route
 ```
+
+`npm publish` runs `prepublishOnly` — typecheck, the unit suite and the build — so a broken tree
+cannot ship; the browser suite is left out because it needs an installed Chromium.
 
 `npm run dev` and `npm test` both run `prepare:dev` first, which vendors the h5p-standalone
 runtime into `public/frame-assets/` and builds the fixtures into `public/fixtures/`. Neither
@@ -481,6 +486,16 @@ SPA-fallback trap described above cannot happen there.
   reports is the body's own, not `documentElement.scrollHeight`, for the reason the element
   measures `#h5p-root` and not the document. `/embed` without `.html` is a Vercel rewrite in
   production and Vite's own html fallback locally.
+- **The pages carry their metadata, and the origin is filled in at build time.** Titles,
+  descriptions, canonical links, Open Graph and Twitter tags, JSON-LD for the software on the
+  front page, `robots.txt` and `sitemap.xml`, and the GitHub link in every page's navigation. The
+  absolute URLs are written as `%SITE_URL%` in the HTML and replaced by `siteUrlPlugin`
+  (`vite.plugins.ts`), which runs before Vite's own `%ENV%` pass so Vite does not warn about a
+  name it does not know. `build-demo.mjs` decides the origin — `SITE_URL` if set, else Vercel's
+  `VERCEL_PROJECT_PRODUCTION_URL`, else the preview's localhost — and writes the sitemap and
+  robots file with it. `/embed` stays out of the sitemap and carries `noindex`. The social card,
+  `demo/og-image.png`, is rendered by `npm run demo:og` in Chromium from a small HTML page and
+  committed, because link previews want a raster image and the deploy has no browser.
 - **What a public demo means.** The frame is same-origin by design, and a package's libraries
   are JavaScript, so `/?src=<any url>` runs a stranger's code on the demo's origin. That is the
   architecture — a host chooses what it plays — not a flaw in it, and it is why the demo origin
