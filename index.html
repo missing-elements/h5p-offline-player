@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@missing-elements/h5p-offline-player</title>
+    <meta
+      name="description"
+      content="Browser-only H5P player. Plays a .h5p archive from a URL or from disk, with no server-side extraction."
+    />
+    <link rel="stylesheet" href="/demo/player-page.css" />
+    <script type="module" src="/src/h5p-offline-player.ts"></script>
+    <script type="module" src="/demo/player-page.js"></script>
+  </head>
+
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">H5</span>h5p-offline-player</a>
+      <nav aria-label="Site">
+        <a href="/" aria-current="page">Player</a>
+        <a href="/demo/">Examples</a>
+      </nav>
+    </header>
+
+    <main>
+      <h1>@missing-elements/h5p-offline-player</h1>
+      <p class="lede">
+        Paste a URL to a <code>.h5p</code> file, or pick one from disk. Nothing is unpacked on a
+        server — the archive is read in place and the files are served to the H5P runtime by a
+        Service Worker.
+      </p>
+
+      <form class="controls" id="load-form">
+        <input
+          type="text"
+          inputmode="url"
+          id="url"
+          name="url"
+          placeholder="https://host.example/course.h5p"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button class="primary" type="submit">Play</button>
+        <label class="file">
+          Choose file
+          <input type="file" id="file" accept=".h5p,application/zip" />
+        </label>
+      </form>
+
+      <label class="toggle">
+        <input type="checkbox" id="use-hub" />
+        Fetch missing libraries from h5p.org when a package does not carry its own
+      </label>
+
+      <div class="samples">
+        <button type="button" data-src="/fixtures/basic.h5p">Basic</button>
+        <button type="button" data-src="/no-range/basic.h5p">Host without Range</button>
+        <button type="button" data-src="/fixtures/large-deflated.h5p">20 MB, deflated</button>
+        <button type="button" data-src="/fixtures/large-stored.h5p">20 MB, stored</button>
+        <button type="button" data-src="/fixtures/traversal.h5p">Hostile entry names</button>
+        <button type="button" data-src="/fixtures/content-only.h5p">Export without libraries</button>
+        <button type="button" data-src="/fixtures/needs-libraries.h5p" data-libraries="/fixtures/libraries.h5p">Stripped export + bundle</button>
+        <button type="button" data-src="/fixtures/not-h5p.h5p">Not an H5P package</button>
+      </div>
+
+      <div class="status">
+        <span class="badge" id="state" data-state="idle">idle</span>
+        <progress id="progress" max="1" hidden></progress>
+      </div>
+
+      <p class="message" id="message" hidden></p>
+      <p class="message hint" id="offer" hidden>
+        <button type="button" id="fetch-libraries">Fetch them from h5p.org and retry</button>
+      </p>
+
+      <h5p-player auto-resize preload="auto"></h5p-player>
+
+      <h2>Events</h2>
+      <pre class="log" id="log"></pre>
+
+      <footer>
+        More ways to embed it:
+        <a href="/demo/">the whole integration</a> ·
+        <a href="/demo/xapi.html">xAPI</a> ·
+        <a href="/demo/local-file.html">local file</a> ·
+        <a href="/demo/embed.html">iframe embed</a> ·
+        <a href="/demo/two-players.html">two on one page</a>
+      </footer>
+    </main>
+  </body>
+</html>

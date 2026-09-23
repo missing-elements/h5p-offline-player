@@ -1,0 +1,625 @@
+import {
+  COLD_ENTRY_WAIT_MS,
+  JOB_REQUEST_DEDUPE_MS,
+  VERSION,
+  WATERMARK_POLL_MS
+} from '../shared/constants'
+import {
+  ChunkStore,
+  QuotaError,
+  deleteStaleCaches,
+  onWatermark,
+  type ChunkMeta
+} from '../shared/chunk-store'
+import { installEvictionPolicy } from '../shared/eviction'
+import { normalizeRequestPath } from '../shared/entry-names'
+import { contentTypeOf } from '../shared/mime'
+import {
+  PlayerError,
+  type FromWorkerMessage,
+  type ToWorkerMessage,
+  type WorkerReply
+} from '../shared/protocol'
+import { contentRange, parseRange, type ByteRange } from '../shared/range'
+import { openSource } from '../shared/source'
+import * as db from '../shared/idb'
+import { PackageReader, type IndexedEntry, type LocatedEntry } from './package-reader'
+import { buildFrameDocument, createNonce } from './frame-document'
+import { matchRoute, routesFor, type RouteMatch, type Routes } from './routes'
+import { sliceStream } from '../shared/stream-utils'
+
+/**
+ * The Service Worker half of the player: a virtual file server over a zip that is never
+ * extracted to disk, plus the frame document it synthesizes for the runtime to live in.
+ *
+ * It is deliberately stateless. Browsers terminate a worker between events, so every handler
+ * rebuilds what it needs from the `packages` table and the chunk store, and anything that cannot
+ * finish inside one event — downloading an archive, inflating a large entry — is handed to the
+ * page-side Jobs worker instead.
+ */
+
+export interface MountOptions {
+  /**
+   * Override the route base. Only useful when a host mounts the handlers into a worker whose
+   * scope is not where the routes should live.
+   */
+  scope?: string
+}
+
+/** A `need-file` request the page has not answered yet. */
+interface PendingFile {
+  promise: Promise<Blob>
+  resolve: (blob: Blob) => void
+  timer: ReturnType<typeof setTimeout>
+}
+
+export function mountH5P(worker: ServiceWorkerGlobalScope, options: MountOptions = {}): void {
+  const routes = routesFor(options.scope ?? worker.registration.scope)
+  const server = new VirtualServer(worker, routes)
+
+  worker.addEventListener('install', () => {
+    // A player update should reach open tabs on the next load, not the next browser restart.
+    void worker.skipWaiting()
+  })
+
+  worker.addEventListener('activate', (event) => {
+    event.waitUntil(
+      (async () => {
+        await deleteStaleCaches()
+        await worker.clients.claim()
+      })()
+    )
+  })
+
+  worker.addEventListener('message', (event) => {
+    event.waitUntil(server.handleMessage(event))
+  })
+
+  worker.addEventListener('fetch', (event) => {
+    const match = matchRoute(routes, event.request.url)
+    if (match.kind === 'none') return // Not ours: YouTube, external media, the host's own assets.
+    event.respondWith(server.handleFetch(event, match))
+  })
+}
+
+class VirtualServer {
+  /** Open readers, keyed by package. Lost on worker restart and rebuilt on the next request. */
+  private readers = new Map<string, Promise<PackageReader>>()
+  /** Picked files, re-sent by the page after a restart because a `File` cannot be persisted. */
+  private files = new Map<string, Blob>()
+  private pendingFiles = new Map<string, PendingFile>()
+  /** In-flight job requests, so a burst of range requests does not start the same job repeatedly. */
+  private requestedJobs = new Set<string>()
+  /** Inline entries being inflated into the cache right now, so a burst for one file inflates it once. */
+  private inflating = new Map<string, Promise<void>>()
+
+  constructor(
+    private readonly worker: ServiceWorkerGlobalScope,
+    private readonly routes: Routes
+  ) {
+    installEvictionPolicy((pkgId) => {
+      this.readers.delete(pkgId)
+    })
+  }
+
+  /* ---------------------------------------------------------------- control channel */
+
+  async handleMessage(event: ExtendableMessageEvent): Promise<void> {
+    const message = event.data as ToWorkerMessage | undefined
+    if (!message || typeof message.type !== 'string') return
+
+    const reply = (payload: WorkerReply) => {
+      const port = event.ports[0]
+      if (port) port.postMessage(payload)
+    }
+
+    try {
+      switch (message.type) {
+        case 'ping':
+          reply({ ok: true, type: 'pong', version: VERSION })
+          return
+
+        case 'register':
+          await db.putPackage(message.record)
+          this.readers.delete(message.record.pkgId)
+          reply({ ok: true, type: 'ack' })
+          return
+
+        case 'index': {
+          const reader = await this.reader(message.pkgId)
+          await db.updatePackage(message.pkgId, { status: 'indexed', lastPlayed: Date.now() })
+          reply({
+            ok: true,
+            type: 'indexed',
+            pkgId: message.pkgId,
+            entryCount: reader.entries.size,
+            title: reader.title,
+            prefetch: reader.prefetchable()
+          })
+          return
+        }
+
+        case 'attach-libraries': {
+          await db.updatePackage(message.pkgId, { libraryPkgId: message.libraryPkgId })
+          // Dropped so the next request rebuilds the reader with the bundle attached.
+          this.readers.delete(message.pkgId)
+          reply({ ok: true, type: 'ack' })
+          return
+        }
+
+        case 'file': {
+          this.files.set(message.pkgId, message.file)
+          const pending = this.pendingFiles.get(message.pkgId)
+          if (pending) {
+            clearTimeout(pending.timer)
+            pending.resolve(message.file)
+            this.pendingFiles.delete(message.pkgId)
+          }
+          reply({ ok: true, type: 'ack' })
+          return
+        }
+      }
+    } catch (error) {
+      reply(toErrorReply(error))
+    }
+  }
+
+  /* ---------------------------------------------------------------- request routing */
+
+  async handleFetch(event: FetchEvent, match: RouteMatch): Promise<Response> {
+    try {
+      switch (match.kind) {
+        case 'ping':
+          return json({ version: VERSION })
+
+        case 'frame':
+          return await this.serveFrame(match.pkgId)
+
+        case 'entry':
+          return await this.serveEntry(event, match.pkgId, match.path)
+
+        default:
+          return new Response(null, { status: 404 })
+      }
+    } catch (error) {
+      // The same answer the frame route gives for a package the table does not know.
+      if (error instanceof UnknownPackageError) return text(error.message, 404)
+      if (error instanceof PlayerError && error.code === 'bad-archive') {
+        return text(error.message, 422)
+      }
+      if (error instanceof QuotaError) {
+        return text(error.message, 507)
+      }
+      return text(error instanceof Error ? error.message : 'Internal player error', 500)
+    }
+  }
+
+  /* ---------------------------------------------------------------- the frame document */
+
+  private async serveFrame(pkgId: string): Promise<Response> {
+    const record = await db.getPackage(pkgId)
+    if (!record) return text('Unknown package', 404)
+
+    await db.touchPackage(pkgId)
+
+    const nonce = createNonce()
+    const body = buildFrameDocument({
+      pkgId,
+      virtualRoot: `${this.routes.virtual}${pkgId}`,
+      assets: record.frameAssets,
+      nonce,
+      title: record.title,
+      allowOrigins: record.allowOrigins
+    })
+
+    return new Response(body, {
+      status: 200,
+      headers: {
+        'content-type': 'text/html; charset=utf-8',
+        // The document is regenerated per navigation; a cached copy would pin a stale nonce.
+        'cache-control': 'no-store'
+      }
+    })
+  }
+
+  /* ---------------------------------------------------------------- package entries */
+
+  private async serveEntry(event: FetchEvent, pkgId: string, rawPath: string): Promise<Response> {
+    const name = normalizeRequestPath(rawPath)
+    if (name === null) return text('Bad entry path', 400)
+
+    const reader = await this.reader(pkgId)
+    const located = reader.get(name)
+    // A 404 here is load-bearing: h5p-standalone probes for `library.json` under both the
+    // versioned and unversioned folder names and picks the shape that answers.
+    if (!located) return new Response(null, { status: 404 })
+
+    // With a bundle attached, `h5p.json` is answered from the merged manifest rather than from
+    // the archive: the dependency list in a content-only export names only the main library.
+    if (name === 'h5p.json' && reader.hasFallbacks) {
+      return json(reader.mergedManifest())
+    }
+
+    const rangeHeader = event.request.headers.get('range')
+
+    // Extracted bytes are stored against the archive they came from, not the package being
+    // played. A library bundle shared by several packages is then inflated once for all of them.
+    switch (located.entry.strategy.kind) {
+      case 'inline':
+        return this.serveInline(located, rangeHeader)
+      case 'slice':
+        return this.serveSlice(located, rangeHeader)
+      case 'chunked':
+        return this.serveChunked(event, located, rangeHeader)
+    }
+  }
+
+  /** Small entries and anything the runtime parses: inflate once into the cache, then serve. */
+  private async serveInline(
+    { reader, entry }: LocatedEntry,
+    rangeHeader: string | null
+  ): Promise<Response> {
+    const store = new ChunkStore(reader.pkgId)
+
+    let cached = await store.getWhole(entry.name)
+    if (!cached) {
+      await this.cacheInline(store, reader, entry)
+      cached = await store.getWhole(entry.name)
+    }
+
+    if (!cached?.body) return text('Entry could not be read', 500)
+
+    const range = parseRange(rangeHeader, entry.size)
+    if (range === 'unsatisfiable') return unsatisfiable(entry.size)
+
+    if (range === 'none') {
+      return new Response(cached.body, {
+        status: 200,
+        headers: entryHeaders(entry, { length: entry.size })
+      })
+    }
+
+    return new Response(sliceStream(cached.body, range), {
+      status: 206,
+      headers: entryHeaders(entry, {
+        length: range.end - range.start + 1,
+        contentRange: contentRange(range, entry.size)
+      })
+    })
+  }
+
+  /**
+   * Inflates an inline entry into the cache, sharing the work with any request already doing it.
+   *
+   * The runtime asks for a library's files in a burst, and the same file more than once when
+   * two of them reference it; every one of those used to miss the cache together, inflate
+   * separately and race each other on the same `cache.put`. The map is per worker instance and
+   * dies with it, which costs nothing but the dedupe. A failure rejects every waiter alike and
+   * clears the slot, so the next request tries again rather than inheriting a dead promise.
+   */
+  private cacheInline(store: ChunkStore, reader: PackageReader, entry: IndexedEntry): Promise<void> {
+    const key = `${reader.pkgId}\u0000${entry.name}`
+    const running = this.inflating.get(key)
+    if (running) return running
+
+    const writing = store
+      .putWhole(entry.name, () => reader.inflate(entry), contentTypeOf(entry.name), entry.size)
+      .finally(() => this.inflating.delete(key))
+    this.inflating.set(key, writing)
+    return writing
+  }
+
+  /** Large and stored: the bytes sit flat in the archive, so they are sliced out of the source. */
+  private async serveSlice(
+    { reader, entry }: LocatedEntry,
+    rangeHeader: string | null
+  ): Promise<Response> {
+    const range = parseRange(rangeHeader, entry.size)
+    if (range === 'unsatisfiable') return unsatisfiable(entry.size)
+
+    const wanted: ByteRange = range === 'none' ? { start: 0, end: entry.size - 1 } : range
+    const body = await reader.sliceStream(entry, wanted)
+
+    if (range === 'none') {
+      return new Response(body, { status: 200, headers: entryHeaders(entry, { length: entry.size }) })
+    }
+
+    return new Response(body, {
+      status: 206,
+      headers: entryHeaders(entry, {
+        length: wanted.end - wanted.start + 1,
+        contentRange: contentRange(wanted, entry.size)
+      })
+    })
+  }
+
+  /**
+   * Large and deflated: the Jobs worker inflates it into chunks and publishes a watermark. What
+   * is already there is served immediately as a shorter `206` — a legal answer that the media
+   * element follows up on, which is what makes a cold video start playing before it is extracted.
+   */
+  private async serveChunked(
+    event: FetchEvent,
+    { reader, entry }: LocatedEntry,
+    rangeHeader: string | null
+  ): Promise<Response> {
+    const pkgId = reader.pkgId
+    const store = new ChunkStore(pkgId)
+    const askAgain = () => this.requestJob(event, pkgId, entry.name)
+
+    /** Lets a response body run ahead of the extraction, chunk by chunk. */
+    const follow = async (bytes: number) =>
+      (await waitForWatermark(store, entry.name, bytes, { onStall: askAgain })) !== null
+
+    let meta: ChunkMeta | null | undefined = await store.getMeta(entry.name)
+    if (!meta || (!meta.complete && meta.available === 0)) {
+      await askAgain()
+      meta = await waitForWatermark(store, entry.name, 1, { onStall: askAgain })
+      if (!meta) return retryLater('Extraction has not produced any bytes yet')
+    }
+
+    const range = parseRange(rangeHeader, entry.size)
+    if (range === 'unsatisfiable') return unsatisfiable(entry.size)
+
+    if (range === 'none') {
+      // A media element's first request carries no `Range` — Chrome only starts using them once
+      // it knows the resource supports them. The real length is known from the zip index, so the
+      // response is honest about its size and the body follows the watermark down.
+      return new Response(store.readRange(entry.name, { start: 0, end: entry.size - 1 }, follow), {
+        status: 200,
+        headers: entryHeaders(entry, { length: entry.size })
+      })
+    }
+
+    // What already exists is answered as a shorter `206`, which is what lets a cold video start
+    // before it is extracted. A range that begins past the watermark is answered in full and the
+    // body waits: an mp4 whose `moov` index sits at the end — and plenty do — is unplayable until
+    // that tail arrives, so refusing it would mean refusing the file.
+    const served: ByteRange =
+      range.start < meta.available
+        ? { start: range.start, end: Math.min(range.end, meta.available - 1) }
+        : range
+
+    return new Response(store.readRange(entry.name, served, follow), {
+      status: 206,
+      headers: entryHeaders(entry, {
+        length: served.end - served.start + 1,
+        contentRange: contentRange(served, entry.size)
+      })
+    })
+  }
+
+  /* ---------------------------------------------------------------- job requests */
+
+  /**
+   * Asks the page to run a job. The worker cannot do it: a browser kills a worker event after a
+   * few minutes and a killed inflate cannot resume, so the request goes to the frame that made
+   * the request, which relays it to its element.
+   */
+  private async requestJob(event: FetchEvent, pkgId: string, entry: string): Promise<void> {
+    const key = `${pkgId}\u0000${entry}`
+    if (this.requestedJobs.has(key)) return
+    this.requestedJobs.add(key)
+    // Cleared on a short timer rather than on completion: this worker may be killed in between,
+    // and the page that owns the job may go away with its tab, so a request that is never
+    // answered has to become askable again quickly.
+    setTimeout(() => this.requestedJobs.delete(key), JOB_REQUEST_DEDUPE_MS)
+
+    await this.postToClient(event.clientId, { type: 'need-job', pkgId, entry })
+  }
+
+  private async postToClient(clientId: string, message: FromWorkerMessage): Promise<void> {
+    const client = clientId ? await this.worker.clients.get(clientId) : undefined
+    if (client) {
+      client.postMessage(message)
+      return
+    }
+
+    // No originating client (a restarted worker, or a request made outside a page): tell every
+    // window we control and let the one that owns the package act on it.
+    const clients = await this.worker.clients.matchAll({ type: 'window' })
+    for (const each of clients) each.postMessage(message)
+  }
+
+  /* ---------------------------------------------------------------- readers */
+
+  /**
+   * Returns the reader for a package, rebuilding it from the `packages` table when the worker has
+   * been restarted since it was last used.
+   */
+  private reader(pkgId: string): Promise<PackageReader> {
+    const existing = this.readers.get(pkgId)
+    if (existing) return existing
+
+    const opening = this.openReader(pkgId)
+    this.readers.set(pkgId, opening)
+    opening.catch(() => this.readers.delete(pkgId))
+    return opening
+  }
+
+  private async openReader(pkgId: string): Promise<PackageReader> {
+    const record = await db.getPackage(pkgId)
+    if (!record) throw new UnknownPackageError(pkgId)
+
+    const file = record.source.type === 'file' ? await this.fileFor(pkgId) : undefined
+    const handle = await openSource(pkgId, record.source, file)
+
+    // Validation waits until any attached bundle is in place; a bundle registered to supply
+    // libraries to something else is never held to its own manifest at all.
+    const standalone = record.role !== 'libraries' && !record.libraryPkgId
+    const reader = await PackageReader.open(pkgId, handle, { requireLibraries: standalone })
+
+    if (record.libraryPkgId) {
+      reader.use(await this.reader(record.libraryPkgId))
+      reader.assertLibrariesPresent()
+    }
+
+    const { title } = reader
+    if (title && title !== record.title) await db.updatePackage(pkgId, { title })
+
+    return reader
+  }
+
+  /** Asks the page for a `File` the worker lost on restart, and waits for it to arrive. */
+  private async fileFor(pkgId: string): Promise<Blob> {
+    const held = this.files.get(pkgId)
+    if (held) return held
+
+    const pending = this.pendingFiles.get(pkgId)
+    if (pending) return pending.promise
+
+    let resolve!: (blob: Blob) => void
+    let reject!: (error: Error) => void
+    const promise = new Promise<Blob>((res, rej) => {
+      resolve = res
+      reject = rej
+    })
+
+    const request: PendingFile = {
+      promise,
+      resolve,
+      timer: setTimeout(() => {
+        // Forgotten as well as rejected. Left in the map, this settled promise would be the
+        // answer to every later call for the package, and the page would never be asked again —
+        // even once it has the file to give.
+        if (this.pendingFiles.get(pkgId) === request) this.pendingFiles.delete(pkgId)
+        reject(new PlayerError('bad-archive', 'The picked file is no longer available'))
+      }, COLD_ENTRY_WAIT_MS)
+    }
+    this.pendingFiles.set(pkgId, request)
+
+    await this.postToClient('', { type: 'need-file', pkgId })
+    return promise
+  }
+}
+
+/* ------------------------------------------------------------------ helpers */
+
+/**
+ * Waits until the entry has at least `needed` bytes, or is complete.
+ *
+ * The bound is a stall, not a wall clock: extraction of a large entry legitimately takes minutes,
+ * and a request for the tail of a 220 MB video cannot be answered until it finishes. What must
+ * not happen is waiting on a job that has died with the tab that owned it, so the watermark is
+ * expected to keep moving — when it stops, the job is asked for again, and only a second silent
+ * stretch gives up.
+ */
+async function waitForWatermark(
+  store: ChunkStore,
+  entry: string,
+  needed: number,
+  options: { stallMs?: number; onStall?: () => Promise<void> } = {}
+): Promise<ChunkMeta | null> {
+  const stallMs = options.stallMs ?? COLD_ENTRY_WAIT_MS
+  let lastAvailable = -1
+  let lastAdvanceAt = Date.now()
+  let askedAgain = false
+
+  // Woken by the writer's notice when there is one; the poll is the fallback that keeps stall
+  // detection working when there is not.
+  let wake: (() => void) | null = null
+  const stop = onWatermark(store.pkgId, entry, () => wake?.())
+
+  try {
+    for (;;) {
+      const meta = await store.getMeta(entry)
+      if (meta && (meta.available >= needed || meta.complete)) return meta
+
+      const available = meta?.available ?? 0
+      if (available !== lastAvailable) {
+        lastAvailable = available
+        lastAdvanceAt = Date.now()
+        askedAgain = false
+      } else if (Date.now() - lastAdvanceAt >= stallMs) {
+        if (askedAgain || !options.onStall) return null
+        await options.onStall()
+        askedAgain = true
+        lastAdvanceAt = Date.now()
+      }
+
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, WATERMARK_POLL_MS)
+        wake = () => {
+          clearTimeout(timer)
+          resolve()
+        }
+      })
+      wake = null
+    }
+  } finally {
+    stop()
+  }
+}
+
+function entryHeaders(
+  entry: IndexedEntry,
+  options: { length: number; contentRange?: string }
+): Headers {
+  const headers = new Headers({
+    // A zip records no media type. Without one here CSS is ignored and Safari refuses media.
+    'content-type': contentTypeOf(entry.name),
+    'content-length': String(options.length),
+    'accept-ranges': 'bytes',
+    // Responses are already served out of the chunk store; an HTTP cache on top would only
+    // duplicate them.
+    'cache-control': 'no-store'
+  })
+  if (options.contentRange) headers.set('content-range', options.contentRange)
+  return headers
+}
+
+function unsatisfiable(size: number): Response {
+  return new Response(null, {
+    status: 416,
+    headers: { 'content-range': `bytes */${size}`, 'accept-ranges': 'bytes' }
+  })
+}
+
+function retryLater(message: string): Response {
+  return new Response(message, {
+    status: 503,
+    headers: { 'retry-after': '1', 'content-type': 'text/plain; charset=utf-8' }
+  })
+}
+
+function json(body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }
+  })
+}
+
+function text(body: string, status: number): Response {
+  return new Response(body, {
+    status,
+    headers: { 'content-type': 'text/plain; charset=utf-8' }
+  })
+}
+
+/** A package the `packages` table does not know. Every route answers it with a 404. */
+class UnknownPackageError extends PlayerError {
+  constructor(pkgId: string) {
+    super('bad-archive', `Package ${pkgId} is not registered`)
+    this.name = 'UnknownPackageError'
+  }
+}
+
+function toErrorReply(error: unknown): WorkerReply {
+  if (error instanceof PlayerError) {
+    // The structured form travels with the message so the element can act on it — fetching the
+    // libraries a package is missing needs to know which ones, and for which content type.
+    return {
+      ok: false,
+      code: error.code,
+      message: error.message,
+      missingLibraries: error.missingLibraries
+    }
+  }
+  if (error instanceof QuotaError) {
+    return { ok: false, code: 'quota', message: error.message }
+  }
+  return {
+    ok: false,
+    code: 'bad-archive',
+    message: error instanceof Error ? error.message : String(error)
+  }
+}

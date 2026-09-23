@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>h5p-offline-player — xAPI</title>
+    <link rel="stylesheet" href="/demo/player-page.css" />
+    <script type="module" src="/src/h5p-offline-player.ts"></script>
+  </head>
+
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">H5</span>h5p-offline-player</a>
+      <nav aria-label="Site">
+        <a href="/">Player</a>
+        <a href="/demo/" aria-current="page">Examples</a>
+      </nav>
+    </header>
+
+    <main>
+      <h1>xAPI</h1>
+      <p class="lede">
+        Every statement the content emits arrives as a DOM event. Nothing is stored and nothing is
+        posted anywhere: if these should reach an LRS, this listener is where that happens. Press
+        <strong>Complete</strong> in the content below.
+      </p>
+
+      <h5p-player src="/fixtures/basic.h5p" auto-resize></h5p-player>
+
+      <h2>Statements</h2>
+      <pre class="log" id="log"></pre>
+
+      <footer><a href="/demo/">All examples</a> · <a href="/">Player page</a></footer>
+    </main>
+
+    <script type="module">
+      const player = document.querySelector('h5p-player')
+      const log = document.querySelector('#log')
+
+      player.addEventListener('xapi', (event) => {
+        log.textContent = `${JSON.stringify(event.detail.statement, null, 2)}\n\n${log.textContent}`
+      })
+
+      player.addEventListener('finished', (event) => {
+        const score = event.detail.statement?.result?.score
+        log.textContent = `— finished: ${score?.raw} / ${score?.max} —\n\n${log.textContent}`
+      })
+
+      player.addEventListener('resize', (event) => {
+        player.style.height = `${Math.max(event.detail.height, 240)}px`
+      })
+    </script>
+  </body>
+</html>

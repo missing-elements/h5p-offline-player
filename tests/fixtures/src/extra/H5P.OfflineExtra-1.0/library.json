@@ -1,0 +1,12 @@
+{
+  "title": "Offline Extra",
+  "description": "A library the content never names. Only the merged manifest pulls it in.",
+  "machineName": "H5P.OfflineExtra",
+  "majorVersion": 1,
+  "minorVersion": 0,
+  "patchVersion": 0,
+  "runnable": 0,
+  "license": "MIT",
+  "coreApi": { "majorVersion": 1, "minorVersion": 24 },
+  "preloadedJs": [{ "path": "extra.js" }]
+}

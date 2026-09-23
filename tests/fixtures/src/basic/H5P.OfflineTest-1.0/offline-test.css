@@ -1,0 +1,12 @@
+.h5p-offline-test {
+  font-family: system-ui, sans-serif;
+  padding: 1rem;
+}
+
+.h5p-offline-test-message {
+  margin: 0 0 1rem;
+}
+
+.h5p-offline-test-complete {
+  padding: 0.5rem 1rem;
+}

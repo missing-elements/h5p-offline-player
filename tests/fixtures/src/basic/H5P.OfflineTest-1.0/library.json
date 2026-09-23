@@ -1,0 +1,15 @@
+{
+  "title": "Offline Test",
+  "description": "Minimal runnable content type, bundled so the fixture needs no network.",
+  "machineName": "H5P.OfflineTest",
+  "majorVersion": 1,
+  "minorVersion": 0,
+  "patchVersion": 0,
+  "runnable": 1,
+  "license": "MIT",
+  "author": "@missing-elements/h5p-offline-player",
+  "embedTypes": ["div"],
+  "coreApi": { "majorVersion": 1, "minorVersion": 24 },
+  "preloadedJs": [{ "path": "offline-test.js" }],
+  "preloadedCss": [{ "path": "offline-test.css" }]
+}

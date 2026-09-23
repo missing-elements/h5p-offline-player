@@ -120,7 +120,7 @@ Content-type JavaScript runs on the frame's origin. A same-origin iframe isolate
 
 ## Packaging
 
-Distributed as one npm package, `@you/h5p-player`. Component 1 is the element; 3, 5 and 6 live in the Service Worker; 4 is a dedicated Worker bundled inside the element and spawned from a `blob:` URL. The host page is outside the package; the repo carries the hosted player page as its demo.
+Distributed as one npm package, `@missing-elements/h5p-offline-player`. Component 1 is the element; 3, 5 and 6 live in the Service Worker; 4 is a dedicated Worker bundled inside the element and spawned from a `blob:` URL. The host page is outside the package; the repo carries the hosted player page as its demo.
 
 ```
 dist/h5p-player.js     <h5p-player> element + embedded Jobs worker — plays a package, nothing else
@@ -130,7 +130,7 @@ dist/index.d.ts        types for the element, its events and mountH5P
 sw/index.js            mountH5P(self) — optional, for hosts that enforce a single worker
 ```
 
-**No fixed paths, no scope collisions.** The element registers `new URL('./h5p-sw.js', import.meta.url)` with `scope: <swDir>h5p/`; bundlers (Vite, webpack 5, Rollup) serve that file same-origin in dev and emit it as an asset in production. The explicit sub-scope means we never claim the directory itself, so a host worker living in the same directory (or at `/`, for a root-placed `h5p-sw.js`) is untouched. All URLs are built under the resulting scope — `/assets/h5p/virtual/…`, `/node_modules/@you/h5p-player/dist/h5p/frame/…` — and nobody cares what the prefix is. Frame assets are resolved the same way and their URLs handed to the worker.
+**No fixed paths, no scope collisions.** The element registers `new URL('./h5p-sw.js', import.meta.url)` with `scope: <swDir>h5p/`; bundlers (Vite, webpack 5, Rollup) serve that file same-origin in dev and emit it as an asset in production. The explicit sub-scope means we never claim the directory itself, so a host worker living in the same directory (or at `/`, for a root-placed `h5p-sw.js`) is untouched. All URLs are built under the resulting scope — `/assets/h5p/virtual/…`, `/node_modules/@missing-elements/h5p-offline-player/dist/h5p/frame/…` — and nobody cares what the prefix is. Frame assets are resolved the same way and their URLs handed to the worker.
 
 The one file that must be same-origin is the Service Worker script itself (browsers reject cross-origin registration). With a bundler this happens automatically; without one, the host downloads `h5p-sw.js` from the CDN once and passes its URL via the `sw` attribute. A host's existing worker coexists: scopes differ, and each document is controlled by the longest matching scope, so the host's worker never sees the frame's requests. `mountH5P` exists only for hosts that enforce a single worker; routes then sit under their scope with the same `h5p/` prefix.
 

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>h5p-offline-player — examples</title>
+    <meta
+      name="description"
+      content="The whole integration in two lines, and the other ways to embed a browser-only H5P player."
+    />
+    <link rel="stylesheet" href="/demo/player-page.css" />
+    <script type="module" src="/src/h5p-offline-player.ts"></script>
+  </head>
+
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">H5</span>h5p-offline-player</a>
+      <nav aria-label="Site">
+        <a href="/">Player</a>
+        <a href="/demo/" aria-current="page">Examples</a>
+      </nav>
+    </header>
+
+    <main>
+      <p class="eyebrow">The whole integration</p>
+      <h1>Import the element, set <code>src</code>, done.</h1>
+      <p class="lede">
+        The Service Worker registers itself, and setting <code>src</code> loads the way it does on
+        <code>&lt;video&gt;</code>. Nothing is unpacked on a server: the archive is read in place
+        and its files are served to the H5P runtime from inside the browser.
+      </p>
+
+      <h5p-player src="/fixtures/basic.h5p" auto-resize></h5p-player>
+
+      <h2>Markup</h2>
+      <pre class="code">&lt;script type="module" src="h5p-player.js"&gt;&lt;/script&gt;
+&lt;h5p-player src="/fixtures/basic.h5p" auto-resize&gt;&lt;/h5p-player&gt;</pre>
+
+      <h2>More ways to embed it</h2>
+      <ul class="grid">
+        <li>
+          <a class="card" href="/">
+            <strong>The player page</strong>
+            <span>A host page with a URL field, a file picker, progress and an event log — built entirely out of the element's events.</span>
+          </a>
+        </li>
+        <li>
+          <a class="card" href="/demo/xapi.html">
+            <strong>xAPI</strong>
+            <span>Every statement the content emits arrives as a DOM event. This is where an LRS would be wired in.</span>
+          </a>
+        </li>
+        <li>
+          <a class="card" href="/demo/local-file.html">
+            <strong>A file from disk</strong>
+            <span>The path around a host with no CORS headers: hand the element a <code>File</code>, read with <code>slice()</code>.</span>
+          </a>
+        </li>
+        <li>
+          <a class="card" href="/demo/embed.html">
+            <strong>iframe embed</strong>
+            <span>For a site that cannot host even one file. The player runs on its own origin.</span>
+          </a>
+        </li>
+        <li>
+          <a class="card" href="/demo/two-players.html">
+            <strong>Two on one page</strong>
+            <span>H5P assumes it owns the page. Each player gets its own frame document, so two do not collide.</span>
+          </a>
+        </li>
+      </ul>
+
+      <footer>
+        <a href="/">Player page</a> ·
+        <a href="https://github.com/missing-elements/h5p-offline-player">Source and README</a>
+      </footer>
+    </main>
+  </body>
+</html>

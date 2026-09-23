@@ -1,0 +1,79 @@
+/** Version of the element/worker pair. Kept in sync with package.json by scripts/sync-h5p-assets.mjs. */
+export const VERSION = '0.1.0'
+
+/** Major version. Cache names carry it, so a major bump discards every cached package. */
+export const MAJOR_VERSION = 0
+
+/** One cache per package: `h5p-pkg-v<major>-<pkgId>`. */
+export const CACHE_PREFIX = `h5p-pkg-v${MAJOR_VERSION}-`
+
+/**
+ * Chunk size for archives and extracted media: the unit of storage, and the ceiling on what one
+ * read or write holds in memory. The segment window in `source.ts` is the one deliberate exception.
+ */
+export const CHUNK_SIZE = 8 * 1024 * 1024
+
+/**
+ * Entries at or below this size are inflated whole into the cache on first request, whatever
+ * their compression method. Above it, a deflated entry goes to the Jobs worker and a stored
+ * entry is sliced straight out of the source.
+ */
+export const INLINE_MAX_SIZE = 16 * 1024 * 1024
+
+/**
+ * How a large span is pulled over HTTP: `SEGMENT_CONCURRENCY` ranged requests of `SEGMENT_SIZE`
+ * in flight at once, emitted in order.
+ *
+ * One request per span is already the difference between a working player and 3,500 round trips
+ * — but a single connection is often capped well below the link. Measured against one real host:
+ * 2.0 MB/s on one connection, 2.6 MB/s on four, against a 3.5 MB/s link. Four is where it
+ * stopped improving; eight was no better.
+ *
+ * The cost is memory. Segments arrive out of order and wait their turn, so up to
+ * `SEGMENT_CONCURRENCY * SEGMENT_SIZE` — 16 MB — can be held at once. That is a deliberate
+ * loosening of "nothing larger than one chunk in memory", and it is why the segment is 4 MB
+ * rather than the 8 MB used everywhere else.
+ */
+export const SEGMENT_SIZE = 4 * 1024 * 1024
+export const SEGMENT_CONCURRENCY = 4
+
+/** Below this, one request is better: the overlap cannot pay back its own latency. */
+export const SEGMENT_MIN_SPAN = 8 * 1024 * 1024
+
+/** Reserved chunk-store entry name for the archive itself (chunked adapter). */
+export const ARCHIVE_ENTRY = '__archive__'
+
+/**
+ * How long the watermark may sit still before the virtual server concludes the job behind it is
+ * gone. It is not a budget for the whole extraction: inflating a few hundred megabytes over a
+ * network legitimately takes minutes, and a request for the tail of such an entry cannot be
+ * answered before it finishes.
+ */
+export const COLD_ENTRY_WAIT_MS = 15_000
+
+/**
+ * How often a waiting response re-reads the watermark when no notice has arrived. Progress is
+ * announced on a `BroadcastChannel` the moment it is written, so this is the fallback that keeps
+ * stall detection honest, not what makes serving prompt.
+ */
+export const WATERMARK_POLL_MS = 500
+
+/**
+ * How long one job request suppresses the next for the same entry. A media element opens with a
+ * burst of range requests that all land within milliseconds, and this is only there to keep that
+ * burst from becoming a burst of messages — the real deduplication is the Jobs worker's own
+ * in-flight map and its Web Lock. Keeping the window short matters: a job can die with the tab
+ * that owned it, and a long window would leave the entry unserved until it expired.
+ */
+export const JOB_REQUEST_DEDUPE_MS = 2_000
+
+/** IndexedDB database and store names. */
+export const DB_NAME = 'h5p-player'
+export const DB_VERSION = 1
+export const PACKAGES_STORE = 'packages'
+
+/**
+ * Synthetic origin for chunk-store keys. The Cache API needs absolute http(s) URLs; these are
+ * never fetched, so an unresolvable TLD keeps them from ever reaching the network.
+ */
+export const CHUNK_KEY_ORIGIN = 'https://chunks.h5p-player.invalid/'

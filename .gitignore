@@ -1,0 +1,24 @@
+node_modules
+dist
+types
+
+# Generated: `npm run sync:assets` vendors the h5p-standalone runtime here, and
+# `npm run fixtures` builds the test archives here. Both are reproducible from source.
+public
+
+# Incremental build state
+*.tsbuildinfo
+
+# Test output
+tests/browser/__screenshots__
+coverage
+
+# Editors and OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.log
+
+# Vitest browser-mode artefacts (failure screenshots)
+.vitest/

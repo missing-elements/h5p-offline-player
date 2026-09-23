@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>h5p-offline-player — iframe embed</title>
+    <link rel="stylesheet" href="/demo/player-page.css" />
+  </head>
+
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">H5</span>h5p-offline-player</a>
+      <nav aria-label="Site">
+        <a href="/">Player</a>
+        <a href="/demo/" aria-current="page">Examples</a>
+      </nav>
+    </header>
+
+    <main>
+      <h1>Embedding the player page</h1>
+      <p class="lede">
+        For a site that cannot host even one file. The player runs on its own origin, so a hostile
+        archive reaches the player's data and not the embedding site's. Storage is partitioned per
+        embedding site.
+      </p>
+
+      <p class="message hint" id="safari-note" hidden>
+        Safari blocks Service Workers in cross-origin iframes and the player cannot run without
+        one, so on Safari the embed degrades to a link.
+      </p>
+
+      <iframe
+        id="embed"
+        title="H5P player"
+        class="embed-frame"
+        src="/?src=/fixtures/basic.h5p"
+        allow="fullscreen"
+      ></iframe>
+
+      <h2>Markup</h2>
+      <pre class="code">&lt;iframe src="https://player.example/embed?src=https://host.example/course.h5p"
+        allow="fullscreen"&gt;&lt;/iframe&gt;</pre>
+
+      <footer><a href="/demo/">All examples</a> · <a href="/">Player page</a></footer>
+    </main>
+
+    <script type="module">
+      // A cross-origin iframe on Safari never gets a controller, so the embed cannot work there.
+      // Detecting the engine is the honest check: the failure is a policy, not a missing API.
+      const isWebKit =
+        /^((?!chrome|android).)*safari/i.test(navigator.userAgent) &&
+        !/chrome|chromium|edg/i.test(navigator.userAgent)
+
+      if (isWebKit) {
+        const frame = document.querySelector('#embed')
+        const link = document.createElement('p')
+        link.innerHTML = '<a href="/?src=/fixtures/basic.h5p">Open the player</a>'
+        frame.replaceWith(link)
+        document.querySelector('#safari-note').hidden = false
+      }
+    </script>
+  </body>
+</html>

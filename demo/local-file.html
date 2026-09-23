@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>h5p-offline-player — local file</title>
+    <link rel="stylesheet" href="/demo/player-page.css" />
+    <script type="module" src="/src/h5p-offline-player.ts"></script>
+  </head>
+
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">H5</span>h5p-offline-player</a>
+      <nav aria-label="Site">
+        <a href="/">Player</a>
+        <a href="/demo/" aria-current="page">Examples</a>
+      </nav>
+    </header>
+
+    <main>
+      <h1>A file from disk</h1>
+      <p class="lede">
+        The path out of a host with no CORS headers: download the archive by hand and hand the
+        <code>File</code> to the element. It is read with <code>File.slice()</code> — never loaded
+        into memory whole, however large it is.
+      </p>
+
+      <form class="controls">
+        <label class="file">
+          Choose a .h5p file
+          <input type="file" id="file" accept=".h5p,application/zip" />
+        </label>
+        <span class="badge" id="state">idle</span>
+      </form>
+
+      <h5p-player auto-resize></h5p-player>
+
+      <footer><a href="/demo/">All examples</a> · <a href="/">Player page</a></footer>
+    </main>
+
+    <script type="module">
+      const player = document.querySelector('h5p-player')
+      const state = document.querySelector('#state')
+
+      document.querySelector('#file').addEventListener('change', (event) => {
+        const [file] = event.target.files
+        if (file) player.file = file
+      })
+
+      player.addEventListener('statechange', (event) => (state.textContent = event.detail.state))
+      player.addEventListener('resize', (event) => {
+        player.style.height = `${Math.max(event.detail.height, 240)}px`
+      })
+    </script>
+  </body>
+</html>

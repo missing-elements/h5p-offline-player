@@ -13,11 +13,11 @@ There are no fixed paths. The element registers its worker with scope `<director
 ## Setup A — app with a bundler (Vite, webpack 5, Rollup)
 
 ```bash
-npm i @you/h5p-player
+npm i @missing-elements/h5p-offline-player
 ```
 
 ```js
-import '@you/h5p-player';
+import '@missing-elements/h5p-offline-player';
 ```
 
 ```html
@@ -30,7 +30,7 @@ Bundlers that do not analyse `new URL(…, import.meta.url)` — esbuild among t
 
 ```html
 <h5p-player src="…" sw="/vendor/h5p-player/h5p-sw.js"
-            assets-base="https://cdn.jsdelivr.net/npm/@you/h5p-player/dist/"></h5p-player>
+            assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player/dist/"></h5p-player>
 ```
 
 `sw` must stay same-origin; `assets-base` (frame bundle, CSS, fonts) may be a CDN.
@@ -41,11 +41,11 @@ Bundlers that do not analyse `new URL(…, import.meta.url)` — esbuild among t
 
 ```html
 <script type="module"
-  src="https://cdn.jsdelivr.net/npm/@you/h5p-player/dist/h5p-player.js"></script>
+  src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player/dist/h5p-player.js"></script>
 <h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js"></h5p-player>
 ```
 
-Download `https://cdn.jsdelivr.net/npm/@you/h5p-player/dist/h5p-sw.js` once, place it on the site, point `sw` at it. This is the only file that cannot come from the CDN: browsers reject cross-origin Service Worker registration. Frame assets load from the CDN. Placing it at the root is safe: the registration scope becomes `/h5p/`, not `/`, so an existing site worker is left alone.
+Download `https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player/dist/h5p-sw.js` once, place it on the site, point `sw` at it. This is the only file that cannot come from the CDN: browsers reject cross-origin Service Worker registration. Frame assets load from the CDN. Placing it at the root is safe: the registration scope becomes `/h5p/`, not `/`, so an existing site worker is left alone.
 
 ## Setup C — iframe embed (nothing on the host)
 
@@ -67,10 +67,16 @@ The element does one thing: play a package.
   src="…"              package URL — setting it loads; setting it again aborts and reloads
   sw="…"               worker URL (default: h5p-sw.js next to the element, same-origin)
   assets-base="…"      directory of frame assets (default: folder of the element)
+  libraries="…"        `hub`, or the URL of a `.h5p` carrying library folders, for packages
+                       exported without their own (default: unset — such packages are refused)
+  allow-origins="…"    extra origins for the frame's CSP, space separated — for a tenant's own
+                       video host or an in-house CDN
+  preload="…"          `auto` pulls large deflated media once the content is up, instead of
+                       waiting for the runtime to ask (default: `none`)
 ></h5p-player>
 ```
 
-Properties: `src`, `file` (a `File` from a picker; setting it loads), `pkgId`, `state` (`idle | probing | downloading | indexing | ready | error`), `scope` (read-only, the resolved worker scope).
+Properties: `src`, `file` (a `File` from a picker; setting it loads), `pkgId`, `preload`, `state` (`idle | probing | downloading | indexing | ready | error`), `scope` (read-only, the resolved worker scope).
 
 Events (all `CustomEvent`, payload in `detail`):
 
@@ -110,6 +116,10 @@ input.onchange = () => (p.file = input.files[0]);
 | Worker blocked by CSP | `script-src` excludes the worker's origin | Keep the default same-origin worker; don't point `sw` at a CDN |
 | Video won't play in Safari, other browsers fine | Worker older than the element (Setup B) | Re-download `h5p-sw.js`; the console warns on version mismatch |
 | `error: quota` | Not enough storage for extraction even after evicting older caches | Show `navigator.storage.estimate()`; suggest freeing site data |
+| `error: bad-archive`, "contains no libraries" | The export has `content/` but no library folders — h5p.com and h5p.org omit libraries the origin site already has | Set `libraries="hub"` to fetch them from h5p.org, point `libraries` at a `.h5p` that carries them, or re-export with them included. `event.detail.missingLibraries` names them |
+| Console: 404 for `<Library>-<major>.<minor>/library.json` on load | Not a fault. h5p-standalone probes the versioned folder name to find out whether a package uses versioned folders; older packages do not, and the 404 is what tells it to fall back to the bare name | Ignore it. One such 404 per load is expected |
+| Console: "violates the following Content Security Policy directive" | The content loads a script, style or font from an origin the frame does not permit | Built in: MathJax CDNs, Google WebFont, YouTube, Vimeo, Panopto. Anything else goes in `allow-origins` |
+| A video shows nothing for minutes, then plays normally | Its mp4 is deflated in the zip *and* not faststart, so the index it needs is the last few kilobytes of a file that can only be read forward. The transfer is genuinely required | Set `preload="auto"` so it starts when the content loads rather than when the learner presses play. The durable fix is to store rather than deflate media when building the package |
 | `error: runtime`, content blank | Content type threw — usually a library missing from the archive, or a script blocked by the frame CSP | Check the console inside the frame; report the archive |
 
 ## Single-worker hosts (advanced)
@@ -118,7 +128,7 @@ Some setups enforce exactly one Service Worker per origin (Angular `ngsw`, some 
 
 ```js
 // host's sw.js
-import { mountH5P } from '@you/h5p-player/sw';
+import { mountH5P } from '@missing-elements/h5p-offline-player/sw';
 mountH5P(self);                       // call before Workbox routing so h5p/* is claimed first
 ```
 

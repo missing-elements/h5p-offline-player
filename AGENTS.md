@@ -1,0 +1,411 @@
+# AGENTS.md
+
+Working notes for this repository. Read `h5p-offline-player-architecture.md` first — it is the
+design, and it is the authority when this file and the code disagree. `h5p-player-setup.md` is
+the guide written for people integrating the package.
+
+## What this is
+
+A browser-only H5P player, shipped as one web component. It plays an arbitrary `.h5p` archive
+fetched from a URL or picked from disk, with no server-side code and no extraction step: the zip
+is read in place and a Service Worker serves its entries to the H5P runtime over a virtual file
+server.
+
+The hard constraints that shape every file here:
+
+- **Static hosting only.** No proxy, no backend, no build step required of the host.
+- **Every large transfer streams.** Nothing is buffered whole. The one deliberate exception is
+  the segment window used to fetch a large span over several connections, which holds up to
+  16 MB — see `segmentedStream`.
+- **No long work in the Service Worker.** Browsers kill a worker event after a few minutes
+  (Safari sooner) and a killed inflate cannot resume, so downloads and extractions run in a
+  page-side dedicated worker that lives as long as the tab.
+- **Archives are untrusted.** Any compression method, any size, any entry name, possibly hostile.
+
+## Layout
+
+```
+src/
+  h5p-offline-player.ts   the <h5p-player> custom element — the only public entry point
+  shared/                 code that runs in all three contexts (page, Service Worker, Jobs worker)
+    constants.ts          sizes, timeouts, cache names, the version stamp
+    protocol.ts           every message shape and the PackageRecord written to IndexedDB
+    source.ts             probe + the three source adapters + the zip.js reader bridge
+    chunk-store.ts        Cache API: whole entries, chunked entries, watermarks, eviction
+    idb.ts                the `packages` table
+    entry-names.ts        entry-name normalisation — the security boundary for hostile archives
+    range.ts, mime.ts, pkg-id.ts
+  sw/
+    sw-entry.ts           standalone worker  -> dist/h5p-sw.js
+    mount.ts              mountH5P(self)     -> dist/h5p-sw-mount.js; the virtual file server
+    package-reader.ts     zip index + per-entry serving strategy
+    frame-document.ts     the frame HTML the worker synthesizes, and its CSP
+    routes.ts             URL shape of the virtual routes
+    stream-utils.ts
+  jobs/
+    jobs-worker.ts        downloads and extractions; the only long-running code
+    chunk-writer.ts       a WritableStream that lands bytes in the chunk store and publishes a watermark
+scripts/                  sync-h5p-assets, build-workers, copy-frame-assets, build-fixtures
+demo/ + index.html        the hosted player page; demo/index.html is the examples index, the rest
+                          are the individual embedding demos, all sharing demo/player-page.css
+tests/unit/               pure logic, node environment
+tests/browser/            the real element against the real worker, chromium via vitest browser mode
+tests/fixtures/src/       the source of the generated .h5p archives
+```
+
+## Commands
+
+```bash
+npm install            # .npmrc sets ignore-scripts: h5p-standalone has an `only-allow yarn` guard
+npx playwright install chromium   # once, for the browser tests
+
+npm run dev            # vendors assets, builds fixtures, serves the demo on :5173
+npm test               # unit + browser
+npm run test:unit      # fast, no browser
+npm run test:browser
+npm run typecheck      # tsc -b plus the tests project
+npm run build          # types, element, both workers, frame assets
+```
+
+`npm run dev` and `npm test` both run `prepare:dev` first, which vendors the h5p-standalone
+runtime into `public/frame-assets/` and builds the fixtures into `public/fixtures/`. Neither
+directory is in git; both are reproducible.
+
+Use Node 22 LTS or 24 LTS. Vitest's `engines` covers `^22.12 || ^24 || >=26`, so an odd-numbered
+release such as Node 23 prints an `EBADENGINE` warning on install. It is only a warning — the
+suite runs — but it is not worth chasing, and no patched Vitest accepts Node 23. The package's
+own `engines` stays at `>=20`: that is what the build scripts need, and nothing in `dist` runs on
+Node at all.
+
+The browser provider is a package, not a name: `provider: playwright()` from
+`@vitest/browser-playwright`. Vitest 4 moved providers out of the core package, so a bare
+`provider: 'playwright'` string silently stops being valid.
+
+## The three contexts
+
+Most bugs here come from forgetting which context a line runs in.
+
+| Context | Lives as long as | Can | Cannot |
+|---|---|---|---|
+| Page (element) | The tab | Hold the `File`, own the Jobs worker, emit DOM events | Touch package bytes |
+| Service Worker | One event, unpredictably | Serve requests, read IndexedDB and the chunk store | Run long work, spawn a Worker, hold state across events |
+| Jobs worker | The tab | Download, inflate, take Web Locks | Intercept requests, reach the DOM |
+
+The Service Worker is **stateless by assumption**. Any handler may be the first one after a
+restart, so it rebuilds readers from the `packages` table on demand. When it needs something only
+a page can do, it messages the frame client (`event.clientId`), the frame relays to its parent
+element, and the element acts. That relay is why `frame-document.ts` has a `message` listener.
+
+## Invariants worth knowing before changing anything
+
+- **Entry names are rejected, never sanitised.** `normalizeEntryName` returns `null` for anything
+  that cannot be a plain relative path. Stripping `..` would let `content/../h5p.json` shadow a
+  real entry. zip.js is called with `filenameValidation: 'tolerant'` on purpose: its own check
+  refuses the *whole archive* over one bad name, and we want per-entry rejection so a legitimate
+  package with one hostile path still plays.
+- **The traversal check that matters is the one on archive names, not on request paths.** A URL
+  can never carry `..` to the worker — the URL parser collapses `..` and `%2e%2e` alike before
+  the request is made. `normalizeRequestPath` still decodes before validating, as defence in
+  depth, but the attack it is named for arrives through the central directory.
+- **The watermark is always a prefix.** Chunks are written in order, so a reader can serve
+  anything below `meta.available` without checking which chunks exist. Do not write chunks out of
+  order.
+- **A resumed write must start on a chunk boundary.** `createChunkWriter` asserts this. Partial
+  chunks are rewritten as they fill, with a doubling interval — a fixed interval is O(n²) in
+  bytes rewritten.
+- **`SourceReader` overrides `createReadable`.** Without it zip.js falls back to walking an entry
+  through `readUint8Array` in 64 kB steps. Over a picked `File` each step is a free `slice()`;
+  over HTTP each one is a request, and a 218 MB video meant roughly 3,500 round trips to the
+  origin — slow enough to look like a hang and enough to get throttled. One ranged request covers
+  the span. This is the main reason a large package behaved completely differently from disk and
+  from a URL.
+- **A large span over HTTP is then pulled by several connections at once.** One request per span
+  is necessary but not sufficient: plenty of hosts cap a single connection well below the link.
+  `segmentedStream` runs `SEGMENT_CONCURRENCY` ranged requests of `SEGMENT_SIZE` and emits them in
+  order — download parallel, inflate serial, because a deflate stream has to be fed from the
+  front. Measured against a server capping each connection at 4 MB/s, a 42 MB entry went from
+  10.7 s to 3.1 s. Against one real host the gain was 1.28x, because that link was already near
+  its own ceiling, so expect anything between the two and nothing at all when the bottleneck is
+  the last mile. Before reaching for something cleverer, measure which of the two limits you are
+  against: `curl -o /dev/null -w '%{speed_download}'` on one connection versus four parallel
+  ranges settles it in seconds.
+  A rolling window, not "split the span into N parts": splitting a 230 MB span four ways would
+  leave three 57 MB quarters in memory waiting their turn. The window keeps at most
+  `SEGMENT_CONCURRENCY * SEGMENT_SIZE` — 16 MB — outstanding for a span of any size, which is a
+  deliberate loosening of the one-chunk-in-memory rule and the reason the segment is 4 MB rather
+  than the 8 MB used elsewhere. It applies only to `range-http`: a picked file and an archive
+  already in the chunk store are local reads, where splitting costs buffering and buys nothing.
+- **Waiting on the watermark is bounded by a stall, not by a wall clock.** Inflating a few hundred
+  megabytes over a network legitimately takes minutes, and a request for the *tail* of such an
+  entry cannot be answered until it finishes: an mp4 whose `moov` index sits at the end — common,
+  since faststart is not the default — is undecodable until then, and extraction only runs
+  forward. So a range beginning past the watermark is answered in full with a body that follows
+  the extraction, and a request with no `Range` header gets a `200` of the true length the same
+  way. Only a watermark that stops moving, twice, gives up.
+- **Some video cannot be streamed at all, and `preload` is the only lever.** Progressive serving
+  assumes the player can use the front of a file. Two package properties together break that: the
+  mp4 is deflated in the zip, so no `Range` reaches a byte without the whole stream before it, and
+  the mp4 is not faststart, so its `moov` index is the last few kilobytes and nothing decodes
+  until the final byte. A real example measured here — a 237 MB package from sodix.de — has both:
+  a 220 MB mp4 deflated at ratio 0.991 (the packager compressed an already-compressed file for a
+  0.9% saving) whose `moov` sits behind a 230 MB `mdat`. Three escape routes were probed near the
+  end of that stream and none opened: the last 2 MB hold no chain of stored blocks to skip
+  through, there are no `00 00 FF FF` markers at head, middle or tail, and so nothing offers pako
+  or zlib a byte-aligned boundary to re-enter at. Read that scan for no more than it says: `00 00
+  FF FF` is an *empty* stored block, so its absence proves only that the compressor never called
+  `Z_SYNC_FLUSH`, and an ordinary stored block is marked by `BTYPE=00` in a 3-bit header that can
+  only be found by walking the chain from the start. It is not evidence that the whole stream is
+  Huffman-coded, and it does not need to be: every compressed byte crosses the network either
+  way, which is the thing that actually costs. Inflation is not the cost either — native `DecompressionStream` runs at 625 MB/s,
+  so 220 MB inflates in under a second against roughly two minutes of network. The wait is the
+  transfer, it is genuinely required, and the only thing left is to start it earlier. That is what
+  `preload="auto"` does. What remains theoretically possible is deflate resynchronisation —
+  brute-force a block boundary near the end, decode forward, discard the first 32 kB as
+  window-contaminated, recover `moov`, and serve a synthesized faststart file — which needs a
+  hand-written bit-level inflate and is not worth it for one badly built zip.
+- **Prefetch waits for `ready`, runs one entry at a time, and is off by default.** Not at index
+  time: those bytes would compete with the archive reads that boot the runtime and make the player
+  itself slower to appear. Not in parallel: two concurrent extractions just halve the rate of
+  whichever video the learner reaches first. Archive order rather than largest first, because the
+  order a packager wrote entries in tracks the order content uses them better than size does. Off
+  by default because it spends a learner's bandwidth on media they may never reach — the same
+  reasoning that keeps `libraries` off. `PackageReader.prefetchable()` names the candidates and
+  they ride back on the `indexed` reply, so no extra round trip.
+- **The cache is never the authority on size.** An entry's real size comes from the zip central
+  directory, so the virtual server can answer with the correct total length while only a prefix
+  exists. That is what lets a cold video start playing.
+- **A package is refused at index time if it does not carry its own libraries.** `h5p.json`
+  declares `preloadedDependencies`; each one must appear as `<name>-<major>.<minor>/library.json`
+  or `<name>/library.json`. This is not a nicety: exports from h5p.com and h5p.org routinely
+  contain nothing but `h5p.json` and `content/`, because the site they came from already has the
+  libraries. Without the check, h5p-standalone asks for `<MainLibrary>/library.json`, takes the
+  404 as "these folders are unversioned", asks again without the version, takes a second 404 and
+  fails with nothing anyone can act on. `findMissingLibraries` is pure and unit-tested; the
+  end-to-end case is the `content-only.h5p` fixture.
+- **A package may be served from more than one archive.** `PackageReader.get()` returns a
+  `LocatedEntry` — the entry *and* the reader it came from — because `libraries` can attach a
+  second archive to fill the gaps in a stripped export. Extracted bytes are cached against the
+  owning archive's `pkgId`, not the package being played, so one library bundle is inflated once
+  and shared by every package that uses it. Two consequences worth remembering: a job is always
+  addressed at the archive that owns the entry, and a bundle registered with `role: 'libraries'`
+  is never held to its own manifest.
+- **When a bundle is attached, `h5p.json` is synthesized, not served.** A content-only export
+  strips `preloadedDependencies` down to the main library as well as dropping the folders, so the
+  runtime would load Interactive Video and none of the interaction types inside it — "Unable to
+  find constructor for: H5P.Text". `mergedManifest()` unions the two dependency lists and keeps
+  only entries whose folder is actually reachable, with the content's own version winning.
+- **A library bundle is downloaded, never range-read.** It is read exhaustively — every library's
+  JSON, scripts and styles — so the element registers it as `chunked` even when the host honours
+  `Range`. Against the real H5P hub this was the difference between 76 and 7 seconds.
+- **A 404 from the virtual server is load-bearing.** h5p-standalone probes `library.json` under
+  both the versioned and unversioned folder names and picks whichever answers.
+- **The frame uses `embedType: 'div'`.** With the default `iframe` type, H5P core creates an inner
+  `about:blank` frame, and whether that child inherits the Service Worker controller differs
+  between browsers.
+- **The frame's `<html>` carries `class="h5p-iframe"`.** Seven rules in the core stylesheet are
+  keyed on `html.h5p-iframe`: the base sans-serif font, the content's 16px/1.5 type, full width,
+  the fullscreen heights. In a normal install H5P writes that class onto the `<html>` of the
+  iframe it creates; div embedding puts it on a `<div>`, where none of those selectors can match
+  and the content renders unstyled in the browser's default serif. This document *is* the H5P
+  document, so it carries the class. Two things follow: `html` and `body` are then 100% tall, so
+  auto-resize measures `#h5p-root` rather than `documentElement.scrollHeight` — the latter can
+  never report less than the frame — and the inline frame CSS must not fight the core rules.
+- **Every response needs a `Content-Type`.** A zip records none. Browsers ignore a stylesheet that
+  is not `text/css`, and Safari refuses media served as `application/octet-stream`.
+- **The frame CSP's runtime allowlist is written without schemes.** `RUNTIME_ALLOWLIST` in
+  `frame-document.ts` names the origins real content types reach at runtime — a MathJax CDN, and
+  Google's WebFont loader plus the two Google Fonts origins it pulls in turn. A scheme-less
+  host-source is matched against the page's own scheme, so an https frame accepts only https
+  while `http://localhost` also accepts http. That is not cosmetic: pre-2022 H5P.ArithmeticQuiz
+  builds its loader URL with `('https:' == document.location.protocol ? 'https' : 'http')`, so a
+  `https://`-pinned entry blocks it during local development. When a content type is blocked, the
+  console names the directive and the origin — add it here, to the right directive, and remember
+  that one feature often spans three (script, style, font). The list covers what H5P itself
+  loads: MathJax, Google's WebFont loader, and the YouTube, Vimeo and Panopto player APIs that
+  H5P.Video puts in the document before embedding a player (`frame-src *` covers the embed, not
+  the script that creates it). A host that only some deployments use — a tenant's Panopto server
+  — belongs in the host's `allow-origins` attribute instead, which appends host-sources and drops
+  anything that is not plainly a host, so a value cannot append directives of its own.
+- **Clearing site data demolishes three things at once, all held by handles that still look
+  valid.** The IndexedDB connection is force-closed, so `idb.ts` listens for `versionchange` and
+  `close`, drops the cached handle, and retries a transaction once on `InvalidStateError` —
+  otherwise every later call throws "the database connection is closing" for the rest of the
+  worker's life. The Service Worker registration is unregistered, so `ensureWorker` re-checks it
+  with `getRegistration` on every load instead of trusting its cached one; without that, the
+  routes fall through to the origin, and a dev server or SPA host answers an unknown path with
+  its own `index.html` — the frame then renders the host page inside itself, with no error
+  anywhere. The chunk store is emptied, which needs nothing: a cold package is the normal case.
+- **The element waits for *its own* registration to reach `activated`**, not for
+  `navigator.serviceWorker.ready` — that tracks the page's controller and may never resolve for a
+  nested scope.
+- **Job requests are deduplicated for two seconds, not for the whole wait.** A job can die with
+  the tab that owned it; a long window would leave the entry unserved until it expired. The real
+  deduplication is the Jobs worker's in-flight map plus a Web Lock. `waitForWatermark` re-asks
+  when the watermark has not moved for `JOB_STALL_MS`.
+
+- **The chunk writer's `abort` publishes nothing.** Everything that reached the store is already
+  recorded by the `publish` that followed its write; bytes still in the partial buffer were never
+  stored. Publishing `written` on abort — which it once did — put the watermark past the data,
+  and a reader that trusted it got a short body.
+- **An aborted job gives up its `inFlight` key at once, not when the abort finishes.** The
+  teardown takes several tasks, and a second press of Play posts `abort` and `download` back to
+  back; a key still held by the dying job made the new request look like a duplicate, and nothing
+  ever answered it. The `finally` deletes only its own entry for the same reason.
+- **A `need-file` request that times out leaves `pendingFiles`, not just its promise.** Left in
+  the map, its settled promise answered every later call for the package and the page was never
+  asked again — even once it had the file to give.
+- **`RangeHttpHandle.read` slices a `200` body as it flows, like `stream` always did.** A host
+  classified `range-http` answered `206` once, which is not a promise it always will; buffering a
+  whole-archive `200` to take a slice held the whole file, and under `segmentedStream` four of
+  them at once.
+
+- **An inline entry is inflated once per burst.** `cacheInline` keeps a per-instance map of
+  writes in flight; concurrent requests for the same cold file join the first one instead of each
+  inflating and racing on the same `cache.put`. The map dies with the worker, which only costs
+  the dedupe.
+- **The frame posts to `location.origin`, and the element checks `event.origin`.** Both sides are
+  same-origin by construction, so nothing legitimate is lost — but `pkgId` is a hash of the URL,
+  so frame URLs are guessable, and a wildcard would hand every xAPI statement to any third-party
+  page that framed one. Not `frame-ancestors 'self'`: that checks every ancestor, and Setup C puts
+  a third-party page at the top of the chain on purpose. It would also be silently ignored in a
+  `<meta>` policy, which is where the frame's CSP lives.
+- **A chunk streams out of the cache; it is not materialised.** `readRange` pipes each chunk's
+  body through, slicing a partial one as it flows, so the 64 kB a media element probes with costs
+  64 kB rather than the 8 MB chunk around it.
+- **The watermark is announced, not only polled.** `setMeta` posts each write on a
+  `BroadcastChannel`; `waitForWatermark` wakes on the notice and polls at `WATERMARK_POLL_MS`
+  only as the fallback that catches a dead job. Two channel objects, because a channel never
+  hears itself — which is also what lets the unit test hear it.
+- **The Jobs worker keeps one reader per package.** The central directory does not change, and
+  re-reading it per extraction was a round of ranged requests per job for an answer it had.
+- **Bulk fetches are `cache: 'no-store'`.** The chunk store is the cache; a second copy in the
+  browser's HTTP cache doubled the storage for nothing.
+- **An unknown `pkgId` is a 404 on every route.** `UnknownPackageError` is what `openReader`
+  throws for a package the table does not know, and `handleFetch` maps it before the generic
+  `bad-archive` → 422.
+- **Eviction never touches a package under a Web Lock, in any tab.** Every lock name starts with
+  `h5p:<pkgId>:` (`locks.ts`): the Jobs worker holds one per download or extraction for as long
+  as it writes — the job key *is* the lock name — and the element holds `playing`, shared, for as
+  long as a package is loaded. `busyPackages()` reads `navigator.locks.query()` and
+  `coldestIdlePackage` skips anything held, so a write in one tab or a learner mid-video in
+  another survives a quota squeeze caused by a third. Both workers install the same policy through
+  `installEvictionPolicy`; before that the Jobs worker — where the large writes, and so the quota
+  errors, actually are — had no policy and evicted whichever cache the browser listed first.
+
+## The element's own box
+
+Three things about the shadow CSS that are easy to undo by accident:
+
+- **The layout lives on an inner `.viewport` wrapper, not on `:host`.** Any rule in the host page
+  that names the element — `h5p-player { display: block; height: 400px }`, the obvious thing to
+  write — beats a `:host` rule whatever its specificity. Putting the flex column on `:host` looks
+  right and collapses the frame to an iframe's intrinsic 150px the moment a host styles the
+  element at all.
+- **`.viewport` has both `height: 100%` and `min-height: inherit`.** The first covers a host given
+  an explicit height, the second a host given only a `min-height`, where a percentage height
+  resolves to auto.
+- **`:host([hidden])` needs `!important`**, for the same cascade reason: a host's `display` beats
+  the shadow tree's, and the UA `[hidden]` rule loses to both.
+
+H5P's fullscreen targets the frame, which the browser sizes itself — the iframe matches
+`:fullscreen`, the host does not. `:host(:fullscreen)` is there for a host page calling
+`requestFullscreen()` on the element, where auto-resize's inline height would otherwise pin it.
+
+## Sizing
+
+The element speaks H5P's own resizer protocol, the exchange `h5p-resizer.js` implements for a
+site embedding h5p.org content. The frame sends `hello`, `prepareResize` and `resize` to
+`window.parent` with `context: 'h5p'`; `onResizerMessage` answers them.
+
+Answering `hello` is load-bearing. Until it is answered H5P leaves its document at full height
+and never reports a content size — so a missing reply looks like "sizing does not work" rather
+than like a failed handshake. On the reply it sets `body { height: auto; overflow: hidden }` and
+starts reporting, which is what the handshake test asserts.
+
+Sizes come from the resize events content types raise when they actually change. A
+`ResizeObserver` on the frame would both miss those and fire on changes that are not resizes;
+H5P also deliberately stays quiet when a resize would not change the height, so no event is not
+the same as a broken exchange.
+
+`externalEmbed: false` is the other native mode and is **not** usable here: it has the frame call
+`window.parent.H5P.fullScreen(...)`, read `window.parent.H5P.isFullscreen` and forward xAPI
+through `window.parent.H5P.externalDispatcher`. That assumes the embedding page is itself an H5P
+page with core loaded — which is the arrangement this whole design exists to avoid.
+
+## Build shape
+
+Three artefacts, built three different ways, because they are consumed three different ways:
+
+| Artefact | Built by | Why |
+|---|---|---|
+| `dist/h5p-player.js` | Vite library build | An ES module the host imports |
+| `dist/h5p-sw.js` | esbuild, IIFE | Registered by URL; has to run on a site with no build step |
+| `dist/h5p-sw-mount.js` | esbuild, ESM | For hosts that enforce one worker per origin |
+| `dist/frame-assets/` | copied verbatim | h5p-standalone, unmodified |
+
+The Jobs worker is not an artefact: `vite.config.ts` bundles it with esbuild into a string behind
+`virtual:h5p-jobs-worker`, and the element spawns it from a `blob:` URL. One fewer file for a host
+to deploy.
+
+In dev the same plugin file serves the Service Worker at any path ending in `/h5p-sw.js`, so
+`new URL('./h5p-sw.js', import.meta.url)` resolves in dev and in a consuming app alike. **esbuild
+bundles both workers behind Vite's back**, so the plugin has a `handleHotUpdate` that invalidates
+the virtual module when anything under `src/` changes. Without it the page keeps running a worker
+bundle that no longer matches the source — a genuinely confusing hour.
+
+## Testing
+
+Unit tests cover the pure logic: name normalisation, range parsing, chunk arithmetic, strategy
+selection, the CSP and the generated frame document. They are fast and are where a rule belongs.
+
+Browser tests drive the real element in chromium. They are the only place the interesting parts
+exist at all — a worker serving a `206` assembled out of cache chunks has no meaningful behaviour
+outside a browser. Two things to know when writing them:
+
+- **The test page is not controlled by the worker.** Its scope is `/src/h5p/` and the test page is
+  not under it, exactly as a host page is not. A `fetch` of a virtual URL from the test realm goes
+  to the network and 404s. Use `frameFetch(player, url)` from `tests/browser/utils.ts`, which
+  fetches through the frame — the client the worker actually controls.
+- **State carries between tests.** Caches and the `packages` table survive; `play()` replaces the
+  document body, which disconnects the previous element and terminates its Jobs worker mid-job. A
+  test that needs a cold load must call `clearPackageCaches()`.
+
+`large-deflated.h5p` carries `content/media/unused.bin`, large and deflated and referenced by
+nothing. It is the only way to tell a prefetch from a demand fetch: the fixture's own
+`big.bin` is rendered as a video by the test library, so the runtime requests it either way.
+
+Fixtures are generated (`scripts/build-fixtures.mjs`) rather than committed, because two of them
+need entries no ordinary zip tool will write — a path traversal, and 20 MB of media to take the
+slice and chunk paths. The script clears only the archives it owns, so a real `.h5p` dropped into
+`public/fixtures/` to try against the demo survives `npm run dev`.
+
+For a manual check against a real, fully bundled package (eight libraries, a genuine H5P content
+type), the h5p-standalone repo ships one:
+
+```bash
+curl -sL -o public/fixtures/real.h5p \
+  https://raw.githubusercontent.com/tunapanda/h5p-standalone/master/test/h5p-test.h5p
+```
+
+## Where this differs from the written design
+
+The architecture and setup documents predate the code. These are deliberate additions, not drift:
+
+- A `resize` event and an `auto-resize` attribute. H5P content sizes itself, and without these
+  every host page has to reimplement the same listener.
+- A `statechange` event, so a host can mirror `state` without polling.
+- A chunked entry requested with no `Range` header is answered `200` with its true length and a
+  body that follows the extraction. Chrome's first request for a media resource carries no
+  `Range`, and the design's original `503` there kept a cold video from ever starting. The `503`
+  with `Retry-After: 1` survives only for an entry whose extraction has produced no bytes at all
+  within the stall window.
+- Eviction is lock-aware across tabs, not only "never the package currently being served". The
+  design's rule protected the package doing the writing; a Web Lock under `h5p:<pkgId>:` — held
+  by a writing job or a playing element anywhere on the origin — now protects any package in use.
+- Generated types live in `types/`, not `dist/index.d.ts`.
+
+## Not built yet
+
+Deliberately out of scope for v1, per the architecture document: the editor, offline management
+(save, library, delete), results storage and save-and-resume, persistent file handles. xAPI is
+emitted as events and stored nowhere.

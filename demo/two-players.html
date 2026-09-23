@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>h5p-offline-player — two players</title>
+    <link rel="stylesheet" href="/demo/player-page.css" />
+    <script type="module" src="/src/h5p-offline-player.ts"></script>
+  </head>
+
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">H5</span>h5p-offline-player</a>
+      <nav aria-label="Site">
+        <a href="/">Player</a>
+        <a href="/demo/" aria-current="page">Examples</a>
+      </nav>
+    </header>
+
+    <main>
+      <h1>Two on one page</h1>
+      <p class="lede">
+        H5P core assumes it owns the page — global <code>H5P</code>, global
+        <code>H5PIntegration</code>, global CSS. Each player gets its own frame document, so two of
+        them on one page do not collide.
+      </p>
+
+      <h5p-player src="/fixtures/basic.h5p" auto-resize></h5p-player>
+      <h5p-player src="/no-range/basic.h5p" auto-resize></h5p-player>
+
+      <footer><a href="/demo/">All examples</a> · <a href="/">Player page</a></footer>
+    </main>
+
+    <script type="module">
+      for (const player of document.querySelectorAll('h5p-player')) {
+        player.addEventListener('resize', (event) => {
+          player.style.height = `${Math.max(event.detail.height, 240)}px`
+        })
+      }
+    </script>
+  </body>
+</html>

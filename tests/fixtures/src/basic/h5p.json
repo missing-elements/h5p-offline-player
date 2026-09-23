@@ -1,0 +1,10 @@
+{
+  "title": "Offline player test",
+  "language": "en",
+  "mainLibrary": "H5P.OfflineTest",
+  "embedTypes": ["div"],
+  "license": "MIT",
+  "preloadedDependencies": [
+    { "machineName": "H5P.OfflineTest", "majorVersion": 1, "minorVersion": 0 }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "emitDeclarationOnly": false,
+    "noEmit": true,
+    "rootDir": ".",
+    "types": ["vite/client", "node"]
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts"],
+  "references": []
+}
