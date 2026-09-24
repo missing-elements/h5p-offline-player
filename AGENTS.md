@@ -204,7 +204,9 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   `preload="auto"` does. What remains theoretically possible is deflate resynchronisation —
   brute-force a block boundary near the end, decode forward, discard the first 32 kB as
   window-contaminated, recover `moov`, and serve a synthesized faststart file — which needs a
-  hand-written bit-level inflate and is not worth it for one badly built zip.
+  hand-written bit-level inflate and is not worth it for one badly built zip. The other cost of a deflated
+  video — the whole of it is pulled once anything touches it, watched or not — has a design and
+  no code yet: demand-paced extraction, under *Not built yet*.
 - **Prefetch waits for `ready`, runs one entry at a time, and is off by default.** Not at index
   time: those bytes would compete with the archive reads that boot the runtime and make the player
   itself slower to appear. Not in parallel: two concurrent extractions just halve the rate of
@@ -722,3 +724,42 @@ The architecture and setup documents predate the code. These are deliberate addi
 Deliberately out of scope for v1, per the architecture document: the editor, offline management
 (save, library, delete), results storage and save-and-resume, persistent file handles. xAPI is
 emitted as events and stored nowhere.
+
+**Demand-paced extraction.** Considered on 2026-09-25 against a real package and deferred; the
+design is recorded here so it does not have to be rediscovered. Today the first request for a
+deflated entry starts a job that inflates the whole file, because a deflate stream cannot be
+restarted in the middle. Measured: an 80 MB deflated mp4 (ratio 0.937, faststart; H5P.Video creates
+its `<video>` with `preload="metadata"`, so the header is asked for the moment the content renders)
+pulled 26 MB from GitHub Pages in the first 15 s with the video paused, and the whole 81 MB from a
+local host, whether or not play was pressed. Interactive Video's icon fonts and SVGs, which the
+browser requests only once their CSS applies, then queued behind four 4 MB segments: 1.3–1.8 s
+each against 52 ms on the idle link. That is the "UI still loading while the video already plays"
+a user sees. Two things were tried and ruled out: priority hints on the segment fetches change
+nothing on that host (240–306 ms per small read under load, hint or no hint), and smaller segments
+only slow the video — the contest is for bandwidth, and only pulling fewer bytes wins it. Random
+access into the stream is not an option either: a checkpoint index would need a bit-level
+inflater and could only cover the part already inflated, which the chunk store serves anyway.
+
+A deflate stream cannot be restarted, but it can be paused: the inflater's state is a few tens of
+kilobytes in the Jobs worker, and `segmentedStream` already stops opening requests when its output
+is not consumed. The design:
+
+- The Service Worker's streaming path announces consumption on the watermark channel, the way it
+  announces liveness today: entry, and the position read up to.
+- The chunk writer gates its writes at the highest announced position plus a read-ahead of one or
+  two segments, and waits for the next notice.
+- Prefetch (`preload`) announces unbounded demand; running ahead is its point.
+- A forward seek announces its position, and the job runs at full speed until it gets there.
+
+It buys a few megabytes at boot instead of the whole file, nothing on the network while paused,
+and icon contention of a couple of seconds on a slow link instead of the whole load. It does not
+change what deflate costs: a seek past the watermark still waits for the transfer of everything in
+between, and the cache then holds what was watched rather than the whole file, so replaying an
+unwatched part is a network cost again. The delicate part is `waitForWatermark`: a job paused for
+lack of demand must not read as a dead one, so either the pause is visible on the channel or the
+stall clock starts only once demand has been announced. Roughly 150 lines across the chunk
+writer, the channel, `mount.ts` and the Jobs worker, plus tests. Deferred because the package-side
+fix exists — `npm run normalize` stores the video, after which the media element drives every byte
+and the same boot pulled 1.4 MB instead of 81 — and because it is not yet known how often the
+player is handed a deflated video nobody can normalize: the h5p.com export analysed above stored
+everything, while this one and the sodix.de one deflated everything.
