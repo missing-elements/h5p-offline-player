@@ -178,8 +178,11 @@ async function downloadArchive(
     throw new PlayerError('network', 'The archive response had no body')
   }
 
+  // The probe's size first: it was measured through a ranged request, which browsers make with
+  // `Accept-Encoding: identity`. This response is a plain `GET` when nothing is being resumed,
+  // and a host that compresses the archive answers that with the compressed copy's length.
   const declared = response.headers.get('content-length')
-  const totalSize = declared ? Number(declared) + startOffset : source.size
+  const totalSize = source.size ?? (declared ? Number(declared) + startOffset : null)
 
   // Index the archive as it passes: a host that ignores `Range` would otherwise keep every entry
   // hostage until the central directory arrives, at the very end. The scanner reads the local

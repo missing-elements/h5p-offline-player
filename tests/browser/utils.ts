@@ -23,6 +23,8 @@ export const FIXTURES = {
   noRangeBasic: '/no-range/basic.h5p',
   noRangeLargeStored: '/no-range/large-stored.h5p',
   noRangeStreamed: '/no-range/streamed.h5p',
+  /** From a host that honours `Range` but gzips the archive for a client that accepts it — GitHub Pages. */
+  compressingBasic: '/compressing/basic.h5p',
   /** A genuine 404. The dev server answers a missing `/fixtures/…` with its HTML fallback. */
   missing: '/no-range/missing.h5p',
   /** A URL that answers 200 with a page instead of an archive — a login wall, in the wild. */

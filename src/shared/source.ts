@@ -87,9 +87,9 @@ export async function probeSource(
     const size = parseContentRangeSize(response.headers.get('content-range'))
     await discardBody(response)
 
-    // `Content-Range` is not CORS-safelisted; `Content-Length` is. When the host exposes neither
-    // usable size, a second plain GET gives one from `Content-Length`.
-    const resolved = size ?? (await sizeFromPlainGet(url, signal))
+    // `Content-Range` is not CORS-safelisted; `Content-Length` is. When the host does not expose
+    // it, a second ranged request gives the size from `Content-Length` instead.
+    const resolved = size ?? (await sizeFromOpenRange(url, signal))
     if (resolved === null) {
       // Range works but the length is unknowable, so the central directory cannot be found from
       // the end. Download it instead.
@@ -105,10 +105,24 @@ export async function probeSource(
   return { type: 'chunked', url, size: declared ? Number(declared) : null, validator }
 }
 
-async function sizeFromPlainGet(url: string, signal?: AbortSignal): Promise<number | null> {
-  const response = await fetch(url, { signal, cache: 'no-store' })
+/**
+ * The size of an archive whose host does not expose `Content-Range`: a `206` to `Range: bytes=0-`
+ * carries the whole length in `Content-Length`, and the body is dropped as soon as the headers
+ * arrive.
+ *
+ * A ranged request, not the plain `GET` this once was. A host that compresses the archive on the
+ * way out — GitHub Pages gzips `application/octet-stream` — answers a plain `GET` with the
+ * compressed copy's length, and `Content-Encoding` is not readable cross-origin either, so nothing
+ * marks it as the wrong number: an 84.6 MB package measured 84.4 MB, and zip.js looked for the end
+ * of the central directory 275 kB short of it. Chromium, Firefox and WebKit all send
+ * `Accept-Encoding: identity` on a request that carries a `Range` header, so a ranged answer is
+ * measured in the same bytes the ranges will later be served in.
+ */
+async function sizeFromOpenRange(url: string, signal?: AbortSignal): Promise<number | null> {
+  const response = await fetch(url, { headers: { Range: 'bytes=0-' }, signal, cache: 'no-store' })
   const length = response.headers.get('content-length')
   await discardBody(response)
+  if (!response.ok) return null
   return length ? Number(length) : null
 }
 

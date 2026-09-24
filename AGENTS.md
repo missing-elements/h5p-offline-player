@@ -301,6 +301,22 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   whole-archive `200` to take a slice held the whole file, and under `segmentedStream` four of
   them at once.
 
+- **The archive's size never comes from a plain `GET`.** When a host does not expose
+  `Content-Range`, the probe measures the archive with `Range: bytes=0-` and reads `Content-Length`
+  off the `206`, and the Jobs worker's download trusts that size over the `Content-Length` of its
+  own plain `GET`. A host that compresses the archive on the way out — GitHub Pages gzips
+  `application/octet-stream` — answers a plain `GET` with the gzipped copy's length, and
+  `Content-Encoding` is not readable cross-origin either, so nothing marks the number as wrong: an
+  84.6 MB package measured 84.4 MB, and zip.js searched for the end of the central directory
+  275 kB short of it — "Could not read the archive index" within a second. Chromium, Firefox and
+  WebKit all send `Accept-Encoding: identity` on any request carrying a `Range` header, which is
+  also why the ranged reads themselves were right all along. A suffix range (`bytes=-22`, the
+  end-of-central-directory record without knowing the size) is not an alternative: it is not a
+  simple range in the Fetch spec's sense, so it triggers a preflight that a static host does not
+  answer, and the fetch fails. `/compressing/<fixture>` on the dev server is that host, gzip
+  applied to ranges too when the request accepts it; `tests/browser/compressing-host.test.ts`
+  pins the browser behaviour the probe depends on, and `tests/unit/source-probe.test.ts` covers
+  the fallback with CORS-filtered headers.
 - **An inline entry is inflated once per burst.** `cacheInline` keeps a per-instance map of
   writes in flight; concurrent requests for the same cold file join the first one instead of each
   inflating and racing on the same `cache.put`. The map dies with the worker, which only costs
@@ -652,6 +668,13 @@ outside a browser. Two things to know when writing them:
 to 20 kB, which is never fetched in segments, so only this archive takes `segmentedStream` end to
 end. The slow-link test in `tests/browser-emulated/` throttles the browser to 1 MB/s and expects
 the first bytes of it inside eight seconds.
+
+`/compressing/<fixture>` is the dev server standing in for GitHub Pages: `Range` honoured, CORS
+open, and the archive gzipped — ranges included, cut from the gzipped copy — whenever the request
+accepts gzip, which a browser's plain `GET` does and its ranged requests do not. In the suite it is
+same-origin, so every header is readable and the probe never needs its size fallback there; the
+browser test pins the two lengths the same archive answers with, and the unit test covers the
+fallback against headers filtered the way CORS filters them.
 
 `large-deflated.h5p` carries `content/media/unused.bin`, large and deflated and referenced by
 nothing. It is the only way to tell a prefetch from a demand fetch: the fixture's own
