@@ -695,6 +695,34 @@ curl -sL -o public/fixtures/real.h5p \
   https://raw.githubusercontent.com/tunapanda/h5p-standalone/master/test/h5p-test.h5p
 ```
 
+## Licensing
+
+The package is `(MIT AND GPL-3.0-only)`, and the parenthesis is the point: our code is MIT,
+`dist/frame-assets/` is not. h5p-standalone declares MIT and its own code is, but its
+`frame.bundle.js` is built from `vendor/h5p/js/` — h5p.js, the event dispatcher, xAPI, the content
+type base, the confirmation dialog, the request queue, the action bar, the tooltip — copied from
+`h5p/h5p-php-library`, which is GPL-3.0 by its LICENSE.txt and composer.json. H5P's own licensing
+page says the GPL is there because of the HTML purifier on the PHP side and has promised since
+2017 to make it optional; the JavaScript carries no separate grant, so it is GPL by the
+repository's terms. The core stylesheet and the `h5p-*` icon fonts come from the same repository.
+Upstream confirmed the consequence in tunapanda/h5p-standalone#188 on 2026-08-26 and has not
+changed its metadata. Three things follow:
+
+- `NOTICE.md` at the root is kept by hand; `LICENSE.txt` and `NOTICE.txt` inside `frame-assets/`
+  are written by `sync-h5p-assets.mjs`, so they always name the h5p-standalone tag actually
+  vendored — that tag is the corresponding source, since upstream records no h5p-php-library
+  revision. Bumping h5p-standalone regenerates them and means re-reading `NOTICE.md`; do not
+  hand-edit anything under `public/frame-assets/`.
+- Both worker bundles and the minified element are built with `legalComments: 'none'`, so the
+  zip.js BSD-3-Clause notice does not survive into `dist/`. `NOTICE.md` reproduces it, which is
+  what its clause 2 asks for. A new dependency that ends up in a bundle means a new entry there.
+- The demo site serves the same directory, so the same files are on it, and `index.html`'s
+  JSON-LD names both licences.
+
+Whether the copyleft reaches our own code is a legal question and is not settled here. The
+element and the workers exchange only messages and HTTP with the runtime; the frame boot script
+runs in the same document and calls its API.
+
 ## Where this differs from the written design
 
 The architecture and setup documents predate the code. These are deliberate additions, not drift:

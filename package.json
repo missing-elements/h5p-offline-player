@@ -2,7 +2,7 @@
   "name": "@missing-elements/h5p-offline-player",
   "version": "0.1.1",
   "description": "Browser-only H5P player web component. Plays arbitrary .h5p archives from a URL or a local file, with no server-side extraction.",
-  "license": "MIT",
+  "license": "(MIT AND GPL-3.0-only)",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/missing-elements/h5p-offline-player.git"
@@ -31,7 +31,9 @@
   },
   "files": [
     "dist",
-    "types"
+    "types",
+    "NOTICE.md",
+    "licenses"
   ],
   "keywords": [
     "h5p",

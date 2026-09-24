@@ -274,5 +274,19 @@ Working on the code? Start with [AGENTS.md](AGENTS.md).
 
 ## Licence
 
-MIT. Bundles [h5p-standalone](https://github.com/tunapanda/h5p-standalone) (MIT) as the runtime
-and [zip.js](https://github.com/gildas-lormeau/zip.js) (BSD-3-Clause) as the archive reader.
+The player's own code — the element, the two workers, the scripts — is MIT, see
+[LICENSE](LICENSE). The package as published is not MIT alone, and its `license` field says so:
+`(MIT AND GPL-3.0-only)`.
+
+- `dist/frame-assets/` is the H5P core runtime, copied unmodified from
+  [h5p-standalone](https://github.com/tunapanda/h5p-standalone). h5p-standalone's own code is
+  MIT, but its `frame.bundle.js`, stylesheet and icon fonts come from
+  [h5p-php-library](https://github.com/h5p/h5p-php-library), which is **GPL-3.0**; upstream
+  confirms it in [issue #188](https://github.com/tunapanda/h5p-standalone/issues/188) while
+  its npm metadata still says MIT. The directory carries its own `LICENSE.txt` and `NOTICE.txt`.
+  Keep them with it when you copy or serve it: a site serving these files is distributing GPL
+  code. Whether the copyleft reaches the page around the player is a legal question, not one
+  this README answers.
+- The three scripts in `dist/` bundle [zip.js](https://github.com/gildas-lormeau/zip.js)
+  (BSD-3-Clause). Minification strips its notice from the files, so
+  [NOTICE.md](NOTICE.md) reproduces it.

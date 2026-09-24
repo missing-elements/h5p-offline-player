@@ -112,6 +112,16 @@ input.onchange = () => (p.file = input.files[0]);
 5. Worker serves each file by strategy: small entries from cache, stored media by slicing, deflated media from chunks — a cold entry starts an extraction job in the page-side worker and is served progressively.
 6. xAPI statements arrive as `xapi` events on the element; nothing is stored.
 
+## Licences
+
+The player's code is MIT. `dist/frame-assets/` is not: it is the H5P core runtime, which is
+GPL-3.0, and the package's `license` field reads `(MIT AND GPL-3.0-only)` for that reason. The
+directory carries a `LICENSE.txt` and a `NOTICE.txt` naming what is in it and where it came from.
+With a bundler (Setup A) they travel with the directory; when you copy `dist/` by hand, copy them
+too; with the CDN (Setup B) they are served from there. A site that serves the runtime to browsers
+is distributing GPL code, so keep the notices reachable. The full account, including zip.js's
+BSD notice, is `NOTICE.md` in the package.
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |

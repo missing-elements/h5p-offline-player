@@ -124,6 +124,7 @@
         <li><code>h5p-sw.js</code> is on the page's own origin. With a bundler that is automatic.</li>
         <li>The package's host sends CORS headers, or no browser can read the file. Without them the element reports <code>error: no-cors</code>, and your page can offer a file picker instead.</li>
         <li><code>Range</code> support on the host is optional. With it a 300 MB package starts after a few kilobytes; without it the archive is downloaded once and played from the browser's cache, booting as soon as its libraries have arrived.</li>
+        <li>Licences: the player's code is MIT. <code>frame-assets/</code> is the H5P core runtime, which is GPL-3.0, and carries its own <code>LICENSE.txt</code> and <code>NOTICE.txt</code>; keep them with it when you copy or serve it. The package's <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/NOTICE.md" rel="noopener">NOTICE.md</a> has the full account.</li>
       </ul>
 
       <h2>Listening to it</h2>
