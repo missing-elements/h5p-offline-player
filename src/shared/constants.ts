@@ -1,5 +1,5 @@
 /** Version of the element/worker pair. Kept in sync with package.json by scripts/sync-h5p-assets.mjs. */
-export const VERSION = '0.1.1'
+export const VERSION = '0.1.2'
 
 /** Major version. Cache names carry it, so a major bump discards every cached package. */
 export const MAJOR_VERSION = 0
