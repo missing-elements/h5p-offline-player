@@ -147,6 +147,13 @@ describe('buildFrameDocument', () => {
     expect(html).toContain('target.dataset.h5p')
   })
 
+  it('pins a YouTube iframe over its box, which H5P.Video up to 1.6.66 fails to do itself', () => {
+    // Its handler sets the style through a minified private field of the YouTube API object,
+    // `player.g`, which YouTube renamed; the line throws and the iframe lands below its 16:9 box,
+    // clipped away by the wrapper — a black picture with sound.
+    expect(html).toMatch(/\.h5p-video\.h5p-youtube iframe \{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; \}/)
+  })
+
   it('forwards xAPI to the parent, the only channel results have', () => {
     expect(html).toContain("dispatcher.on('xAPI'")
     expect(html).toContain('parent.postMessage')

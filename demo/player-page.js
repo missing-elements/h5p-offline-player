@@ -82,7 +82,10 @@ player.addEventListener('finished', (event) => {
 player.addEventListener('error', (event) => {
   const { code, message: detail, missingLibraries } = event.detail
   bar.hidden = true
-  show(EXPLANATIONS[code] ?? detail, 'error')
+  // A runtime error once the content is up does not stop it — content types throw non-fatal
+  // exceptions routinely — so it is shown as a note, not as the player failing.
+  const late = code === 'runtime' && player.state === 'ready'
+  show(late ? `The content reported an error and kept running: ${detail}` : (EXPLANATIONS[code] ?? detail), late ? 'hint' : 'error')
   write(`error  ${code}: ${detail}`)
 
   // The element reports what a package is missing; offering to go and get it is the host's call,

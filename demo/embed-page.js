@@ -105,6 +105,12 @@ player.addEventListener('error', (event) => {
     })
     return
   }
+  // Once the content is up, a runtime error inside it is the content's business: it keeps
+  // running, and a red notice over a working video would say otherwise.
+  if (code === 'runtime' && player.state === 'ready') {
+    console.warn(`h5p-player: the content reported an error and kept running: ${message}`)
+    return
+  }
   say(message || code, 'error')
 })
 

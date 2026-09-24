@@ -170,6 +170,8 @@ export function buildFrameDocument(options: FrameDocumentOptions): string {
   html, body { background: transparent; }
   body { overflow-x: hidden; }
   #h5p-root { width: 100%; }
+  /* H5P.Video 1.6.66 library workaround */
+  .h5p-video.h5p-youtube iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
 </style>
 </head>
 <body>

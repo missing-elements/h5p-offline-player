@@ -92,7 +92,7 @@ Events (all `CustomEvent`, payload in `detail`):
 | `xapi` | Any xAPI statement from the content — the only channel for results; nothing is stored |
 | `finished` | Content reported completion / score |
 | `progress` | Download or extraction progress for the current package, `fraction` 0–1 |
-| `error` | `code`: `no-cors`, `no-worker`, `network`, `quota`, `bad-archive`, `runtime` (content type failed inside the frame, e.g. a library missing from the package) |
+| `error` | `code`: `no-cors`, `no-worker`, `network`, `quota`, `bad-archive`, `runtime` (content type failed inside the frame, e.g. a library missing from the package). A `runtime` error after `ready` leaves `state` at `ready`: the content threw but is still running, so do not hide the player on it |
 
 ```js
 const p = document.querySelector('h5p-player');
@@ -128,6 +128,8 @@ input.onchange = () => (p.file = input.files[0]);
 | Console: "violates the following Content Security Policy directive" | The content loads a script, style or font from an origin the frame does not permit | Built in: MathJax CDNs, Google WebFont, YouTube, Vimeo, Panopto. Anything else goes in `allow-origins` |
 | A video shows nothing for minutes, then plays normally | Its mp4 is deflated in the zip *and* not faststart, so the index it needs is the last few kilobytes of a file that can only be read forward. The transfer is genuinely required | Set `preload="auto"` so it starts when the content loads rather than when the learner presses play. The durable fix is to rewrite the package once with `npm run normalize -- course.h5p` from the player repository: it stores the media, moves the mp4 index to the front and leaves the content untouched |
 | `error: runtime`, content blank | Content type threw — usually a library missing from the archive, or a script blocked by the frame CSP | Check the console inside the frame; report the archive |
+| `error: runtime` while the content works | A content type threw a non-fatal exception, which many do on resize. `state` stays `ready` | Log it; nothing to fix in the host |
+| YouTube video: sound but a black picture, `error: runtime` naming `youtube.js` | H5P.Video up to 1.6.66 sets its iframe's style through a private field of the YouTube API object that YouTube renamed; the iframe lands below its box and is clipped | The player's frame styles pin the iframe anyway, so it plays. Re-export the package with H5P.Video 1.6.80 or later to lose the error |
 
 ## Single-worker hosts (advanced)
 

@@ -363,6 +363,20 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   `estimate().quota` keeps reporting the real one, so the message reads oddly there and a
   pre-flight check could not have helped. `tests/browser-emulated/` uses that same override through
   CDP, in a Vitest project of its own because the override is per browser profile.
+- **A runtime error after `ready` is an event, not a state.** Before `ready` it is the boot
+  failing and the state goes to `error`; after it the content is up and, in practice, still
+  working — H5P content types throw non-fatal exceptions routinely, on resize in particular —
+  so the element reports it and leaves `ready` alone. A host that hides the player on `error`
+  must not hide working content. The demo pages follow: the player page shows it as a note, the
+  embed page only logs it.
+- **The frame's own CSS pins a YouTube iframe over its box.** H5P.Video's YouTube handler does
+  that with `player.g.style = …`, reaching into the YouTube API object's minified internals; the
+  field was renamed, so up to 1.6.66 — the version the hub still ships, and the one inside every
+  existing export — the line throws and the iframe flows below its 16:9 box, clipped away by the
+  wrapper: sound, black picture, the same in Lumi. The rule `.h5p-video.h5p-youtube iframe`
+  says what the line meant; the fixed library (1.6.80, `getIframe()`) sets the same styles, so
+  the rule is idle there. A workaround for one library, kept because that library is inside
+  packages this player will be handed for years.
 - **The frame reports the runtime's own failed loads.** Its `error` listener is capture-phase,
   because a resource failure fires on the element and never bubbles, and it reports only tags
   marked `data-h5p` — the ones h5p-standalone injected. A content image that 404s, or an
@@ -633,6 +647,8 @@ The architecture and setup documents predate the code. These are deliberate addi
 - A `resize` event and an `auto-resize` attribute. H5P content sizes itself, and without these
   every host page has to reimplement the same listener.
 - A `statechange` event, so a host can mirror `state` without polling.
+- A `runtime` error after `ready` does not move the state to `error`. The design's state machine
+  has one `error` state; a content type that throws once after booting is not that.
 - A chunked entry requested with no `Range` header is answered `200` with its true length and a
   body that follows the extraction. Chrome's first request for a media resource carries no
   `Range`, and the design's original `503` there kept a cold video from ever starting. The `503`

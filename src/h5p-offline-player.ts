@@ -805,7 +805,11 @@ export class H5PPlayerElement extends HTMLElement {
             detail: { code: 'runtime', message: data.message }
           })
         )
-        this.setState('error')
+        // Before `ready` a runtime error is the boot failing. After it the content is up and
+        // very likely still working — H5P content types throw non-fatal exceptions routinely,
+        // on resize in particular — so it is reported and the state is left alone: a host that
+        // hides the player on `error` must not hide working content.
+        if (this.internalState !== 'ready') this.setState('error')
         return
 
       case 'relay':

@@ -213,7 +213,7 @@ Properties: `src`, `file` (a `File` from a picker — setting it loads), `pkgId`
 | `progress` | Download or extraction progress, `fraction` 0–1 (or `null` when the total is unknown) |
 | `resize` | The content's height changed |
 | `statechange` | `state` changed |
-| `error` | `code`: `no-cors`, `no-worker`, `network`, `quota`, `bad-archive`, `runtime` |
+| `error` | `code`: `no-cors`, `no-worker`, `network`, `quota`, `bad-archive`, `runtime`. A `runtime` error after `ready` leaves `state` at `ready`: the content threw but is still running |
 
 ```js
 const player = document.querySelector('h5p-player')
