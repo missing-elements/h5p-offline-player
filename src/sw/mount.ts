@@ -1,6 +1,7 @@
 import {
   ARCHIVE_ENTRY,
   COLD_ENTRY_WAIT_MS,
+  FAILURE_BACKOFF_MS,
   JOB_REQUEST_DEDUPE_MS,
   VERSION,
   WATERMARK_POLL_MS
@@ -10,8 +11,10 @@ import {
   FORWARD_INDEX_ENTRY,
   QuotaError,
   deleteStaleCaches,
+  isQuotaError,
   onWatermark,
-  type ChunkMeta
+  type ChunkMeta,
+  type EntryFailure
 } from '../shared/chunk-store'
 import { installEvictionPolicy } from '../shared/eviction'
 import { normalizeRequestPath } from '../shared/entry-names'
@@ -19,16 +22,18 @@ import { contentTypeOf } from '../shared/mime'
 import {
   PlayerError,
   type FromWorkerMessage,
+  type PackageRecord,
   type ToWorkerMessage,
   type WorkerReply
 } from '../shared/protocol'
 import { contentRange, parseRange, type ByteRange } from '../shared/range'
 import { openSource } from '../shared/source'
 import * as db from '../shared/idb'
-import { PackageReader, type IndexedEntry, type LocatedEntry } from './package-reader'
+import { PackageReader, STORED, type IndexedEntry, type LocatedEntry } from './package-reader'
 import { buildFrameDocument, createNonce } from './frame-document'
 import { matchRoute, routesFor, type RouteMatch, type Routes } from './routes'
 import { sliceStream } from '../shared/stream-utils'
+import { quotaMessage } from '../shared/storage'
 
 /**
  * The Service Worker half of the player: a virtual file server over a zip that is never
@@ -94,6 +99,12 @@ class VirtualServer {
   private requestedJobs = new Set<string>()
   /** Inline entries being inflated into the cache right now, so a burst for one file inflates it once. */
   private inflating = new Map<string, Promise<void>>()
+  /**
+   * Until when the store is taken to be full. Set when a cache write is refused for lack of space
+   * and nothing was left to evict; while it stands, inline entries are served straight from the
+   * archive without another attempt to cache them.
+   */
+  private storageFullUntil = 0
 
   constructor(
     private readonly worker: ServiceWorkerGlobalScope,
@@ -122,15 +133,14 @@ class VirtualServer {
           return
 
         case 'register':
-          await db.putPackage(message.record)
-          this.readers.delete(message.record.pkgId)
+          await this.registerPackage(message.record)
           reply({ ok: true, type: 'ack' })
           return
 
         case 'index': {
           const reader = await this.refresh(message.pkgId, await this.reader(message.pkgId))
           if (!reader.partial) {
-            await db.updatePackage(message.pkgId, { status: 'indexed', lastPlayed: Date.now() })
+            await bookkeeping(db.updatePackage(message.pkgId, { status: 'indexed', lastPlayed: Date.now() }))
           }
           reply({
             ok: true,
@@ -166,8 +176,22 @@ class VirtualServer {
         }
       }
     } catch (error) {
-      reply(toErrorReply(error))
+      reply(await toErrorReply(error))
     }
+  }
+
+  /**
+   * Writes the package's row. On an origin with no room left for even that, a row already there
+   * for the same package is kept and serves: it names the same source — the id is a hash of it —
+   * and a package that played before can play again from an archive nothing needs to store.
+   */
+  private async registerPackage(record: PackageRecord): Promise<void> {
+    try {
+      await db.putPackage(record)
+    } catch (error) {
+      if (!isQuotaError(error) || !(await db.getPackage(record.pkgId))) throw error
+    }
+    this.readers.delete(record.pkgId)
   }
 
   /* ---------------------------------------------------------------- request routing */
@@ -206,7 +230,7 @@ class VirtualServer {
     const record = await db.getPackage(pkgId)
     if (!record) return text('Unknown package', 404)
 
-    await db.touchPackage(pkgId)
+    await bookkeeping(db.touchPackage(pkgId))
 
     const nonce = createNonce()
     const body = buildFrameDocument({
@@ -270,7 +294,16 @@ class VirtualServer {
     }
   }
 
-  /** Small entries and anything the runtime parses: inflate once into the cache, then serve. */
+  /**
+   * Small entries and anything the runtime parses: inflate once into the cache, then serve.
+   *
+   * The cache is a convenience here, not a need. When the browser refuses the write for lack of
+   * space — after eviction has found nothing more to drop — the entry is served from the archive
+   * directly, and the store is left alone for `FAILURE_BACKOFF_MS` so a burst of requests does
+   * not repeat the failed copy for each of them. A package on a host that honours `Range`, or
+   * picked from disk, therefore plays with no storage at all; what it loses is only the speed of
+   * a second play.
+   */
   private async serveInline(
     { reader, entry }: LocatedEntry,
     rangeHeader: string | null
@@ -278,12 +311,18 @@ class VirtualServer {
     const store = new ChunkStore(reader.pkgId)
 
     let cached = await store.getWhole(entry.name)
-    if (!cached) {
-      await this.cacheInline(store, reader, entry)
-      cached = await store.getWhole(entry.name)
+    if (!cached && Date.now() >= this.storageFullUntil) {
+      try {
+        await this.cacheInline(store, reader, entry)
+        cached = await store.getWhole(entry.name)
+      } catch (error) {
+        if (!(error instanceof QuotaError)) throw error
+        this.storageFullUntil = Date.now() + FAILURE_BACKOFF_MS
+      }
     }
 
-    if (!cached?.body) return text('Entry could not be read', 500)
+    if (!cached) return this.serveUncached(reader, entry, rangeHeader)
+    if (!cached.body) return text('Entry could not be read', 500)
 
     const range = parseRange(rangeHeader, entry.size)
     if (range === 'unsatisfiable') return unsatisfiable(entry.size)
@@ -325,6 +364,40 @@ class VirtualServer {
     return writing
   }
 
+  /**
+   * An inline entry straight from the archive, with nothing written anywhere. A stored entry is
+   * sliced out of the source like a large one would be; a deflated one is inflated for this
+   * response alone and cut to the range as it flows.
+   */
+  private async serveUncached(
+    reader: PackageReader,
+    entry: IndexedEntry,
+    rangeHeader: string | null
+  ): Promise<Response> {
+    const range = parseRange(rangeHeader, entry.size)
+    if (range === 'unsatisfiable') return unsatisfiable(entry.size)
+
+    const whole = range === 'none' || (range.start === 0 && range.end === entry.size - 1)
+    const wanted: ByteRange = range === 'none' ? { start: 0, end: entry.size - 1 } : range
+
+    let body: BodyInit | null
+    if (entry.size === 0) body = null
+    else if (entry.method === STORED) body = await reader.sliceStream(entry, wanted)
+    else if (whole) body = reader.inflate(entry)
+    else body = sliceStream(reader.inflate(entry), wanted)
+
+    if (range === 'none') {
+      return new Response(body, { status: 200, headers: entryHeaders(entry, { length: entry.size }) })
+    }
+    return new Response(body, {
+      status: 206,
+      headers: entryHeaders(entry, {
+        length: wanted.end - wanted.start + 1,
+        contentRange: contentRange(wanted, entry.size)
+      })
+    })
+  }
+
   /** Large and stored: the bytes sit flat in the archive, so they are sliced out of the source. */
   private async serveSlice(
     { reader, entry }: LocatedEntry,
@@ -364,14 +437,28 @@ class VirtualServer {
     const askAgain = () => this.requestJob(event, pkgId, entry.name)
 
     /** Lets a response body run ahead of the extraction, chunk by chunk. */
-    const follow = async (bytes: number) =>
-      (await waitForWatermark(store, entry.name, bytes, { onStall: askAgain })) !== null
+    const follow = async (bytes: number) => {
+      const reached = await waitForWatermark(store, entry.name, bytes, { onStall: askAgain })
+      return reached !== null && (reached.complete || reached.available >= bytes)
+    }
 
     let meta: ChunkMeta | null | undefined = await store.getMeta(entry.name)
+
+    // The last attempt failed. A fresh failure is the answer — waiting out a stall to rediscover
+    // it helps nobody, and a media element takes a 507 as the error it is. An old one is retested:
+    // the space it lacked may be there now. Cleared before asking, or the wait below would read
+    // the stale record as the new attempt's result.
+    if (meta?.error) {
+      if (Date.now() - meta.error.at < FAILURE_BACKOFF_MS) return failedEntry(meta.error)
+      await store.setMeta(entry.name, { size: entry.size, available: 0, complete: false })
+      meta = undefined
+    }
+
     if (!meta || (!meta.complete && meta.available === 0)) {
       await askAgain()
       meta = await waitForWatermark(store, entry.name, 1, { onStall: askAgain })
       if (!meta) return retryLater('Extraction has not produced any bytes yet')
+      if (meta.error && meta.available === 0) return failedEntry(meta.error)
     }
 
     const range = parseRange(rangeHeader, entry.size)
@@ -632,6 +719,8 @@ async function waitForWatermark(
     for (;;) {
       const meta = await store.getMeta(entry)
       if (meta && (meta.available >= needed || meta.complete)) return meta
+      // A recorded failure is an answer too; the caller decides what to serve.
+      if (meta?.error) return meta
 
       const available = meta?.available ?? 0
       if (available !== lastAvailable) {
@@ -690,6 +779,24 @@ function retryLater(message: string): Response {
   })
 }
 
+/** What a request for an entry gets when the job that should have produced it failed. */
+function failedEntry(failure: EntryFailure): Response {
+  return text(failure.message, failure.code === 'quota' ? 507 : 500)
+}
+
+/**
+ * A write to the `packages` table that only keeps the books — `lastPlayed`, `status` — and must
+ * not take a request down with it. An origin filled to the last byte refuses these tiny writes
+ * along with the large ones, and neither is needed to serve the package.
+ */
+async function bookkeeping(write: Promise<unknown>): Promise<void> {
+  try {
+    await write
+  } catch (error) {
+    if (!isQuotaError(error)) throw error
+  }
+}
+
 function json(body: unknown): Response {
   return new Response(JSON.stringify(body), {
     headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }
@@ -711,7 +818,7 @@ class UnknownPackageError extends PlayerError {
   }
 }
 
-function toErrorReply(error: unknown): WorkerReply {
+async function toErrorReply(error: unknown): Promise<WorkerReply> {
   if (error instanceof PlayerError) {
     // The structured form travels with the message so the element can act on it — fetching the
     // libraries a package is missing needs to know which ones, and for which content type.
@@ -724,6 +831,10 @@ function toErrorReply(error: unknown): WorkerReply {
   }
   if (error instanceof QuotaError) {
     return { ok: false, code: 'quota', message: error.message }
+  }
+  if (isQuotaError(error)) {
+    // Raw from IndexedDB: the `packages` row itself did not fit.
+    return { ok: false, code: 'quota', message: await quotaMessage('this package', null) }
   }
   return {
     ok: false,

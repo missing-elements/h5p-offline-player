@@ -67,6 +67,17 @@ export const WATERMARK_POLL_MS = 500
  */
 export const JOB_REQUEST_DEDUPE_MS = 2_000
 
+/**
+ * How long a storage failure is taken at its word. After a write has been refused for lack of
+ * space, the virtual server serves inline entries straight from the archive without trying the
+ * cache again, and answers a request for an entry whose extraction failed with that failure,
+ * until this much time has passed — then it tries once more, because space may have come back:
+ * another tab closed, a package evicted, the user cleared something. Short, so a recovery is
+ * noticed; long enough that a media element probing a 10 MB entry with a burst of range requests
+ * does not copy 10 MB into a full store on every one of them.
+ */
+export const FAILURE_BACKOFF_MS = 10_000
+
 /** IndexedDB database and store names. */
 export const DB_NAME = 'h5p-player'
 export const DB_VERSION = 1

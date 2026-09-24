@@ -3,6 +3,7 @@ import type { ByteRange } from './range'
 import { sliceStream } from './stream-utils'
 import { busyPackages } from './locks'
 import type { ForwardIndexSnapshot } from './forward-index'
+import type { ErrorCode } from './protocol'
 
 /**
  * The chunk store: one Cache API cache per package. Small entries are stored whole; archives and
@@ -10,7 +11,8 @@ import type { ForwardIndexSnapshot } from './forward-index'
  * slice and nothing bigger than one chunk is ever resident.
  *
  * It is a cache, not a library. Nothing in v1 lets a user manage it; when a write hits the quota,
- * the coldest package that is not currently playing is dropped and the write is retried.
+ * the coldest package that is not currently playing is dropped — emptied first, then deleted,
+ * because only the first of those gives the space back at once — and the write is retried.
  */
 
 /** What is known about a chunked entry while and after it is written. */
@@ -20,6 +22,19 @@ export interface ChunkMeta {
   /** Bytes written so far, always a prefix of the entry: chunks are written in order. */
   available: number
   complete: boolean
+  /**
+   * Set when the last attempt to produce the entry failed. The Jobs worker records it so the
+   * virtual server can answer with the failure at once instead of waiting out a stall, and take
+   * the entry up again once the failure is old enough to be worth retesting.
+   */
+  error?: EntryFailure
+}
+
+export interface EntryFailure {
+  code: ErrorCode
+  message: string
+  /** When it happened, `Date.now()`. */
+  at: number
 }
 
 const META_MARKER = '/__meta__'
@@ -59,7 +74,8 @@ function forwardIndexKey(pkgId: string): string {
   return `${CHUNK_KEY_ORIGIN}${pkgId}/chunk/${encodeEntry(ARCHIVE_ENTRY)}${FORWARD_INDEX_MARKER}`
 }
 
-function isQuotaError(error: unknown): boolean {
+/** A write the browser refused for lack of space, in either spelling. */
+export function isQuotaError(error: unknown): boolean {
   return (
     error instanceof DOMException &&
     (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')
@@ -140,14 +156,28 @@ export class ChunkStore {
   }
 
   async setMeta(entry: string, meta: ChunkMeta): Promise<void> {
-    const cache = await this.cache()
     // The watermark must never be the write that fails on quota, or a complete entry would look
-    // partial forever. It is tiny, so it is written without the eviction dance.
-    await cache.put(
+    // partial forever. It is tiny, but tiny is not exempt: an origin filled to the last byte
+    // refuses a hundred bytes too, so it goes through the same eviction as the chunks.
+    await this.write(
       metaKey(this.pkgId, entry),
-      new Response(JSON.stringify(meta), { headers: { 'content-type': 'application/json' } })
+      () => new Response(JSON.stringify(meta), { headers: { 'content-type': 'application/json' } })
     )
     announceWatermark({ pkgId: this.pkgId, entry, meta })
+  }
+
+  /**
+   * Drops the chunks of an entry and keeps its meta. What a failed extraction leaves behind: a
+   * deflate stream cannot be resumed, so the next attempt starts from zero anyway, and until then
+   * the partial chunks only hold space the rest of the package may need.
+   */
+  async discardChunks(entry: string): Promise<void> {
+    const cache = await this.cache()
+    const prefix = `${CHUNK_KEY_ORIGIN}${this.pkgId}/chunk/${encodeEntry(entry)}/`
+    const chunks = (await cache.keys()).filter(
+      (request) => request.url.startsWith(prefix) && /^\d+$/.test(request.url.slice(prefix.length))
+    )
+    await Promise.all(chunks.map((request) => cache.delete(request)))
   }
 
   async putChunk(entry: string, index: number, bytes: Uint8Array): Promise<void> {
@@ -286,10 +316,9 @@ export class ChunkStore {
   }
 
   async setForwardIndex(snapshot: ForwardIndexSnapshot): Promise<void> {
-    const cache = await this.cache()
-    await cache.put(
+    await this.write(
       forwardIndexKey(this.pkgId),
-      new Response(JSON.stringify(snapshot), { headers: { 'content-type': 'application/json' } })
+      () => new Response(JSON.stringify(snapshot), { headers: { 'content-type': 'application/json' } })
     )
     announceWatermark({
       pkgId: this.pkgId,
@@ -366,9 +395,28 @@ async function evictColdestPackage(exceptPkgId: string): Promise<boolean> {
 
   if (!victim) return false
 
+  await emptyCache(cacheNameFor(victim))
   await caches.delete(cacheNameFor(victim))
   await onPackageEvicted?.(victim)
   return true
+}
+
+/**
+ * Deletes a cache's entries one by one before the cache itself goes.
+ *
+ * `caches.delete()` alone frees nothing the write that triggered it can use: Chromium keeps the
+ * bytes on the books until every `Cache` object anyone holds for that cache has been garbage
+ * collected, and the virtual server creates one per request it serves. Measured against a
+ * simulated quota: with a handle alive the space never came back; with handles dropped it took
+ * about 770 ms; with the entries deleted first it was back in 3 ms. Without this, a write under
+ * pressure evicted every idle package in turn, found each eviction had freed nothing yet, and
+ * gave up — while a page reload seconds later found the space there after all.
+ */
+async function emptyCache(name: string): Promise<void> {
+  if (!(await caches.has(name))) return
+  const cache = await caches.open(name)
+  const keys = await cache.keys()
+  await Promise.all(keys.map((request) => cache.delete(request)))
 }
 
 /** Fallback when no policy is installed: any other idle package cache, in whatever order the browser lists. */

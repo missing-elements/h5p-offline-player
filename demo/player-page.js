@@ -28,8 +28,9 @@ const show = (text, kind = 'hint') => {
 
 /**
  * What a host page can usefully say about each failure. Only the codes whose own message is
- * technical get a canned one; `bad-archive` and `runtime` already arrive as a sentence written
- * for a person — often naming the exact library a package is missing — so they are shown as-is.
+ * technical get a canned one; `bad-archive`, `runtime` and `quota` already arrive as a sentence
+ * written for a person — the library a package is missing, the size a package needed against
+ * what the browser gives the site — so they are shown as-is.
  */
 const EXPLANATIONS = {
   'no-cors':
@@ -38,8 +39,7 @@ const EXPLANATIONS = {
   'no-worker':
     'This page needs a Service Worker. Open it over https:// or localhost in Safari, Chrome, ' +
     'Firefox or Edge — an in-app browser will not do.',
-  network: 'The package could not be fetched. Check the URL.',
-  quota: 'There is not enough storage left for this package. Clear site data and try again.'
+  network: 'The package could not be fetched. Check the URL.'
 }
 
 player.addEventListener('statechange', (event) => {

@@ -3,31 +3,79 @@ import {
   ChunkStore,
   FORWARD_INDEX_ENTRY,
   QuotaError,
+  cacheNameFor,
   onWatermark,
   setEvictionListener,
   setEvictionPolicy
 } from '../../src/shared/chunk-store'
 
-/** The Cache API reduced to what `write` touches, with the first put optionally out of quota. */
+/**
+ * The Cache API reduced to what the store touches: named caches with `put`, `match`, `keys` and
+ * `delete`, and the first put optionally out of quota. `events` records every deletion in the
+ * order it happened, which is what the eviction test is about.
+ */
 function fakeCaches(failFirstPut: boolean) {
-  const stored = new Map<string, Uint8Array>()
+  const stores = new Map<string, Map<string, Uint8Array<ArrayBuffer>>>()
+  const handles = new Map<string, ReturnType<typeof makeCache>>()
+  const events: string[] = []
   let puts = 0
 
-  const cache = {
-    async put(key: string, response: Response) {
-      puts += 1
-      const body = new Uint8Array(await response.arrayBuffer())
-      if (failFirstPut && puts === 1) throw new DOMException('full', 'QuotaExceededError')
-      stored.set(key, body)
-    },
-    async match() {
-      return undefined
+  const mapFor = (name: string) => {
+    let stored = stores.get(name)
+    if (!stored) {
+      stored = new Map()
+      stores.set(name, stored)
+    }
+    return stored
+  }
+
+  function makeCache(name: string) {
+    const stored = mapFor(name)
+    return {
+      async put(key: string, response: Response) {
+        puts += 1
+        const body = new Uint8Array(await response.arrayBuffer())
+        if (failFirstPut && puts === 1) throw new DOMException('full', 'QuotaExceededError')
+        stored.set(key, body)
+      },
+      async match(key: string) {
+        const body = stored.get(key)
+        return body ? new Response(body) : undefined
+      },
+      async keys() {
+        return [...stored.keys()].map((key) => new Request(key))
+      },
+      async delete(request: Request | string) {
+        const url = typeof request === 'string' ? request : request.url
+        events.push(`entry ${name} ${url}`)
+        return stored.delete(url)
+      }
     }
   }
 
+  const primary = cacheNameFor('pkg')
+
   return {
-    caches: { open: async () => cache, delete: async () => true, keys: async () => [] },
-    stored,
+    caches: {
+      open: async (name: string = primary) => {
+        let handle = handles.get(name)
+        if (!handle) {
+          handle = makeCache(name)
+          handles.set(name, handle)
+        }
+        return handle
+      },
+      has: async (name: string) => stores.has(name),
+      delete: async (name: string) => {
+        events.push(`cache ${name}`)
+        return stores.delete(name)
+      },
+      keys: async () => [...stores.keys()]
+    },
+    /** Puts an entry in place without going through `put`, so it does not count as an attempt. */
+    seed: (name: string, key: string) => mapFor(name).set(key, new Uint8Array([1])),
+    stored: mapFor(primary),
+    events,
     puts: () => puts
   }
 }
@@ -86,6 +134,26 @@ describe('ChunkStore writes', () => {
     expect(text([...fake.stored.values()][0])).toBe('hello')
   })
 
+  it('empties the victim before deleting it, so the space is back before the retry', async () => {
+    const fake = fakeCaches(true)
+    vi.stubGlobal('caches', fake.caches)
+    const victim = cacheNameFor('colder')
+    fake.seed(victim, 'https://chunks.h5p-player.invalid/colder/whole/a.js')
+    fake.seed(victim, 'https://chunks.h5p-player.invalid/colder/whole/b.js')
+    setEvictionPolicy(async () => 'colder')
+
+    await new ChunkStore('pkg').putWhole('a.js', () => new Blob(['x']).stream(), 'text/javascript')
+
+    // Chromium keeps a deleted cache's bytes on the books until every handle to it is collected;
+    // deleting its entries first is what gives the space back to the write that needed it.
+    expect(fake.events).toEqual([
+      `entry ${victim} https://chunks.h5p-player.invalid/colder/whole/a.js`,
+      `entry ${victim} https://chunks.h5p-player.invalid/colder/whole/b.js`,
+      `cache ${victim}`
+    ])
+    expect(fake.puts()).toBe(2)
+  })
+
   it('retries a chunk from the one copy it took', async () => {
     const fake = fakeCaches(true)
     vi.stubGlobal('caches', fake.caches)
@@ -96,6 +164,41 @@ describe('ChunkStore writes', () => {
 
     expect(fake.puts()).toBe(2)
     expect([...fake.stored.values()][0]).toEqual(bytes)
+  })
+
+  it('writes the watermark through eviction too: a full origin refuses a hundred bytes as readily as a chunk', async () => {
+    const fake = fakeCaches(true)
+    vi.stubGlobal('caches', fake.caches)
+    const evicted: string[] = []
+    setEvictionPolicy(async () => 'colder')
+    setEvictionListener((pkgId) => {
+      evicted.push(pkgId)
+    })
+    const store = new ChunkStore('pkg')
+
+    await store.setMeta('content/media/a.mp4', { size: 10, available: 10, complete: true })
+
+    expect(evicted).toEqual(['colder'])
+    expect(await store.getMeta('content/media/a.mp4')).toEqual({ size: 10, available: 10, complete: true })
+  })
+
+  it("discards an entry's chunks and keeps its meta", async () => {
+    const fake = fakeCaches(false)
+    vi.stubGlobal('caches', fake.caches)
+    const store = new ChunkStore('pkg')
+    const failure = { code: 'quota' as const, message: 'full', at: 1 }
+
+    await store.putChunk('content/media/a.mp4', 0, new Uint8Array([1]))
+    await store.putChunk('content/media/a.mp4', 1, new Uint8Array([2]))
+    await store.putChunk('content/media/b.mp4', 0, new Uint8Array([3]))
+    await store.setMeta('content/media/a.mp4', { size: 2, available: 0, complete: false, error: failure })
+
+    await store.discardChunks('content/media/a.mp4')
+
+    expect(await store.getChunk('content/media/a.mp4', 0)).toBeUndefined()
+    expect(await store.getChunk('content/media/a.mp4', 1)).toBeUndefined()
+    expect(await store.getChunk('content/media/b.mp4', 0)).toEqual(new Uint8Array([3]))
+    expect((await store.getMeta('content/media/a.mp4'))?.error).toEqual(failure)
   })
 
   it('announces every watermark it writes, so a waiter need not poll for it', async () => {
@@ -114,21 +217,7 @@ describe('ChunkStore writes', () => {
   })
 
   it('keeps the forward index beside the archive and announces each publish of it', async () => {
-    const fake = fakeCaches(false)
-    // A match that answers what was put, since the index is read back.
-    const puts = new Map<string, Uint8Array<ArrayBuffer>>()
-    const cache = await fake.caches.open()
-    const originalPut = cache.put.bind(cache)
-    cache.put = async (key: string, response: Response) => {
-      const copy = response.clone()
-      await originalPut(key, response)
-      puts.set(key, new Uint8Array(await copy.arrayBuffer()))
-    }
-    cache.match = (async (key: string) => {
-      const bytes = puts.get(key)
-      return bytes ? new Response(bytes) : undefined
-    }) as never
-    vi.stubGlobal('caches', fake.caches)
+    vi.stubGlobal('caches', fakeCaches(false).caches)
 
     const heard: unknown[] = []
     const stop = onWatermark('pkg', FORWARD_INDEX_ENTRY, (meta) => heard.push(meta))

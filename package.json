@@ -36,11 +36,13 @@
   "keywords": [
     "h5p",
     "h5p-player",
+    "h5p-standalone",
+    "h5p-viewer",
+    "h5p-self-hosted",
+    "h5p-offline-player",
     "web-component",
     "custom-element",
     "service-worker",
-    "offline",
-    "zip",
     "elearning"
   ],
   "scripts": {
@@ -56,7 +58,7 @@
     "preview:demo": "vite preview --config vite.demo.config.ts",
     "test": "npm run prepare:dev && vitest run",
     "test:unit": "vitest run --project unit",
-    "test:browser": "npm run prepare:dev && vitest run --project browser",
+    "test:browser": "npm run prepare:dev && vitest run --project browser --project browser-quota",
     "test:watch": "npm run prepare:dev && vitest",
     "typecheck": "tsc -b --force && tsc -p tsconfig.test.json",
     "prepublishOnly": "npm run typecheck && npm run test:unit && npm run build"

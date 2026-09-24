@@ -42,18 +42,32 @@ export default defineConfig({
         test: {
           name: 'browser',
           include: ['tests/browser/**/*.test.ts'],
-          browser: {
-            enabled: true,
-            // From Vitest 4 on, a provider is a package rather than a name.
-            provider: playwright(),
-            headless: true,
-            // Chromium only: the paths this exercises — Service Worker registration on a nested
-            // scope, Range responses synthesized by a worker — are where browsers differ most,
-            // and a second engine belongs in CI rather than in the default run.
-            instances: [{ browser: 'chromium' }]
-          }
+          browser: browserProject()
+        }
+      },
+      {
+        // A browser of its own: the storage-quota override these tests apply is per browser
+        // profile, and would otherwise land on whatever other test file happened to be running.
+        extends: true,
+        test: {
+          name: 'browser-quota',
+          include: ['tests/browser-quota/**/*.test.ts'],
+          browser: browserProject()
         }
       }
     ]
   }
 })
+
+function browserProject() {
+  return {
+    enabled: true,
+    // From Vitest 4 on, a provider is a package rather than a name.
+    provider: playwright(),
+    headless: true,
+    // Chromium only: the paths this exercises — Service Worker registration on a nested scope,
+    // Range responses synthesized by a worker — are where browsers differ most, and a second
+    // engine belongs in CI rather than in the default run.
+    instances: [{ browser: 'chromium' as const }]
+  }
+}

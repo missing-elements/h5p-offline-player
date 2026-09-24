@@ -251,9 +251,24 @@ function bootScript(bootConfig: string): string {
       post({ type: 'error', message: String((error && error.message) || error) });
     });
 
+  // Capture phase, because a resource that fails to load fires 'error' on its own element and
+  // never bubbles: the runtime's script loader waits on 'load' alone, so a library script the
+  // server could not deliver would otherwise leave the boot hanging without a word. Only the
+  // tags the runtime injected itself count (it marks them data-h5p); a content image that 404s,
+  // or an optional script a content type reaches for, is the content's business, not a failure
+  // of the player.
   window.addEventListener('error', function (event) {
+    var target = event.target;
+    if (target && target !== window) {
+      if (!(target.dataset && target.dataset.h5p)) return;
+      var url = String(target.src || target.href || '').replace(location.origin, '');
+      var root = String(config.h5pJsonPath).replace(location.origin, '') + '/';
+      var shown = url.indexOf(root) === 0 ? url.slice(root.length) : url;
+      post({ type: 'error', message: 'Could not load ' + shown });
+      return;
+    }
     post({ type: 'error', message: String(event.message || 'Script error in H5P content') });
-  });
+  }, true);
 })();`
 }
 

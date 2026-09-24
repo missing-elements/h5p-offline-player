@@ -83,6 +83,10 @@ npm run demo:og        # re-render the social card, demo/og-image.png
 npm run preview:demo   # serves dist-demo/ with the production headers and the /no-range route
 ```
 
+`npm run test:browser` runs two browser projects: `browser`, the suite, and `browser-quota`, the
+storage-quota tests, which get a browser of their own because the CDP quota override they apply
+is per browser profile and would otherwise land on whatever other file was running.
+
 `npm publish` runs `prepublishOnly` — typecheck, the unit suite and the build — so a broken tree
 cannot ship; the browser suite is left out because it needs an installed Chromium.
 
@@ -302,6 +306,51 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
 - **An unknown `pkgId` is a 404 on every route.** `UnknownPackageError` is what `openReader`
   throws for a package the table does not know, and `handleFetch` maps it before the generic
   `bad-archive` → 422.
+- **Eviction empties a cache before it deletes it.** In Chromium `caches.delete()` frees nothing
+  the write that triggered it can use: the bytes stay on the books until every `Cache` object
+  anyone holds for that cache has been garbage-collected, and the virtual server makes one per
+  request. Measured against a simulated quota: with a handle alive the space never came back,
+  with handles dropped it took about 770 ms, with the entries deleted first it was back in 3 ms.
+  Before `emptyCache`, a write under pressure evicted every idle package in turn, found each
+  eviction had freed nothing yet, and gave up — while a reload seconds later found the room.
+  One cost that remains: a partial chunk is rewritten as it fills, and the Cache API holds the
+  old and the new copy together while the put lands, so an entry needs up to twice its last
+  partial — 16 MB at most — of spare room for a moment. A store within one chunk of full can
+  therefore still refuse a write that would have fitted afterwards.
+- **Caching an inline entry is a convenience; a refused write is served around.** Everything
+  under `INLINE_MAX_SIZE` — including a stored mp4 — is copied into the cache before it is
+  served, but nothing requires that. When the copy is refused for lack of space after eviction
+  has found nothing more to drop, `serveUncached` streams the entry from the archive for that
+  response alone, and the store is left untried for `FAILURE_BACKOFF_MS` so a media element
+  probing a 10 MB entry with a burst of ranges does not copy 10 MB into a full store for each.
+  Consequence: a package on a host that honours `Range`, or picked from disk, plays with no
+  storage at all. Before this, a refused write was a 507, and the runtime's script loader —
+  which waits on `load` alone — left the frame blank at `indexing` for ever, with no event.
+  The one place storage is a hard requirement is a host without `Range`: the archive has to
+  land whole, and a package larger than the room is refused with its size and the reason.
+- **A failed extraction is recorded, not rediscovered.** The Jobs worker writes the failure into
+  the entry's `ChunkMeta.error` and drops its chunks — a deflate stream cannot be resumed, and
+  until the next attempt the partial chunks only hold space the rest of the package may need.
+  `waitForWatermark` returns on a recorded failure, so a request gets its 507 (quota) or 500 at
+  once instead of after the 15 s stall; after `FAILURE_BACKOFF_MS` the record is cleared and the
+  entry tried again, because the space may have come back.
+- **Bookkeeping never takes a request down.** An origin filled to the last byte refuses a
+  hundred-byte write as readily as a chunk: `setMeta` therefore goes through the same eviction
+  as the chunks (it once assumed tiny meant exempt), `touchPackage` and the `status` update are
+  best-effort, and `register` keeps an existing row when the new one does not fit — the id is a
+  hash of the source, so the row names the same package.
+- **The quota message carries the numbers.** Built where the write failed, in the Jobs worker,
+  from `navigator.storage.estimate()` and the size that was needed — the archive's for a
+  download, the entry's for an extraction — because "quota exceeded" tells nobody whether the
+  package is too big for this browser or the site has merely filled up. One caveat for testing
+  it: under DevTools' "simulate custom storage quota", writes fail at the simulated cap while
+  `estimate().quota` keeps reporting the real one, so the message reads oddly there and a
+  pre-flight check could not have helped. `tests/browser-quota/` uses that same override through
+  CDP, in a Vitest project of its own because the override is per browser profile.
+- **The frame reports the runtime's own failed loads.** Its `error` listener is capture-phase,
+  because a resource failure fires on the element and never bubbles, and it reports only tags
+  marked `data-h5p` — the ones h5p-standalone injected. A content image that 404s, or an
+  optional script a content type reaches for, is the content's business.
 - **Eviction never touches a package under a Web Lock, in any tab.** Every lock name starts with
   `h5p:<pkgId>:` (`locks.ts`): the Jobs worker holds one per download or extraction for as long
   as it writes — the job key *is* the lock name — and the element holds `playing`, shared, for as

@@ -911,6 +911,10 @@ export class H5PPlayerElement extends HTMLElement {
     const message = error instanceof Error ? error.message : String(error)
     const missingLibraries = error instanceof PlayerError ? error.missingLibraries : undefined
 
+    // A package that failed to load is not loaded: its `playing` lock goes, so another load —
+    // here or in another tab — may evict what it left in the store, and any job still running
+    // for it is stopped.
+    this.abortLoad()
     this.setState('error')
     this.dispatchEvent(
       new CustomEvent<PlayerErrorDetail>('error', { detail: { code, message, missingLibraries } })

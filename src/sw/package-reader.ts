@@ -21,8 +21,9 @@ export type Strategy =
   /** Large and deflated (method 8): the Jobs worker inflates into chunks, served progressively. */
   | { kind: 'chunked' }
 
-const STORED = 0
-const DEFLATE = 8
+/** Zip compression methods: the only two an H5P package is served with. */
+export const STORED = 0
+export const DEFLATE = 8
 
 const LOCAL_HEADER_SIGNATURE = 0x04034b50
 const LOCAL_HEADER_FIXED_SIZE = 30

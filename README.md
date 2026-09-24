@@ -233,6 +233,10 @@ no "open in another browser" banner. Those belong to the host page, built out of
 - `h5p-sw.js` is served from the site's own origin — browsers reject cross-origin Service Worker
   registration. With a bundler this is automatic. Frame assets may come from a CDN.
 - Package URLs send CORS headers. `Range` support is optional but avoids a full download first.
+- Storage is optional on a host that honours `Range`, and for a file picked from disk: the
+  player caches what fits and serves the rest straight from the archive. A host without `Range`
+  makes it a requirement — the whole archive has to be stored — and a package larger than the
+  room the browser gives the site is refused with `error: quota`, naming the size it needed.
 
 Integration details, including bundler-specific setup and single-worker hosts, are in
 [h5p-player-setup.md](h5p-player-setup.md). The design is in

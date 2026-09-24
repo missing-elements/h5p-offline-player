@@ -136,6 +136,17 @@ describe('buildFrameDocument', () => {
     expect(hostile).toContain('&lt;script&gt;')
   })
 
+  it('reports a runtime script or stylesheet that fails to load, in the capture phase', () => {
+    // A failed resource fires 'error' on its own element and never bubbles, and the runtime's
+    // loader waits on 'load' alone: without a capturing listener a library the server could not
+    // deliver leaves the boot hanging with nothing reported anywhere.
+    expect(html).toMatch(/window\.addEventListener\('error', function \(event\) \{[\s\S]*\}, true\);/)
+    expect(html).toContain('Could not load ')
+    // Only the tags the runtime injected itself, which it marks data-h5p: a content image that
+    // 404s is the content's business.
+    expect(html).toContain('target.dataset.h5p')
+  })
+
   it('forwards xAPI to the parent, the only channel results have', () => {
     expect(html).toContain("dispatcher.on('xAPI'")
     expect(html).toContain('parent.postMessage')

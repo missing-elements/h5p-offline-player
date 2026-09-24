@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import { configure } from '@zip.js/zip.js'
 import { ARCHIVE_ENTRY, CHUNK_SIZE } from '../shared/constants'
-import { ChunkStore, QuotaError } from '../shared/chunk-store'
+import { ChunkStore, QuotaError, isQuotaError } from '../shared/chunk-store'
 import { installEvictionPolicy } from '../shared/eviction'
 import { LocalHeaderScanner } from '../shared/forward-index'
 import { packageLockName, packageLockPrefix } from '../shared/locks'
@@ -13,6 +13,7 @@ import {
   type ToJobsMessage
 } from '../shared/protocol'
 import { openSource } from '../shared/source'
+import { quotaMessage } from '../shared/storage'
 import { PackageReader } from '../sw/package-reader'
 import { createChunkWriter } from './chunk-writer'
 
@@ -116,13 +117,10 @@ async function run(message: Exclude<ToJobsMessage, { type: 'abort' }>): Promise<
     })
   } catch (error) {
     if (controller.signal.aborted) return
-    send({
-      type: 'failed',
-      pkgId: message.pkgId,
-      entry,
-      code: codeFor(error),
-      message: error instanceof Error ? error.message : String(error)
-    })
+    const code = codeFor(error)
+    const text = error instanceof Error ? error.message : String(error)
+    if (entry) await recordFailure(message.pkgId, entry, code, text)
+    send({ type: 'failed', pkgId: message.pkgId, entry, code, message: text })
   } finally {
     // Only its own entry: an abort may already have handed the key to a successor.
     if (inFlight.get(key) === controller) inFlight.delete(key)
@@ -214,19 +212,29 @@ async function downloadArchive(
     }
   })
 
-  await response.body.pipeThrough(indexer).pipeTo(
-    createChunkWriter({
-      store,
-      entry: ARCHIVE_ENTRY,
-      totalSize,
-      startOffset,
-      onProgress: (loaded) => {
-        send({ type: 'progress', pkgId, loaded, total: totalSize })
-        void publishIndex(false)
-      }
-    }),
-    { signal }
-  )
+  try {
+    await response.body.pipeThrough(indexer).pipeTo(
+      createChunkWriter({
+        store,
+        entry: ARCHIVE_ENTRY,
+        totalSize,
+        startOffset,
+        onProgress: (loaded) => {
+          send({ type: 'progress', pkgId, loaded, total: totalSize })
+          void publishIndex(false)
+        }
+      }),
+      { signal }
+    )
+  } catch (error) {
+    if (!(error instanceof QuotaError)) throw error
+    // The whole archive has to land here — that is what a host without `Range` costs — so the
+    // number that matters is the archive's size against what the browser gives the site.
+    throw new QuotaError(
+      `${await quotaMessage('this package', totalSize)} Its host does not support partial ` +
+        'downloads, so the whole archive has to be stored before it can play.'
+    )
+  }
   await publishIndex(true)
 
   const meta = await store.getArchiveMeta()
@@ -269,22 +277,49 @@ async function extractEntry(
   // would repeat this from zero on every attempt.
   await store.setMeta(entryName, { size: entry.size, available: 0, complete: false })
 
-  await reader.inflate(entry).pipeTo(
-    createChunkWriter({
-      store,
-      entry: entryName,
-      totalSize: entry.size,
-      onProgress: (loaded) =>
-        send({ type: 'progress', pkgId, entry: entryName, loaded, total: entry.size })
-    }),
-    { signal }
-  )
+  try {
+    await reader.inflate(entry).pipeTo(
+      createChunkWriter({
+        store,
+        entry: entryName,
+        totalSize: entry.size,
+        onProgress: (loaded) =>
+          send({ type: 'progress', pkgId, entry: entryName, loaded, total: entry.size })
+      }),
+      { signal }
+    )
+  } catch (error) {
+    if (!(error instanceof QuotaError)) throw error
+    throw new QuotaError(await quotaMessage('this file', entry.size))
+  }
 
   send({ type: 'done', pkgId, entry: entryName, size: entry.size })
 }
 
+/**
+ * Leaves a failed extraction's verdict where the Service Worker will look for it. Its chunks go —
+ * a deflate stream cannot be resumed, and until the next attempt they only hold space the rest of
+ * the package may need — and the meta stays, carrying the failure, so a request for the entry is
+ * answered with it at once rather than after a stall, and retried only once it has aged.
+ */
+async function recordFailure(pkgId: string, entry: string, code: ErrorCode, message: string): Promise<void> {
+  const store = new ChunkStore(pkgId)
+  try {
+    const existing = await store.getMeta(entry)
+    await store.discardChunks(entry)
+    await store.setMeta(entry, {
+      size: existing?.size ?? null,
+      available: 0,
+      complete: false,
+      error: { code, message, at: Date.now() }
+    })
+  } catch {
+    // A store that cannot even take the note leaves the request to the stall path.
+  }
+}
+
 function codeFor(error: unknown): ErrorCode {
   if (error instanceof PlayerError) return error.code
-  if (error instanceof QuotaError) return 'quota'
+  if (error instanceof QuotaError || isQuotaError(error)) return 'quota'
   return 'network'
 }
