@@ -30,7 +30,8 @@ src/
   shared/                 code that runs in all three contexts (page, Service Worker, Jobs worker)
     constants.ts          sizes, timeouts, cache names, the version stamp
     protocol.ts           every message shape and the PackageRecord written to IndexedDB
-    source.ts             probe + the three source adapters + the zip.js reader bridge
+    source.ts             probe + the three source adapters; imports no zip.js, so the element stays small
+    source-reader.ts      the zip.js reader bridge and the segmented fetch behind it
     chunk-store.ts        Cache API: whole entries, chunked entries, watermarks, eviction
     idb.ts                the `packages` table
     entry-names.ts        entry-name normalisation — the security boundary for hostile archives
@@ -40,6 +41,7 @@ src/
     mount.ts              mountH5P(self)     -> dist/h5p-sw-mount.js; the virtual file server
     package-reader.ts     zip index + per-entry serving strategy
     frame-document.ts     the frame HTML the worker synthesizes, and its CSP
+    frame-boot.ts         the script that runs inside that frame; built to a string, never imported
     watermark-wait.ts     the stall-bounded wait for an entry's bytes, and what counts as progress
     routes.ts             URL shape of the virtual routes
     stream-utils.ts
@@ -48,7 +50,8 @@ src/
     chunk-writer.ts       a WritableStream that lands bytes in the chunk store and publishes a watermark
 scripts/                  sync-h5p-assets, build-workers, copy-frame-assets, build-fixtures,
                           normalize-h5p (the package rewriter; scripts/lib/ holds its zip writer,
-                          mp4 remux and policy)
+                          mp4 remux and policy); scripts/lib/frame-boot-plugin.mjs builds the
+                          frame's boot script for esbuild and Vite alike
 demo/ + index.html        the hosted player page; demo/index.html is the examples index,
                           demo/setup.html the setup page for integrators, the rest are the
                           individual embedding demos, all sharing demo/player-page.css
@@ -517,6 +520,33 @@ Three artefacts, built three different ways, because they are consumed three dif
 The Jobs worker is not an artefact: `vite.config.ts` bundles it with esbuild into a string behind
 `virtual:h5p-jobs-worker`, and the element spawns it from a `blob:` URL. One fewer file for a host
 to deploy.
+
+The frame's boot script is built the same way. `src/sw/frame-boot.ts` is a typed module nothing
+imports; `scripts/lib/frame-boot-plugin.mjs` bundles it to a minified classic script behind
+`virtual:h5p-frame-boot` — as an esbuild plugin for the two worker builds and, through
+`frameBootPlugin()` in `vite.plugins.ts`, for Vite when the unit tests load `frame-document.ts`.
+The document inlines that string under its nonce and puts the per-package configuration in a
+`<script type="application/json">` block beside it, so the script is the same bytes for every
+package and the JSON needs no nonce. Before this the script was a template literal, and every
+frame document shipped its comments and indentation. TypeScript sees the plugin through
+`frame-boot-plugin.d.mts`; `tsconfig.node.json` does not enable `allowJs`.
+
+**The element is minified after Vite, in `build-workers.mjs`.** Vite leaves an ES library's
+whitespace and comments alone on purpose: esbuild drops `/* @__PURE__ */` annotations when it
+minifies whitespace, and a consumer's bundler tree-shakes a library by them. This module
+registers the element on import, so nothing in it can be shaken out and nothing is lost by the
+extra pass. Vite's own output was 215 kB with every JSDoc block in it.
+
+**The element does not carry zip.js.** It probes a source and never reads an archive, but
+`source.ts` used to import zip.js for the reader bridge, and zip.js has module-level side effects
+Rollup cannot drop, so 100 kB of it rode along. The bridge now lives in `source-reader.ts`,
+imported by the reader and the Jobs worker only. Element bundle before and after: 314 kB
+(131 kB gzipped) to 205 kB (85 kB gzipped); the Jobs worker string inside it, which does need
+zip.js, is 190 kB of that.
+
+**Shipped strings carry no comments.** The frame's `<style>` block and the element's shadow CSS
+are explained in TypeScript comments beside the constants, not inside them; a comment inside a
+template literal survives every minifier and ships with every response.
 
 In dev the same plugin file serves the Service Worker at any path ending in `/h5p-sw.js`, so
 `new URL('./h5p-sw.js', import.meta.url)` resolves in dev and in a consuming app alike. **esbuild

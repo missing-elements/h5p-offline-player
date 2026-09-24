@@ -1,5 +1,6 @@
 import { resolve } from 'node:path'
 import { build } from 'esbuild'
+import { frameBootEsbuildPlugin } from './frame-boot-plugin.mjs'
 
 /**
  * The two worker artefacts, built the same way for the package (`build-workers.mjs`) and for the
@@ -14,7 +15,8 @@ const shared = {
   target: 'es2022',
   minify: true,
   legalComments: 'none',
-  define: { 'import.meta.env.DEV': 'false' }
+  define: { 'import.meta.env.DEV': 'false' },
+  plugins: [frameBootEsbuildPlugin(true)]
 }
 
 /** `h5p-sw.js`: a self-contained classic script, because a Service Worker is registered by URL. */

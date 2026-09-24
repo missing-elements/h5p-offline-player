@@ -110,12 +110,12 @@ describe('buildFrameDocument', () => {
   })
 
   it('uses div embedding, so there is no inner about:blank frame to inherit a controller', () => {
-    expect(html).toContain("embedType: 'div'")
+    expect(html).toMatch(/embedType:\s*["']div["']/)
   })
 
   it('turns off every result endpoint, because there is no server to post to', () => {
-    expect(html).toContain('postUserStatistics: false')
-    expect(html).toContain('saveFreq: false')
+    expect(html).toMatch(/postUserStatistics:\s*(?:false|!1)/)
+    expect(html).toMatch(/saveFreq:\s*(?:false|!1)/)
   })
 
   it('marks the document element the way H5P core styles expect', () => {
@@ -140,11 +140,11 @@ describe('buildFrameDocument', () => {
     // A failed resource fires 'error' on its own element and never bubbles, and the runtime's
     // loader waits on 'load' alone: without a capturing listener a library the server could not
     // deliver leaves the boot hanging with nothing reported anywhere.
-    expect(html).toMatch(/window\.addEventListener\('error', function \(event\) \{[\s\S]*\}, true\);/)
+    expect(html).toMatch(/addEventListener\(["']error["'],\s*function\s*\([^)]*\)\s*\{[\s\S]*?\},\s*(?:true|!0)\)/)
     expect(html).toContain('Could not load ')
     // Only the tags the runtime injected itself, which it marks data-h5p: a content image that
     // 404s is the content's business.
-    expect(html).toContain('target.dataset.h5p')
+    expect(html).toMatch(/\.dataset\.h5p\b/)
   })
 
   it('pins a YouTube iframe over its box, which H5P.Video up to 1.6.66 fails to do itself', () => {
@@ -154,13 +154,23 @@ describe('buildFrameDocument', () => {
     expect(html).toMatch(/\.h5p-video\.h5p-youtube iframe \{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; \}/)
   })
 
+  it('ships the boot script minified, its configuration as a JSON block beside it', () => {
+    const script = /<script nonce="deadbeef">([\s\S]*?)<\/script>/.exec(html)![1]
+    // What every frame document carries: no comments, no indentation, one line.
+    expect(script).not.toMatch(/\/\/ |\/\* /)
+    expect(script.split('\n').length).toBeLessThan(4)
+    expect(html).toContain('<script type="application/json" id="h5p-boot-config">')
+    // A `<` in a value could otherwise end the JSON block early.
+    expect(buildFrameDocument({ ...options, virtualRoot: 'https://site.example/</script>' })).not.toContain('</script>"')
+  })
+
   it('forwards xAPI to the parent, the only channel results have', () => {
-    expect(html).toContain("dispatcher.on('xAPI'")
+    expect(html).toMatch(/\.on\(["']xAPI["']/)
     expect(html).toContain('parent.postMessage')
   })
 
   it('relays the worker job requests the Service Worker cannot run itself', () => {
-    expect(html).toContain("data.type === 'need-job'")
+    expect(html).toMatch(/\.type\s*===?\s*["']need-job["']/)
   })
 })
 
@@ -222,7 +232,7 @@ describe('the boot script', () => {
     expect(html).toContain('parent.postMessage(')
     // Package ids are derived from the URL, so frame URLs are guessable; a wildcard here would
     // hand every xAPI statement to any third-party page that framed one.
-    expect(html).not.toMatch(/parent\.postMessage\([^;]*'\*'\)/)
+    expect(html).not.toMatch(/parent\.postMessage\([^;]*["']\*["']\)/)
     expect(html).toMatch(/parent\.postMessage\([^;]*location\.origin\)/)
   })
 })

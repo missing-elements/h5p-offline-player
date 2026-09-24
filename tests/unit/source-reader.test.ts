@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { SourceReader, type SourceHandle } from '../../src/shared/source'
+import type { SourceHandle } from '../../src/shared/source'
+import { SourceReader } from '../../src/shared/source-reader'
 import {
   SEGMENT_CONCURRENCY,
   SEGMENT_MIN_SPAN,

@@ -3,6 +3,7 @@ import type { ServerResponse } from 'node:http'
 import { resolve } from 'node:path'
 import type { Connect, Plugin } from 'vite'
 import { build as esbuild } from 'esbuild'
+import { FRAME_BOOT_ENTRY, FRAME_BOOT_VIRTUAL_ID, bundleFrameBoot, frameBootEsbuildPlugin } from './scripts/lib/frame-boot-plugin.mjs'
 
 /**
  * The plugins both Vite configs share. `vite.config.ts` is the library build, the dev server and
@@ -30,10 +31,39 @@ export async function bundleWorker(entry: string, minify: boolean): Promise<stri
     target: 'es2022',
     minify,
     legalComments: 'none',
-    define: { 'import.meta.env.DEV': String(!minify) }
+    define: { 'import.meta.env.DEV': String(!minify) },
+    plugins: [frameBootEsbuildPlugin(minify)]
   })
 
   return result.outputFiles[0].text
+}
+
+const RESOLVED_FRAME_BOOT_ID = `\0${FRAME_BOOT_VIRTUAL_ID}`
+
+/**
+ * Supplies the frame's boot script to `frame-document.ts` as a string when that module is loaded
+ * through Vite — the unit tests — the same way esbuild supplies it to the worker bundles. Always
+ * minified: what the tests see is what ships.
+ */
+export function frameBootPlugin(): Plugin {
+  return {
+    name: 'h5p-frame-boot',
+
+    resolveId(id) {
+      return id === FRAME_BOOT_VIRTUAL_ID ? RESOLVED_FRAME_BOOT_ID : null
+    },
+
+    async load(id) {
+      if (id !== RESOLVED_FRAME_BOOT_ID) return null
+      return `export default ${JSON.stringify(await bundleFrameBoot(true))};`
+    },
+
+    handleHotUpdate({ file, server }) {
+      if (file !== FRAME_BOOT_ENTRY) return
+      const virtualModule = server.moduleGraph.getModuleById(RESOLVED_FRAME_BOOT_ID)
+      if (virtualModule) server.moduleGraph.invalidateModule(virtualModule)
+    }
+  }
 }
 
 /** Supplies the Jobs worker to the element as a string, for `new Worker(blob:)`. */

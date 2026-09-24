@@ -9,3 +9,12 @@ declare module 'virtual:h5p-jobs-worker' {
   const source: string
   export default source
 }
+
+/**
+ * The frame's boot script, bundled and minified the same way, for `frame-document.ts` to inline
+ * under the per-response nonce. Source: `src/sw/frame-boot.ts`.
+ */
+declare module 'virtual:h5p-frame-boot' {
+  const source: string
+  export default source
+}

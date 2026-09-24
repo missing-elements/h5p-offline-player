@@ -1,5 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import { transform } from 'esbuild'
 import { buildMountModule, buildServiceWorker } from './lib/worker-bundle.mjs'
 
 /**
@@ -17,6 +18,15 @@ const distDir = resolve(rootDir, 'dist')
 await buildServiceWorker(resolve(distDir, 'h5p-sw.js'))
 await buildMountModule(resolve(distDir, 'h5p-sw-mount.js'))
 
+// Vite leaves an ES library's whitespace and comments alone on purpose: esbuild drops the
+// `/* @__PURE__ */` annotations when it minifies whitespace, and a consumer's bundler tree-shakes
+// a library by them. This module registers the element on import, so nothing in it can be shaken
+// out and nothing is lost — it is minified here, after Vite, with the same settings as the workers.
+const elementPath = resolve(distDir, 'h5p-player.js')
+const element = await readFile(elementPath, 'utf8')
+const minified = await transform(element, { minify: true, format: 'esm', target: 'es2022', legalComments: 'none' })
+await writeFile(elementPath, minified.code)
+
 const sizeOf = async (name) => {
   const contents = await readFile(resolve(distDir, name))
   return `${name} ${(contents.length / 1024).toFixed(1)} kB`
@@ -30,4 +40,4 @@ await writeFile(
   'utf8'
 )
 
-console.log(`[build-workers] ${await sizeOf('h5p-sw.js')}, ${await sizeOf('h5p-sw-mount.js')}`)
+console.log(`[build-workers] ${await sizeOf('h5p-player.js')} (minified after Vite), ${await sizeOf('h5p-sw.js')}, ${await sizeOf('h5p-sw-mount.js')}`)

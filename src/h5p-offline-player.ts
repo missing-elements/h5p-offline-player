@@ -76,30 +76,21 @@ export interface PlayerProgressDetail {
  * and the frame collapses to an iframe's intrinsic 150px, while `CSSStyleSheet.replaceSync` is
  * CSSOM and not subject to it. One sheet is shared by every instance on the page.
  */
+// Three things here are easy to undo by accident. The layout lives on `.viewport`, not on
+// `:host`: any rule in the host page that names this element beats a `:host` rule however
+// specific, so a host writing `h5p-player { display: block; height: 400px }` — the obvious thing
+// — must not be able to break it. `:host(:fullscreen)` is for a host page that calls
+// requestFullscreen on the element (H5P's own fullscreen targets the frame, which the browser
+// sizes itself); without `!important` the inline height auto-resize writes would pin it to the
+// content height while it is meant to fill the screen. And `.viewport` has both `height: 100%`,
+// for a host given an explicit height, and `min-height: inherit`, for one given only a
+// min-height, where a percentage height resolves to auto and leaves the frame at an iframe's
+// intrinsic 150px.
 const SHADOW_CSS = `
-  /* Any rule in the host page that names this element beats a :host rule, however
-     specific — so the layout lives on a wrapper inside the shadow tree, which the page
-     cannot reach. A host writing "h5p-player { display: block; height: 400px }", which is
-     the obvious thing to write, then cannot break it. */
   :host { display: block; position: relative; width: 100%; }
   :host([hidden]) { display: none !important; }
-
-  /* H5P's own fullscreen targets the frame, which the browser sizes to the screen on its
-     own; this is for a host page that calls requestFullscreen on the element instead.
-     Without the important flag, the inline height auto-resize writes would pin it to the
-     content height while it is meant to be filling the screen. */
   :host(:fullscreen) { height: 100% !important; width: 100% !important; }
-
-  /* height: 100% covers a host given an explicit height; min-height: inherit covers one
-     given only a min-height, where a percentage height would resolve to auto and leave the
-     frame at an iframe's intrinsic 150px. */
-  .viewport {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    min-height: inherit;
-  }
-
+  .viewport { display: flex; flex-direction: column; height: 100%; min-height: inherit; }
   iframe { display: block; flex: 1 1 auto; width: 100%; min-height: 0; border: 0; }
 `
 
