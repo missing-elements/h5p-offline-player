@@ -24,6 +24,12 @@ export interface SourceHandle {
   read(range: ByteRange): Promise<Uint8Array>
   /** Streams an inclusive byte range. Used to serve large stored entries without buffering. */
   stream(range: ByteRange): Promise<ReadableStream<Uint8Array>>
+  /**
+   * Bytes taken from the network so far, over every read and stream of this handle. Only a
+   * network handle counts: it is how a job shows it is alive while the inflate has produced
+   * nothing yet, and a local read has no such silence.
+   */
+  readonly received?: number
 }
 
 /* ------------------------------------------------------------------ probing */
@@ -111,10 +117,24 @@ async function sizeFromPlainGet(url: string, signal?: AbortSignal): Promise<numb
 /* ------------------------------------------------------------------ handles */
 
 class RangeHttpHandle implements SourceHandle {
+  received = 0
+
   constructor(
     readonly descriptor: Extract<SourceDescriptor, { type: 'range-http' }>,
     readonly size: number
   ) {}
+
+  /** Counts a body's bytes as they pass, without holding any of them. */
+  private counted(body: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
+    return body.pipeThrough(
+      new TransformStream<Uint8Array, Uint8Array>({
+        transform: (chunk, controller) => {
+          this.received += chunk.length
+          controller.enqueue(chunk)
+        }
+      })
+    )
+  }
 
   private async fetchRange(range: ByteRange): Promise<Response> {
     // The chunk store is the cache. Letting the browser's HTTP cache keep a second copy of a
@@ -131,14 +151,20 @@ class RangeHttpHandle implements SourceHandle {
 
   async read(range: ByteRange): Promise<Uint8Array> {
     const response = await this.fetchRange(range)
-    if (response.status !== 200) return new Uint8Array(await response.arrayBuffer())
+    if (response.status !== 200) {
+      const bytes = new Uint8Array(await response.arrayBuffer())
+      this.received += bytes.length
+      return bytes
+    }
 
     // A host that answered 200 sent the whole archive. It is sliced as it flows, exactly as
     // `stream` does it: buffering it to take the slice would hold the whole file — and under
     // `segmentedStream`, four whole files at once. The slice ends the pipe, which cancels the
     // body, so the transfer stops there too.
     if (!response.body) throw new PlayerError('network', 'Range response had no body')
-    return new Uint8Array(await new Response(sliceStream(response.body, range)).arrayBuffer())
+    return new Uint8Array(
+      await new Response(sliceStream(this.counted(response.body), range)).arrayBuffer()
+    )
   }
 
   async stream(range: ByteRange): Promise<ReadableStream<Uint8Array>> {
@@ -147,7 +173,8 @@ class RangeHttpHandle implements SourceHandle {
 
     // A host that answered 200 sent the whole archive. Buffering it to take a slice would mean
     // holding hundreds of megabytes; the body is sliced as it flows instead.
-    return response.status === 200 ? sliceStream(response.body, range) : response.body
+    const body = this.counted(response.body)
+    return response.status === 200 ? sliceStream(body, range) : body
   }
 }
 
@@ -228,6 +255,70 @@ export async function openSource(
 }
 
 /**
+ * One segment of a span: a ranged request whose bytes are kept as they arrive, so that when the
+ * segment's turn comes the consumer takes what is already there and then follows the request
+ * live, rather than waiting for the whole segment to land first.
+ */
+class Segment {
+  private readonly arrived: Uint8Array[] = []
+  private reader: ReadableStreamDefaultReader<Uint8Array> | null = null
+  private finished = false
+  private failure: unknown = null
+  private wake: (() => void) | null = null
+  private cancelled = false
+  /** Bytes that have arrived so far. */
+  received = 0
+
+  constructor(open: () => Promise<ReadableStream<Uint8Array>>) {
+    void this.pump(open)
+  }
+
+  private async pump(open: () => Promise<ReadableStream<Uint8Array>>): Promise<void> {
+    try {
+      const stream = await open()
+      if (this.cancelled) {
+        await stream.cancel()
+        return
+      }
+      this.reader = stream.getReader()
+      for (;;) {
+        const { done, value } = await this.reader.read()
+        if (done) break
+        this.arrived.push(value)
+        this.received += value.length
+        this.wake?.()
+      }
+    } catch (error) {
+      if (!this.cancelled) this.failure = error
+    } finally {
+      this.finished = true
+      this.wake?.()
+    }
+  }
+
+  /** The next chunk that has arrived, waiting for one when none has; `null` once the segment is done. */
+  async next(): Promise<Uint8Array | null> {
+    for (;;) {
+      const chunk = this.arrived.shift()
+      if (chunk) return chunk
+      if (this.failure) throw this.failure
+      if (this.finished) return null
+      await new Promise<void>((resolve) => {
+        this.wake = resolve
+      })
+      this.wake = null
+    }
+  }
+
+  cancel(): void {
+    this.cancelled = true
+    this.arrived.length = 0
+    void this.reader?.cancel().catch(() => {})
+    this.wake?.()
+  }
+}
+
+/**
  * Pulls one span over several connections and emits it in order.
  *
  * A rolling window rather than "split into N halves and join": splitting a 230 MB span four ways
@@ -238,46 +329,63 @@ export async function openSource(
  *
  * Order is what makes this usable at all: the consumer is an inflate, and a deflate stream has to
  * be fed from the front. So the download is parallel and the decode stays serial.
+ *
+ * Two things about the start. The first segment is handed over as it arrives, not once it is
+ * complete: on a link that is itself the limit, waiting for a whole 4 MB segment meant the inflate
+ * saw nothing until it landed. And the other connections open only once the first is flowing:
+ * opened together, the four share the link and the first segment's bytes — the only ones the
+ * inflate can use yet — arrive at a quarter of the rate, so the first byte of output waited for
+ * roughly 16 MB of transfer. Measured against a 40 MB deflated video on a 4 Mbit/s link, that was
+ * 34 s to the first extracted byte — past the 30 s the virtual server gives an extraction to
+ * produce anything. A host that caps each connection loses nothing to the ramp: the others open
+ * as soon as the first byte arrives.
  */
 function segmentedStream(handle: SourceHandle, span: ByteRange): ReadableStream<Uint8Array> {
   const total = span.end - span.start + 1
   const count = Math.ceil(total / SEGMENT_SIZE)
-  const pending = new Map<number, Promise<Uint8Array>>()
+  const segments = new Map<number, Segment>()
 
+  /** The next segment to open. */
   let next = 0
-  let emitted = 0
-  let stopped = false
+  /** The segment being emitted. */
+  let current = 0
 
-  const begin = (index: number) => {
+  const open = (index: number) => {
     const start = span.start + index * SEGMENT_SIZE
-    const request = handle.read({ start, end: Math.min(start + SEGMENT_SIZE - 1, span.end) })
-    // Observed when its turn comes. Attaching a no-op catch now stops a segment that fails while
-    // an earlier one is still in flight from surfacing as an unhandled rejection first.
-    void request.catch(() => {})
-    pending.set(index, request)
+    const range = { start, end: Math.min(start + SEGMENT_SIZE - 1, span.end) }
+    segments.set(index, new Segment(() => handle.stream(range)))
   }
 
   return new ReadableStream<Uint8Array>(
     {
       async pull(controller) {
-        if (emitted >= count) {
-          controller.close()
-          return
+        for (;;) {
+          if (current >= count) {
+            controller.close()
+            return
+          }
+          // Opened here rather than in `start`, so nothing is fetched until something reads.
+          if (next === current) open(next++)
+          const segment = segments.get(current)!
+
+          if (segment.received > 0) {
+            while (next < count && segments.size < SEGMENT_CONCURRENCY) open(next++)
+          }
+
+          const chunk = await segment.next()
+          if (chunk) {
+            controller.enqueue(chunk)
+            return
+          }
+          segments.delete(current)
+          current += 1
         }
-
-        // Filled here rather than in `start` so nothing is fetched until something reads.
-        while (!stopped && next < count && pending.size < SEGMENT_CONCURRENCY) begin(next++)
-
-        const bytes = await pending.get(emitted)!
-        pending.delete(emitted)
-        emitted += 1
-        controller.enqueue(bytes)
       },
       cancel() {
-        // `SourceHandle.read` takes no signal, so segments already in flight run to completion.
-        // Bounded by the window, so the waste is at most a few megabytes.
-        stopped = true
-        pending.clear()
+        for (const segment of segments.values()) segment.cancel()
+        segments.clear()
+        next = count
+        current = count
       }
     },
     { highWaterMark: 0 }

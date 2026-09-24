@@ -40,6 +40,7 @@ src/
     mount.ts              mountH5P(self)     -> dist/h5p-sw-mount.js; the virtual file server
     package-reader.ts     zip index + per-entry serving strategy
     frame-document.ts     the frame HTML the worker synthesizes, and its CSP
+    watermark-wait.ts     the stall-bounded wait for an entry's bytes, and what counts as progress
     routes.ts             URL shape of the virtual routes
     stream-utils.ts
   jobs/
@@ -83,9 +84,10 @@ npm run demo:og        # re-render the social card, demo/og-image.png
 npm run preview:demo   # serves dist-demo/ with the production headers and the /no-range route
 ```
 
-`npm run test:browser` runs two browser projects: `browser`, the suite, and `browser-quota`, the
-storage-quota tests, which get a browser of their own because the CDP quota override they apply
-is per browser profile and would otherwise land on whatever other file was running.
+`npm run test:browser` runs two browser projects: `browser`, the suite, and `browser-emulated`,
+the tests that emulate a browser condition through CDP — a storage cap, a slow link. Those get a
+browser of their own, one file at a time, because the emulation is per browser profile and would
+otherwise land on whatever other file was running.
 
 `npm publish` runs `prepublishOnly` — typecheck, the unit suite and the build — so a broken tree
 cannot ship; the browser suite is left out because it needs an installed Chromium.
@@ -158,13 +160,27 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   deliberate loosening of the one-chunk-in-memory rule and the reason the segment is 4 MB rather
   than the 8 MB used elsewhere. It applies only to `range-http`: a picked file and an archive
   already in the chunk store are local reads, where splitting costs buffering and buys nothing.
+  **The first segment streams, and the others open only once it flows.** Handing a segment over
+  whole meant the inflate saw nothing until 4 MB had landed, and on a link that is itself the
+  limit the four connections shared it, so the first byte of output waited for roughly 16 MB of
+  transfer. Measured with a 40 MB deflated video at 4 Mbit/s: 34 s to the first extracted byte,
+  past the stall bound, so the media request got a 503 for a job that was perfectly healthy; a
+  real 93 MB package from a host with half-second latency took 8.6 s on a fast link. `Segment`
+  keeps a request's bytes as they arrive and the consumer follows it live when its turn comes,
+  and the window fills only after the first byte, which costs a per-connection-capped host one
+  round trip and nothing else. Same 40 MB at 4 Mbit/s now: first byte in under two seconds.
 - **Waiting on the watermark is bounded by a stall, not by a wall clock.** Inflating a few hundred
   megabytes over a network legitimately takes minutes, and a request for the *tail* of such an
   entry cannot be answered until it finishes: an mp4 whose `moov` index sits at the end — common,
   since faststart is not the default — is undecodable until then, and extraction only runs
   forward. So a range beginning past the watermark is answered in full with a body that follows
   the extraction, and a request with no `Range` header gets a `200` of the true length the same
-  way. Only a watermark that stops moving, twice, gives up.
+  way. Only a watermark that stops moving, twice, gives up — and **input counts as movement**:
+  the Jobs worker announces the bytes it has taken from the network every `INPUT_LIVENESS_MS`
+  on the watermark channel (`announceActivity`, nothing written), and `waitForWatermark` resets
+  its stall clock on them, so a slow or erratic host cannot make a live job look dead before its
+  first flush. The first flush itself is 256 kB, not 1 MB, for the same reason: it is what the
+  opening probe and the bound both wait on.
 - **Some video cannot be streamed at all, and `preload` is the only lever.** Progressive serving
   assumes the player can use the front of a file. Two package properties together break that: the
   mp4 is deflated in the zip, so no `Range` reaches a byte without the whole stream before it, and
@@ -345,7 +361,7 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   package is too big for this browser or the site has merely filled up. One caveat for testing
   it: under DevTools' "simulate custom storage quota", writes fail at the simulated cap while
   `estimate().quota` keeps reporting the real one, so the message reads oddly there and a
-  pre-flight check could not have helped. `tests/browser-quota/` uses that same override through
+  pre-flight check could not have helped. `tests/browser-emulated/` uses that same override through
   CDP, in a Vitest project of its own because the override is per browser profile.
 - **The frame reports the runtime's own failed loads.** Its `error` listener is capture-phase,
   because a resource failure fires on the element and never bubbles, and it reports only tags
@@ -587,6 +603,11 @@ outside a browser. Two things to know when writing them:
 - **State carries between tests.** Caches and the `packages` table survive; `play()` replaces the
   document body, which disconnects the previous element and terminates its Jobs worker mid-job. A
   test that needs a cold load must call `clearPackageCaches()`.
+
+`segmented.h5p` is `large-deflated.h5p` with media that does not compress: 20 MB of zeros deflate
+to 20 kB, which is never fetched in segments, so only this archive takes `segmentedStream` end to
+end. The slow-link test in `tests/browser-emulated/` throttles the browser to 1 MB/s and expects
+the first bytes of it inside eight seconds.
 
 `large-deflated.h5p` carries `content/media/unused.bin`, large and deflated and referenced by
 nothing. It is the only way to tell a prefetch from a demand fetch: the fixture's own

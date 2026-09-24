@@ -78,6 +78,15 @@ export const JOB_REQUEST_DEDUPE_MS = 2_000
  */
 export const FAILURE_BACKOFF_MS = 10_000
 
+/**
+ * How often a job announces the bytes it has taken from the network. The Service Worker's stall
+ * bound watches the watermark, which cannot move until the inflate has produced its first flush;
+ * on a slow or erratic host the input can flow for a good while before that. These notices are
+ * how a waiter tells slow from dead. Nothing is written for them: they go on the watermark
+ * channel and wake whoever is waiting on the entry.
+ */
+export const INPUT_LIVENESS_MS = 1_000
+
 /** IndexedDB database and store names. */
 export const DB_NAME = 'h5p-player'
 export const DB_VERSION = 1

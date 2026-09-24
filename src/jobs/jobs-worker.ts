@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import { configure } from '@zip.js/zip.js'
-import { ARCHIVE_ENTRY, CHUNK_SIZE } from '../shared/constants'
-import { ChunkStore, QuotaError, isQuotaError } from '../shared/chunk-store'
+import { ARCHIVE_ENTRY, CHUNK_SIZE, INPUT_LIVENESS_MS } from '../shared/constants'
+import { ChunkStore, QuotaError, announceActivity, isQuotaError } from '../shared/chunk-store'
 import { installEvictionPolicy } from '../shared/eviction'
 import { LocalHeaderScanner } from '../shared/forward-index'
 import { packageLockName, packageLockPrefix } from '../shared/locks'
@@ -12,7 +12,7 @@ import {
   type SourceDescriptor,
   type ToJobsMessage
 } from '../shared/protocol'
-import { openSource } from '../shared/source'
+import { openSource, type SourceHandle } from '../shared/source'
 import { quotaMessage } from '../shared/storage'
 import { PackageReader } from '../sw/package-reader'
 import { createChunkWriter } from './chunk-writer'
@@ -277,6 +277,7 @@ async function extractEntry(
   // would repeat this from zero on every attempt.
   await store.setMeta(entryName, { size: entry.size, available: 0, complete: false })
 
+  const stopReporting = reportInput(reader.handle, pkgId, entryName)
   try {
     await reader.inflate(entry).pipeTo(
       createChunkWriter({
@@ -291,9 +292,28 @@ async function extractEntry(
   } catch (error) {
     if (!(error instanceof QuotaError)) throw error
     throw new QuotaError(await quotaMessage('this file', entry.size))
+  } finally {
+    stopReporting()
   }
 
   send({ type: 'done', pkgId, entry: entryName, size: entry.size })
+}
+
+/**
+ * Announces, while a job runs, the bytes it has taken from the network, so the Service Worker's
+ * stall bound can tell a slow start from a dead job. Only for a network handle: a local read has
+ * no silence worth reporting. Nothing is written; the notice rides the watermark channel.
+ */
+function reportInput(handle: SourceHandle, pkgId: string, entry: string): () => void {
+  if (handle.received === undefined) return () => {}
+  let last = handle.received
+  const timer = setInterval(() => {
+    const now = handle.received ?? last
+    if (now === last) return
+    last = now
+    announceActivity(pkgId, entry, now)
+  }, INPUT_LIVENESS_MS)
+  return () => clearInterval(timer)
 }
 
 /**

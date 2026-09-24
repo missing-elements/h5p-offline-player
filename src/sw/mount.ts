@@ -33,6 +33,7 @@ import { PackageReader, STORED, type IndexedEntry, type LocatedEntry } from './p
 import { buildFrameDocument, createNonce } from './frame-document'
 import { matchRoute, routesFor, type RouteMatch, type Routes } from './routes'
 import { sliceStream } from '../shared/stream-utils'
+import { waitForWatermark } from './watermark-wait'
 import { quotaMessage } from '../shared/storage'
 
 /**
@@ -689,64 +690,6 @@ class VirtualServer {
 }
 
 /* ------------------------------------------------------------------ helpers */
-
-/**
- * Waits until the entry has at least `needed` bytes, or is complete.
- *
- * The bound is a stall, not a wall clock: extraction of a large entry legitimately takes minutes,
- * and a request for the tail of a 220 MB video cannot be answered until it finishes. What must
- * not happen is waiting on a job that has died with the tab that owned it, so the watermark is
- * expected to keep moving — when it stops, the job is asked for again, and only a second silent
- * stretch gives up.
- */
-async function waitForWatermark(
-  store: ChunkStore,
-  entry: string,
-  needed: number,
-  options: { stallMs?: number; onStall?: () => Promise<void> } = {}
-): Promise<ChunkMeta | null> {
-  const stallMs = options.stallMs ?? COLD_ENTRY_WAIT_MS
-  let lastAvailable = -1
-  let lastAdvanceAt = Date.now()
-  let askedAgain = false
-
-  // Woken by the writer's notice when there is one; the poll is the fallback that keeps stall
-  // detection working when there is not.
-  let wake: (() => void) | null = null
-  const stop = onWatermark(store.pkgId, entry, () => wake?.())
-
-  try {
-    for (;;) {
-      const meta = await store.getMeta(entry)
-      if (meta && (meta.available >= needed || meta.complete)) return meta
-      // A recorded failure is an answer too; the caller decides what to serve.
-      if (meta?.error) return meta
-
-      const available = meta?.available ?? 0
-      if (available !== lastAvailable) {
-        lastAvailable = available
-        lastAdvanceAt = Date.now()
-        askedAgain = false
-      } else if (Date.now() - lastAdvanceAt >= stallMs) {
-        if (askedAgain || !options.onStall) return null
-        await options.onStall()
-        askedAgain = true
-        lastAdvanceAt = Date.now()
-      }
-
-      await new Promise<void>((resolve) => {
-        const timer = setTimeout(resolve, WATERMARK_POLL_MS)
-        wake = () => {
-          clearTimeout(timer)
-          resolve()
-        }
-      })
-      wake = null
-    }
-  } finally {
-    stop()
-  }
-}
 
 function entryHeaders(
   entry: IndexedEntry,

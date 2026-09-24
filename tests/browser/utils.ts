@@ -12,6 +12,8 @@ export const FIXTURES = {
   basic: '/fixtures/basic.h5p',
   largeDeflated: '/fixtures/large-deflated.h5p',
   largeStored: '/fixtures/large-stored.h5p',
+  /** A large deflated entry that does not compress, so its span is fetched in segments over HTTP. */
+  segmented: '/fixtures/segmented.h5p',
   traversal: '/fixtures/traversal.h5p',
   notH5P: '/fixtures/not-h5p.h5p',
   corrupt: '/fixtures/corrupt.h5p',

@@ -84,7 +84,9 @@ reads the archive in place and answers the H5P runtime's requests out of it:
 - the archive's **central directory** is read over HTTP `Range` requests, so a 300 MB package
   costs a few kilobytes before it starts;
 - **large spans are pulled by several connections at once** and reassembled in order, because a
-  single connection is often capped well below the link;
+  single connection is often capped well below the link — the first one streams straight into
+  the inflate, and the others open once it flows, so a slow link still sees its first bytes
+  within a second or two;
 - **small entries and scripts** are inflated once into a Cache API store;
 - **large stored media** is sliced straight out of the archive — never extracted, never stored;
 - **large deflated media** is inflated into 8 MB chunks by a page-side worker, and served

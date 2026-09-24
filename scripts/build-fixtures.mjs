@@ -118,6 +118,23 @@ built.push([
   })
 ])
 
+// 3b. A large deflated entry that does not compress: its compressed span is long enough to be
+//     fetched in segments over HTTP, which the compressible one above never is — 20 MB of zeros
+//     deflate to 20 kB. This is the archive that exercises `segmentedStream` end to end.
+built.push([
+  'segmented.h5p',
+  await writeArchive('segmented.h5p', async (writer) => {
+    await addBaseFiles(writer, { skip: ['content/content.json'] })
+    await writer.add(
+      'content/content.json',
+      new TextReader(
+        JSON.stringify({ message: 'Large incompressible deflated media', media: { path: 'media/big.bin' } })
+      )
+    )
+    await writer.add('content/media/big.bin', new Uint8ArrayReader(randomBytes()))
+  })
+])
+
 // 3c. Every entry with a data descriptor — the layout a writer that streams produces, and what
 //     h5p.com's exporter ships: sizes after the data, nothing in the local header to skip by.
 //     Libraries first and media last, so a host that ignores Range can boot it before the media

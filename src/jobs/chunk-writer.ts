@@ -7,10 +7,13 @@ import type { ChunkStore } from '../shared/chunk-store'
  * partial chunk is written early and rewritten as it fills.
  *
  * Each rewrite copies everything written so far, so a fixed interval would cost O(n²): an 8 MB
- * chunk flushed every megabyte writes 36 MB. The interval doubles instead — 1, 2, 4, 8 MB — which
- * keeps the first bytes just as prompt and bounds the total rewritten at roughly twice the entry.
+ * chunk flushed every megabyte writes 36 MB. The interval doubles instead — 256 kB, 512 kB, 1, 2,
+ * 4, 8 MB — which keeps the first bytes prompt and bounds the total rewritten at roughly twice
+ * the entry. 256 kB rather than 1 MB because the first flush is what a media element's opening
+ * probe and the virtual server's stall bound both wait on, and on a slow link a megabyte of
+ * inflated video is several seconds of nothing visible.
  */
-const FIRST_FLUSH_SIZE = 1024 * 1024
+const FIRST_FLUSH_SIZE = 256 * 1024
 
 export interface ChunkWriterOptions {
   store: ChunkStore

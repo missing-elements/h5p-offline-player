@@ -58,7 +58,7 @@
     "preview:demo": "vite preview --config vite.demo.config.ts",
     "test": "npm run prepare:dev && vitest run",
     "test:unit": "vitest run --project unit",
-    "test:browser": "npm run prepare:dev && vitest run --project browser --project browser-quota",
+    "test:browser": "npm run prepare:dev && vitest run --project browser --project browser-emulated",
     "test:watch": "npm run prepare:dev && vitest",
     "typecheck": "tsc -b --force && tsc -p tsconfig.test.json",
     "prepublishOnly": "npm run typecheck && npm run test:unit && npm run build"

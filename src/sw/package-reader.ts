@@ -92,7 +92,8 @@ export class PackageReader {
 
   private constructor(
     pkgId: string,
-    private readonly handle: SourceHandle,
+    /** The archive this reader reads. Exposed for the Jobs worker's liveness reports. */
+    readonly handle: SourceHandle,
     entries: Map<string, IndexedEntry>,
     rejected: string[],
     manifest: PackageManifest,

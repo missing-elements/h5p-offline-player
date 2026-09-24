@@ -7,6 +7,7 @@ export const GENERATED_FIXTURES = [
   'basic.h5p',
   'large-deflated.h5p',
   'large-stored.h5p',
+  'segmented.h5p',
   'streamed.h5p',
   'traversal.h5p',
   'not-h5p.h5p',

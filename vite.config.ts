@@ -46,12 +46,14 @@ export default defineConfig({
         }
       },
       {
-        // A browser of its own: the storage-quota override these tests apply is per browser
-        // profile, and would otherwise land on whatever other test file happened to be running.
+        // A browser of its own, one file at a time: these tests emulate a browser condition
+        // through CDP — a storage cap, a slow link — and the emulation is per browser profile,
+        // so it would otherwise land on whatever other test file happened to be running.
         extends: true,
         test: {
-          name: 'browser-quota',
-          include: ['tests/browser-quota/**/*.test.ts'],
+          name: 'browser-emulated',
+          include: ['tests/browser-emulated/**/*.test.ts'],
+          fileParallelism: false,
           browser: browserProject()
         }
       }

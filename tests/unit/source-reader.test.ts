@@ -116,13 +116,28 @@ describe('sliceStream', () => {
 })
 
 /**
- * A handle that synthesises bytes per range rather than holding the span, and reports how many
- * reads overlap. Each read increments before its first await, so every concurrent one is counted.
+ * A handle that synthesises bytes per range and streams them in pieces, under the test's control
+ * when it asks for it: `hold()` stops every stream at its next piece until `release(n)` lets that
+ * many through, `flow()` lets everything through. It records which ranges were opened, in order,
+ * how many downloads were in flight at once, and how many were cancelled.
  */
-function countingHandle(size: number, type: 'range-http' | 'file' = 'range-http') {
-  const reads: ByteRange[] = []
-  let open = 0
+function pieceHandle(size: number, type: 'range-http' | 'file' = 'range-http', piece = 64 * 1024) {
+  const opened: ByteRange[] = []
+  let inFlight = 0
   let peak = 0
+  let cancelled = 0
+  let allowance = Infinity
+  const waiting: Array<() => void> = []
+
+  const gate = () =>
+    new Promise<void>((resolve) => {
+      if (allowance > 0) {
+        allowance -= 1
+        resolve()
+      } else {
+        waiting.push(resolve)
+      }
+    })
 
   const fill = (range: ByteRange) => {
     const out = new Uint8Array(range.end - range.start + 1)
@@ -137,20 +152,63 @@ function countingHandle(size: number, type: 'range-http' | 'file' = 'range-http'
         : { type: 'file', name: 'course.h5p', size, lastModified: 0 },
     size,
     async read(range) {
-      reads.push(range)
-      open += 1
-      peak = Math.max(peak, open)
-      await Promise.resolve()
-      open -= 1
+      opened.push(range)
       return fill(range)
     },
     async stream(range) {
-      reads.push(range)
-      return new Blob([fill(range)]).stream()
+      opened.push(range)
+      inFlight += 1
+      peak = Math.max(peak, inFlight)
+      let position = range.start
+      let settled = false
+      const settle = () => {
+        if (settled) return
+        settled = true
+        inFlight -= 1
+      }
+      return new ReadableStream<Uint8Array>(
+        {
+          async pull(controller) {
+            if (position > range.end) {
+              settle()
+              controller.close()
+              return
+            }
+            await gate()
+            const end = Math.min(position + piece - 1, range.end)
+            controller.enqueue(fill({ start: position, end }))
+            position = end + 1
+          },
+          cancel() {
+            cancelled += 1
+            settle()
+          }
+        },
+        { highWaterMark: 0 }
+      )
     }
   }
 
-  return { handle, reads, peakConcurrency: () => peak }
+  return {
+    handle,
+    opened,
+    peak: () => peak,
+    cancelled: () => cancelled,
+    hold() {
+      allowance = 0
+    },
+    release(count: number) {
+      allowance += count
+      while (allowance > 0 && waiting.length) {
+        allowance -= 1
+        waiting.shift()!()
+      }
+    },
+    flow() {
+      allowance = Infinity
+      for (const resolve of waiting.splice(0)) resolve()
+    }
+  }
 }
 
 /** Reads a stream to the end without keeping it, and reports what it saw. */
@@ -171,11 +229,13 @@ async function drain(stream: ReadableStream<Uint8Array>) {
   return { length, inOrder }
 }
 
+const settle = () => new Promise((resolve) => setTimeout(resolve, 20))
+
 describe('fetching a large span over several connections', () => {
   const SPAN = SEGMENT_MIN_SPAN + SEGMENT_SIZE
 
   it('reassembles the segments in order, byte for byte', async () => {
-    const { handle } = countingHandle(SPAN)
+    const { handle } = pieceHandle(SPAN)
 
     // Order is the whole point: the consumer is an inflate, and a deflate stream has no way back.
     expect(await drain(new SourceReader(handle).createReadable())).toEqual({
@@ -185,12 +245,12 @@ describe('fetching a large span over several connections', () => {
   })
 
   it('splits into segments that tile the span with no gap and no overlap', async () => {
-    const { handle, reads } = countingHandle(SPAN)
+    const { handle, opened } = pieceHandle(SPAN)
     await drain(new SourceReader(handle).createReadable())
 
-    expect(reads).toHaveLength(Math.ceil(SPAN / SEGMENT_SIZE))
+    expect(opened).toHaveLength(Math.ceil(SPAN / SEGMENT_SIZE))
 
-    const ordered = [...reads].sort((a, b) => a.start - b.start)
+    const ordered = [...opened].sort((a, b) => a.start - b.start)
     expect(ordered[0].start).toBe(0)
     expect(ordered[ordered.length - 1].end).toBe(SPAN - 1)
     for (let i = 1; i < ordered.length; i += 1) {
@@ -198,37 +258,87 @@ describe('fetching a large span over several connections', () => {
     }
   })
 
+  it('hands over the first bytes before the first segment is complete, and only then opens more connections', async () => {
+    // Enough segments to fill the window; SPAN itself holds only three.
+    const fake = pieceHandle(SEGMENT_SIZE * 6)
+    fake.hold()
+    const reader = new SourceReader(fake.handle).createReadable().getReader()
+
+    // One connection, nothing through it yet: the consumer waits on the first piece.
+    const first = reader.read()
+    await settle()
+    expect(fake.opened).toHaveLength(1)
+
+    // The first piece is enough to be handed over — the segment is nowhere near complete.
+    fake.release(1)
+    const { value } = await first
+    expect(value!.length).toBe(64 * 1024)
+    expect(fake.opened).toHaveLength(1)
+
+    // Now that the first segment is flowing, the rest of the window opens.
+    const second = reader.read()
+    await settle()
+    expect(fake.opened).toHaveLength(SEGMENT_CONCURRENCY)
+    expect(fake.peak()).toBe(SEGMENT_CONCURRENCY)
+
+    fake.flow()
+    await second
+    await reader.cancel()
+  })
+
   it('keeps no more than the window in flight, whatever the size of the span', async () => {
-    const { handle, peakConcurrency } = countingHandle(SEGMENT_SIZE * 12)
-    await drain(new SourceReader(handle).createReadable())
+    const fake = pieceHandle(SEGMENT_SIZE * 12)
+    await drain(new SourceReader(fake.handle).createReadable())
 
     // A fixed window is what keeps memory flat: splitting the span N ways instead would leave
     // whole fractions of a 200 MB video waiting their turn in memory.
-    expect(peakConcurrency()).toBe(SEGMENT_CONCURRENCY)
+    expect(fake.peak()).toBeLessThanOrEqual(SEGMENT_CONCURRENCY)
+    expect(fake.peak()).toBeGreaterThanOrEqual(SEGMENT_CONCURRENCY - 1)
+    expect(fake.opened).toHaveLength(12)
+  })
+
+  it('stops every connection when the consumer cancels', async () => {
+    const fake = pieceHandle(SEGMENT_SIZE * 6)
+    fake.hold()
+    const reader = new SourceReader(fake.handle).createReadable().getReader()
+    const first = reader.read()
+    await settle()
+    fake.release(1)
+    await first
+    const second = reader.read()
+    await settle()
+    expect(fake.opened).toHaveLength(SEGMENT_CONCURRENCY)
+
+    await reader.cancel()
+    await settle()
+
+    // A segment already in flight used to run to completion; now the abort reaches the request.
+    expect(fake.cancelled()).toBe(SEGMENT_CONCURRENCY)
+    await expect(second).resolves.toEqual({ done: true, value: undefined })
   })
 
   it('leaves a local source alone, where splitting buys nothing', async () => {
-    const { handle, reads } = countingHandle(SPAN, 'file')
+    const { handle, opened } = pieceHandle(SPAN, 'file')
 
     expect(await drain(new SourceReader(handle).createReadable())).toEqual({
       length: SPAN,
       inOrder: true
     })
-    expect(reads).toHaveLength(1)
+    expect(opened).toHaveLength(1)
   })
 
   it('opens nothing until the stream is actually read', async () => {
-    const { handle, reads } = countingHandle(SPAN)
+    const { handle, opened } = pieceHandle(SPAN)
     new SourceReader(handle).createReadable()
 
     await Promise.resolve()
-    expect(reads).toHaveLength(0)
+    expect(opened).toHaveLength(0)
   })
 
   it('still uses one request below the threshold', async () => {
-    const { handle, reads } = countingHandle(SEGMENT_MIN_SPAN - 1)
+    const { handle, opened } = pieceHandle(SEGMENT_MIN_SPAN - 1)
     await drain(new SourceReader(handle).createReadable())
 
-    expect(reads).toHaveLength(1)
+    expect(opened).toHaveLength(1)
   })
 })

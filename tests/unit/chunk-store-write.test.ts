@@ -204,7 +204,7 @@ describe('ChunkStore writes', () => {
   it('announces every watermark it writes, so a waiter need not poll for it', async () => {
     vi.stubGlobal('caches', fakeCaches(false).caches)
     const heard: unknown[] = []
-    const stop = onWatermark('pkg', 'content/media/a.mp4', (meta) => heard.push(meta))
+    const stop = onWatermark('pkg', 'content/media/a.mp4', (notice) => heard.push(notice.meta))
 
     await new ChunkStore('pkg').setMeta('content/media/a.mp4', { size: 10, available: 5, complete: false })
     await new ChunkStore('other').setMeta('content/media/a.mp4', { size: 1, available: 1, complete: true })
@@ -220,7 +220,7 @@ describe('ChunkStore writes', () => {
     vi.stubGlobal('caches', fakeCaches(false).caches)
 
     const heard: unknown[] = []
-    const stop = onWatermark('pkg', FORWARD_INDEX_ENTRY, (meta) => heard.push(meta))
+    const stop = onWatermark('pkg', FORWARD_INDEX_ENTRY, (notice) => heard.push(notice.meta))
     const store = new ChunkStore('pkg')
     const snapshot = {
       entries: [{ name: 'h5p.json', directory: false, method: 8, encrypted: false, crc32: 1, compressedSize: 10, uncompressedSize: 12, headerOffset: 0, dataStart: 38 }],

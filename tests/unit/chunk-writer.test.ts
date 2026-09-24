@@ -27,7 +27,8 @@ describe('createChunkWriter', () => {
     const { store, metas, bytesInStore } = recordingStore()
     const writer = createChunkWriter({ store, entry: 'content/videos/a.mp4', totalSize: 10 * MB }).getWriter()
 
-    // 1 MB crosses the first partial-flush threshold and is stored; the next half only buffers.
+    // 1 MB crosses the first partial-flush threshold (256 kB) and is stored whole; with the
+    // interval doubled to 2 MB, the next half only buffers.
     await writer.write(new Uint8Array(MB))
     await writer.write(new Uint8Array(MB / 2))
     expect(bytesInStore()).toBe(MB)

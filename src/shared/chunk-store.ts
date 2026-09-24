@@ -447,7 +447,10 @@ const WATERMARK_CHANNEL = 'h5p-player-watermark'
 export interface WatermarkNotice {
   pkgId: string
   entry: string
-  meta: ChunkMeta
+  /** The record that was just written, on a watermark notice. */
+  meta?: ChunkMeta
+  /** Bytes the job has taken from the network so far, on a liveness notice. */
+  received?: number
 }
 
 let announcer: BroadcastChannel | null | undefined
@@ -470,11 +473,20 @@ function announceWatermark(notice: WatermarkNotice): void {
   }
 }
 
-/** Calls `onNotice` for every watermark written to one entry, until the returned function is called. */
+/**
+ * Tells whoever waits on an entry that its job is alive: the bytes taken from the network so far.
+ * A liveness notice writes nothing — there is nothing to serve yet — it only keeps a waiter from
+ * reading a slow start as a dead job.
+ */
+export function announceActivity(pkgId: string, entry: string, received: number): void {
+  announceWatermark({ pkgId, entry, received })
+}
+
+/** Calls `onNotice` for every notice about one entry, until the returned function is called. */
 export function onWatermark(
   pkgId: string,
   entry: string,
-  onNotice: (meta: ChunkMeta) => void
+  onNotice: (notice: WatermarkNotice) => void
 ): () => void {
   listener ??= openChannel()
   const channel = listener
@@ -482,7 +494,7 @@ export function onWatermark(
 
   const onMessage = (event: MessageEvent<WatermarkNotice>) => {
     const notice = event.data
-    if (notice?.pkgId === pkgId && notice.entry === entry) onNotice(notice.meta)
+    if (notice?.pkgId === pkgId && notice.entry === entry) onNotice(notice)
   }
   channel.addEventListener('message', onMessage)
   return () => channel.removeEventListener('message', onMessage)
