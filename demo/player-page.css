@@ -111,7 +111,9 @@ p code, li code, .lede code { padding: 0.1em 0.35em; border-radius: 4px; backgro
   font: 700 0.7rem / 1 ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-.topbar nav { display: flex; gap: 0.25rem; }
+/* Wraps rather than overflows: a wider system font or a larger text setting on a narrow phone
+   pushed the fourth link past the edge, and the whole page scrolled sideways. */
+.topbar nav { display: flex; flex-wrap: wrap; gap: 0.25rem; min-width: 0; }
 
 .topbar nav a {
   padding: 0.375rem 0.7rem;
@@ -246,49 +248,77 @@ label.file input { display: none; }
 
 /* ---------------------------------------------------------------- status */
 
+/*
+ * A readout, not another chip: a flat strip whose left edge takes the state's colour, with the
+ * state as a small capital label, the progress bar, and the clock on the right. The sample
+ * buttons above it are pills; nothing here is.
+ */
 .status {
   display: flex;
   align-items: center;
   gap: 0.875rem;
-  min-height: 2rem;
+  min-height: 2.5rem;
   margin: 1.25rem 0 0.5rem;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
   font-size: 0.9rem;
+  transition: border-color var(--ease);
 }
+
+.status[data-state="ready"] { border-left-color: var(--ok); }
+.status[data-state="error"] { border-left-color: var(--danger); }
+.status[data-state="probing"],
+.status[data-state="downloading"],
+.status[data-state="indexing"] { border-left-color: var(--accent); }
 
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.2rem 0.7rem 0.2rem 0.6rem;
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  background: var(--surface);
-  font-size: 0.8rem;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  text-transform: lowercase;
+  gap: 0.5rem;
+  min-width: 7.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 .badge::before {
   content: "";
-  width: 0.5rem;
-  height: 0.5rem;
+  width: 0.55rem;
+  height: 0.55rem;
   border-radius: 50%;
   background: var(--muted);
 }
 
-.badge[data-state="ready"] { border-color: color-mix(in srgb, var(--ok) 45%, transparent); color: var(--ok); }
+.badge[data-state="ready"] { color: var(--ok); }
 .badge[data-state="ready"]::before { background: var(--ok); }
-.badge[data-state="error"] { border-color: color-mix(in srgb, var(--danger) 45%, transparent); color: var(--danger); }
+.badge[data-state="error"] { color: var(--danger); }
 .badge[data-state="error"]::before { background: var(--danger); }
 
 .badge[data-state="probing"],
 .badge[data-state="downloading"],
-.badge[data-state="indexing"] { border-color: color-mix(in srgb, var(--accent) 45%, transparent); color: var(--accent); }
+.badge[data-state="indexing"] { color: var(--accent); }
 
 .badge[data-state="probing"]::before,
 .badge[data-state="downloading"]::before,
 .badge[data-state="indexing"]::before { background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+
+/* Seconds since the load was asked for, frozen when the player is ready or has failed. */
+.timer {
+  margin-left: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.timer[hidden] { display: none; }
+.status[data-state="ready"] .timer { color: var(--fg); }
 
 @keyframes pulse { 50% { opacity: 0.35; } }
 
@@ -393,8 +423,8 @@ a.card:hover { border-color: var(--line-strong); box-shadow: var(--shadow); tran
 
 footer {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 0.75rem;
+  flex-direction: column;
+  gap: 0.75rem;
   margin-top: 3rem;
   padding-top: 1.25rem;
   border-top: 1px solid var(--line);
@@ -403,12 +433,26 @@ footer {
   line-height: 1.6;
 }
 
-/* A footer with more than a row of links keeps each line in a paragraph that takes the whole
-   row, so a sentence wraps as a sentence rather than as flex items. */
-footer p {
-  flex: 1 1 100%;
-  margin: 0;
+footer p { margin: 0; }
+
+/* The links as a list that wraps between items, never inside one — a run of inline links with
+   dots between them broke "local file" across two lines on a phone, and a dot could start a line. */
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.1rem;
 }
+
+.footer-links a {
+  white-space: nowrap;
+  color: var(--fg);
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 0.2em;
+  transition: color var(--ease), text-decoration-color var(--ease);
+}
+
+.footer-links a:hover { color: var(--accent); text-decoration-color: currentColor; }
 
 footer .credit {
   font-size: 0.8125rem;
@@ -466,9 +510,13 @@ footer .credit {
   .table thead { display: none; }
   .table tr { display: block; padding: 0.5rem 0; border-top: 1px solid var(--line); }
   .table td { display: block; padding: 0.15rem 0; border: 0; }
+  .topbar { gap: 0.4rem 0.75rem; }
+  .topbar nav { gap: 0.1rem; }
+  .topbar nav a { padding: 0.3rem 0.55rem; font-size: 0.85rem; }
   .controls { flex-direction: column; align-items: stretch; }
   .controls input[type="text"], .controls button, .controls label.file { flex: none; width: 100%; }
   .controls .badge { align-self: flex-start; }
   .status { flex-wrap: wrap; }
-  progress { flex-basis: 100%; }
+  /* The bar takes a line of its own below the state and the clock. */
+  progress { flex-basis: 100%; order: 1; }
 }

@@ -8,7 +8,9 @@ const player = document.querySelector('h5p-player')
 const form = document.querySelector('#load-form')
 const urlInput = document.querySelector('#url')
 const fileInput = document.querySelector('#file')
+const status = document.querySelector('#status')
 const stateBadge = document.querySelector('#state')
+const timer = document.querySelector('#timer')
 const bar = document.querySelector('#progress')
 const message = document.querySelector('#message')
 const log = document.querySelector('#log')
@@ -42,12 +44,57 @@ const EXPLANATIONS = {
   network: 'The package could not be fetched. Check the URL.'
 }
 
+/**
+ * The clock: from the moment a load is asked for until the player is ready or has failed. Each
+ * state on the way is logged with the time it was reached, which is what tells a slow host from
+ * a slow package: a long `probing` is the host answering slowly, a long `indexing` is the
+ * libraries coming down.
+ */
+let loadStarted = null
+let ticking = null
+
+const seconds = (ms) => `${(ms / 1000).toFixed(ms < 10_000 ? 2 : 1)} s`
+const elapsed = () => (loadStarted === null ? null : performance.now() - loadStarted)
+
+const startClock = () => {
+  loadStarted = performance.now()
+  clearInterval(ticking)
+  ticking = setInterval(() => {
+    timer.textContent = seconds(elapsed())
+  }, 100)
+  timer.textContent = '0.00 s'
+  timer.hidden = false
+}
+
+const stopClock = (label) => {
+  clearInterval(ticking)
+  ticking = null
+  const ms = elapsed()
+  if (ms === null) return null
+  timer.textContent = `${label} ${seconds(ms)}`
+  return ms
+}
+
 player.addEventListener('statechange', (event) => {
   const { state } = event.detail
   stateBadge.textContent = state
   stateBadge.dataset.state = state
+  status.dataset.state = state
   if (state !== 'error') show('')
   bar.hidden = state !== 'downloading'
+
+  if (state === 'ready') {
+    const ms = stopClock('ready in')
+    write(ms === null ? 'ready' : `ready  ${seconds(ms)}`)
+  } else if (state === 'error') {
+    stopClock('failed after')
+  } else if (state === 'idle') {
+    stopClock('')
+    timer.hidden = true
+    loadStarted = null
+  } else if (loadStarted !== null) {
+    write(`${state}  ${seconds(elapsed())}`)
+  }
 })
 
 player.addEventListener('progress', (event) => {
@@ -71,7 +118,6 @@ player.addEventListener('progress', (event) => {
 
 player.addEventListener('ready', () => {
   bar.hidden = true
-  write('ready')
 })
 
 player.addEventListener('xapi', (event) => {
@@ -119,6 +165,7 @@ const loadUrl = (url, librarySource) => {
   reload = () => loadUrl(url, librarySource)
   applyLibrarySource(librarySource)
   write(`loading  ${url}`)
+  startClock()
   // Removed first so re-setting the same URL still counts as a change.
   player.removeAttribute('src')
   player.setAttribute('src', url)
@@ -130,6 +177,7 @@ const loadFile = (file) => {
   reload = () => loadFile(file)
   applyLibrarySource(useHub.checked ? 'hub' : null)
   write(`loading  ${file.name} (${(file.size / 1024).toFixed(0)} kB, from disk)`)
+  startClock()
   urlInput.value = ''
   player.file = file
 }

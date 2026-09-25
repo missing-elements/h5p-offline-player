@@ -93,9 +93,10 @@
         <button type="button" data-src="/no-range/video.h5p">Interactive video · host without Range</button>
       </div>
 
-      <div class="status">
+      <div class="status" id="status" data-state="idle">
         <span class="badge" id="state" data-state="idle">idle</span>
         <progress id="progress" max="1" hidden></progress>
+        <span class="timer" id="timer" hidden></span>
       </div>
 
       <p class="message" id="message" hidden></p>
@@ -109,16 +110,16 @@
       <pre class="log" id="log"></pre>
 
       <footer>
-        <p>
-          <a href="/demo/setup.html">Setting it up</a> ·
-          <a href="/demo/">the whole integration</a> ·
-          <a href="/demo/xapi.html">xAPI</a> ·
-          <a href="/demo/local-file.html">local file</a> ·
-          <a href="/demo/embed.html">iframe embed</a> ·
-          <a href="/demo/two-players.html">two on one page</a> ·
-          <a href="https://github.com/missing-elements/h5p-offline-player" rel="noopener">source on GitHub</a> ·
+        <nav class="footer-links" aria-label="More on this site">
+          <a href="/demo/setup.html">Setting it up</a>
+          <a href="/demo/">The whole integration</a>
+          <a href="/demo/xapi.html">xAPI</a>
+          <a href="/demo/local-file.html">Local file</a>
+          <a href="/demo/embed.html">iframe embed</a>
+          <a href="/demo/two-players.html">Two on one page</a>
+          <a href="https://github.com/missing-elements/h5p-offline-player" rel="noopener">Source on GitHub</a>
           <a href="https://www.npmjs.com/package/@missing-elements/h5p-offline-player" rel="noopener">npm</a>
-        </p>
+        </nav>
         <p class="credit">
           The sample content was written for this player; its libraries come from the
           <a href="https://h5p.org/content-types-and-applications" rel="noopener">H5P hub</a> (MIT). The video is
