@@ -121,11 +121,7 @@ export class H5PPlayerElement extends HTMLElement {
   constructor() {
     super()
     const root = this.attachShadow({ mode: 'open' })
-    root.innerHTML = `
-      <div class="viewport">
-        <iframe part="frame" allow="fullscreen" title="H5P content"></iframe>
-      </div>
-    `
+    root.innerHTML = `<div class="viewport"><iframe part="frame" allow="fullscreen" title="H5P content"></iframe></div>`
     adoptShadowStyles(root)
     this.iframe = root.querySelector('iframe')!
   }
