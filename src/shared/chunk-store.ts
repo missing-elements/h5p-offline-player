@@ -208,8 +208,8 @@ export class ChunkStore {
    * back 64 kB of it was the old cost of every such request.
    *
    * `waitFor` lets the stream run ahead of the extraction: it is called with the byte the next
-   * chunk reaches and must resolve true once that much exists. Without it every byte of the
-   * range has to be in the store before the first one can be served.
+   * chunk reaches and must resolve true once that much exists, or false to end the body there.
+   * Without it every byte of the range has to be in the store before the first one can be served.
    */
   readRange(
     entry: string,
@@ -242,8 +242,14 @@ export class ChunkStore {
 
             if (waitFor) {
               const reaches = Math.min((index + 1) * CHUNK_SIZE, range.end + 1)
+              // Told the extraction is gone, the body ends short rather than erroring. A media
+              // element takes an errored body as a fatal error of the resource — "Format error"
+              // before its metadata, a network error after — and never asks again; a body that
+              // ends early it follows up with a request for the rest, exactly as it follows the
+              // shorter `206` a partly extracted entry is answered with, and that request finds
+              // whatever has landed since, or asks for the job anew.
               if (!(await waitFor(reaches))) {
-                controller.error(new Error(`Extraction of ${entry} stalled before byte ${reaches}`))
+                controller.close()
                 return
               }
             }
@@ -449,7 +455,9 @@ export interface WatermarkNotice {
   entry: string
   /** The record that was just written, on a watermark notice. */
   meta?: ChunkMeta
-  /** Bytes the job has taken from the network so far, on a liveness notice. */
+  /** The job is running, on a liveness notice — sent every `INPUT_LIVENESS_MS` while it is. */
+  running?: true
+  /** Bytes the job has taken from the network so far, beside `running`, when the source counts. */
   received?: number
   /** The job is queued behind another extraction and alive, on a queued notice. */
   queued?: true
@@ -476,12 +484,14 @@ function announceWatermark(notice: WatermarkNotice): void {
 }
 
 /**
- * Tells whoever waits on an entry that its job is alive: the bytes taken from the network so far.
- * A liveness notice writes nothing — there is nothing to serve yet — it only keeps a waiter from
- * reading a slow start as a dead job.
+ * Tells whoever waits on an entry that its job is alive, whether or not anything has arrived:
+ * sent on a timer for as long as the job runs, with the bytes taken from the network so far when
+ * the source counts them. A liveness notice writes nothing — there is nothing to serve yet — it
+ * only keeps a waiter from reading a slow start, or a silent link, as a dead job. The job's own
+ * reads bound the silence (`resilientStream`); the waiter does not have to.
  */
-export function announceActivity(pkgId: string, entry: string, received: number): void {
-  announceWatermark({ pkgId, entry, received })
+export function announceRunning(pkgId: string, entry: string, received?: number): void {
+  announceWatermark({ pkgId, entry, running: true, received })
 }
 
 /**

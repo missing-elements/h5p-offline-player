@@ -25,6 +25,11 @@ export const FIXTURES = {
   noRangeStreamed: '/no-range/streamed.h5p',
   /** From a host that honours `Range` but gzips the archive for a client that accepts it — GitHub Pages. */
   compressingBasic: '/compressing/basic.h5p',
+  /**
+   * From a host that can be taken away mid-transfer — `/stalling/__outage` starts an outage —
+   * and paces the body, so a transfer is still under way when it begins.
+   */
+  stalling: '/stalling/segmented.h5p?rate=2097152',
   /** A genuine 404. The dev server answers a missing `/fixtures/…` with its HTML fallback. */
   missing: '/no-range/missing.h5p',
   /** A URL that answers 200 with a page instead of an archive — a login wall, in the wild. */

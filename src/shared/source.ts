@@ -2,6 +2,7 @@ import { ARCHIVE_ENTRY } from './constants'
 import { ChunkStore } from './chunk-store'
 import { PlayerError, type RemoteSourceDescriptor, type SourceDescriptor } from './protocol'
 import type { ByteRange } from './range'
+import { resilientStream } from './resilient-stream'
 import { sliceStream } from './stream-utils'
 
 /**
@@ -148,47 +149,61 @@ class RangeHttpHandle implements SourceHandle {
     )
   }
 
-  private async fetchRange(range: ByteRange): Promise<Response> {
+  private async fetchRange(range: ByteRange, signal: AbortSignal): Promise<Response> {
     // The chunk store is the cache. Letting the browser's HTTP cache keep a second copy of a
     // large archive doubles the storage for nothing.
     const response = await fetch(this.descriptor.url, {
       headers: { Range: `bytes=${range.start}-${range.end}` },
-      cache: 'no-store'
+      cache: 'no-store',
+      signal
     })
     if (response.status !== 206 && response.status !== 200) {
+      await discardBody(response)
+      // A `PlayerError` is final; anything else `resilientStream` asks for again. A host that is
+      // overloaded, restarting or rate-limiting says so with a status that can change by itself;
+      // a missing file or an expired URL does not.
+      if (TRANSIENT_STATUSES.has(response.status)) {
+        throw new Error(`Range request answered ${response.status}`)
+      }
       throw new PlayerError('network', `Range request failed with ${response.status}`)
     }
     return response
   }
 
-  async read(range: ByteRange): Promise<Uint8Array> {
-    const response = await this.fetchRange(range)
-    if (response.status !== 200) {
-      const bytes = new Uint8Array(await response.arrayBuffer())
-      this.received += bytes.length
-      return bytes
-    }
-
-    // A host that answered 200 sent the whole archive. It is sliced as it flows, exactly as
-    // `stream` does it: buffering it to take the slice would hold the whole file — and under
-    // `segmentedStream`, four whole files at once. The slice ends the pipe, which cancels the
-    // body, so the transfer stops there too.
-    if (!response.body) throw new PlayerError('network', 'Range response had no body')
-    return new Uint8Array(
-      await new Response(sliceStream(this.counted(response.body), range)).arrayBuffer()
-    )
-  }
-
-  async stream(range: ByteRange): Promise<ReadableStream<Uint8Array>> {
-    const response = await this.fetchRange(range)
+  /** One attempt at a range: the request, its body counted, and sliced when the host sent it all. */
+  private async attempt(range: ByteRange, signal: AbortSignal): Promise<ReadableStream<Uint8Array>> {
+    const response = await this.fetchRange(range, signal)
     if (!response.body) throw new PlayerError('network', 'Range response had no body')
 
     // A host that answered 200 sent the whole archive. Buffering it to take a slice would mean
-    // holding hundreds of megabytes; the body is sliced as it flows instead.
+    // holding hundreds of megabytes — and under `segmentedStream`, four whole files at once — so
+    // the body is sliced as it flows instead. The slice ends the pipe, which cancels the body,
+    // so the transfer stops there too.
     const body = this.counted(response.body)
     return response.status === 200 ? sliceStream(body, range) : body
   }
+
+  async read(range: ByteRange): Promise<Uint8Array> {
+    return new Uint8Array(await new Response(await this.stream(range)).arrayBuffer())
+  }
+
+  /**
+   * Every range, streamed or read whole, goes through `resilientStream`: a request that goes
+   * quiet or fails is opened again from the byte it reached. That covers the segments of a large
+   * span, the local header a Service Worker reads before an inline entry, and the central
+   * directory alike — a link that drops for a moment costs a moment, not the job.
+   */
+  async stream(range: ByteRange): Promise<ReadableStream<Uint8Array>> {
+    return resilientStream(range, (remaining, signal) => this.attempt(remaining, signal), {
+      // Bytes on any request of this archive: a segment waiting its turn behind one that flows
+      // is not a stalled link.
+      progress: () => this.received
+    })
+  }
 }
+
+/** Statuses a host answers with when it, not the request, is the problem for now. */
+const TRANSIENT_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504])
 
 class ChunkedHandle implements SourceHandle {
   private store: ChunkStore

@@ -32,6 +32,7 @@ src/
     protocol.ts           every message shape and the PackageRecord written to IndexedDB
     source.ts             probe + the three source adapters; imports no zip.js, so the element stays small
     source-reader.ts      the zip.js reader bridge and the segmented fetch behind it
+    resilient-stream.ts   a ranged read that opens itself again from the byte it reached when the link goes quiet or drops
     chunk-store.ts        Cache API: whole entries, chunked entries, watermarks, eviction
     idb.ts                the `packages` table
     entry-names.ts        entry-name normalisation — the security boundary for hostile archives
@@ -180,12 +181,43 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   since faststart is not the default — is undecodable until then, and extraction only runs
   forward. So a range beginning past the watermark is answered in full with a body that follows
   the extraction, and a request with no `Range` header gets a `200` of the true length the same
-  way. Only a watermark that stops moving, twice, gives up — and **input counts as movement**:
-  the Jobs worker announces the bytes it has taken from the network every `INPUT_LIVENESS_MS`
-  on the watermark channel (`announceActivity`, nothing written), and `waitForWatermark` resets
-  its stall clock on them, so a slow or erratic host cannot make a live job look dead before its
-  first flush. The first flush itself is 256 kB, not 1 MB, for the same reason: it is what the
-  opening probe and the bound both wait on.
+  way. Only a watermark that stops moving, twice, gives up — and **a running job counts as
+  movement**: the Jobs worker announces every job it is running every `INPUT_LIVENESS_MS` on the
+  watermark channel (`announceRunning`, nothing written, the bytes taken from the network riding
+  along), and `waitForWatermark` resets its stall clock on each, so neither a slow host nor a
+  silent one can make a live job look dead. The bound is for a job that died with its tab. It
+  once counted only bytes taken from the network, and thirty silent seconds on a live link were
+  enough to end a media element's response for good — the next invariant. The first flush is
+  256 kB, not 1 MB, for a related reason: it is what the opening probe waits on.
+- **A ranged read survives the link, and a body the server gives up on ends short.** Reproduced
+  on 2026-09-25 with a 27.8 MB deflated, non-faststart mp4 from a local host paced at 1 MB/s: the
+  host went silent for 40 s during the extraction, and 31 s in, the media element's response —
+  its body following the extraction — was errored, Chrome reported `net::ERR_ABORTED`, and the
+  `<video>` went to `MEDIA_ERR_SRC_NOT_SUPPORTED`, "Format error", Interactive Video's own
+  handler throwing on the way and leaving its play icon on. A media element never asks again
+  after that. The extraction, alive throughout, finished a minute later, which is why a reload
+  played from cache. A host that dropped the connection did the same by a shorter path: the
+  fetch rejected, the job failed, same error. Three things now hold. `RangeHttpHandle.stream` —
+  and `read`, which goes through it — is a `resilientStream`: a request that delivers nothing for
+  `READ_STALL_MS`, fails, or ends early is opened again from the byte it reached, after a delay
+  that doubles from `READ_RETRY_DELAY_MS`, and `READ_RETRIES` consecutive attempts without a byte
+  fail it; the count starts over whenever bytes arrive, so a link that stalls now and then over a
+  long transfer keeps going. The stall is a silent *link*, measured on the handle's `received`
+  across every request of the archive, not a silent request: a host that serves one request at a
+  time answers a span's segments in turn, and on a slow link the ones waiting their turn sit for
+  longer than the bound while the first still flows — aborting those would only send them to the
+  back of that host's queue. A `PlayerError` from the request is final — a 404, a 403 on an
+  expired URL — and `TRANSIENT_STATUSES` are what a host answers when it, not the request, is the
+  problem for now. `readRange` ends the body with `close()` rather than `error()` when its wait
+  gives up: measured in the same setup, Chrome then asks for the rest, as it does after the
+  shorter `206` a partly extracted entry gets, and played 22 s after the host came back; an
+  errored body it never follows up. And a body that stays open for as long as the transfer takes
+  is fine in Chromium — 6.5 minutes on one tail request at 50 kB/s, measured — so no wall clock
+  is needed there. `/stalling/<fixture>?rate=` on the dev server is a host with an outage switch;
+  `tests/browser/stalling-host.test.ts` runs an extraction across a silent link and across a
+  reset one and expects the tail to arrive, and `tests/unit/resilient-stream.test.ts` pins the
+  retry policy. Not covered: the archive download from a host without `Range`, which is a plain
+  `GET` with nothing to resume by; a silent link there still ends in a 503 from `awaitEntry`.
 - **Some video cannot be streamed at all, and `preload` is the only lever.** Progressive serving
   assumes the player can use the front of a file. Two package properties together break that: the
   mp4 is deflated in the zip, so no `Range` reaches a byte without the whole stream before it, and
@@ -728,6 +760,12 @@ accepts gzip, which a browser's plain `GET` does and its ranged requests do not.
 same-origin, so every header is readable and the probe never needs its size fallback there; the
 browser test pins the two lengths the same archive answers with, and the unit test covers the
 fallback against headers filtered the way CORS filters them.
+
+`/stalling/<fixture>?rate=<bytes per second>` is a host with an outage switch: `Range` honoured, the
+body paced, and `/stalling/__outage?ms=<n>&mode=silent|reset` takes it away for a while — every
+response in flight goes quiet and new requests wait, or every response in flight is destroyed and
+new requests get a `503`. It is how the browser suite drives an extraction across a link that
+drops, without CDP, so it runs in the ordinary `browser` project.
 
 `large-deflated.h5p` carries `content/media/unused.bin`, large and deflated and referenced by
 nothing. It is the only way to tell a prefetch from a demand fetch: the fixture's own

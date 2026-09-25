@@ -120,6 +120,20 @@ export const FAILURE_BACKOFF_MS = 10_000
  */
 export const INPUT_LIVENESS_MS = 1_000
 
+/**
+ * How a ranged read over HTTP survives the link. A request that delivers nothing for
+ * `READ_STALL_MS` is aborted and opened again from the byte it reached, as is one that fails or
+ * ends early; the delay before each retry starts at `READ_RETRY_DELAY_MS` and doubles, and
+ * `READ_RETRIES` consecutive attempts without a byte fail the read. The stall bound is above the
+ * slowest first answer measured from a real host — 14 s, on one that serves a client's requests
+ * one at a time — because a retry against such a host goes to the back of its queue. With the
+ * doubling delays, a link that is dead throughout is given up after roughly a minute when the
+ * requests fail at once, four when they hang.
+ */
+export const READ_STALL_MS = 30_000
+export const READ_RETRIES = 6
+export const READ_RETRY_DELAY_MS = 1_000
+
 /** IndexedDB database and store names. */
 export const DB_NAME = 'h5p-player'
 export const DB_VERSION = 1

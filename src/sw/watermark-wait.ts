@@ -10,12 +10,14 @@ import { onWatermark, type ChunkMeta, type ChunkStore } from '../shared/chunk-st
  * to keep showing progress — when it stops, the job is asked for again, and only a second silent
  * stretch gives up.
  *
- * Progress is two things. The watermark moving is the obvious one. The other is input: the Jobs
- * worker announces the bytes it has taken from the network, and those count too, because on a
- * slow or erratic host the inflate can be starved for longer than the stall bound before it has
- * produced its first flush, while the job is perfectly alive. Measured against a 93 MB deflated
- * video on a host with half-second latency, the first byte of output took 8.6 s on a fast link
- * and past 30 s on a 4 Mbit/s one — and the old bound read the second as a dead job.
+ * Progress is the watermark moving, and it is also the job saying it is there. The Jobs worker
+ * announces a running job every second whether or not bytes are arriving, and a queued one the
+ * same way, and either resets the clock: the bound is for a job that died with its tab, not for a
+ * link that has gone quiet. It once counted only bytes taken from the network, and thirty
+ * silent seconds on a live job — a host hiccup, a phone changing networks — ended the media
+ * element's response with an error it never recovers from, while the extraction went on to
+ * finish. How long a silent link is tolerated is the job's own business (`resilientStream`),
+ * and a job that gives up records a failure, which this returns at once.
  */
 export async function waitForWatermark(
   store: ChunkStore,
@@ -44,8 +46,8 @@ export async function waitForWatermark(
   // detection working when there is not.
   let wake: (() => void) | null = null
   const stop = onWatermark(store.pkgId, entry, (notice) => {
-    if (notice.received !== undefined && notice.received !== lastReceived) {
-      lastReceived = notice.received
+    if (notice.running || (notice.received !== undefined && notice.received !== lastReceived)) {
+      lastReceived = notice.received ?? lastReceived
       lastAdvanceAt = Date.now()
       askedAgain = false
     }

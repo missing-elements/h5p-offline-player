@@ -56,7 +56,7 @@ describe('ChunkStore.readRange', () => {
     )
   })
 
-  it('asks before each chunk and errors when told the extraction stalled', async () => {
+  it('asks before each chunk and ends the body short when told the extraction is gone', async () => {
     const { store, first } = await storeWithTwoChunks()
     const asked: number[] = []
     const waitFor = async (bytes: number) => {
@@ -64,9 +64,10 @@ describe('ChunkStore.readRange', () => {
       return bytes <= CHUNK_SIZE
     }
 
-    await expect(
-      collect(store.readRange('e', { start: CHUNK_SIZE - 10, end: CHUNK_SIZE + 9 }, waitFor))
-    ).rejects.toThrow(/stalled/)
+    // Short, not errored: a media element follows a body that ends early with a request for the
+    // rest, and takes an errored one as a fatal error of the resource.
+    const body = await collect(store.readRange('e', { start: CHUNK_SIZE - 10, end: CHUNK_SIZE + 9 }, waitFor))
+    expect(body).toEqual(first.subarray(CHUNK_SIZE - 10, CHUNK_SIZE))
     expect(asked).toEqual([CHUNK_SIZE, CHUNK_SIZE + 10])
 
     // Asked for the first chunk only, it serves it.

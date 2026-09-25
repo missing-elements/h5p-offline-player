@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import { configure } from '@zip.js/zip.js'
 import { ARCHIVE_ENTRY, CHUNK_SIZE, INPUT_LIVENESS_MS, WARM_ENTRY } from '../shared/constants'
-import { ChunkStore, QuotaError, announceActivity, announceQueued, isQuotaError } from '../shared/chunk-store'
+import { ChunkStore, QuotaError, announceQueued, announceRunning, isQuotaError } from '../shared/chunk-store'
 import { installEvictionPolicy } from '../shared/eviction'
 import { LocalHeaderScanner } from '../shared/forward-index'
 import { packageLockName, packageLockPrefix } from '../shared/locks'
@@ -389,7 +389,7 @@ async function extractEntry(
   // would repeat this from zero on every attempt.
   await store.setMeta(entryName, { size: entry.size, available: 0, complete: false })
 
-  const stopReporting = reportInput(reader.handle, pkgId, entryName)
+  const stopReporting = reportRunning(reader.handle, pkgId, entryName)
   try {
     await reader.inflate(entry).pipeTo(
       createChunkWriter({
@@ -412,19 +412,17 @@ async function extractEntry(
 }
 
 /**
- * Announces, while a job runs, the bytes it has taken from the network, so the Service Worker's
- * stall bound can tell a slow start from a dead job. Only for a network handle: a local read has
- * no silence worth reporting. Nothing is written; the notice rides the watermark channel.
+ * Announces, every `INPUT_LIVENESS_MS` while a job runs, that it is running — with the bytes it
+ * has taken from the network when the source counts them — so the Service Worker's stall bound
+ * can tell a job that is alive from one that died with its tab. Whether bytes are arriving is not
+ * the question: the job's own reads bound a silent link and give up on their own terms, and a
+ * waiter that gave up first ended a media element's response with an error it never recovers
+ * from. Nothing is written; the notice rides the watermark channel.
  */
-function reportInput(handle: SourceHandle, pkgId: string, entry: string): () => void {
-  if (handle.received === undefined) return () => {}
-  let last = handle.received
-  const timer = setInterval(() => {
-    const now = handle.received ?? last
-    if (now === last) return
-    last = now
-    announceActivity(pkgId, entry, now)
-  }, INPUT_LIVENESS_MS)
+function reportRunning(handle: SourceHandle, pkgId: string, entry: string): () => void {
+  const announce = () => announceRunning(pkgId, entry, handle.received)
+  announce()
+  const timer = setInterval(announce, INPUT_LIVENESS_MS)
   return () => clearInterval(timer)
 }
 

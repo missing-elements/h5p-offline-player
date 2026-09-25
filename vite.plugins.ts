@@ -263,18 +263,125 @@ function compressingHostHandler(): Connect.NextHandleFunction {
   }
 }
 
+/**
+ * A host with an outage switch, for the tests that take the link away in the middle of a
+ * transfer: `Range` honoured, CORS open, the body paced at `?rate=<bytes per second>` so that a
+ * transfer is still under way when the outage begins. `/stalling/__outage?ms=<n>&mode=<m>` starts
+ * one. In `silent` mode every response in flight stops writing and every new request waits,
+ * headers included, until it is over — a link that has gone quiet. In `reset` mode the responses
+ * in flight are destroyed and new requests are answered `503` — a host that is down. Either
+ * way nothing is lost that a later request cannot ask for again.
+ */
+function stallingHostHandler(): Connect.NextHandleFunction {
+  const prefix = '/stalling/'
+  const inFlight = new Set<ServerResponse>()
+  let outageUntil = 0
+  let outageMode: 'silent' | 'reset' = 'silent'
+
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+  const inOutage = () => Date.now() < outageUntil
+  const waitOut = async () => {
+    while (inOutage()) await sleep(50)
+  }
+  const drained = (res: ServerResponse) =>
+    new Promise<void>((resolve) => {
+      const done = () => {
+        res.off('drain', done)
+        res.off('close', done)
+        resolve()
+      }
+      res.once('drain', done)
+      res.once('close', done)
+    })
+
+  const serve = async (req: Connect.IncomingMessage, res: ServerResponse, name: string, rate: number) => {
+    res.setHeader('access-control-allow-origin', '*')
+    res.setHeader('cache-control', 'no-store')
+    if (inOutage() && outageMode === 'reset') {
+      res.statusCode = 503
+      return res.end('outage')
+    }
+    await waitOut()
+
+    let body: Buffer
+    try {
+      body = await readArchive(name)
+    } catch {
+      res.statusCode = 404
+      return res.end('no such fixture')
+    }
+
+    res.setHeader('content-type', 'application/octet-stream')
+    res.setHeader('accept-ranges', 'bytes')
+    let piece = body
+    res.statusCode = 200
+    const range = /^bytes=(\d+)-(\d*)$/.exec(req.headers.range ?? '')
+    if (range) {
+      const start = Number(range[1])
+      const end = range[2] ? Math.min(Number(range[2]), body.length - 1) : body.length - 1
+      if (start >= body.length) {
+        res.setHeader('content-range', `bytes */${body.length}`)
+        res.statusCode = 416
+        return res.end()
+      }
+      piece = body.subarray(start, end + 1)
+      res.setHeader('content-range', `bytes ${start}-${end}/${body.length}`)
+      res.statusCode = 206
+    }
+    res.setHeader('content-length', String(piece.length))
+    if (req.method === 'HEAD') return res.end()
+
+    inFlight.add(res)
+    try {
+      const slice = 64 * 1024
+      for (let at = 0; at < piece.length && !res.destroyed; at += slice) {
+        if (inOutage()) {
+          if (outageMode === 'reset') {
+            res.destroy()
+            break
+          }
+          await waitOut()
+        }
+        const chunk = piece.subarray(at, Math.min(at + slice, piece.length))
+        if (!res.write(chunk)) await drained(res)
+        if (rate > 0) await sleep((chunk.length / rate) * 1000)
+      }
+      if (!res.destroyed) res.end()
+    } finally {
+      inFlight.delete(res)
+    }
+  }
+
+  return (req, res, next) => {
+    const url = new URL(req.url ?? '/', 'http://localhost')
+    if (url.pathname === `${prefix}__outage`) {
+      outageUntil = Date.now() + Number(url.searchParams.get('ms') ?? 0)
+      outageMode = url.searchParams.get('mode') === 'reset' ? 'reset' : 'silent'
+      if (outageMode === 'reset') for (const pending of inFlight) pending.destroy()
+      res.setHeader('cache-control', 'no-store')
+      res.statusCode = 204
+      return res.end()
+    }
+    const name = fixtureName(url.pathname, prefix)
+    if (!name) return next()
+    void serve(req, res, name, Number(url.searchParams.get('rate') ?? 0))
+  }
+}
+
 export function noRangeFixturesPlugin(): Plugin {
   return {
     name: 'h5p-no-range-fixtures',
     configureServer(server) {
       server.middlewares.use(noRangeHandler())
       server.middlewares.use(compressingHostHandler())
+      server.middlewares.use(stallingHostHandler())
     },
     // `vite preview` of the demo build as well, so the built site can be checked end to end
     // before it is deployed — the deployment gets the route from `vercel.json` instead.
     configurePreviewServer(server) {
       server.middlewares.use(noRangeHandler())
       server.middlewares.use(compressingHostHandler())
+      server.middlewares.use(stallingHostHandler())
     }
   }
 }

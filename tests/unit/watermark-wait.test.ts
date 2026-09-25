@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ChunkStore, announceActivity, announceQueued } from '../../src/shared/chunk-store'
+import { ChunkStore, announceQueued, announceRunning } from '../../src/shared/chunk-store'
 import { waitForWatermark } from '../../src/sw/watermark-wait'
 
 /** The Cache API reduced to a map, enough for meta records to be written and read back. */
@@ -57,7 +57,7 @@ describe('waitForWatermark', () => {
     let asked = 0
 
     // The inflate has produced nothing, but the network has: a slow host, not a dead job.
-    const stopInput = every(100, (n) => announceActivity('pkg', ENTRY, n * 65536))
+    const stopInput = every(100, (n) => announceRunning('pkg', ENTRY, n * 65536))
     const landing = setTimeout(() => {
       void store.setMeta(ENTRY, { size: 10, available: 1, complete: false })
     }, 1_500)
@@ -73,6 +73,34 @@ describe('waitForWatermark', () => {
       expect(asked).toBe(0)
     } finally {
       stopInput()
+      clearTimeout(landing)
+    }
+  })
+
+  it('keeps waiting while the job reports itself running, even with nothing arriving', async () => {
+    vi.stubGlobal('caches', fakeCaches())
+    const store = new ChunkStore('pkg')
+    await store.setMeta(ENTRY, { size: 10, available: 0, complete: false })
+    let asked = 0
+
+    // The link has gone quiet, and the job is riding it out: neither the watermark nor the bytes
+    // taken from the network move, and the job says so every tick. That is not a dead job.
+    const stopHeartbeat = every(100, () => announceRunning('pkg', ENTRY, 65536))
+    const landing = setTimeout(() => {
+      void store.setMeta(ENTRY, { size: 10, available: 1, complete: false })
+    }, 1_500)
+
+    try {
+      const result = await waitForWatermark(store, ENTRY, 1, {
+        stallMs: 100,
+        onStall: async () => {
+          asked += 1
+        }
+      })
+      expect(result?.available).toBe(1)
+      expect(asked).toBe(0)
+    } finally {
+      stopHeartbeat()
       clearTimeout(landing)
     }
   })
