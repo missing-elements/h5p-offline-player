@@ -1,7 +1,9 @@
 import { afterAll, describe, expect, it } from 'vitest'
 import jobsWorkerSource from 'virtual:h5p-jobs-worker'
 import { cacheNameFor } from '../../src/shared/chunk-store'
-import type { FromJobsMessage, ToJobsMessage } from '../../src/shared/protocol'
+import type { EntryLocation, FromJobsMessage, SourceDescriptor, ToJobsMessage } from '../../src/shared/protocol'
+import { openSource } from '../../src/shared/source'
+import { PackageReader, locationOf } from '../../src/sw/package-reader'
 
 /**
  * The Jobs worker driven directly, without an element in front of it. The element's own tests
@@ -54,6 +56,21 @@ async function rangeSource(path: string) {
   return { type: 'range-http', url, size } as const
 }
 
+/**
+ * What the Service Worker tells the Jobs worker about an entry: the worker has no index of its
+ * own, so a test that posts an extraction has to say where the entry is, as the server would.
+ */
+async function locate(pkgId: string, source: SourceDescriptor, names: string[]): Promise<Record<string, EntryLocation>> {
+  const reader = await PackageReader.open(pkgId, await openSource(pkgId, source), { requireLibraries: false })
+  return Object.fromEntries(
+    names.map((name) => {
+      const located = reader.get(name)
+      if (!located) throw new Error(`${name} is not in ${source.type === 'file' ? 'the file' : source.url}`)
+      return [name, locationOf(located.entry)]
+    })
+  )
+}
+
 describe('the Jobs worker', () => {
   afterAll(() => caches.delete(cacheNameFor(PKG)))
 
@@ -82,10 +99,14 @@ describe('the Jobs worker', () => {
       const all = jobs.next(watch, 55_000).catch(() => {})
 
       // A demand, then two prefetches, then demand for the last one: it goes ahead of the other prefetch.
-      jobs.post({ type: 'extract', pkgId: one, entry: 'content/media/big.bin', source: first })
-      jobs.post({ type: 'extract', pkgId: one, entry: 'content/media/unused.bin', source: first, prefetch: true })
-      jobs.post({ type: 'extract', pkgId: two, entry: 'content/media/big.bin', source: second, prefetch: true })
-      jobs.post({ type: 'extract', pkgId: two, entry: 'content/media/big.bin', source: second })
+      const inOne = await locate(one, first, ['content/media/big.bin', 'content/media/unused.bin'])
+      const inTwo = await locate(two, second, ['content/media/big.bin'])
+      const big = 'content/media/big.bin'
+      const unused = 'content/media/unused.bin'
+      jobs.post({ type: 'extract', pkgId: one, entry: big, location: inOne[big], source: first })
+      jobs.post({ type: 'extract', pkgId: one, entry: unused, location: inOne[unused], source: first, prefetch: true })
+      jobs.post({ type: 'extract', pkgId: two, entry: big, location: inTwo[big], source: second, prefetch: true })
+      jobs.post({ type: 'extract', pkgId: two, entry: big, location: inTwo[big], source: second })
 
       await new Promise<void>((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error(`only ${finished.length} extractions finished`)), 50_000)

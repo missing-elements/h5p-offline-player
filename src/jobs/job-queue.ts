@@ -1,4 +1,4 @@
-import type { SourceDescriptor } from '../shared/protocol'
+import type { EntryLocation, SourceDescriptor } from '../shared/protocol'
 
 /**
  * The order extractions run in. One at a time — two concurrent inflates halve the rate of
@@ -16,6 +16,7 @@ import type { SourceDescriptor } from '../shared/protocol'
 export interface ExtractJob {
   pkgId: string
   entry: string
+  location: EntryLocation
   source: SourceDescriptor
   prefetch: boolean
 }

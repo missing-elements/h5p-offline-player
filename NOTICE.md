@@ -11,7 +11,7 @@ not. This file says which is which.
 
 ## zip.js — BSD-3-Clause
 
-The three scripts in `dist/` bundle [zip.js](https://github.com/gildas-lormeau/zip.js) as the
+The two Service Worker scripts in `dist/`, `h5p-sw.js` and `h5p-sw-mount.js`, bundle [zip.js](https://github.com/gildas-lormeau/zip.js) as the
 archive reader. They are minified with legal comments removed, so its notice does not survive
 into the files themselves and is reproduced here instead, as its licence requires:
 

@@ -293,6 +293,6 @@ The player's own code — the element, the two workers, the scripts — is MIT, 
   Keep them with it when you copy or serve it: a site serving these files is distributing GPL
   code. Whether the copyleft reaches the page around the player is a legal question, not one
   this README answers.
-- The three scripts in `dist/` bundle [zip.js](https://github.com/gildas-lormeau/zip.js)
+- The two Service Worker scripts in `dist/`, `h5p-sw.js` and `h5p-sw-mount.js`, bundle [zip.js](https://github.com/gildas-lormeau/zip.js)
   (BSD-3-Clause). Minification strips its notice from the files, so
   [NOTICE.md](NOTICE.md) reproduces it.

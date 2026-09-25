@@ -1,5 +1,6 @@
 import { WARM_ENTRY, WARM_STALL_MS } from '../shared/constants'
 import { QuotaError, type ChunkStore } from '../shared/chunk-store'
+import { DEFLATE, LOCAL_HEADER_FIXED_SIZE, STORED, localHeaderDataStart } from '../shared/local-header'
 import { contentTypeOf } from '../shared/mime'
 import type { WarmSpan } from '../shared/protocol'
 import type { SourceHandle } from '../shared/source'
@@ -19,11 +20,6 @@ import type { SourceHandle } from '../shared/source'
  * A span that stops flowing: give up on it. A corrupt entry: skip it, the server will report it
  * when asked. Only a warm that landed everything writes the marker that spares the next load.
  */
-
-const LOCAL_HEADER_SIGNATURE = 0x04034b50
-const LOCAL_HEADER_FIXED_SIZE = 30
-const STORED = 0
-const DEFLATE = 8
 
 export interface WarmProgress {
   /** Bytes of the spans consumed so far. */
@@ -62,15 +58,11 @@ export async function warmPackage(
 
         await cursor.skip(entry.offset - position)
         const header = await cursor.take(LOCAL_HEADER_FIXED_SIZE)
-        const view = new DataView(header.buffer, header.byteOffset, header.byteLength)
-        if (view.getUint32(0, true) !== LOCAL_HEADER_SIGNATURE) {
-          throw new Error(`${entry.name}: no local header at ${entry.offset}`)
-        }
-        const nameLength = view.getUint16(26, true)
-        const extraLength = view.getUint16(28, true)
-        await cursor.skip(nameLength + extraLength)
+        const dataStart = localHeaderDataStart(entry.offset, header)
+        if (dataStart === null) throw new Error(`${entry.name}: no local header at ${entry.offset}`)
+        await cursor.skip(dataStart - (entry.offset + LOCAL_HEADER_FIXED_SIZE))
         const compressed = await cursor.take(entry.compressedSize)
-        position = entry.offset + LOCAL_HEADER_FIXED_SIZE + nameLength + extraLength + entry.compressedSize
+        position = dataStart + entry.compressedSize
 
         if (entry.method !== STORED && entry.method !== DEFLATE) {
           result.skipped += 1

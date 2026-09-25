@@ -29,7 +29,7 @@ import {
 import { contentRange, parseRange, type ByteRange } from '../shared/range'
 import { openSource } from '../shared/source'
 import * as db from '../shared/idb'
-import { PackageReader, STORED, type IndexedEntry, type LocatedEntry } from './package-reader'
+import { type IndexedEntry, type LocatedEntry, PackageReader, STORED, locationOf } from './package-reader'
 import { buildFrameDocument, createNonce } from './frame-document'
 import { matchRoute, routesFor, type RouteMatch, type Routes } from './routes'
 import { sliceStream } from '../shared/stream-utils'
@@ -441,7 +441,7 @@ class VirtualServer {
   ): Promise<Response> {
     const pkgId = reader.pkgId
     const store = new ChunkStore(pkgId)
-    const askAgain = () => this.requestJob(event, pkgId, entry.name)
+    const askAgain = () => this.requestJob(event, pkgId, entry)
 
     /** Lets a response body run ahead of the extraction, chunk by chunk. */
     const follow = async (bytes: number) => {
@@ -561,8 +561,8 @@ class VirtualServer {
    * few minutes and a killed inflate cannot resume, so the request goes to the frame that made
    * the request, which relays it to its element.
    */
-  private async requestJob(event: FetchEvent, pkgId: string, entry: string): Promise<void> {
-    const key = `${pkgId}\u0000${entry}`
+  private async requestJob(event: FetchEvent, pkgId: string, entry: IndexedEntry): Promise<void> {
+    const key = `${pkgId}\u0000${entry.name}`
     if (this.requestedJobs.has(key)) return
     this.requestedJobs.add(key)
     // Cleared on a short timer rather than on completion: this worker may be killed in between,
@@ -570,7 +570,13 @@ class VirtualServer {
     // answered has to become askable again quickly.
     setTimeout(() => this.requestedJobs.delete(key), JOB_REQUEST_DEDUPE_MS)
 
-    await this.postToClient(event.clientId, { type: 'need-job', pkgId, entry })
+    // The entry's location rides along: the Jobs worker has no index of its own to look it up in.
+    await this.postToClient(event.clientId, {
+      type: 'need-job',
+      pkgId,
+      entry: entry.name,
+      location: locationOf(entry)
+    })
   }
 
   private async postToClient(clientId: string, message: FromWorkerMessage): Promise<void> {

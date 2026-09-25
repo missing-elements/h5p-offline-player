@@ -1,12 +1,13 @@
 /// <reference lib="webworker" />
-import { configure } from '@zip.js/zip.js'
 import { ARCHIVE_ENTRY, CHUNK_SIZE, INPUT_LIVENESS_MS, WARM_ENTRY } from '../shared/constants'
 import { ChunkStore, QuotaError, announceQueued, announceRunning, isQuotaError } from '../shared/chunk-store'
 import { installEvictionPolicy } from '../shared/eviction'
 import { LocalHeaderScanner } from '../shared/forward-index'
+import { DEFLATE, LOCAL_HEADER_FIXED_SIZE, STORED, localHeaderDataStart } from '../shared/local-header'
 import { packageLockName, packageLockPrefix } from '../shared/locks'
 import {
   PlayerError,
+  type EntryLocation,
   type ErrorCode,
   type FromJobsMessage,
   type SourceDescriptor,
@@ -14,25 +15,27 @@ import {
   type WarmSpan
 } from '../shared/protocol'
 import { openSource, type SourceHandle } from '../shared/source'
+import { streamSpan } from '../shared/span-stream'
 import { quotaMessage } from '../shared/storage'
-import { PackageReader } from '../sw/package-reader'
 import { createChunkWriter } from './chunk-writer'
 import { JobQueue, type ExtractJob } from './job-queue'
 import { warmPackage } from './warm'
 
 /**
  * The Jobs worker. Everything that takes longer than a Service Worker event is allowed to lives
- * here: downloading an archive from a host that ignores `Range`, and inflating a large deflated
- * entry into chunks. It runs in the page, so it lives as long as the tab and can be killed only
- * by the user navigating away.
+ * here: downloading an archive from a host that ignores `Range`, warming the libraries, and
+ * inflating a large deflated entry into chunks. It runs in the page, so it lives as long as the
+ * tab and can be killed only by the user navigating away.
+ *
+ * It carries no zip.js and reads no index. Every job is told where in the archive its bytes are
+ * — the warm gets its spans, an extraction gets its entry's location — by the Service Worker,
+ * which has the central directory already; the worker steps over a local header and inflates
+ * with the native `DecompressionStream`. Reading the index here as well cost a round of ranged
+ * requests per worker and a hundred and sixty kilobytes in every page that embeds the element.
  *
  * Jobs are guarded by a Web Lock named after the package and entry, so two tabs playing the same
  * package share one extraction instead of racing to write the same chunks.
  */
-
-// Inflate here rather than in a nested worker: this worker already exists to be long-lived,
-// and `DecompressionStream` does the deflate without another thread hop.
-configure({ useWebWorkers: false })
 
 const scope = self as unknown as DedicatedWorkerGlobalScope
 
@@ -48,25 +51,6 @@ let extracting: string | null = null
 let heartbeat: ReturnType<typeof setInterval> | null = null
 /** Files handed over by the page for local-file packages, kept for the life of the worker. */
 const files = new Map<string, Blob>()
-/**
- * Readers by package, kept for the life of the worker. A central directory does not change, and
- * opening one is a round of ranged requests plus an inflate of `h5p.json` — paid per extraction
- * job before this, for an answer the previous job already had.
- */
-const readers = new Map<string, Promise<PackageReader>>()
-
-function readerFor(pkgId: string, source: SourceDescriptor): Promise<PackageReader> {
-  const known = readers.get(pkgId)
-  if (known) return known
-
-  const opening = (async () => {
-    const handle = await openSource(pkgId, source, files.get(pkgId))
-    return PackageReader.open(pkgId, handle, { requireLibraries: false })
-  })()
-  readers.set(pkgId, opening)
-  opening.catch(() => readers.delete(pkgId))
-  return opening
-}
 
 function send(message: FromJobsMessage): void {
   scope.postMessage(message)
@@ -74,9 +58,8 @@ function send(message: FromJobsMessage): void {
 
 // The large writes happen here, so this is where quota runs out: the policy has to be installed
 // here as well as in the Service Worker, or a full disk evicts whatever the browser lists first.
-installEvictionPolicy((pkgId) => {
-  readers.delete(pkgId)
-})
+// Nothing to forget on an eviction: this worker keeps no reader or index per package.
+installEvictionPolicy(() => {})
 
 /**
  * Doubles as the Web Lock name, which is why it carries the package prefix: while this job holds
@@ -111,6 +94,7 @@ scope.addEventListener('message', (event: MessageEvent<ToJobsMessage & { file?: 
     scheduleExtract({
       pkgId: message.pkgId,
       entry: message.entry,
+      location: message.location,
       source: message.source,
       prefetch: message.prefetch === true
     })
@@ -140,7 +124,13 @@ function pump(): void {
   const key = jobKey(job.pkgId, job.entry)
   extracting = key
   syncHeartbeat()
-  void run({ type: 'extract', pkgId: job.pkgId, entry: job.entry, source: job.source }).finally(() => {
+  void run({
+    type: 'extract',
+    pkgId: job.pkgId,
+    entry: job.entry,
+    location: job.location,
+    source: job.source
+  }).finally(() => {
     if (extracting === key) extracting = null
     pump()
   })
@@ -179,7 +169,7 @@ async function run(message: Exclude<ToJobsMessage, { type: 'abort' }>): Promise<
       } else if (message.type === 'warm') {
         await warmJob(message.pkgId, message.source, message.spans, controller.signal)
       } else {
-        await extractEntry(message.pkgId, message.entry, message.source, controller.signal)
+        await extractEntry(message.pkgId, message.entry, message.location, message.source, controller.signal)
       }
     })
   } catch (error) {
@@ -363,6 +353,7 @@ async function warmJob(
 async function extractEntry(
   pkgId: string,
   entryName: string,
+  location: EntryLocation,
   source: SourceDescriptor,
   signal: AbortSignal
 ): Promise<void> {
@@ -374,41 +365,69 @@ async function extractEntry(
     return
   }
 
-  // A job only ever extracts from the archive it was asked about: the Service Worker resolves
-  // which archive an entry lives in and addresses the job at that one.
-  const reader = await readerFor(pkgId, source)
-  const located = reader.get(entryName)
-
-  if (!located) {
-    throw new PlayerError('bad-archive', `${entryName} is not in the archive`)
+  if (location.method !== STORED && location.method !== DEFLATE) {
+    throw new PlayerError('bad-archive', `${entryName} is compressed with a method this player cannot extract`)
   }
-  const { entry } = located
+
+  // A job only ever extracts from the archive it was asked about: the Service Worker resolves
+  // which archive an entry lives in, addresses the job at that one, and says where in it the
+  // entry is. `partial`: an entry the forward index named lies below the watermark of an archive
+  // that is still downloading, and is whole there — the index only names an entry once its
+  // bytes have all arrived.
+  const handle = await openSource(pkgId, source, files.get(pkgId), { partial: true })
+  const start = location.dataStart ?? (await dataStartOf(handle, entryName, location))
+  const end = start + location.compressedSize - 1
+  if (end >= handle.size) {
+    throw new PlayerError('bad-archive', `${entryName} extends past the end of the archive`)
+  }
 
   // A deflate stream has no restart points, so a partial extraction is discarded rather than
   // resumed. This is the reason extraction never runs in the Service Worker: a kill mid-inflate
   // would repeat this from zero on every attempt.
-  await store.setMeta(entryName, { size: entry.size, available: 0, complete: false })
+  await store.setMeta(entryName, { size: location.size, available: 0, complete: false })
 
-  const stopReporting = reportRunning(reader.handle, pkgId, entryName)
+  const stopReporting = reportRunning(handle, pkgId, entryName)
   try {
-    await reader.inflate(entry).pipeTo(
+    await inflated(streamSpan(handle, { start, end }), location).pipeTo(
       createChunkWriter({
         store,
         entry: entryName,
-        totalSize: entry.size,
+        totalSize: location.size,
         onProgress: (loaded) =>
-          send({ type: 'progress', pkgId, entry: entryName, loaded, total: entry.size })
+          send({ type: 'progress', pkgId, entry: entryName, loaded, total: location.size })
       }),
       { signal }
     )
   } catch (error) {
     if (!(error instanceof QuotaError)) throw error
-    throw new QuotaError(await quotaMessage('this file', entry.size))
+    throw new QuotaError(await quotaMessage('this file', location.size))
   } finally {
     stopReporting()
   }
 
-  send({ type: 'done', pkgId, entry: entryName, size: entry.size })
+  send({ type: 'done', pkgId, entry: entryName, size: location.size })
+}
+
+/** Where an entry's data begins: its local header, read for the name and extra lengths in front. */
+async function dataStartOf(handle: SourceHandle, entryName: string, location: EntryLocation): Promise<number> {
+  if (location.header === undefined) {
+    throw new PlayerError('bad-archive', `${entryName} has no known location in the archive`)
+  }
+  const header = await handle.read({
+    start: location.header,
+    end: location.header + LOCAL_HEADER_FIXED_SIZE - 1
+  })
+  const start = localHeaderDataStart(location.header, header)
+  if (start === null) throw new PlayerError('bad-archive', `${entryName} has a malformed local header`)
+  return start
+}
+
+/** The entry's bytes as stored, or inflated when it is deflated. */
+function inflated(compressed: ReadableStream<Uint8Array>, location: EntryLocation): ReadableStream<Uint8Array> {
+  if (location.method === STORED || location.compressedSize === 0) return compressed
+  // The lib types the codec's input as `BufferSource`, stricter than the plain views it gets.
+  const inflate = new DecompressionStream('deflate-raw') as unknown as ReadableWritablePair<Uint8Array, Uint8Array>
+  return compressed.pipeThrough(inflate)
 }
 
 /**

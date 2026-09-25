@@ -136,6 +136,25 @@ export interface PrefetchEntry {
   entry: string
   /** Uncompressed size — the number that decides whether starting it early is worth the bytes. */
   size: number
+  location: EntryLocation
+}
+
+/**
+ * Where an entry's compressed bytes are, as the Service Worker's index knows it, so the Jobs
+ * worker can extract the entry without an index of its own. An entry from the central directory
+ * is named by its local header, which the worker reads for the name and extra lengths in front
+ * of the data; one from the forward index of a downloading archive has had that header read
+ * already and carries where the data begins.
+ */
+export interface EntryLocation {
+  /** Offset of the local header in the archive. */
+  header?: number
+  /** Where the compressed bytes begin, when the local header has already been read. */
+  dataStart?: number
+  compressedSize: number
+  /** Uncompressed size. */
+  size: number
+  method: number
 }
 
 /** One entry inside a warm span: where its local header is, and what follows it. */
@@ -191,7 +210,7 @@ export type WorkerReply =
  * resume, so every long extraction is handed back to the page.
  */
 export type FromWorkerMessage =
-  | { type: 'need-job'; pkgId: string; entry: string }
+  | { type: 'need-job'; pkgId: string; entry: string; location: EntryLocation }
   | { type: 'need-file'; pkgId: string }
 
 /* ------------------------------------------------------------------ element → Jobs worker */
@@ -199,7 +218,15 @@ export type FromWorkerMessage =
 export type ToJobsMessage =
   | { type: 'download'; pkgId: string; source: SourceDescriptor }
   /** `prefetch`: asked for ahead of demand, so it queues behind anything the runtime is waiting on. */
-  | { type: 'extract'; pkgId: string; entry: string; source: SourceDescriptor; file?: File; prefetch?: true }
+  | {
+      type: 'extract'
+      pkgId: string
+      entry: string
+      location: EntryLocation
+      source: SourceDescriptor
+      file?: File
+      prefetch?: true
+    }
   /** Pulls the spans into the cache. Reports under the reserved entry name `WARM_ENTRY`. */
   | { type: 'warm'; pkgId: string; source: SourceDescriptor; spans: WarmSpan[] }
   | { type: 'abort'; pkgId: string }

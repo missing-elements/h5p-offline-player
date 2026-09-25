@@ -1,4 +1,5 @@
 import jobsWorkerSource from 'virtual:h5p-jobs-worker'
+import SHADOW_CSS from './shadow.css?inline'
 import { VERSION, WARM_ENTRY } from './shared/constants'
 import {
   HUB_CONTENT_TYPE_URL,
@@ -73,29 +74,13 @@ export interface PlayerProgressDetail {
 }
 
 /**
- * The element's own box. Adopted as a constructable stylesheet rather than written as an inline
- * `<style>`: under a host page's `style-src 'self'` the inline element is blocked without a word
- * and the frame collapses to an iframe's intrinsic 150px, while `CSSStyleSheet.replaceSync` is
- * CSSOM and not subject to it. One sheet is shared by every instance on the page.
+ * The element's own box, `shadow.css`, adopted as a constructable stylesheet rather than written
+ * as an inline `<style>`: under a host page's `style-src 'self'` the inline element is blocked
+ * without a word and the frame collapses to an iframe's intrinsic 150px, while
+ * `CSSStyleSheet.replaceSync` is CSSOM and not subject to it. One sheet is shared by every
+ * instance on the page. The rules and the reasons behind them are in the stylesheet itself:
+ * `?inline` hands it over as a string, minified for the build, comments and all gone.
  */
-// Three things here are easy to undo by accident. The layout lives on `.viewport`, not on
-// `:host`: any rule in the host page that names this element beats a `:host` rule however
-// specific, so a host writing `h5p-player { display: block; height: 400px }` — the obvious thing
-// — must not be able to break it. `:host(:fullscreen)` is for a host page that calls
-// requestFullscreen on the element (H5P's own fullscreen targets the frame, which the browser
-// sizes itself); without `!important` the inline height auto-resize writes would pin it to the
-// content height while it is meant to fill the screen. And `.viewport` has both `height: 100%`,
-// for a host given an explicit height, and `min-height: inherit`, for one given only a
-// min-height, where a percentage height resolves to auto and leaves the frame at an iframe's
-// intrinsic 150px.
-const SHADOW_CSS = `
-  :host { display: block; position: relative; width: 100%; }
-  :host([hidden]) { display: none !important; }
-  :host(:fullscreen) { height: 100% !important; width: 100% !important; }
-  .viewport { display: flex; flex-direction: column; height: 100%; min-height: inherit; }
-  iframe { display: block; flex: 1 1 auto; width: 100%; min-height: 0; border: 0; }
-`
-
 let shadowSheet: CSSStyleSheet | null = null
 
 function adoptShadowStyles(root: ShadowRoot): void {
@@ -130,7 +115,7 @@ export class H5PPlayerElement extends HTMLElement {
   private internalState: PlayerState = 'idle'
   private internalPkgId: string | null = null
   /** Large deflated entries, in archive order, waiting to be pulled before the content asks. */
-  private prefetchQueue: string[] = []
+  private prefetchQueue: PrefetchEntry[] = []
   private prefetching: string | null = null
 
   constructor() {
@@ -333,7 +318,7 @@ export class H5PPlayerElement extends HTMLElement {
       }
       if (signal.aborted) return
 
-      this.prefetchQueue = indexed.prefetch.map((each) => each.entry)
+      this.prefetchQueue = [...indexed.prefetch]
       // A download that booted early already has its frame; the final index only swapped the
       // worker onto the real one. Otherwise: the registration has to be `activated` before this
       // navigation, or it reaches the server and 404s — there is no such file.
@@ -780,16 +765,16 @@ export class H5PPlayerElement extends HTMLElement {
     if (this.preload !== 'auto') return
     if (this.prefetching) return
 
-    const entry = this.prefetchQueue.shift()
-    if (!entry) return
+    const next = this.prefetchQueue.shift()
+    if (!next) return
 
     const pkgId = this.internalPkgId
     const source = this.currentSource
     if (!pkgId || !source) return
 
-    this.prefetching = entry
+    this.prefetching = next.entry
     // Marked, so it queues behind anything the runtime is actually waiting on.
-    this.postToJobs({ type: 'extract', pkgId, entry, source, prefetch: true })
+    this.postToJobs({ type: 'extract', pkgId, entry: next.entry, location: next.location, source, prefetch: true })
   }
 
   private postToJobs(message: ToJobsMessage): void {
@@ -880,6 +865,7 @@ export class H5PPlayerElement extends HTMLElement {
       type: 'extract',
       pkgId: message.pkgId,
       entry: message.entry,
+      location: message.location,
       source: this.currentSource
     })
   }

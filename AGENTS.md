@@ -27,12 +27,15 @@ The hard constraints that shape every file here:
 ```
 src/
   h5p-offline-player.ts   the <h5p-player> custom element — the only public entry point
+  shadow.css              the element's own box, imported `?inline` so Vite minifies it into the bundle
   shared/                 code that runs in all three contexts (page, Service Worker, Jobs worker)
     constants.ts          sizes, timeouts, cache names, the version stamp
     protocol.ts           every message shape and the PackageRecord written to IndexedDB
     source.ts             probe + the three source adapters; imports no zip.js, so the element stays small
-    source-reader.ts      the zip.js reader bridge and the segmented fetch behind it
+    source-reader.ts      the zip.js reader bridge — the one module besides package-reader that imports zip.js
+    span-stream.ts        how a span is pulled: one request, or several at once over HTTP; shared by the bridge and the Jobs worker
     resilient-stream.ts   a ranged read that opens itself again from the byte it reached when the link goes quiet or drops
+    local-header.ts       the thirty bytes in front of an entry's data, parsed without zip.js
     chunk-store.ts        Cache API: whole entries, chunked entries, watermarks, eviction
     idb.ts                the `packages` table
     entry-names.ts        entry-name normalisation — the security boundary for hostile archives
@@ -47,7 +50,7 @@ src/
     routes.ts             URL shape of the virtual routes
     stream-utils.ts
   jobs/
-    jobs-worker.ts        downloads, extractions and warming; the only long-running code
+    jobs-worker.ts        downloads, extractions and warming; the only long-running code, and it carries no zip.js
     job-queue.ts          the order extractions run in: one at a time, demand first, promotion on a repeat
     chunk-writer.ts       a WritableStream that lands bytes in the chunk store and publishes a watermark
     warm.ts               walks the library spans off one ranged request each and caches their entries
@@ -144,7 +147,8 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
 - **A resumed write must start on a chunk boundary.** `createChunkWriter` asserts this. Partial
   chunks are rewritten as they fill, with a doubling interval — a fixed interval is O(n²) in
   bytes rewritten.
-- **`SourceReader` overrides `createReadable`.** Without it zip.js falls back to walking an entry
+- **`SourceReader` overrides `createReadable`.** It hands the span to `streamSpan`, which is also
+  what the Jobs worker reads an entry through. Without it zip.js falls back to walking an entry
   through `readUint8Array` in 64 kB steps. Over a picked `File` each step is a free `slice()`;
   over HTTP each one is a request, and a 218 MB video meant roughly 3,500 round trips to the
   origin — slow enough to look like a hang and enough to get throttled. One ranged request covers
@@ -367,8 +371,9 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   element hands them to the Jobs worker as a `warm` job and boots the frame when it is done.
   `warm.ts` walks each span by the offsets the central directory gave, inflates each entry and
   `putWhole`s it, then writes a marker under `WARM_ENTRY` so the next load skips it. The spans
-  travel in the reply rather than being recomputed in the Jobs worker because that worker's own
-  reader would cost another round of index requests — five seconds on that host. Three rules:
+  travel in the reply rather than being recomputed in the Jobs worker because that worker has no
+  index of its own, and building one cost another round of index requests — five seconds on
+  that host — back when it did. Three rules:
   it never fails a load (no room, a stalled span, a header that is not where the index said —
   the frame boots against whatever landed, and the virtual server serves the rest on demand);
   only a warm that landed everything writes the marker; and it runs for `range-http` only, since
@@ -419,8 +424,21 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   `BroadcastChannel`; `waitForWatermark` wakes on the notice and polls at `WATERMARK_POLL_MS`
   only as the fallback that catches a dead job. Two channel objects, because a channel never
   hears itself — which is also what lets the unit test hear it.
-- **The Jobs worker keeps one reader per package.** The central directory does not change, and
-  re-reading it per extraction was a round of ranged requests per job for an answer it had.
+- **The Jobs worker carries no zip.js and reads no index.** Every job is told where its bytes
+  are by the Service Worker, which has the central directory: the warm gets its spans, an
+  extraction gets an `EntryLocation` — the local header's offset for a central-directory entry,
+  the data's start for one the forward index named, plus sizes and method — on the `need-job`
+  message and on each `PrefetchEntry`. The worker reads the thirty-byte local header
+  (`local-header.ts`, the same parse the server and the warm use), streams the compressed span
+  through `streamSpan` and inflates with the native `DecompressionStream`. Before this the worker
+  opened its own zip.js reader per package, which was a round of ranged requests per worker —
+  five seconds on the fwu.de host — for an index the server already had, and put zip.js in the
+  element's bundle by way of the worker string: 159 kB of the worker's 193, 208 kB for the
+  element. Measured after: the worker is 24 kB, the element 40 kB minified (17 kB gzipped), the
+  Service Worker unchanged, since the index is its job. A chunked source is opened `partial` for
+  an extraction, because an entry the forward index named lies whole below the watermark of an
+  archive still downloading. `tests/browser/jobs-worker.test.ts` builds the locations the way
+  the server does, through `locationOf`.
 - **Bulk fetches are `cache: 'no-store'`.** The chunk store is the cache; a second copy in the
   browser's HTTP cache doubled the storage for nothing.
 - **An unknown `pkgId` is a 404 on every route.** `UnknownPackageError` is what `openReader`
@@ -565,7 +583,9 @@ a normalized package gains the early boot and the seekable video, and still wait
 
 ## The element's own box
 
-Three things about the shadow CSS that are easy to undo by accident:
+The shadow CSS is `src/shadow.css`, imported `?inline`: Vite hands it to the element as a string,
+minified for the build, so the reasons behind the rules can sit beside them as CSS comments. Three
+things about it that are easy to undo by accident:
 
 - **The layout lives on an inner `.viewport` wrapper, not on `:host`.** Any rule in the host page
   that names the element — `h5p-player { display: block; height: 400px }`, the obvious thing to
@@ -638,16 +658,22 @@ minifies whitespace, and a consumer's bundler tree-shakes a library by them. Thi
 registers the element on import, so nothing in it can be shaken out and nothing is lost by the
 extra pass. Vite's own output was 215 kB with every JSDoc block in it.
 
-**The element does not carry zip.js.** It probes a source and never reads an archive, but
-`source.ts` used to import zip.js for the reader bridge, and zip.js has module-level side effects
-Rollup cannot drop, so 100 kB of it rode along. The bridge now lives in `source-reader.ts`,
-imported by the reader and the Jobs worker only. Element bundle before and after: 314 kB
-(131 kB gzipped) to 205 kB (85 kB gzipped); the Jobs worker string inside it, which does need
-zip.js, is 190 kB of that.
+**The element does not carry zip.js, and neither does the Jobs worker string inside it.** The
+element probes a source and never reads an archive, but `source.ts` used to import zip.js for
+the reader bridge, and zip.js has module-level side effects Rollup cannot drop, so 100 kB of it
+rode along; the bridge moved to `source-reader.ts`, which took the element from 314 kB (131 kB
+gzipped) to 205 kB (85 kB gzipped). The Jobs worker string was 190 kB of what remained, 159 kB of
+it zip.js for an index the Service Worker already had; with the worker told where each entry is
+instead (the invariant above), the element is 40 kB minified, 17 kB gzipped. zip.js is now in
+the two Service Worker scripts only.
 
-**Shipped strings carry no comments.** The frame's `<style>` block and the element's shadow CSS
-are explained in TypeScript comments beside the constants, not inside them; a comment inside a
-template literal survives every minifier and ships with every response.
+**Shipped strings carry no comments.** The frame's `<style>` block is explained in TypeScript
+comments beside the constant, not inside it; a comment inside a template literal survives every
+minifier and ships with every response. The element's shadow CSS is the exception that proves
+it: it is a `.css` file imported `?inline`, which Vite's CSS pipeline minifies for the build, so
+its comments live in the file. The frame's four rules stay a string because the Service Worker is
+bundled by esbuild behind Vite's back, where a `.css` import would need a plugin of its own to
+save sixty bytes a response.
 
 In dev the same plugin file serves the Service Worker at any path ending in `/h5p-sw.js`, so
 `new URL('./h5p-sw.js', import.meta.url)` resolves in dev and in a consuming app alike. **esbuild

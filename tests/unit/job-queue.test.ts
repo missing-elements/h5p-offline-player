@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { JobQueue } from '../../src/jobs/job-queue'
 
 const source = { type: 'range-http', url: 'https://host.example/a.h5p', size: 1 } as const
-const job = (entry: string, prefetch = false, pkgId = 'pkg') => ({ pkgId, entry, source, prefetch })
+const location = { header: 0, compressedSize: 1, size: 1, method: 8 }
+const job = (entry: string, prefetch = false, pkgId = 'pkg') => ({ pkgId, entry, location, source, prefetch })
 const order = (queue: JobQueue) => queue.waiting().map((item) => item.entry)
 
 describe('JobQueue', () => {

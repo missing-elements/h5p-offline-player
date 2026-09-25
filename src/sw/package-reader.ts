@@ -2,7 +2,15 @@ import { ZipReader, type Entry, type FileEntry } from '@zip.js/zip.js'
 import { INLINE_MAX_SIZE, MEDIA_INLINE_MAX_SIZE, WARM_ENTRY_MAX_SIZE, WARM_GAP, WARM_MAX_BYTES } from '../shared/constants'
 import { indexEntryNames, normalizeEntryName } from '../shared/entry-names'
 import { isMediaEntry, isTextEntry } from '../shared/mime'
-import { PlayerError, type MissingLibraries, type PrefetchEntry, type WarmEntry, type WarmSpan } from '../shared/protocol'
+import { DEFLATE, LOCAL_HEADER_FIXED_SIZE, STORED, localHeaderDataStart } from '../shared/local-header'
+import {
+  PlayerError,
+  type EntryLocation,
+  type MissingLibraries,
+  type PrefetchEntry,
+  type WarmEntry,
+  type WarmSpan
+} from '../shared/protocol'
 import type { SourceHandle } from '../shared/source'
 import { SourceReader } from '../shared/source-reader'
 import type { ByteRange } from '../shared/range'
@@ -22,12 +30,7 @@ export type Strategy =
   /** Large and deflated (method 8): the Jobs worker inflates into chunks, served progressively. */
   | { kind: 'chunked' }
 
-/** Zip compression methods: the only two an H5P package is served with. */
-export const STORED = 0
-export const DEFLATE = 8
-
-const LOCAL_HEADER_SIGNATURE = 0x04034b50
-const LOCAL_HEADER_FIXED_SIZE = 30
+export { DEFLATE, STORED }
 
 /** The parts of `h5p.json` the player needs. Everything in it comes from an untrusted archive. */
 export interface PackageManifest {
@@ -395,7 +398,7 @@ export class PackageReader {
   prefetchable(): PrefetchEntry[] {
     return [...this.entries.values()]
       .filter((entry) => entry.strategy.kind === 'chunked')
-      .map((entry) => ({ entry: entry.name, size: entry.size }))
+      .map((entry) => ({ entry: entry.name, size: entry.size, location: locationOf(entry) }))
   }
 
   /**
@@ -555,14 +558,8 @@ export class PackageReader {
       end: entry.zip.offset + LOCAL_HEADER_FIXED_SIZE - 1
     })
 
-    const view = new DataView(header.buffer, header.byteOffset, header.byteLength)
-    if (view.getUint32(0, true) !== LOCAL_HEADER_SIGNATURE) {
-      throw new PlayerError('bad-archive', `${entry.name} has a malformed local header`)
-    }
-
-    const nameLength = view.getUint16(26, true)
-    const extraLength = view.getUint16(28, true)
-    const start = entry.zip.offset + LOCAL_HEADER_FIXED_SIZE + nameLength + extraLength
+    const start = localHeaderDataStart(entry.zip.offset, header)
+    if (start === null) throw new PlayerError('bad-archive', `${entry.name} has a malformed local header`)
 
     return { start, end: start + entry.compressedSize - 1 }
   }
@@ -574,6 +571,21 @@ export class PackageReader {
       start: data.start + range.start,
       end: data.start + range.end
     })
+  }
+}
+
+/**
+ * Where an entry's compressed bytes are, for a job that extracts it without an index of its own.
+ * A central-directory entry is named by its local header; a forward entry by where its data
+ * begins, since the scanner has already read the header.
+ */
+export function locationOf(entry: IndexedEntry): EntryLocation {
+  return {
+    header: entry.zip?.offset,
+    dataStart: entry.dataStart,
+    compressedSize: entry.compressedSize,
+    size: entry.size,
+    method: entry.method
   }
 }
 
