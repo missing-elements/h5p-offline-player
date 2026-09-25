@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import { configure } from '@zip.js/zip.js'
 import { ARCHIVE_ENTRY, CHUNK_SIZE, INPUT_LIVENESS_MS, WARM_ENTRY } from '../shared/constants'
-import { ChunkStore, QuotaError, announceActivity, isQuotaError } from '../shared/chunk-store'
+import { ChunkStore, QuotaError, announceActivity, announceQueued, isQuotaError } from '../shared/chunk-store'
 import { installEvictionPolicy } from '../shared/eviction'
 import { LocalHeaderScanner } from '../shared/forward-index'
 import { packageLockName, packageLockPrefix } from '../shared/locks'
@@ -17,6 +17,7 @@ import { openSource, type SourceHandle } from '../shared/source'
 import { quotaMessage } from '../shared/storage'
 import { PackageReader } from '../sw/package-reader'
 import { createChunkWriter } from './chunk-writer'
+import { JobQueue, type ExtractJob } from './job-queue'
 import { warmPackage } from './warm'
 
 /**
@@ -36,6 +37,15 @@ configure({ useWebWorkers: false })
 const scope = self as unknown as DedicatedWorkerGlobalScope
 
 const inFlight = new Map<string, AbortController>()
+/**
+ * Extractions waiting their turn. They run one at a time — see `JobQueue` for the order — and
+ * while they wait they announce themselves as queued on the watermark channel, so a request that
+ * is waiting on one hears a live job rather than a silent one. Downloads and warming are not
+ * queued: both happen before the frame boots, with nothing to compete against.
+ */
+const queue = new JobQueue()
+let extracting: string | null = null
+let heartbeat: ReturnType<typeof setInterval> | null = null
 /** Files handed over by the page for local-file packages, kept for the life of the worker. */
 const files = new Map<string, Blob>()
 /**
@@ -81,6 +91,8 @@ scope.addEventListener('message', (event: MessageEvent<ToJobsMessage & { file?: 
   if (!message) return
 
   if (message.type === 'abort') {
+    queue.drop(message.pkgId)
+    syncHeartbeat()
     for (const [key, controller] of inFlight) {
       if (!key.startsWith(packageLockPrefix(message.pkgId))) continue
       controller.abort()
@@ -95,8 +107,59 @@ scope.addEventListener('message', (event: MessageEvent<ToJobsMessage & { file?: 
 
   if (message.file) files.set(message.pkgId, message.file)
 
+  if (message.type === 'extract') {
+    scheduleExtract({
+      pkgId: message.pkgId,
+      entry: message.entry,
+      source: message.source,
+      prefetch: message.prefetch === true
+    })
+    return
+  }
+
   void run(message)
 })
+
+/* ------------------------------------------------------------------ the extraction queue */
+
+function scheduleExtract(job: ExtractJob): void {
+  // Running already: the request is a duplicate, and the running job is never interrupted.
+  if (extracting === jobKey(job.pkgId, job.entry)) return
+  queue.request(job)
+  syncHeartbeat()
+  pump()
+}
+
+function pump(): void {
+  if (extracting !== null) return
+  const job = queue.next()
+  if (!job) {
+    syncHeartbeat()
+    return
+  }
+  const key = jobKey(job.pkgId, job.entry)
+  extracting = key
+  syncHeartbeat()
+  void run({ type: 'extract', pkgId: job.pkgId, entry: job.entry, source: job.source }).finally(() => {
+    if (extracting === key) extracting = null
+    pump()
+  })
+}
+
+/** While anything waits, every queued entry is announced alive once per liveness interval. */
+function syncHeartbeat(): void {
+  if (queue.size === 0) {
+    if (heartbeat !== null) clearInterval(heartbeat)
+    heartbeat = null
+    return
+  }
+  if (heartbeat !== null) return
+  const announce = () => {
+    for (const job of queue.waiting()) announceQueued(job.pkgId, job.entry)
+  }
+  announce()
+  heartbeat = setInterval(announce, INPUT_LIVENESS_MS)
+}
 
 async function run(message: Exclude<ToJobsMessage, { type: 'abort' }>): Promise<void> {
   const entry = message.type === 'extract' ? message.entry : message.type === 'warm' ? WARM_ENTRY : undefined

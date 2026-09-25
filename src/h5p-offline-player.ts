@@ -788,7 +788,8 @@ export class H5PPlayerElement extends HTMLElement {
     if (!pkgId || !source) return
 
     this.prefetching = entry
-    this.postToJobs({ type: 'extract', pkgId, entry, source })
+    // Marked, so it queues behind anything the runtime is actually waiting on.
+    this.postToJobs({ type: 'extract', pkgId, entry, source, prefetch: true })
   }
 
   private postToJobs(message: ToJobsMessage): void {

@@ -47,6 +47,7 @@ src/
     stream-utils.ts
   jobs/
     jobs-worker.ts        downloads, extractions and warming; the only long-running code
+    job-queue.ts          the order extractions run in: one at a time, demand first, promotion on a repeat
     chunk-writer.ts       a WritableStream that lands bytes in the chunk store and publishes a watermark
     warm.ts               walks the library spans off one ranged request each and caches their entries
 scripts/                  sync-h5p-assets, build-workers, copy-frame-assets, build-fixtures,
@@ -342,6 +343,33 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   a picked file and a downloaded archive are local reads. `tests/unit/warm.test.ts` builds a real
   archive with a video between two library folders and checks the split, the walk and the marker;
   `tests/browser/warm.test.ts` checks the phase, the cache and the skip on a second load.
+- **Extractions run one at a time, and the order is the policy.** A runtime asks for every
+  video it instantiates at boot, not only the one on screen: an Interactive Book from sodix.de
+  with six deflated videos (4.6 to 57.8 MB, none faststart) kept two `<video>` elements attached
+  and still requested all six within the first second — H5P.Video creates a media element per
+  chapter, and a detached one loads its header all the same. Three extractions and three inline
+  inflates then shared 1.27 MB/s, and the first chapter's 21 MB video, which plays nothing until
+  its last byte because its `moov` is at the end, finished at 26 s instead of the 16 s it takes
+  alone. So the Jobs worker runs extractions through `JobQueue`: a demand — the virtual server's
+  `need-job` — queues behind earlier demands and ahead of every prefetch; a repeated demand for a
+  queued entry moves it to the front, which the server's two-second dedupe keeps the boot burst
+  from doing to itself while a learner opening a later chapter is heard at once; a prefetch
+  (`extract` with `prefetch: true`, which is how `advancePrefetch` posts) goes to the back and
+  promotes nothing. The running job is never interrupted, since a deflate stream cannot resume.
+  Two things keep a queued entry's waiters honest: the Jobs worker announces it as `queued` on the
+  watermark channel every `INPUT_LIVENESS_MS`, which `waitForWatermark` counts as alive, and
+  `serveChunked` answers a queued entry at once with its headers and a body that follows, rather
+  than holding the request open until the first flush — behind a long queue that could be
+  minutes, longer than a fetch event may stay unanswered. Downloads and warming are not queued;
+  both happen before the frame boots. `job-queue.test.ts` pins the order, `jobs-worker.test.ts`
+  drives three extractions through the real worker and checks they never overlap.
+- **Media is held to a lower inline bar than everything else.** `INLINE_MAX_SIZE` is 16 MB, and an
+  inline entry is copied whole before its first byte is served; a media element wants the head
+  first and the rest by ranges. So `chooseStrategy` puts media over `MEDIA_INLINE_MAX_SIZE`
+  (1 MB) on the slice path when stored and the chunked path when deflated, where the head is
+  served on demand and a deflated one takes its turn in the queue. Before this, the same book's
+  three smaller videos, 5 to 10 MB each, were inflated whole by the Service Worker on their
+  probes, in parallel with the three extractions, for chapters nobody had opened.
 - **An inline entry is inflated once per burst.** `cacheInline` keeps a per-instance map of
   writes in flight; concurrent requests for the same cold file join the first one instead of each
   inflating and racing on the same `cache.put`. The map dies with the worker, which only costs
@@ -779,7 +807,9 @@ Deliberately out of scope for v1, per the architecture document: the editor, off
 emitted as events and stored nowhere.
 
 **Demand-paced extraction.** Considered on 2026-09-25 against a real package and deferred; the
-design is recorded here so it does not have to be rediscovered. Today the first request for a
+design is recorded here so it does not have to be rediscovered. Since then extractions run one at
+a time in demand order (see the queue invariant above), which takes care of the *contention*
+between videos; what follows is about the bytes a single job pulls that nobody watches. Today the first request for a
 deflated entry starts a job that inflates the whole file, because a deflate stream cannot be
 restarted in the middle. Measured: an 80 MB deflated mp4 (ratio 0.937, faststart; H5P.Video creates
 its `<video>` with `preload="metadata"`, so the header is asked for the moment the content renders)

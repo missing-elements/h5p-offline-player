@@ -45,8 +45,68 @@ function spawn() {
   }
 }
 
+/** A `range-http` descriptor for a fixture, with its size read off the dev server. */
+async function rangeSource(path: string) {
+  const url = new URL(path, location.href).href
+  const response = await fetch(url, { headers: { Range: 'bytes=0-' }, cache: 'no-store' })
+  const size = Number(response.headers.get('content-length'))
+  await response.body?.cancel()
+  return { type: 'range-http', url, size } as const
+}
+
 describe('the Jobs worker', () => {
   afterAll(() => caches.delete(cacheNameFor(PKG)))
+
+  it('extracts one entry at a time, demand before prefetch, and a repeated demand jumps the queue', { timeout: 60_000 }, async () => {
+    const one = 'jobs-worker-queue-one'
+    const two = 'jobs-worker-queue-two'
+    await caches.delete(cacheNameFor(one))
+    await caches.delete(cacheNameFor(two))
+    const first = await rangeSource('/fixtures/large-deflated.h5p')
+    const second = await rangeSource('/fixtures/segmented.h5p')
+    const jobs = spawn()
+    const finished: string[] = []
+    const started = new Set<string>()
+    let overlap = false
+
+    try {
+      const watch = (message: FromJobsMessage) => {
+        if (message.type === 'progress' && message.entry) {
+          started.add(`${message.pkgId}:${message.entry}`)
+          // Progress from a second entry while the first is still going would be two inflates at once.
+          if (started.size > finished.length + 1) overlap = true
+        }
+        if (message.type === 'done' && message.entry) finished.push(`${message.pkgId}:${message.entry}`)
+        return false
+      }
+      const all = jobs.next(watch, 55_000).catch(() => {})
+
+      // A demand, then two prefetches, then demand for the last one: it goes ahead of the other prefetch.
+      jobs.post({ type: 'extract', pkgId: one, entry: 'content/media/big.bin', source: first })
+      jobs.post({ type: 'extract', pkgId: one, entry: 'content/media/unused.bin', source: first, prefetch: true })
+      jobs.post({ type: 'extract', pkgId: two, entry: 'content/media/big.bin', source: second, prefetch: true })
+      jobs.post({ type: 'extract', pkgId: two, entry: 'content/media/big.bin', source: second })
+
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(`only ${finished.length} extractions finished`)), 50_000)
+        const tick = setInterval(() => {
+          if (finished.length === 3) {
+            clearInterval(tick)
+            clearTimeout(timer)
+            resolve()
+          }
+        }, 100)
+      })
+      void all
+
+      expect(finished).toEqual([`${one}:content/media/big.bin`, `${two}:content/media/big.bin`, `${one}:content/media/unused.bin`])
+      expect(overlap).toBe(false)
+    } finally {
+      jobs.dispose()
+      await caches.delete(cacheNameFor(one))
+      await caches.delete(cacheNameFor(two))
+    }
+  })
 
   it('runs a job re-requested right after its abort, rather than dropping it as a duplicate', async () => {
     await caches.delete(cacheNameFor(PKG))

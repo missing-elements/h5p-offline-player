@@ -1,5 +1,5 @@
 import { ZipReader, type Entry, type FileEntry } from '@zip.js/zip.js'
-import { INLINE_MAX_SIZE, WARM_ENTRY_MAX_SIZE, WARM_GAP, WARM_MAX_BYTES } from '../shared/constants'
+import { INLINE_MAX_SIZE, MEDIA_INLINE_MAX_SIZE, WARM_ENTRY_MAX_SIZE, WARM_GAP, WARM_MAX_BYTES } from '../shared/constants'
 import { indexEntryNames, normalizeEntryName } from '../shared/entry-names'
 import { isMediaEntry, isTextEntry } from '../shared/mime'
 import { PlayerError, type MissingLibraries, type PrefetchEntry, type WarmEntry, type WarmSpan } from '../shared/protocol'
@@ -579,14 +579,16 @@ export class PackageReader {
 
 /**
  * Serving strategy for one entry. Size decides first, then compression method: only a large
- * deflated entry is worth the cost of a background extraction.
+ * deflated entry is worth the cost of a background extraction. Media has its own, lower bar —
+ * see `MEDIA_INLINE_MAX_SIZE` — because a media element only ever wants the head first.
  */
 export function chooseStrategy(
   name: string,
   entry: { uncompressedSize: number; compressionMethod: number }
 ): Strategy {
   if (isTextEntry(name)) return { kind: 'inline' }
-  if (entry.uncompressedSize <= INLINE_MAX_SIZE) return { kind: 'inline' }
+  const limit = isMediaEntry(name) ? MEDIA_INLINE_MAX_SIZE : INLINE_MAX_SIZE
+  if (entry.uncompressedSize <= limit) return { kind: 'inline' }
   if (entry.compressionMethod === STORED) return { kind: 'slice' }
   if (entry.compressionMethod === DEFLATE) return { kind: 'chunked' }
   // Anything else (zstd, bzip2, an encrypted entry) still works through zip.js if a codec is

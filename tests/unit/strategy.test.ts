@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Entry } from '@zip.js/zip.js'
 import { chooseStrategy } from '../../src/sw/package-reader'
-import { INLINE_MAX_SIZE } from '../../src/shared/constants'
+import { INLINE_MAX_SIZE, MEDIA_INLINE_MAX_SIZE } from '../../src/shared/constants'
 
 const entry = (overrides: Partial<Entry>): Entry =>
   ({ uncompressedSize: 0, compressedSize: 0, compressionMethod: 8, ...overrides }) as Entry
@@ -24,6 +24,18 @@ describe('chooseStrategy', () => {
     })
   })
 
+  it('holds media to a lower bar: a stored video over a megabyte is sliced, a deflated one extracted', () => {
+    const size = MEDIA_INLINE_MAX_SIZE * 4
+    expect(size).toBeLessThan(INLINE_MAX_SIZE)
+    expect(chooseStrategy('content/videos/clip.mp4', entry({ uncompressedSize: size, compressionMethod: STORED }))).toEqual({ kind: 'slice' })
+    expect(chooseStrategy('content/videos/clip.mp4', entry({ uncompressedSize: size, compressionMethod: DEFLATE }))).toEqual({ kind: 'chunked' })
+    expect(chooseStrategy('content/audio/clip.mp3', entry({ uncompressedSize: size, compressionMethod: DEFLATE }))).toEqual({ kind: 'chunked' })
+    // The same size in an image is still inline: the browser needs it whole anyway.
+    expect(chooseStrategy('content/images/photo.jpg', entry({ uncompressedSize: size, compressionMethod: DEFLATE }))).toEqual({ kind: 'inline' })
+    // And media at the bar itself is small.
+    expect(chooseStrategy('content/videos/clip.mp4', entry({ uncompressedSize: MEDIA_INLINE_MAX_SIZE, compressionMethod: DEFLATE }))).toEqual({ kind: 'inline' })
+  })
+
   it('slices large stored media, which needs no extraction at all', () => {
     const strategy = chooseStrategy(
       'content/lesson.mp4',
@@ -42,7 +54,7 @@ describe('chooseStrategy', () => {
 
   it('treats the threshold itself as small', () => {
     expect(
-      chooseStrategy('content/lesson.mp4', entry({ uncompressedSize: INLINE_MAX_SIZE }))
+      chooseStrategy('content/images/photo.png', entry({ uncompressedSize: INLINE_MAX_SIZE }))
     ).toEqual({ kind: 'inline' })
   })
 

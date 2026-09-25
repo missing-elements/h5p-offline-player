@@ -451,6 +451,8 @@ export interface WatermarkNotice {
   meta?: ChunkMeta
   /** Bytes the job has taken from the network so far, on a liveness notice. */
   received?: number
+  /** The job is queued behind another extraction and alive, on a queued notice. */
+  queued?: true
 }
 
 let announcer: BroadcastChannel | null | undefined
@@ -480,6 +482,16 @@ function announceWatermark(notice: WatermarkNotice): void {
  */
 export function announceActivity(pkgId: string, entry: string, received: number): void {
   announceWatermark({ pkgId, entry, received })
+}
+
+/**
+ * Tells whoever waits on an entry that its job is queued behind another extraction — alive, not
+ * yet producing. Extractions run one at a time so the video the learner is looking at gets the
+ * whole link; the ones behind it announce this instead of bytes, and a waiter that hears it keeps
+ * waiting rather than asking for the job again or giving up.
+ */
+export function announceQueued(pkgId: string, entry: string): void {
+  announceWatermark({ pkgId, entry, queued: true })
 }
 
 /** Calls `onNotice` for every notice about one entry, until the returned function is called. */

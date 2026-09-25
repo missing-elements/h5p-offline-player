@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ChunkStore, announceActivity } from '../../src/shared/chunk-store'
+import { ChunkStore, announceActivity, announceQueued } from '../../src/shared/chunk-store'
 import { waitForWatermark } from '../../src/sw/watermark-wait'
 
 /** The Cache API reduced to a map, enough for meta records to be written and read back. */
@@ -74,6 +74,47 @@ describe('waitForWatermark', () => {
     } finally {
       stopInput()
       clearTimeout(landing)
+    }
+  })
+
+  it('keeps waiting while the job reports itself queued behind another', async () => {
+    vi.stubGlobal('caches', fakeCaches())
+    const store = new ChunkStore('pkg')
+    await store.setMeta(ENTRY, { size: 10, available: 0, complete: false })
+    let asked = 0
+
+    const stopHeartbeat = every(100, () => announceQueued('pkg', ENTRY))
+    const landing = setTimeout(() => {
+      void store.setMeta(ENTRY, { size: 10, available: 1, complete: false })
+    }, 1_500)
+
+    try {
+      const result = await waitForWatermark(store, ENTRY, 1, {
+        stallMs: 100,
+        onStall: async () => {
+          asked += 1
+        }
+      })
+      expect(result?.available).toBe(1)
+      expect(asked).toBe(0)
+    } finally {
+      stopHeartbeat()
+      clearTimeout(landing)
+    }
+  })
+
+  it('returns at once on a queued notice when the caller can send a body that follows', async () => {
+    vi.stubGlobal('caches', fakeCaches())
+    const store = new ChunkStore('pkg')
+    const stopHeartbeat = every(50, () => announceQueued('pkg', ENTRY))
+
+    try {
+      const started = performance.now()
+      const result = await waitForWatermark(store, ENTRY, 1, { stallMs: 5_000, queuedIsEnough: true })
+      expect(result).toEqual({ size: null, available: 0, complete: false })
+      expect(performance.now() - started).toBeLessThan(1_000)
+    } finally {
+      stopHeartbeat()
     }
   })
 

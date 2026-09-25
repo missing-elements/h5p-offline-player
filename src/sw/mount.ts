@@ -463,7 +463,9 @@ class VirtualServer {
 
     if (!meta || (!meta.complete && meta.available === 0)) {
       await askAgain()
-      meta = await waitForWatermark(store, entry.name, 1, { onStall: askAgain })
+      // Its first flush, or word that it is queued behind another extraction: either way the
+      // headers go out now and the body follows the watermark down. Only silence gives up.
+      meta = await waitForWatermark(store, entry.name, 1, { onStall: askAgain, queuedIsEnough: true })
       if (!meta) return retryLater('Extraction has not produced any bytes yet')
       if (meta.error && meta.available === 0) return failedEntry(meta.error)
     }

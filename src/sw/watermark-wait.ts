@@ -21,13 +21,24 @@ export async function waitForWatermark(
   store: ChunkStore,
   entry: string,
   needed: number,
-  options: { stallMs?: number; onStall?: () => Promise<void> } = {}
+  options: {
+    stallMs?: number
+    onStall?: () => Promise<void>
+    /**
+     * Return as soon as the job reports itself queued. For a response that can carry a body
+     * which follows the extraction, a queued job is reason enough to send the headers now — the
+     * bytes come when its turn does — rather than hold the request open until its first flush,
+     * which behind a long queue could be minutes, longer than a fetch event may stay unanswered.
+     */
+    queuedIsEnough?: boolean
+  } = {}
 ): Promise<ChunkMeta | null> {
   const stallMs = options.stallMs ?? COLD_ENTRY_WAIT_MS
   let lastAvailable = -1
   let lastReceived = -1
   let lastAdvanceAt = Date.now()
   let askedAgain = false
+  let queued = false
 
   // Woken by the writer's notice when there is one; the poll is the fallback that keeps stall
   // detection working when there is not.
@@ -35,6 +46,13 @@ export async function waitForWatermark(
   const stop = onWatermark(store.pkgId, entry, (notice) => {
     if (notice.received !== undefined && notice.received !== lastReceived) {
       lastReceived = notice.received
+      lastAdvanceAt = Date.now()
+      askedAgain = false
+    }
+    // Queued is alive: extractions run one at a time, and an entry waiting its turn behind a
+    // long video must not read as a dead job.
+    if (notice.queued) {
+      queued = true
       lastAdvanceAt = Date.now()
       askedAgain = false
     }
@@ -47,6 +65,7 @@ export async function waitForWatermark(
       if (meta && (meta.available >= needed || meta.complete)) return meta
       // A recorded failure is an answer too; the caller decides what to serve.
       if (meta?.error) return meta
+      if (queued && options.queuedIsEnough) return meta ?? { size: null, available: 0, complete: false }
 
       const available = meta?.available ?? 0
       if (available !== lastAvailable) {

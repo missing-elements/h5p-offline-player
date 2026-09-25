@@ -198,7 +198,8 @@ export type FromWorkerMessage =
 
 export type ToJobsMessage =
   | { type: 'download'; pkgId: string; source: SourceDescriptor }
-  | { type: 'extract'; pkgId: string; entry: string; source: SourceDescriptor; file?: File }
+  /** `prefetch`: asked for ahead of demand, so it queues behind anything the runtime is waiting on. */
+  | { type: 'extract'; pkgId: string; entry: string; source: SourceDescriptor; file?: File; prefetch?: true }
   /** Pulls the spans into the cache. Reports under the reserved entry name `WARM_ENTRY`. */
   | { type: 'warm'; pkgId: string; source: SourceDescriptor; spans: WarmSpan[] }
   | { type: 'abort'; pkgId: string }

@@ -21,6 +21,15 @@ export const CHUNK_SIZE = 8 * 1024 * 1024
 export const INLINE_MAX_SIZE = 16 * 1024 * 1024
 
 /**
+ * Media is the exception to the rule above. A media element reads by ranges and, on first
+ * contact, wants only the header; an inline entry is copied whole before its first byte is
+ * served, so a 7 MB video cost 7 MB the moment the runtime created its `<video>` — and a book
+ * with six of them pulled all six at boot, whether or not anyone would watch. Above this, media
+ * is sliced when stored and extracted when deflated, both of which serve the head on demand.
+ */
+export const MEDIA_INLINE_MAX_SIZE = 1024 * 1024
+
+/**
  * How a large span is pulled over HTTP: `SEGMENT_CONCURRENCY` ranged requests of `SEGMENT_SIZE`
  * in flight at once, emitted in order.
  *
