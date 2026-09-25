@@ -3,11 +3,6 @@
 [![npm](https://img.shields.io/npm/v/%40missing-elements%2Fh5p-offline-player)](https://www.npmjs.com/package/@missing-elements/h5p-offline-player)
 [![licence](https://img.shields.io/npm/l/%40missing-elements%2Fh5p-offline-player)](LICENSE)
 
-> **Not production ready.** This is an early release under active development. The API, the
-> worker protocol and the cache layout can still change between versions, and the browser
-> coverage is Chromium first. Try it, report what breaks, but do not put it in front of learners
-> yet.
-
 A browser-only H5P player, as one web component. It plays an arbitrary `.h5p` archive from a URL
 or from disk — no server-side extraction, no backend, nothing to unpack ahead of time.
 
