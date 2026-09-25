@@ -71,6 +71,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.13.0",
+    "@vercel/analytics": "^2.0.1",
     "@vitest/browser": "^5.0.1",
     "@vitest/browser-playwright": "^5.0.1",
     "esbuild": "^0.25.0",
