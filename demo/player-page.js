@@ -58,6 +58,10 @@ player.addEventListener('progress', (event) => {
   if (fraction === null) bar.removeAttribute('value')
   else bar.value = fraction
 
+  if (phase === 'warm') {
+    // The libraries being pulled into the cache in a few requests, before the frame boots.
+    show('Loading the libraries')
+  }
   if (phase === 'extract') {
     // Deliberately not "playback starts before it finishes": whether it does depends on where
     // the mp4 keeps its index, and a file with it at the end plays nothing until the last byte.

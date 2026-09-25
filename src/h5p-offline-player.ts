@@ -1,5 +1,5 @@
 import jobsWorkerSource from 'virtual:h5p-jobs-worker'
-import { VERSION } from './shared/constants'
+import { VERSION, WARM_ENTRY } from './shared/constants'
 import {
   HUB_CONTENT_TYPE_URL,
   PlayerError,
@@ -9,6 +9,7 @@ import {
   type FrameAssets,
   type FromFrameMessage,
   type FromJobsMessage,
+  type WarmSpan,
   type FromWorkerMessage,
   type H5PResizerMessage,
   type PackageRecord,
@@ -66,7 +67,8 @@ export interface PlayerProgressDetail {
   fraction: number | null
   loaded: number
   total: number | null
-  phase: 'download' | 'libraries' | 'extract'
+  /** `warm`: the libraries being pulled into the cache before the frame boots, on a host that honours `Range`. */
+  phase: 'download' | 'libraries' | 'warm' | 'extract'
   entry?: string
 }
 
@@ -313,18 +315,25 @@ export class H5PPlayerElement extends HTMLElement {
       }
 
       const frameUrl = `${routes.frame}${pkgId}`
-      let prefetch: PrefetchEntry[]
+      let indexed: IndexResult
 
       if (descriptor.type === 'chunked') {
         this.setState('downloading')
-        prefetch = await this.downloadAndIndex(pkgId, descriptor, signal, frameUrl)
+        indexed = await this.downloadAndIndex(pkgId, descriptor, signal, frameUrl)
       } else {
         this.setState('indexing')
-        prefetch = await this.index(pkgId, signal)
+        indexed = await this.index(pkgId, signal)
+        if (signal.aborted) return
+        // The libraries are pulled into the cache in a few requests before the frame boots;
+        // read on demand, they cost the runtime one or two round trips per file. Not a step
+        // that can fail the load: the frame boots against whatever landed.
+        if (descriptor.type === 'range-http' && indexed.warm.length > 0) {
+          await this.runWarm(pkgId, descriptor, indexed.warm, signal)
+        }
       }
       if (signal.aborted) return
 
-      this.prefetchQueue = prefetch.map((each) => each.entry)
+      this.prefetchQueue = indexed.prefetch.map((each) => each.entry)
       // A download that booted early already has its frame; the final index only swapped the
       // worker onto the real one. Otherwise: the registration has to be `activated` before this
       // navigation, or it reaches the server and 404s — there is no such file.
@@ -348,7 +357,7 @@ export class H5PPlayerElement extends HTMLElement {
     source: SourceDescriptor,
     signal: AbortSignal,
     frameUrl: string
-  ): Promise<PrefetchEntry[]> {
+  ): Promise<IndexResult> {
     let booted = false
     let attempt: Promise<void> | null = null
 
@@ -371,7 +380,7 @@ export class H5PPlayerElement extends HTMLElement {
     }
 
     await this.runDownload(pkgId, source, signal, 'download', tryBoot)
-    if (signal.aborted) return []
+    if (signal.aborted) return nothingIndexed()
     if (attempt) await attempt
 
     // A frame already up keeps its state; the rest of this is the worker's bookkeeping.
@@ -386,19 +395,19 @@ export class H5PPlayerElement extends HTMLElement {
    * Without a `libraries` attribute this is one call that either works or reports exactly what is
    * missing. Reaching out to a third party is never something the element decides on its own.
    */
-  private async index(pkgId: string, signal: AbortSignal): Promise<PrefetchEntry[]> {
+  private async index(pkgId: string, signal: AbortSignal): Promise<IndexResult> {
     try {
-      return prefetchOf(await this.send({ type: 'index', pkgId }))
+      return indexResultOf(await this.send({ type: 'index', pkgId }))
     } catch (error) {
       const missing = error instanceof PlayerError ? error.missingLibraries : undefined
       const source = this.librarySource()
       if (!missing || !source) throw error
 
       await this.supplyLibraries(pkgId, missing, source, signal)
-      if (signal.aborted) return []
+      if (signal.aborted) return nothingIndexed()
 
       // Either it is complete now, or this throws naming what is still absent.
-      return prefetchOf(await this.send({ type: 'index', pkgId }))
+      return indexResultOf(await this.send({ type: 'index', pkgId }))
     }
   }
 
@@ -557,6 +566,43 @@ export class H5PPlayerElement extends HTMLElement {
     })
   }
 
+  /**
+   * Has the Jobs worker pull the archive's library spans into the cache, and waits for it. The
+   * job answers `done` however it went — a full store or a host that stopped answering only
+   * shorten what landed — so this resolves and never rejects; an abort resolves it too.
+   */
+  private runWarm(pkgId: string, source: SourceDescriptor, spans: WarmSpan[], signal: AbortSignal): Promise<void> {
+    return new Promise((resolve) => {
+      const jobs = this.ensureJobs()
+
+      const onMessage = (event: MessageEvent<FromJobsMessage>) => {
+        const message = event.data
+        if (message.pkgId !== pkgId || message.entry !== WARM_ENTRY) return
+
+        if (message.type === 'progress') {
+          this.emitProgress({
+            phase: 'warm',
+            loaded: message.loaded,
+            total: message.total,
+            fraction: message.total ? message.loaded / message.total : null
+          })
+          return
+        }
+
+        jobs.removeEventListener('message', onMessage)
+        resolve()
+      }
+
+      jobs.addEventListener('message', onMessage)
+      signal.addEventListener('abort', () => {
+        jobs.removeEventListener('message', onMessage)
+        resolve()
+      })
+
+      this.postToJobs({ type: 'warm', pkgId, source, spans })
+    })
+  }
+
   /* ---------------------------------------------------------------- Service Worker */
 
   /**
@@ -692,6 +738,9 @@ export class H5PPlayerElement extends HTMLElement {
 
     this.jobs.addEventListener('message', (event: MessageEvent<FromJobsMessage>) => {
       const message = event.data
+      // A warm reports under a reserved entry name; `runWarm` is listening for it, and a report
+      // that reached here as an extraction would surface as one.
+      if (message.entry === WARM_ENTRY) return
       if (message.type === 'progress' && message.entry) {
         this.emitProgress({
           phase: 'extract',
@@ -920,8 +969,19 @@ export class H5PPlayerElement extends HTMLElement {
 /* ------------------------------------------------------------------ helpers */
 
 /** The entries the worker flagged as needing a background inflate, if it flagged any. */
-function prefetchOf(reply: WorkerReply): PrefetchEntry[] {
-  return reply.ok && reply.type === 'indexed' ? (reply.prefetch ?? []) : []
+/** What an index hands the load: the media worth starting early, and the spans worth pulling first. */
+interface IndexResult {
+  prefetch: PrefetchEntry[]
+  warm: WarmSpan[]
+}
+
+function nothingIndexed(): IndexResult {
+  return { prefetch: [], warm: [] }
+}
+
+function indexResultOf(reply: WorkerReply): IndexResult {
+  if (!reply.ok || reply.type !== 'indexed') return nothingIndexed()
+  return { prefetch: reply.prefetch ?? [], warm: reply.warm ?? [] }
 }
 
 /**

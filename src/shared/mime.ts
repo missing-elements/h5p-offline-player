@@ -72,6 +72,12 @@ export function contentTypeOf(entryName: string): string {
  * True for entries the H5P runtime parses rather than streams. They are never chunked: a
  * partially available script is worse than a slow one.
  */
+/** Audio or video by extension: what a media element reads by ranges rather than whole. */
+export function isMediaEntry(entryName: string): boolean {
+  const type = TYPES[extensionOf(entryName)]
+  return type !== undefined && (type.startsWith('audio/') || type.startsWith('video/'))
+}
+
 export function isTextEntry(entryName: string): boolean {
   return TEXT_EXTENSIONS.has(extensionOf(entryName))
 }

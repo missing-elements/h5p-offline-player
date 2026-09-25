@@ -44,6 +44,30 @@ export const SEGMENT_MIN_SPAN = 8 * 1024 * 1024
 export const ARCHIVE_ENTRY = '__archive__'
 
 /**
+ * Reserved chunk-store entry name for the warm marker: its meta says the archive's inline spans
+ * have been pulled into the cache, so a later load boots without asking the host.
+ */
+export const WARM_ENTRY = '__warm__'
+
+/**
+ * Warming: on a host that honours `Range`, the runs of the archive that hold the runtime's own
+ * files — every library's scripts, styles and JSON — are pulled whole before the frame boots,
+ * instead of one or two ranged requests per file while it boots. Two requests of 4 MB against
+ * 156 of a few hundred bytes each, measured on one real package; on a host that answers a
+ * client's requests one at a time, that was the difference between 128 s and 9 s.
+ *
+ * A span is a run of inline entries separated by gaps of at most `WARM_GAP`, so a large media
+ * entry between two library folders splits it and is never pulled. An entry over
+ * `WARM_ENTRY_MAX_SIZE` compressed is not a candidate, a span with nothing the boot reads in it is
+ * not pulled, and the whole warm is capped at `WARM_MAX_BYTES`. A span that stops flowing for
+ * `WARM_STALL_MS` is given up, and the frame boots against whatever landed.
+ */
+export const WARM_GAP = 256 * 1024
+export const WARM_ENTRY_MAX_SIZE = 1024 * 1024
+export const WARM_MAX_BYTES = 16 * 1024 * 1024
+export const WARM_STALL_MS = 20_000
+
+/**
  * How long the watermark may sit still before the virtual server concludes the job behind it is
  * gone. It is not a budget for the whole extraction: inflating a few hundred megabytes over a
  * network legitimately takes minutes, and a request for the tail of such an entry cannot be

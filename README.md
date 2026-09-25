@@ -87,7 +87,10 @@ reads the archive in place and answers the H5P runtime's requests out of it:
   single connection is often capped well below the link — the first one streams straight into
   the inflate, and the others open once it flows, so a slow link still sees its first bytes
   within a second or two;
-- **small entries and scripts** are inflated once into a Cache API store;
+- **small entries and scripts** are inflated once into a Cache API store — and on a host that
+  honours `Range`, the runs of the archive that hold the libraries are pulled whole before the
+  frame boots, a few requests instead of one or two per file. Against a host that answers a
+  client's requests one at a time, that was the difference between a 128 s boot and a 9 s one;
 - **large stored media** is sliced straight out of the archive — never extracted, never stored;
 - **large deflated media** is inflated into 8 MB chunks by a page-side worker, and served
   progressively as a shorter `206` so a cold video starts before extraction finishes;
@@ -210,7 +213,7 @@ Properties: `src`, `file` (a `File` from a picker — setting it loads), `pkgId`
 | `ready` | The runtime is up and the content is visible |
 | `xapi` | Any xAPI statement from the content — the only channel for results; nothing is stored |
 | `finished` | The content reported completion, with its score |
-| `progress` | Download or extraction progress, `fraction` 0–1 (or `null` when the total is unknown) |
+| `progress` | Download, warm-up or extraction progress, `fraction` 0–1 (or `null` when the total is unknown); `phase` is `download`, `libraries`, `warm` or `extract` |
 | `resize` | The content's height changed |
 | `statechange` | `state` changed |
 | `error` | `code`: `no-cors`, `no-worker`, `network`, `quota`, `bad-archive`, `runtime`. A `runtime` error after `ready` leaves `state` at `ready`: the content threw but is still running |

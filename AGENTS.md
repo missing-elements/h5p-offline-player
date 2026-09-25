@@ -46,8 +46,9 @@ src/
     routes.ts             URL shape of the virtual routes
     stream-utils.ts
   jobs/
-    jobs-worker.ts        downloads and extractions; the only long-running code
+    jobs-worker.ts        downloads, extractions and warming; the only long-running code
     chunk-writer.ts       a WritableStream that lands bytes in the chunk store and publishes a watermark
+    warm.ts               walks the library spans off one ranged request each and caches their entries
 scripts/                  sync-h5p-assets, build-workers, copy-frame-assets, build-fixtures,
                           normalize-h5p (the package rewriter; scripts/lib/ holds its zip writer,
                           mp4 remux and policy); scripts/lib/frame-boot-plugin.mjs builds the
@@ -319,6 +320,28 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   applied to ranges too when the request accepts it; `tests/browser/compressing-host.test.ts`
   pins the browser behaviour the probe depends on, and `tests/unit/source-probe.test.ts` covers
   the fallback with CORS-filtered headers.
+- **On a host that honours `Range`, the libraries are pulled whole before the frame boots.** The
+  runtime reads them exhaustively at boot — every `library.json`, script and stylesheet — and an
+  inline entry read on demand costs two ranged requests, the 30-byte local header and then the
+  data. Measured against a real host (nginx in front of a store, `stream.dev.mkis.fwu.de`): a
+  90 MB package with 53 libraries took 136 s to `ready`, 128 of them in 156 requests for 0.54 MB,
+  because that host answers one client's requests roughly one at a time — eight small ranges
+  fired together took 4.8 to 14 s each, the same eight in sequence 0.5 to 0.7 s. Its non-media
+  entries lay in two runs, 3.85 MB and 0.16 MB, which one request each pulled in 6.5 s and 1.0 s.
+  So `PackageReader.warmSpans()` names those runs — small inline entries that are not media,
+  coalesced across gaps of at most `WARM_GAP`, a span kept only if it holds something the boot
+  reads, the total capped at `WARM_MAX_BYTES` — and they ride back on the `indexed` reply; the
+  element hands them to the Jobs worker as a `warm` job and boots the frame when it is done.
+  `warm.ts` walks each span by the offsets the central directory gave, inflates each entry and
+  `putWhole`s it, then writes a marker under `WARM_ENTRY` so the next load skips it. The spans
+  travel in the reply rather than being recomputed in the Jobs worker because that worker's own
+  reader would cost another round of index requests — five seconds on that host. Three rules:
+  it never fails a load (no room, a stalled span, a header that is not where the index said —
+  the frame boots against whatever landed, and the virtual server serves the rest on demand);
+  only a warm that landed everything writes the marker; and it runs for `range-http` only, since
+  a picked file and a downloaded archive are local reads. `tests/unit/warm.test.ts` builds a real
+  archive with a video between two library folders and checks the split, the walk and the marker;
+  `tests/browser/warm.test.ts` checks the phase, the cache and the skip on a second load.
 - **An inline entry is inflated once per burst.** `cacheInline` keeps a per-instance map of
   writes in flight; concurrent requests for the same cold file join the first one instead of each
   inflating and racing on the same `cache.put`. The map dies with the worker, which only costs
@@ -746,6 +769,8 @@ The architecture and setup documents predate the code. These are deliberate addi
 - Generated types live in `types/`, not `dist/index.d.ts`.
 - A normalizer script. The design leaves the package's layout to whoever built it; the script
   is how they get the layout the player streams best.
+- The libraries are warmed into the cache before the frame boots on a `Range` host. The design
+  reads every entry on demand; on a high-latency host that made the boot a matter of minutes.
 
 ## Not built yet
 

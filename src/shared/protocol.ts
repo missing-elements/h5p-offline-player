@@ -138,6 +138,32 @@ export interface PrefetchEntry {
   size: number
 }
 
+/** One entry inside a warm span: where its local header is, and what follows it. */
+export interface WarmEntry {
+  name: string
+  /** Offset of the local header in the archive. */
+  offset: number
+  compressedSize: number
+  /** Uncompressed size. */
+  size: number
+  method: number
+}
+
+/**
+ * A run of the archive worth pulling whole before the frame boots: small entries — the libraries'
+ * scripts, styles and JSON, and whatever small files sit between them — that the runtime would
+ * otherwise ask for one by one, at one or two ranged requests each. Named in the `indexed` reply
+ * for a host that honours `Range`; the Jobs worker walks each span in one request and lands every
+ * entry in the cache.
+ */
+export interface WarmSpan {
+  start: number
+  /** Exclusive. */
+  end: number
+  /** In archive order. */
+  entries: WarmEntry[]
+}
+
 export type WorkerReply =
   | { ok: true; type: 'pong'; version: string }
   | {
@@ -147,6 +173,8 @@ export type WorkerReply =
       entryCount: number
       title?: string
       prefetch?: PrefetchEntry[]
+      /** Spans to pull whole before booting. Only for a host that honours `Range`. */
+      warm?: WarmSpan[]
       /** Built from the forward index of an archive still downloading, not its central directory. */
       partial?: boolean
       /** For a partial index: whether everything the runtime needs to boot has arrived. */
@@ -171,6 +199,8 @@ export type FromWorkerMessage =
 export type ToJobsMessage =
   | { type: 'download'; pkgId: string; source: SourceDescriptor }
   | { type: 'extract'; pkgId: string; entry: string; source: SourceDescriptor; file?: File }
+  /** Pulls the spans into the cache. Reports under the reserved entry name `WARM_ENTRY`. */
+  | { type: 'warm'; pkgId: string; source: SourceDescriptor; spans: WarmSpan[] }
   | { type: 'abort'; pkgId: string }
 
 export type FromJobsMessage =

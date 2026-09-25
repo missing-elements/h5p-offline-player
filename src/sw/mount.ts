@@ -150,6 +150,12 @@ class VirtualServer {
             entryCount: reader.entries.size,
             title: reader.title,
             prefetch: reader.prefetchable(),
+            // Only where a read is a round trip. A picked file and a downloaded archive are
+            // local, and their entries are inflated on demand for nothing.
+            warm:
+              reader.handle.descriptor.type === 'range-http' && !reader.partial
+                ? reader.warmSpans()
+                : undefined,
             partial: reader.partial || undefined,
             ready: reader.partial ? reader.bootReady() : undefined
           })

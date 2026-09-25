@@ -91,7 +91,7 @@ Events (all `CustomEvent`, payload in `detail`):
 | `ready` | Runtime initialised, content visible |
 | `xapi` | Any xAPI statement from the content — the only channel for results; nothing is stored |
 | `finished` | Content reported completion / score |
-| `progress` | Download or extraction progress for the current package, `fraction` 0–1 |
+| `progress` | Download, warm-up or extraction progress for the current package, `fraction` 0–1; `phase` is `download`, `libraries`, `warm` or `extract` |
 | `error` | `code`: `no-cors`, `no-worker`, `network`, `quota`, `bad-archive`, `runtime` (content type failed inside the frame, e.g. a library missing from the package). A `runtime` error after `ready` leaves `state` at `ready`: the content threw but is still running, so do not hide the player on it |
 
 ```js
@@ -107,7 +107,7 @@ input.onchange = () => (p.file = input.files[0]);
 
 1. Element connects, registers the worker with scope `<swDir>h5p/` (or finds routes mounted in the page's controller), waits for that registration to become `activated`.
 2. `src` is set: probes it with `GET` + `Range: bytes=0-0`: CORS? `206`? Picks a source adapter and writes its descriptor plus the frame-asset URLs to IndexedDB.
-3. Worker indexes the archive and returns `pkgId`.
+3. Worker indexes the archive and returns `pkgId`. On a host that honours `Range`, the element then has the page-side worker pull the archive's library spans into the cache in a few requests (`progress` events with `phase: 'warm'`), so the boot that follows asks the host for nothing.
 4. Element sets the iframe (`allow="fullscreen"`) to `<scope>frame/<pkgId>`; the worker answers the navigation with the generated frame document, which boots h5p-standalone against `<scope>virtual/<pkgId>`.
 5. Worker serves each file by strategy: small entries from cache, stored media by slicing, deflated media from chunks — a cold entry starts an extraction job in the page-side worker and is served progressively.
 6. xAPI statements arrive as `xapi` events on the element; nothing is stored.

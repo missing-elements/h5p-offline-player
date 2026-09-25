@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 import { configure } from '@zip.js/zip.js'
-import { ARCHIVE_ENTRY, CHUNK_SIZE, INPUT_LIVENESS_MS } from '../shared/constants'
+import { ARCHIVE_ENTRY, CHUNK_SIZE, INPUT_LIVENESS_MS, WARM_ENTRY } from '../shared/constants'
 import { ChunkStore, QuotaError, announceActivity, isQuotaError } from '../shared/chunk-store'
 import { installEvictionPolicy } from '../shared/eviction'
 import { LocalHeaderScanner } from '../shared/forward-index'
@@ -10,12 +10,14 @@ import {
   type ErrorCode,
   type FromJobsMessage,
   type SourceDescriptor,
-  type ToJobsMessage
+  type ToJobsMessage,
+  type WarmSpan
 } from '../shared/protocol'
 import { openSource, type SourceHandle } from '../shared/source'
 import { quotaMessage } from '../shared/storage'
 import { PackageReader } from '../sw/package-reader'
 import { createChunkWriter } from './chunk-writer'
+import { warmPackage } from './warm'
 
 /**
  * The Jobs worker. Everything that takes longer than a Service Worker event is allowed to lives
@@ -97,7 +99,7 @@ scope.addEventListener('message', (event: MessageEvent<ToJobsMessage & { file?: 
 })
 
 async function run(message: Exclude<ToJobsMessage, { type: 'abort' }>): Promise<void> {
-  const entry = message.type === 'extract' ? message.entry : undefined
+  const entry = message.type === 'extract' ? message.entry : message.type === 'warm' ? WARM_ENTRY : undefined
   const key = jobKey(message.pkgId, entry)
 
   if (inFlight.has(key)) return
@@ -111,6 +113,8 @@ async function run(message: Exclude<ToJobsMessage, { type: 'abort' }>): Promise<
     await navigator.locks.request(key, { signal: controller.signal }, async () => {
       if (message.type === 'download') {
         await downloadArchive(message.pkgId, message.source, controller.signal)
+      } else if (message.type === 'warm') {
+        await warmJob(message.pkgId, message.source, message.spans, controller.signal)
       } else {
         await extractEntry(message.pkgId, message.entry, message.source, controller.signal)
       }
@@ -119,7 +123,8 @@ async function run(message: Exclude<ToJobsMessage, { type: 'abort' }>): Promise<
     if (controller.signal.aborted) return
     const code = codeFor(error)
     const text = error instanceof Error ? error.message : String(error)
-    if (entry) await recordFailure(message.pkgId, entry, code, text)
+    // A warm that could not even start is not a failed entry; nothing waits on its record.
+    if (entry && entry !== WARM_ENTRY) await recordFailure(message.pkgId, entry, code, text)
     send({ type: 'failed', pkgId: message.pkgId, entry, code, message: text })
   } finally {
     // Only its own entry: an abort may already have handed the key to a successor.
@@ -242,6 +247,47 @@ async function downloadArchive(
 
   const meta = await store.getArchiveMeta()
   send({ type: 'done', pkgId, size: meta?.size ?? meta?.available ?? 0 })
+}
+
+/* ------------------------------------------------------------------ warming */
+
+/**
+ * Pulls the spans the index named into the cache before the frame boots. `warm.ts` holds the
+ * walk; this is the job around it: the marker that spares a repeat, the handle, the reports.
+ * Whatever stops it short of the end — no room, a host that stops answering, a span that is not
+ * what the index said — the frame boots anyway and the virtual server serves the rest on demand,
+ * so a warm ends in `done` or in an abort, and only a job that could not start ends in `failed`.
+ */
+async function warmJob(
+  pkgId: string,
+  source: SourceDescriptor,
+  spans: WarmSpan[],
+  signal: AbortSignal
+): Promise<void> {
+  const store = new ChunkStore(pkgId)
+  const marker = await store.getWhole(WARM_ENTRY)
+  if (marker) {
+    await marker.body?.cancel()
+    send({ type: 'done', pkgId, entry: WARM_ENTRY, size: 0 })
+    return
+  }
+
+  const handle = await openSource(pkgId, source, files.get(pkgId))
+  let landed = 0
+  try {
+    await warmPackage(handle, spans, store, {
+      signal,
+      onProgress: ({ loaded, total }) => {
+        landed = loaded
+        send({ type: 'progress', pkgId, entry: WARM_ENTRY, loaded, total })
+      }
+    })
+  } catch (error) {
+    if (signal.aborted) return
+    console.warn('[h5p-player] warming stopped early; the rest is served on demand:', error)
+  }
+  if (signal.aborted) return
+  send({ type: 'done', pkgId, entry: WARM_ENTRY, size: landed })
 }
 
 /* ------------------------------------------------------------------ extraction */

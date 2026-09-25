@@ -1,8 +1,8 @@
 import { ZipReader, type Entry, type FileEntry } from '@zip.js/zip.js'
-import { INLINE_MAX_SIZE } from '../shared/constants'
+import { INLINE_MAX_SIZE, WARM_ENTRY_MAX_SIZE, WARM_GAP, WARM_MAX_BYTES } from '../shared/constants'
 import { indexEntryNames, normalizeEntryName } from '../shared/entry-names'
-import { isTextEntry } from '../shared/mime'
-import { PlayerError, type MissingLibraries, type PrefetchEntry } from '../shared/protocol'
+import { isMediaEntry, isTextEntry } from '../shared/mime'
+import { PlayerError, type MissingLibraries, type PrefetchEntry, type WarmEntry, type WarmSpan } from '../shared/protocol'
 import type { SourceHandle } from '../shared/source'
 import { SourceReader } from '../shared/source-reader'
 import type { ByteRange } from '../shared/range'
@@ -396,6 +396,79 @@ export class PackageReader {
     return [...this.entries.values()]
       .filter((entry) => entry.strategy.kind === 'chunked')
       .map((entry) => ({ entry: entry.name, size: entry.size }))
+  }
+
+  /**
+   * The runs of the archive worth pulling whole before the frame boots, in archive order.
+   *
+   * The runtime reads the libraries exhaustively at boot — every `library.json`, script and
+   * stylesheet — and each inline entry costs one or two ranged requests when read on demand. On a
+   * host with half a second of latency that is a minute of round trips for a megabyte of files,
+   * and on one that answers a client's requests one at a time it is two. The archive's layout is
+   * the way out: exporters write a library's files together and the libraries together, so the
+   * entries the boot needs lie in a few contiguous runs, and one request per run lands them all.
+   *
+   * A candidate is a small inline entry that is not media; its bytes end where the next local
+   * header begins, since a zip is contiguous. Candidates closer than `WARM_GAP` share a span, so
+   * a large video between two library folders splits the run and is never pulled. A span with
+   * nothing the boot reads — a cluster of images and no script, style or JSON — is left to
+   * demand, and the total is capped at `WARM_MAX_BYTES`, taking spans in archive order.
+   *
+   * Only for an index read from the central directory: a forward entry has no offset to walk
+   * from, and the archive it came from is local anyway.
+   */
+  warmSpans(): WarmSpan[] {
+    const located = [...this.entries.values()].filter((entry) => entry.zip !== undefined)
+    const offsets = located.map((entry) => entry.zip!.offset).sort((a, b) => a - b)
+    const nextOffset = new Map<number, number>()
+    for (let i = 0; i + 1 < offsets.length; i += 1) nextOffset.set(offsets[i], offsets[i + 1])
+
+    const candidates = located
+      .filter(
+        (entry) =>
+          entry.strategy.kind === 'inline' &&
+          !entry.zip!.encrypted &&
+          (entry.method === STORED || entry.method === DEFLATE) &&
+          entry.compressedSize <= WARM_ENTRY_MAX_SIZE &&
+          !isMediaEntry(entry.name)
+      )
+      .sort((a, b) => a.zip!.offset - b.zip!.offset)
+
+    const spans: WarmSpan[] = []
+    for (const entry of candidates) {
+      const zip = entry.zip!
+      // The central directory's name and extra lengths are the local header's in practice; the
+      // slack covers a local extra field that is longer, for the last entry of the archive,
+      // which has no successor to bound it.
+      const computed =
+        zip.offset + LOCAL_HEADER_FIXED_SIZE + zip.rawFilename.length + zip.rawExtraField.length + entry.compressedSize
+      const end = nextOffset.get(zip.offset) ?? Math.min(this.handle.size, computed + 4096)
+      const record: WarmEntry = {
+        name: entry.name,
+        offset: zip.offset,
+        compressedSize: entry.compressedSize,
+        size: entry.size,
+        method: entry.method
+      }
+      const last = spans[spans.length - 1]
+      if (last && zip.offset - last.end <= WARM_GAP) {
+        last.end = Math.max(last.end, end)
+        last.entries.push(record)
+      } else {
+        spans.push({ start: zip.offset, end, entries: [record] })
+      }
+    }
+
+    const kept: WarmSpan[] = []
+    let budget = WARM_MAX_BYTES
+    for (const span of spans) {
+      if (!span.entries.some((entry) => isTextEntry(entry.name))) continue
+      const length = span.end - span.start
+      if (length > budget) continue
+      budget -= length
+      kept.push(span)
+    }
+    return kept
   }
 
   /**
