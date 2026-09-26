@@ -2,9 +2,9 @@ import { cp, rm } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
 /**
- * Moves the vendored runtime into `dist/frame-assets/`, where the element resolves it with
- * `new URL('./frame-assets/', import.meta.url)`. Hosts whose bundler does not follow that
- * pattern serve `dist/` statically and point `assets-base` at it instead.
+ * Moves the vendored runtime into `dist/frame-assets/`, where the element names each file with
+ * its own `new URL('./frame-assets/<file>', import.meta.url)`. Hosts whose bundler does not
+ * follow that pattern serve `dist/` statically and point `assets-base` at it instead.
  */
 
 const rootDir = resolve(import.meta.dirname, '..')

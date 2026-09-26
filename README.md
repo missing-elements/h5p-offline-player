@@ -34,10 +34,12 @@ import '@missing-elements/h5p-offline-player'
 <h5p-player src="https://host.example/course.h5p" auto-resize></h5p-player>
 ```
 
-That is all. The element finds its worker and runtime files with
-`new URL('./h5p-sw.js', import.meta.url)`, which these bundlers copy into the build and rewrite.
-A bundler that does not follow that pattern, esbuild among them, leaves the files behind: then
-serve the package's `dist/` folder from a static path and set `sw` and `assets-base` to it.
+That is all: nothing to copy, nothing to configure. The element names every file it needs —
+the worker, the two runtime scripts, the stylesheet, each font — with its own
+`new URL('./file', import.meta.url)`, and each file stands alone, so these bundlers emit them as
+hashed assets and rewrite the URLs themselves, in the dev server as in the build. A bundler that
+does not follow that pattern, esbuild among them, leaves the files behind: then serve the
+package's `dist/` folder from a static path and set `sw` and `assets-base` to it.
 
 **B · No build step:**
 
@@ -279,14 +281,16 @@ The player's own code — the element, the two workers, the scripts — is MIT, 
 [LICENSE](LICENSE). The package as published is not MIT alone, and its `license` field says so:
 `(MIT AND GPL-3.0-only)`.
 
-- `dist/frame-assets/` is the H5P core runtime, copied unmodified from
-  [h5p-standalone](https://github.com/tunapanda/h5p-standalone). h5p-standalone's own code is
+- `dist/frame-assets/` is the H5P core runtime from
+  [h5p-standalone](https://github.com/tunapanda/h5p-standalone): the scripts unmodified, the
+  stylesheet rebuilt so that it stands alone. h5p-standalone's own code is
   MIT, but its `frame.bundle.js`, stylesheet and icon fonts come from
   [h5p-php-library](https://github.com/h5p/h5p-php-library), which is **GPL-3.0**; upstream
   confirms it in [issue #188](https://github.com/tunapanda/h5p-standalone/issues/188) while
   its npm metadata still says MIT. The directory carries its own `LICENSE.txt` and `NOTICE.txt`.
   Keep them with it when you copy or serve it: a site serving these files is distributing GPL
-  code. Whether the copyleft reaches the page around the player is a legal question, not one
+  code. A bundler emits the runtime files without the text files beside them, so `h5p.css`
+  carries a notice comment of its own that names the licence. Whether the copyleft reaches the page around the player is a legal question, not one
   this README answers.
 - The two Service Worker scripts in `dist/`, `h5p-sw.js` and `h5p-sw-mount.js`, bundle [zip.js](https://github.com/gildas-lormeau/zip.js)
   (BSD-3-Clause). Minification strips its notice from the files, so

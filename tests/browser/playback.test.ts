@@ -138,6 +138,19 @@ describe('playing a package', () => {
     expect(frame.defaultView!.getComputedStyle(frame.documentElement).fontFamily).toBe('sans-serif')
   })
 
+  it('declares the text faces itself and loads one on demand, past the frame CSP', async () => {
+    const player = await play(FIXTURES.basic)
+    const frame = frameDocument(player)
+
+    // The faces are out of the core sheet so that a bundler can emit each file; the document
+    // declares them against the URLs the element resolved. Nothing is fetched until a face is
+    // used, so load one the way a theme would, and check the browser got it.
+    const faces = [...frame.fonts].filter((face) => face.family.replace(/["']/g, '') === 'Inter')
+    expect(faces).toHaveLength(6)
+    const loaded = await frame.fonts.load('600 16px Inter')
+    expect(loaded.map((face) => `${face.weight} ${face.style}`)).toEqual(['600 normal'])
+  })
+
   it('reports a content height over H5P\'s own resizer protocol', async () => {
     const player = createPlayer()
     player.style.height = '600px'

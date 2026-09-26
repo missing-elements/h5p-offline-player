@@ -125,7 +125,7 @@ Distributed as one npm package, `@missing-elements/h5p-offline-player`. Componen
 ```
 dist/h5p-player.js     <h5p-player> element + embedded Jobs worker — plays a package, nothing else
 dist/h5p-sw.js         standalone Service Worker (self-contained IIFE)
-dist/frame-assets/     main.bundle.js, frame.bundle.js, h5p.css, fonts — referenced via new URL(…, import.meta.url)
+dist/frame-assets/     main.bundle.js, frame.bundle.js, h5p.css, fonts/*.woff2 — each referenced by its own new URL(…, import.meta.url)
 dist/index.d.ts        types for the element, its events and mountH5P
 sw/index.js            mountH5P(self) — optional, for hosts that enforce a single worker
 ```

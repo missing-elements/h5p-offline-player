@@ -24,7 +24,11 @@ import '@missing-elements/h5p-offline-player';
 <h5p-player src="https://host.example/course.h5p"></h5p-player>
 ```
 
-That's all — setting `src` loads and plays. The element registers the worker via `new URL('./h5p-sw.js', import.meta.url)` and resolves the frame assets the same way; Vite (build and dev), Rollup and webpack 5 emit them as hashed assets and rewrite the URLs. The same pattern is used in production by `pdfjs-viewer-element`.
+That's all — setting `src` loads and plays. Nothing is copied and nothing is configured. The element names every file it needs with its own `new URL('./file', import.meta.url)`: the worker, `frame-assets/main.bundle.js`, `frame-assets/frame.bundle.js`, `frame-assets/h5p.css` and each of the twelve text fonts under `frame-assets/fonts/`. Each file stands alone — the stylesheet carries its icon fonts and images inlined, and the frame declares the text fonts against the URLs the element resolved — so Vite (build and dev), Rollup and webpack 5 emit them as hashed assets wherever they like and rewrite the URLs. The same pattern is used in production by `pdfjs-viewer-element`. Verified against a fresh Vite 6 app (dev server and build) and a fresh webpack 5 app with no configuration beyond the entry.
+
+The Vite dev server needs one thing done on its behalf: it pre-bundles dependencies into `node_modules/.vite/deps/`, which rewrites those URLs to files that were never put there. The element recognises that directory and falls back to the package's own copy under `node_modules/@missing-elements/h5p-offline-player/dist/`, which Vite serves. If your layout puts the package somewhere Vite does not serve — a monorepo that hoists it above the app's root — add it to `optimizeDeps.exclude`, or set `sw` and `assets-base` as below.
+
+With webpack, a `module.rules` entry that matches `.css` or `.js` everywhere also matches these files, which webpack loads as `new URL` assets; give such rules `dependency: { not: ['url'] }` so they leave the assets alone.
 
 Bundlers that do not analyse `new URL(…, import.meta.url)` — esbuild among them — leave the files behind and the worker 404s. Serve the package `dist` folder from a static path (or use the CDN) and point the element at it:
 
@@ -117,8 +121,9 @@ input.onchange = () => (p.file = input.files[0]);
 The player's code is MIT. `dist/frame-assets/` is not: it is the H5P core runtime, which is
 GPL-3.0, and the package's `license` field reads `(MIT AND GPL-3.0-only)` for that reason. The
 directory carries a `LICENSE.txt` and a `NOTICE.txt` naming what is in it and where it came from.
-With a bundler (Setup A) they travel with the directory; when you copy `dist/` by hand, copy them
-too; with the CDN (Setup B) they are served from there. A site that serves the runtime to browsers
+With a bundler (Setup A) the runtime files are emitted without them, so `h5p.css` opens with a
+comment naming the GPL and pointing at the package's `NOTICE.md`; when you copy `dist/` by hand,
+copy them too; with the CDN (Setup B) they are served from there. A site that serves the runtime to browsers
 is distributing GPL code, so keep the notices reachable. The full account, including zip.js's
 BSD notice, is `NOTICE.md` in the package.
 

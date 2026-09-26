@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   buildContentSecurityPolicy,
   buildFrameDocument,
-  createNonce
+  createNonce,
+  fontFaceRules
 } from '../../src/sw/frame-document'
 
 const PKG = 'b'.repeat(32)
@@ -13,7 +14,7 @@ const options = {
   assets: {
     mainJs: 'https://site.example/frame-assets/main.bundle.js',
     frameJs: 'https://site.example/frame-assets/frame.bundle.js',
-    frameCss: 'https://site.example/frame-assets/styles/h5p.css'
+    frameCss: 'https://site.example/frame-assets/h5p.css'
   },
   nonce: 'deadbeef',
   title: 'A course'
@@ -32,7 +33,7 @@ describe('buildContentSecurityPolicy', () => {
       assets: {
         mainJs: 'https://cdn.example/dist/main.bundle.js',
         frameJs: 'https://cdn.example/dist/frame.bundle.js',
-        frameCss: 'https://cdn.example/dist/styles/h5p.css'
+        frameCss: 'https://cdn.example/dist/frame-assets/h5p.css'
       }
     })
     expect(csp).toContain('https://cdn.example')
@@ -213,6 +214,44 @@ describe('allow-origins', () => {
   it('does not repeat a host given twice', () => {
     const csp = withOrigins(['a.example', 'a.example'])
     expect(csp.match(/a\.example/g)).toHaveLength(4)
+  })
+})
+
+describe('the text faces', () => {
+  const inter = { family: 'Inter', style: 'normal', weight: '400', url: 'https://cdn.example/assets/inter-400-Ab12.woff2' }
+
+  it('declares each face against the URL the element resolved, wherever a bundler put it', () => {
+    const html = buildFrameDocument({ ...options, assets: { ...options.assets, fonts: [inter] } })
+    expect(html).toContain(
+      `@font-face { font-display: swap; font-family: 'Inter'; font-style: normal; font-weight: 400; src: url("${inter.url}") format('woff2'); }`
+    )
+  })
+
+  it('allows the fonts origin, which may differ from the scripts when a bundler splits them', () => {
+    const csp = buildContentSecurityPolicy({ ...options, assets: { ...options.assets, fonts: [inter] } })
+    expect(csp).toMatch(/font-src[^;]*https:\/\/cdn\.example/)
+  })
+
+  it('declares nothing for a record an older element wrote, whose stylesheet declares them', () => {
+    expect(fontFaceRules(undefined)).toBe('')
+    expect(buildFrameDocument(options)).not.toContain('@font-face')
+  })
+
+  it('drops a face that does not have the shape the sync script writes', () => {
+    const rules = fontFaceRules([
+      { ...inter, family: "Inter'; } body { display: none" },
+      { ...inter, style: 'oblique 10deg' },
+      { ...inter, weight: 'bold' },
+      { ...inter, url: 'javascript:alert(1)' },
+      { ...inter, url: 'not a url' }
+    ])
+    expect(rules).toBe('')
+  })
+
+  it('keeps a URL inside its quotes and the style block, because a parsed href is percent-encoded', () => {
+    const rules = fontFaceRules([{ ...inter, url: 'https://cdn.example/a"b</style><script>x.woff2' }])
+    expect(rules).not.toContain('</style>')
+    expect(rules).toContain('url("https://cdn.example/a%22b%3C/style%3E%3Cscript%3Ex.woff2")')
   })
 })
 

@@ -83,8 +83,20 @@ export interface FrameAssets {
   mainJs: string
   /** h5p-standalone `frame.bundle.js` — h5p.js, jQuery and the core runtime. */
   frameJs: string
-  /** h5p-standalone `styles/h5p.css`. */
+  /** h5p-standalone `styles/h5p.css`, rebuilt to stand alone: icon fonts and images inlined. */
   frameCss: string
+  /**
+   * The text faces taken out of that sheet, which the frame document declares itself. Absent
+   * from a record an older element wrote, whose `frameCss` still declares them.
+   */
+  fonts?: FrameFont[]
+}
+
+export interface FrameFont {
+  family: string
+  style: string
+  weight: string
+  url: string
 }
 
 export type ErrorCode =

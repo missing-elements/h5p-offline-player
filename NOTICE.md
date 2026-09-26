@@ -48,15 +48,17 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ## The H5P runtime in `dist/frame-assets/` — GPL-3.0
 
-`dist/frame-assets/` is the runtime the element loads inside its frame, copied unmodified from
-[h5p-standalone](https://github.com/tunapanda/h5p-standalone) 3.8.2. h5p-standalone's own
+`dist/frame-assets/` is the runtime the element loads inside its frame, taken from
+[h5p-standalone](https://github.com/tunapanda/h5p-standalone) 3.8.2: the scripts unmodified, the
+stylesheet rebuilt into `h5p.css` with its icon fonts and image inlined as data URLs and its
+Inter and Open Sans faces moved to `fonts/`, declared by the frame document instead. h5p-standalone's own
 code is MIT (Copyright (c) 2015 Tunapanda), but `frame.bundle.js` is built from the H5P core
 scripts in its `vendor/h5p/js/` — `h5p.js`, `h5p-event-dispatcher.js`, `h5p-x-api.js`,
 `h5p-x-api-event.js`, `h5p-content-type.js`, `h5p-confirmation-dialog.js`, `request-queue.js`,
 `h5p-action-bar.js`, `h5p-tooltip.js` — which come from
 [h5p/h5p-php-library](https://github.com/h5p/h5p-php-library), licensed under the
-**GNU General Public License v3.0**. The core stylesheet (`styles/h5p.css`, `styles/h5p-fonts.css`),
-the `h5p-*` icon fonts and `images/` come from the same repository. Upstream confirmed this in
+**GNU General Public License v3.0**. The core stylesheet (`h5p.css`), the `h5p-*` icon fonts and the
+throbber image inlined in it come from the same repository. Upstream confirmed this in
 [tunapanda/h5p-standalone#188](https://github.com/tunapanda/h5p-standalone/issues/188); its npm
 metadata still says MIT.
 
@@ -71,8 +73,12 @@ Also inside `dist/frame-assets/`:
 - jQuery 3.5.1, in `frame.bundle.js` — MIT, Copyright JS Foundation and other contributors,
   <https://jquery.org/license>.
 - regenerator-runtime, in `main.bundle.js` — MIT, see `main.bundle.js.LICENSE.txt`.
-- Inter, `fonts/inter/` — SIL Open Font License 1.1, see `fonts/inter/LICENSE.txt`.
-- Open Sans, `fonts/open-sans/` — SIL Open Font License 1.1, see `fonts/open-sans/OFL.txt`.
+- Inter, `fonts/inter-*.woff2` — SIL Open Font License 1.1, see `fonts/Inter-LICENSE.txt`.
+- Open Sans, `fonts/open-sans-*.woff2` — SIL Open Font License 1.1, see `fonts/OpenSans-OFL.txt`.
+
+With a bundler (Setup A) the runtime files are emitted under hashed names and the text
+files beside them do not travel; `h5p.css` therefore opens with a `/*! … */` comment naming
+the GPL and pointing here, which bundlers leave in an emitted asset.
 
 ## What this means for a site
 

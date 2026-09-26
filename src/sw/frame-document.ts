@@ -1,5 +1,5 @@
 import bootSource from 'virtual:h5p-frame-boot'
-import type { FrameAssets } from '../shared/protocol'
+import type { FrameAssets, FrameFont } from '../shared/protocol'
 
 /**
  * The frame document, generated per request. H5P core assumes it owns the page — it plants
@@ -85,7 +85,8 @@ function escapeHtml(value: string): string {
 /** Origins that appear in a CSP directive, deduplicated. `'self'` covers same-origin assets. */
 function assetOrigins(assets: FrameAssets, base: string): string[] {
   const origins = new Set<string>()
-  for (const url of Object.values(assets)) {
+  const urls = [assets.mainJs, assets.frameJs, assets.frameCss, ...(assets.fonts ?? []).map((font) => font.url)]
+  for (const url of urls) {
     try {
       const origin = new URL(url, base).origin
       if (origin !== new URL(base).origin) origins.add(origin)
@@ -94,6 +95,36 @@ function assetOrigins(assets: FrameAssets, base: string): string[] {
     }
   }
   return [...origins]
+}
+
+/**
+ * The `@font-face` rules for the text faces `sync-h5p-assets.mjs` took out of the core sheet, so
+ * that each face is its own file a bundler can emit and the browser fetches only the ones in use.
+ * The values arrive through IndexedDB, so each is held to the shape the sync script writes and a
+ * face that does not fit is left out rather than escaped: a URL is reparsed and must be http(s),
+ * and a parsed URL's `href` has `"`, `<` and whitespace percent-encoded, so it cannot leave the
+ * quoted `url()` or the `<style>` block.
+ */
+export function fontFaceRules(fonts: readonly FrameFont[] | undefined): string {
+  if (!fonts) return ''
+  return fonts
+    .flatMap(({ family, style, weight, url }) => {
+      if (!/^[A-Za-z][A-Za-z0-9 -]*$/.test(family) || !/^(normal|italic)$/.test(style) || !/^\d{3}$/.test(weight)) {
+        return []
+      }
+      let href: string
+      try {
+        const parsed = new URL(url)
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return []
+        href = parsed.href
+      } catch {
+        return []
+      }
+      return [
+        `  @font-face { font-display: swap; font-family: '${family}'; font-style: ${style}; font-weight: ${weight}; src: url("${href}") format('woff2'); }`
+      ]
+    })
+    .join('\n')
 }
 
 export function buildContentSecurityPolicy(options: FrameDocumentOptions): string {
@@ -162,6 +193,8 @@ export function buildFrameDocument(options: FrameDocumentOptions): string {
     frameCss: assets.frameCss
   }).replaceAll('<', '\\u003c')
 
+  const fontFaces = fontFaceRules(assets.fonts)
+
   // The last rule in the style block is for H5P.Video's YouTube handler, which pins its iframe
   // over the 16:9 box it builds with one line that reaches into the YouTube API object's minified
   // internals (`player.g.style = …`). The field it names changed, so up to H5P.Video 1.6.66 the
@@ -179,6 +212,7 @@ export function buildFrameDocument(options: FrameDocumentOptions): string {
   body { overflow-x: hidden; }
   #h5p-root { width: 100%; }
   .h5p-video.h5p-youtube iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+${fontFaces}
 </style>
 </head>
 <body>

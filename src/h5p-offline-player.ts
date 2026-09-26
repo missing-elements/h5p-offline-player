@@ -1,5 +1,6 @@
 import jobsWorkerSource from 'virtual:h5p-jobs-worker'
 import SHADOW_CSS from './shadow.css?inline'
+import { FRAME_FONTS } from './frame-fonts'
 import { VERSION, WARM_ENTRY } from './shared/constants'
 import {
   HUB_CONTENT_TYPE_URL,
@@ -34,25 +35,64 @@ import { routesFor, type Routes } from './sw/routes'
  * was in flight for the previous package and starts over.
  */
 
-/** Frame assets ship next to this module. See the note in `vite.config.ts` about `@vite-ignore`. */
+/** In dev the runtime is served from `public/frame-assets/`, the same flat layout as `dist/`. */
 const DEV_ASSETS_BASE = '/frame-assets/'
 
-// `@vite-ignore` matters in dev and in a consuming app alike: in dev the file is served by the
-// plugin in `vite.config.ts` and Vite must not try to resolve it at transform time; in a build,
-// Vite, Rollup and webpack 5 recognise this exact shape and emit the file as an asset with the
-// URL rewritten.
-const DEFAULT_SW_URL = new URL(/* @vite-ignore */ './h5p-sw.js', import.meta.url).href
-
-const DEFAULT_ASSETS_BASE = import.meta.env.DEV
-  ? new URL(DEV_ASSETS_BASE, location.href).href
-  : new URL(/* @vite-ignore */ './frame-assets/', import.meta.url).href
-
-/** File names inside the vendored h5p-standalone `dist`, relative to the assets base. */
+/** File names inside `frame-assets/`, relative to the assets base. */
 const ASSET_FILES = {
   mainJs: 'main.bundle.js',
   frameJs: 'frame.bundle.js',
-  frameCss: 'styles/h5p.css'
+  frameCss: 'h5p.css'
 } as const
+
+// Every file the element needs is named here, one static `new URL('./file', import.meta.url)`
+// each, so that Vite, Rollup and webpack 5 in a consuming app emit it as an asset and rewrite the
+// URL — nothing for the host to copy. A directory cannot be emitted that way, which is why the
+// runtime is not addressed as `./frame-assets/` plus a name, and why each file stands alone:
+// `h5p.css` carries its fonts and images inlined (see `sync-h5p-assets.mjs`).
+//
+// `@vite-ignore` matters in dev and in a consuming app alike: in dev the worker is served by the
+// plugin in `vite.plugins.ts` and Vite must not try to resolve the file at transform time. The
+// comment does not survive the minifying pass in `build-workers.mjs`, and a consumer does not
+// need it: there the files exist beside the module.
+//
+// One consumer needs help: Vite's dev server pre-bundles dependencies into
+// `node_modules/.vite/deps/`, rewriting each of these URLs to a file that was never put there.
+// The package's own copy is still served at its real path, so a URL that landed in the
+// pre-bundle directory is pointed back at it. A Vite build, Rollup and webpack never produce
+// such a URL, and neither does Vite with the package in `optimizeDeps.exclude`.
+const VITE_DEPS = '/node_modules/.vite/deps/'
+const PACKAGE_DIST = '/node_modules/@missing-elements/h5p-offline-player/dist/'
+
+function unbundled(href: string): string {
+  const url = new URL(href)
+  const at = url.pathname.indexOf(VITE_DEPS)
+  if (at < 0) return href
+  url.pathname = url.pathname.slice(0, at) + PACKAGE_DIST + url.pathname.slice(at + VITE_DEPS.length)
+  url.search = ''
+  return url.href
+}
+
+const DEFAULT_SW_URL = unbundled(new URL(/* @vite-ignore */ './h5p-sw.js', import.meta.url).href)
+
+/** The runtime inside a directory: the dev server's, or the one an `assets-base` names. */
+function assetsIn(base: string): FrameAssets {
+  return {
+    mainJs: new URL(ASSET_FILES.mainJs, base).href,
+    frameJs: new URL(ASSET_FILES.frameJs, base).href,
+    frameCss: new URL(ASSET_FILES.frameCss, base).href,
+    fonts: FRAME_FONTS.map(({ family, style, weight, file }) => ({ family, style, weight, url: new URL(`fonts/${file}`, base).href }))
+  }
+}
+
+const DEFAULT_ASSETS: FrameAssets = import.meta.env.DEV
+  ? assetsIn(new URL(DEV_ASSETS_BASE, location.href).href)
+  : {
+      mainJs: unbundled(new URL(/* @vite-ignore */ './frame-assets/main.bundle.js', import.meta.url).href),
+      frameJs: unbundled(new URL(/* @vite-ignore */ './frame-assets/frame.bundle.js', import.meta.url).href),
+      frameCss: unbundled(new URL(/* @vite-ignore */ './frame-assets/h5p.css', import.meta.url).href),
+      fonts: FRAME_FONTS.map(({ family, style, weight, packaged }) => ({ family, style, weight, url: unbundled(packaged) }))
+    }
 
 export type PlayerState = 'idle' | 'probing' | 'downloading' | 'indexing' | 'ready' | 'error'
 
@@ -497,14 +537,10 @@ export class H5PPlayerElement extends HTMLElement {
 
   private frameAssets(): FrameAssets {
     const raw = this.getAttribute('assets-base')?.trim()
-    const base = raw ? new URL(raw.endsWith('/') ? raw : `${raw}/`, location.href).href : DEFAULT_ASSETS_BASE
-
-    return {
-      mainJs: new URL(ASSET_FILES.mainJs, base).href,
-      frameJs: new URL(ASSET_FILES.frameJs, base).href,
-      frameCss: new URL(ASSET_FILES.frameCss, base).href
-    }
+    if (!raw) return DEFAULT_ASSETS
+    return assetsIn(new URL(raw.endsWith('/') ? raw : `${raw}/`, location.href).href)
   }
+
 
   /** Runs the pre-play download for a host that does not honour `Range`, reporting progress. */
   private runDownload(
