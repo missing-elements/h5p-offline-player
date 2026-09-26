@@ -934,3 +934,27 @@ fix exists — `npm run normalize` stores the video, after which the media eleme
 and the same boot pulled 1.4 MB instead of 81 — and because it is not yet known how often the
 player is handed a deflated video nobody can normalize: the h5p.com export analysed above stored
 everything, while this one and the sodix.de one deflated everything.
+
+**Offline app shell (PWA).** Raised on 2026-09-26 by tunapanda/h5p-standalone's "local
+standalone player" issue: a teacher hands out `.h5p` files, a student plays them later with no
+connection, without installing XAMPP or nginx. Playing a picked file already needs no network —
+the element reads the `File` and the Service Worker serves entries from it. What still needs one
+is the player itself: the page, the element, the worker, `frame-assets/` and the fonts. The
+design:
+
+- A web app manifest, so the player installs to the desktop or home screen and opens as a window.
+- One worker, not two. The app's worker precaches the shell and calls `mountH5P(self)` first.
+  A separate app-shell worker at `/` beside ours does **not** work offline: the frame is
+  controlled by our worker (scope `…/h5p/`), and `mount.ts` passes every request outside its
+  routes to the network, so the frame's requests for `h5p.css`, `frame.bundle.js` and the fonts
+  never reach the shell's cache. The single-worker setup already exists for other reasons;
+  this is the first case that needs it.
+- `navigator.storage.persist()` once installed, so the shell and the chunk store are not evicted.
+  Safari may still clear an app left unused for weeks.
+
+What it would not cover. The file is picked again on every visit — a `File` cannot be stored,
+and persistent file handles are out of scope — though the chunk store keeps what was extracted.
+A package without its own libraries needs `libraries="hub"`, which fetches over the network on
+first use; offline it would need the bundle precached, or a probe that falls back to the cached
+copy. How the probe behaves offline has not been checked. The natural home is the demo site
+(`vite.demo.config.ts`), which would become the installable player.
