@@ -958,3 +958,31 @@ A package without its own libraries needs `libraries="hub"`, which fetches over 
 first use; offline it would need the bundle precached, or a probe that falls back to the cached
 copy. How the probe behaves offline has not been checked. The natural home is the demo site
 (`vite.demo.config.ts`), which would become the installable player.
+
+**Version proof on xAPI statements.** Raised on 2026-09-26 from a compliance-training
+perspective: in regulated training the completion record is the audit trail, so it has to land
+in an LRS the organisation controls — already the case, since xAPI is emitted as events and
+stored nowhere — and it has to prove *which version* of the `.h5p` each learner completed.
+Nothing proves that today. `remotePkgId` hashes the URL plus the host's `ETag` or
+`Last-Modified` when one is sent, so it moves when a well-behaved host's file changes, but it
+names no content and appears in no statement; `filePkgId` is name, size and mtime. The design:
+a content hash attached to every statement, as a `context.extensions` value under an IRI of
+ours, which the element adds before emitting `xapi` and `finished`. Hashing the whole archive
+means reading it all, which a range-read package never does; the central directory is already
+read at index time, is a few kilobytes, and changes with any entry's CRC, size or name, so a
+hash of it — computed in the Service Worker, returned on the `indexed` reply — identifies the
+content at no extra cost. Worth deciding with it: whether the extension also carries the source
+URL and the player version, and how a host reads the hash for its own records (a property on
+the element, beside `pkgId`).
+
+**Accessibility statement.** Raised in the same comment: Section 508 conformance is judged on
+the whole package, the player and the H5P content types together, and a content type that traps
+keyboard focus is a non-starter for compliance audiences. The player's own surface is small —
+the element renders one iframe and no controls — so the work is a keyboard-only and
+screen-reader pass and a page stating what the player handles and what depends on the content
+type. Known candidates on the player's side: the iframe's `title` is a fixed "H5P content"
+(`h5p-offline-player.ts`) where the package's own title, which `h5p.json` carries, would say
+something; focus moving into and out of the frame; keyboard access in and out of fullscreen;
+and whether an `error` reaches assistive technology, which today it does only if the host page
+renders it. The content-type side is H5P's own per-type accessibility list, to be linked rather
+than restated.
