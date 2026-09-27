@@ -12,8 +12,9 @@ not. This file says which is which.
 ## zip.js — BSD-3-Clause
 
 The two Service Worker scripts in `dist/`, `h5p-sw.js` and `h5p-sw-mount.js`, bundle [zip.js](https://github.com/gildas-lormeau/zip.js) as the
-archive reader. They are minified with legal comments removed, so its notice does not survive
-into the files themselves and is reproduced here instead, as its licence requires:
+archive reader. They are minified with the notices inside zip.js's sources removed, and each
+file opens instead with a `/*! … */` comment carrying the licence below in full — so it travels
+with the file when a bundler emits it on its own. It is reproduced here as well:
 
 ```
 BSD 3-Clause License

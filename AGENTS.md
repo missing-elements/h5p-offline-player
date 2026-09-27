@@ -853,8 +853,16 @@ changed its metadata. Three things follow:
   revision. Bumping h5p-standalone regenerates them and means re-reading `NOTICE.md`; do not
   hand-edit anything under `public/frame-assets/`.
 - Both worker bundles and the minified element are built with `legalComments: 'none'`, so the
-  zip.js BSD-3-Clause notice does not survive into `dist/`. `NOTICE.md` reproduces it, which is
-  what its clause 2 asks for. A new dependency that ends up in a bundle means a new entry there.
+  notices inside the bundled sources do not survive. What a user ships has to carry its notices
+  *in the file*, because a bundler emits each file on its own and nothing from the package root
+  goes with it — found by a user's 0.1.5 build, which had the GPL runtime and zip.js with no
+  notice anywhere. So every shipped file with third-party code opens with a `/*! … */` header:
+  the two workers carry zip.js's BSD-3-Clause licence in full (`zipJsNotice` in
+  `scripts/lib/worker-bundle.mjs`, read from the installed package; its clause 2 asks for the
+  whole text), and `frame.bundle.js`, `main.bundle.js` and `h5p.css` name their licences and the
+  corresponding source (`sync-h5p-assets.mjs`). `NOTICE.md` reproduces all of it for anyone
+  reading the package. A new dependency that ends up in a bundle means a new header and a new
+  entry there.
 - The demo site serves the same directory, so the same files are on it, and `index.html`'s
   JSON-LD names both licences.
 
