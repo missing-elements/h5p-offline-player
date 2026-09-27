@@ -994,3 +994,36 @@ something; focus moving into and out of the frame; keyboard access in and out of
 and whether an `error` reaches assistive technology, which today it does only if the host page
 renders it. The content-type side is H5P's own per-type accessibility list, to be linked rather
 than restated.
+
+**Save and resume.** Raised on 2026-09-28 comparing the player with Lumi, whose server stores
+learner state so a learner comes back where they left off; here a reload starts over. Listed as
+out of scope for v1 above, but the plumbing is already in the runtime. h5p-standalone 3.8.2
+takes `saveFreq`, `contentUserData` and `ajax.contentUserDataUrl`, and H5P core, given a
+`saveFreq`, posts each instance's `getCurrentState()` every `saveFreq` seconds through
+`setUserData(…, 'state', …)` — `data`, `preload` and `invalidate` fields to the `contentUserData`
+URL — and hands preloaded `contentUserData` to the instance as its `previousState`. The frame sets
+`saveFreq: false` today (`frame-boot.ts`). The design:
+
+- The Service Worker answers a `…/h5p/userdata/<pkgId>/…` route with the URL's content id, data
+  type and sub-content id, and writes the posted state to a `userdata` table in IndexedDB —
+  its own store, never evicted with the chunk caches, since it is small and not reproducible.
+- The frame document is built by the worker, which can read that table, so the saved state rides
+  in the boot configuration as `contentUserData` and no request is needed at boot.
+- The state is keyed by the package's content, not its source: the central-directory hash from
+  *Version proof* above. State written against one version of a package must not be handed to
+  another; H5P core appears to have its own answer for that — a `RESET` state and a "content
+  changed, starting over" dialog, found in `frame.bundle.js` and not yet traced — which a hash
+  mismatch could feed, rather than silently dropping the state.
+- Off by default, behind a `resume` attribute. A browser is not a learner: on a shared machine,
+  state left by one student would be picked up by the next. The element gets a way to clear it
+  (`clearUserData()`), and a host that knows its users should key state by them.
+- A host with its own backend takes the state over instead: a `userdata` event with the data
+  type, sub-content id and payload on every save, and a property to hand the state back in
+  before load. With those the worker stores nothing, and the LRS-owning organisations from
+  *Version proof* keep resume state beside their records.
+
+Not covered: `setFinished` (h5p-standalone's `setFinishedUrl`), which H5P posts on completion
+and which xAPI's `completed` already carries; and sub-content that saves outside `state`, which
+the route should accept and store by data type without interpreting it. Confirm against a real
+Interactive Video and Course Presentation that the state round-trips, and trace the reset path,
+before building on either.
