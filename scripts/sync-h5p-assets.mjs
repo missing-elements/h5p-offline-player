@@ -7,8 +7,8 @@ import { build } from 'esbuild'
  * browser tests serve it from, and stamps the package version into `src/shared/constants.ts` so
  * the element and the Service Worker can tell each other apart at runtime.
  *
- * The runtime scripts are copied unmodified. The player synthesizes the document they run in; it
- * does not patch H5P itself.
+ * The runtime scripts' code is copied unmodified; each only gains a leading licence comment (see
+ * below). The player synthesizes the document they run in; it does not patch H5P itself.
  *
  * Every file in the directory stands alone, because the element names each one with its own
  * `new URL('./frame-assets/<file>', import.meta.url)` and a consumer's bundler emits each under a
@@ -67,13 +67,31 @@ await rm(targetDir, { recursive: true, force: true })
 await mkdir(targetDir, { recursive: true })
 
 // `main.bundle.js` walks the package's dependencies; `frame.bundle.js` is h5p.js, jQuery and the
-// core runtime. The third file is webpack's notice for what it left out of `main.bundle.js`.
-const files = ['main.bundle.js', 'frame.bundle.js', 'main.bundle.js.LICENSE.txt']
+// core runtime. Each is given a `/*! … */` header naming its licences, because a consumer's
+// bundler emits each file on its own under a hashed name and none of the text files in this
+// directory travel with it — a user's build of 0.1.5 shipped `frame.bundle-*.js`, the GPL file,
+// with no notice at all, and `main.bundle-*.js` pointing at a `main.bundle.js.LICENSE.txt` that
+// was never emitted. Bundlers keep a `/*!` comment in an asset they emit as is, and webpack's
+// Terser, which minifies emitted `.js` assets too, moves it into a `.LICENSE.txt` it does ship.
+// The pointer webpack left in `main.bundle.js` is replaced by the notice it pointed at, so that
+// file is not shipped. Nothing after the first line changes.
+const corresponding = `https://github.com/tunapanda/h5p-standalone/tree/v${standaloneVersion}`
+const headers = {
+  'frame.bundle.js': `/*! H5P core runtime (h5p.js and its companions) from h5p/h5p-php-library, GPL-3.0-only (https://github.com/h5p/h5p-php-library). jQuery 3.5.1, MIT (https://jquery.org/license). h5p-standalone ${standaloneVersion}, MIT, Copyright (c) 2015 Tunapanda. Corresponding source: ${corresponding}. See NOTICE.md in @missing-elements/h5p-offline-player. */`,
+  'main.bundle.js': `/*! h5p-standalone ${standaloneVersion}, MIT, Copyright (c) 2015 Tunapanda (${corresponding}). See NOTICE.md in @missing-elements/h5p-offline-player. */`
+}
+const WEBPACK_POINTER = '/*! For license information please see main.bundle.js.LICENSE.txt */\n'
 
-for (const file of files) {
+for (const [file, header] of Object.entries(headers)) {
   const source = resolve(standaloneDir, file)
   if (!(await exists(source))) fail(`Required runtime file missing: ${source}`)
-  await cp(source, resolve(targetDir, file))
+  let code = await readFile(source, 'utf8')
+  if (file === 'main.bundle.js') {
+    if (!code.startsWith(WEBPACK_POINTER)) fail(`${source} no longer starts with webpack's licence pointer`)
+    const pointed = (await readFile(resolve(standaloneDir, 'main.bundle.js.LICENSE.txt'), 'utf8')).trim()
+    code = `${pointed}\n${code.slice(WEBPACK_POINTER.length)}`
+  }
+  await writeFile(resolve(targetDir, file), `${header}\n${code}`, 'utf8')
 }
 
 // `styles/h5p.css` is the stylesheet the runtime loads; `h5p-fonts.css` beside it repeats its
@@ -182,7 +200,8 @@ function frameAssetsNotice(standalone, player) {
 
 These files are the H5P runtime that <h5p-player> loads inside its frame. They were copied
 from h5p-standalone ${standalone} (https://github.com/tunapanda/h5p-standalone,
-tag v${standalone}) by @missing-elements/h5p-offline-player ${player}: the scripts unmodified,
+tag v${standalone}) by @missing-elements/h5p-offline-player ${player}: the scripts' code
+unmodified, each given a leading licence comment,
 the stylesheet rebuilt so that it stands alone: its icon fonts and images inlined as data URLs,
 its Inter and Open Sans faces moved to fonts/ and declared by the frame document instead. They are NOT covered by
 that package's MIT licence. Keep this file and LICENSE.txt beside them when you copy or serve
@@ -205,7 +224,7 @@ fonts/open-sans-* Open Sans, SIL Open Font License 1.1 -- fonts/OpenSans-OFL.txt
 
 main.bundle.js
   - h5p-standalone. MIT, Copyright (c) 2015 Tunapanda. Includes regenerator-runtime (MIT),
-    see main.bundle.js.LICENSE.txt.
+    named in its own leading comment.
 
 Corresponding source for the GPL parts as built:
 https://github.com/tunapanda/h5p-standalone/tree/v${standalone} (src/ and vendor/h5p/).

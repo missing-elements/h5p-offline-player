@@ -636,7 +636,7 @@ Three artefacts, built three different ways, because they are consumed three dif
 | `dist/h5p-player.js` | Vite library build | An ES module the host imports |
 | `dist/h5p-sw.js` | esbuild, IIFE | Registered by URL; has to run on a site with no build step |
 | `dist/h5p-sw-mount.js` | esbuild, ESM | For hosts that enforce one worker per origin |
-| `dist/frame-assets/` | `sync-h5p-assets.mjs`, then copied | h5p-standalone's scripts unmodified; its stylesheet rebuilt to stand alone |
+| `dist/frame-assets/` | `sync-h5p-assets.mjs`, then copied | h5p-standalone's scripts unmodified but for a licence header; its stylesheet rebuilt to stand alone |
 | `dist-demo/` | `scripts/build-demo.mjs` | The hosted demo: the pages, and `dist/`'s layout at the site root |
 
 The Jobs worker is not an artefact: `vite.config.ts` bundles it with esbuild into a string behind

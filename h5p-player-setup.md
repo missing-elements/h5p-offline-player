@@ -121,8 +121,9 @@ input.onchange = () => (p.file = input.files[0]);
 The player's code is MIT. `dist/frame-assets/` is not: it is the H5P core runtime, which is
 GPL-3.0, and the package's `license` field reads `(MIT AND GPL-3.0-only)` for that reason. The
 directory carries a `LICENSE.txt` and a `NOTICE.txt` naming what is in it and where it came from.
-With a bundler (Setup A) the runtime files are emitted without them, so `h5p.css` opens with a
-comment naming the GPL and pointing at the package's `NOTICE.md`; when you copy `dist/` by hand,
+With a bundler (Setup A) the runtime files are emitted without them, so `frame.bundle.js`,
+`main.bundle.js` and `h5p.css` each open with a comment naming their licences, the corresponding
+source and the package's `NOTICE.md`; when you copy `dist/` by hand,
 copy them too; with the CDN (Setup B) they are served from there. A site that serves the runtime to browsers
 is distributing GPL code, so keep the notices reachable. The full account, including zip.js's
 BSD notice, is `NOTICE.md` in the package.

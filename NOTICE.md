@@ -49,7 +49,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ## The H5P runtime in `dist/frame-assets/` — GPL-3.0
 
 `dist/frame-assets/` is the runtime the element loads inside its frame, taken from
-[h5p-standalone](https://github.com/tunapanda/h5p-standalone) 3.8.2: the scripts unmodified, the
+[h5p-standalone](https://github.com/tunapanda/h5p-standalone) 3.8.2: the scripts' code unmodified, each given a leading licence comment, the
 stylesheet rebuilt into `h5p.css` with its icon fonts and image inlined as data URLs and its
 Inter and Open Sans faces moved to `fonts/`, declared by the frame document instead. h5p-standalone's own
 code is MIT (Copyright (c) 2015 Tunapanda), but `frame.bundle.js` is built from the H5P core
@@ -72,13 +72,14 @@ Also inside `dist/frame-assets/`:
 
 - jQuery 3.5.1, in `frame.bundle.js` — MIT, Copyright JS Foundation and other contributors,
   <https://jquery.org/license>.
-- regenerator-runtime, in `main.bundle.js` — MIT, see `main.bundle.js.LICENSE.txt`.
+- regenerator-runtime, in `main.bundle.js` — MIT, named in the file's own leading comment.
 - Inter, `fonts/inter-*.woff2` — SIL Open Font License 1.1, see `fonts/Inter-LICENSE.txt`.
 - Open Sans, `fonts/open-sans-*.woff2` — SIL Open Font License 1.1, see `fonts/OpenSans-OFL.txt`.
 
 With a bundler (Setup A) the runtime files are emitted under hashed names and the text
-files beside them do not travel; `h5p.css` therefore opens with a `/*! … */` comment naming
-the GPL and pointing here, which bundlers leave in an emitted asset.
+files beside them do not travel; `frame.bundle.js`, `main.bundle.js` and `h5p.css` therefore
+each open with a `/*! … */` comment naming their licences, the corresponding source and this
+file, which bundlers leave in an emitted asset.
 
 ## What this means for a site
 

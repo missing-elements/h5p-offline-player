@@ -282,7 +282,7 @@ The player's own code — the element, the two workers, the scripts — is MIT, 
 `(MIT AND GPL-3.0-only)`.
 
 - `dist/frame-assets/` is the H5P core runtime from
-  [h5p-standalone](https://github.com/tunapanda/h5p-standalone): the scripts unmodified, the
+  [h5p-standalone](https://github.com/tunapanda/h5p-standalone): the scripts' code unmodified, the
   stylesheet rebuilt so that it stands alone. h5p-standalone's own code is
   MIT, but its `frame.bundle.js`, stylesheet and icon fonts come from
   [h5p-php-library](https://github.com/h5p/h5p-php-library), which is **GPL-3.0**; upstream
