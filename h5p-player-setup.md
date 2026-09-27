@@ -133,6 +133,7 @@ BSD notice, is `NOTICE.md` in the package.
 | Symptom | Cause | Fix |
 |---|---|---|
 | `error: no-cors` | Package host sends no CORS headers | Cannot be fetched from a browser. Ask the user to download the file and use `file` |
+| `error: network`, "is an http: URL and this page is served over https:" | `src` or `libraries` is `http://` on an `https://` page. Browsers block that as mixed content (and a CSP naming only `https:` blocks it first); up to 0.1.5 it was reported as `no-cors` | Use the `https://` URL the message names; most hosts, GitHub Pages included, serve both. `http://localhost` is exempt and works as is |
 | `error: no-worker` | Page on `http://`, in-app browser without Service Worker support, or `sw` points cross-origin | Use `https://`; show "Open in Safari / Chrome"; serve `h5p-sw.js` from your origin |
 | Worker or frame assets 404 after build | Bundler does not analyse `new URL(…, import.meta.url)` (esbuild) | Serve `dist/` statically and set `sw` + `assets-base` |
 | Worker blocked by CSP | `script-src` excludes the worker's origin | Keep the default same-origin worker; don't point `sw` at a CDN |

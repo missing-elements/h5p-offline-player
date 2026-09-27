@@ -62,10 +62,43 @@ function readValidator(response: Response): string | null {
  * body (which is why the body is cancelled as soon as the headers arrive — a `HEAD` would prove
  * neither, and is often blocked outright).
  */
+/**
+ * The `https:` URL to suggest when `url` is `http:` on an `https:` page, else `null`. Browsers
+ * refuse such a fetch as mixed content — and a page whose CSP names only `https:` refuses it
+ * before that — and the rejection reads exactly like a host without CORS, so without this check
+ * the element reported `no-cors` and sent people to ask for a download. Loopback hosts are
+ * exempt: `http://localhost` and `127.0.0.1` are potentially trustworthy, and browsers let an
+ * `https:` page reach them.
+ */
+export function insecureOnSecurePage(url: string, pageUrl: string | undefined): string | null {
+  if (!pageUrl) return null
+  let target: URL
+  try {
+    target = new URL(url, pageUrl)
+  } catch {
+    return null
+  }
+  if (new URL(pageUrl).protocol !== 'https:' || target.protocol !== 'http:') return null
+  const host = target.hostname
+  if (host === 'localhost' || host.endsWith('.localhost') || host === '[::1]' || /^127\.\d+\.\d+\.\d+$/.test(host)) {
+    return null
+  }
+  target.protocol = 'https:'
+  return target.href
+}
+
 export async function probeSource(
   url: string,
   signal?: AbortSignal
 ): Promise<RemoteSourceDescriptor> {
+  const secure = insecureOnSecurePage(url, globalThis.location?.href)
+  if (secure) {
+    throw new PlayerError(
+      'network',
+      `${url} is an http: URL and this page is served over https:, so the browser blocks it as mixed content. Use ${secure} if the host serves it.`
+    )
+  }
+
   let response: Response
   try {
     response = await fetch(url, { headers: { Range: 'bytes=0-0' }, signal, cache: 'no-store' })

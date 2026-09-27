@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { probeSource } from '../../src/shared/source'
+import { insecureOnSecurePage, probeSource } from '../../src/shared/source'
 
 /**
  * What the probe can learn about an archive from the headers a browser lets it read. The fake
@@ -87,5 +87,35 @@ describe('probeSource', () => {
 
     expect(descriptor).toMatchObject({ type: 'chunked', size: SIZE, validator: null })
     expect(host.ranges).toEqual(['bytes=0-0'])
+  })
+})
+
+describe('an http: package on an https: page', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('is refused before any request, with the https: URL to use instead', async () => {
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    vi.stubGlobal('location', new URL('https://player.example/'))
+
+    // The browser would refuse it as mixed content, which reads like a host without CORS; the
+    // element used to say `no-cors` and send people to ask for a download.
+    const probe = probeSource('http://alekswebnet.github.io/h5p/gh-normalized.h5p')
+    await expect(probe).rejects.toMatchObject({ code: 'network' })
+    await expect(probe).rejects.toThrow('https://alekswebnet.github.io/h5p/gh-normalized.h5p')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('lets loopback through, which browsers treat as trustworthy from an https: page', () => {
+    for (const url of ['http://localhost:5173/a.h5p', 'http://app.localhost/a.h5p', 'http://127.0.0.1/a.h5p', 'http://[::1]/a.h5p']) {
+      expect(insecureOnSecurePage(url, 'https://player.example/')).toBeNull()
+    }
+  })
+
+  it('leaves an http: page, an https: package and a relative URL alone', () => {
+    expect(insecureOnSecurePage('http://host.example/a.h5p', 'http://player.example/')).toBeNull()
+    expect(insecureOnSecurePage('https://host.example/a.h5p', 'https://player.example/')).toBeNull()
+    expect(insecureOnSecurePage('/fixtures/a.h5p', 'https://player.example/')).toBeNull()
+    expect(insecureOnSecurePage('http://host.example/a.h5p', undefined)).toBeNull()
   })
 })
