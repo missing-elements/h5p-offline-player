@@ -54,7 +54,9 @@ label.file.primary:hover { filter: brightness(1.06); }
 
 body.dragging .drop-hint { display: grid; }
 
-/* Installed, the app is a window of its own: the site's navigation leads out of it. */
+/* Installed, the app is a window of its own: the site's navigation leads out of it. More
+   specific than the shared sheet's `.topbar nav` on purpose: the build emits this sheet's link
+   before that one, so a rule that relied on coming later lost, and the menu stayed. */
 @media (display-mode: standalone) {
-  .topbar nav { display: none; }
+  .topbar nav[aria-label="Site"] { display: none; }
 }
