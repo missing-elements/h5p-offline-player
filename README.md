@@ -262,7 +262,7 @@ filled in when the content has not set them itself:
 ```json
 "context": {
   "revision": "sha256:500da158…",
-  "platform": "h5p-offline-player 0.1.8"
+  "platform": "h5p-offline-player 0.1.9"
 }
 ```
 
