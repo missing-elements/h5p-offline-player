@@ -215,7 +215,7 @@ It is off by default. `libraries="hub"` is a request to a third party on every c
 the host's decision to make, not the element's.
 
 **A ready-made bundle.** The repository ships one: the H5P hub's runtime libraries for every
-content type it serves, 98 libraries in 9.5 MB, each at its newest minor version — the pack the
+content type it serves, 98 libraries in ~10 MB, each at its newest minor version — the pack the
 [offline app](https://h5p-offline-player.vercel.app/app/) carries. Download
 [`libraries.h5p`](https://github.com/missing-elements/h5p-offline-player/raw/main/apps/demo/app/libraries.h5p)
 and serve it from your own site, next to the element:

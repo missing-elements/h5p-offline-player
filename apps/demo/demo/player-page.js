@@ -118,6 +118,9 @@ player.addEventListener('progress', (event) => {
 
 player.addEventListener('ready', () => {
   bar.hidden = true
+  // The build every statement will name in `context.revision`. On a host without Range the frame
+  // can boot before the index that yields it, and the statements wait for it instead.
+  if (player.revision) write(`revision  ${player.revision}`)
 })
 
 player.addEventListener('xapi', (event) => {

@@ -45,7 +45,9 @@
       <p class="lede">
         Every statement the content emits arrives as a DOM event. Nothing is stored and nothing is
         posted anywhere: if these should reach an LRS, this listener is where that happens. Answer
-        a question below and watch the statements arrive.
+        a question below and watch the statements arrive. Each one names the build it came from:
+        <code>context.revision</code> is a fingerprint of the package's index, the same one
+        <code>h5p-normalize</code> prints, and <code>context.platform</code> the player's version.
       </p>
 
       <h5p-player src="/demo/content/quiz.h5p" auto-resize></h5p-player>
