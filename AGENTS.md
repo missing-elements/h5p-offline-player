@@ -61,7 +61,8 @@ packages/player/          @missing-elements/h5p-offline-player — the published
       chunk-writer.ts       a WritableStream that lands bytes in the chunk store and publishes a watermark
       warm.ts               walks the library spans off one ranged request each and caches their entries
   scripts/                  sync-h5p-assets, build-workers, copy-frame-assets, build-fixtures, prepack;
-                            scripts/lib/worker-bundle.mjs builds both workers (the demo reuses it),
+                            scripts/lib/worker-bundle.mjs builds both workers, and a host's own worker with the
+                            handlers mounted (the demo uses it for h5p-sw.js and the app's sw.js),
                             scripts/lib/frame-boot-plugin.mjs the frame's boot script for esbuild and Vite alike
   vite.config.ts            the library build and the test runner
   vite.plugins.ts           the plugins it uses, which the demo's config imports too: the Jobs worker,
@@ -338,7 +339,10 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   just registered: a row outlives an eviction and a cut-short download. The URL, not the
   `pkgId`, is the key, because the id hashes the host's validator as well, which the failed
   probe never got. Online the probe still runs first, so a bundle the hub has changed is
-  downloaded again under its new id. This is what lets the installable app play a stripped
+  downloaded again under its new id. The question gets three seconds, not the control channel's
+  thirty, and silence counts as "none": a worker older than the element — an `h5p-sw.js` copied
+  before an update — does not know the message and never answers it. This is what lets the
+  installable app play a stripped
   export offline; the fallback lives in the element, so any host gets it. Its tests in
   `libraries.test.ts` take the bundle host down with `/stalling/`'s `reset` outage, and give each
   play a content URL of its own — the worker keeps a package's reader with its bundle attached,
@@ -767,7 +771,8 @@ the reader bridge, and zip.js has module-level side effects Rollup cannot drop, 
 rode along; the bridge moved to `source-reader.ts`, which took the element from 314 kB (131 kB
 gzipped) to 205 kB (85 kB gzipped). The Jobs worker string was 190 kB of what remained, 159 kB of
 it zip.js for an index the Service Worker already had; with the worker told where each entry is
-instead (the invariant above), the element is 40 kB minified, 17 kB gzipped. zip.js is now in
+instead (the invariant above), the element was 40 kB minified, 17 kB gzipped; 43 kB and 14 kB
+now, on 2026-09-28. zip.js is now in
 the two Service Worker scripts only.
 
 **Shipped strings carry no comments.** The frame's `<style>` block is explained in TypeScript
@@ -829,7 +834,7 @@ SPA-fallback trap described above cannot happen there.
   descriptions, canonical links, Open Graph and Twitter tags, JSON-LD for the software on the
   front page, `robots.txt` and `sitemap.xml`, and the GitHub link in every page's navigation. The
   absolute URLs are written as `%SITE_URL%` in the HTML and replaced by `siteUrlPlugin`
-  (`vite.plugins.ts`), which runs before Vite's own `%ENV%` pass so Vite does not warn about a
+  (`apps/demo/vite.config.ts`), which runs before Vite's own `%ENV%` pass so Vite does not warn about a
   name it does not know. `build-demo.mjs` decides the origin — `SITE_URL` if set, else Vercel's
   `VERCEL_PROJECT_PRODUCTION_URL`, else the preview's localhost — and writes the sitemap and
   robots file with it. `/embed` stays out of the sitemap and carries `noindex`. The social card,
@@ -1014,6 +1019,10 @@ The architecture and setup documents predate the code. These are deliberate addi
   is how they get the layout the player streams best.
 - The libraries are warmed into the cache before the frame boots on a `Range` host. The design
   reads every entry on demand; on a high-latency host that made the boot a matter of minutes.
+- A library source that cannot be reached falls back to a bundle downloaded whole from the same
+  URL before. The design has no notion of playing without the network beyond a picked file.
+- An installable app, on the demo site at `/app/`: the design's "offline management" is still out
+  of scope, but the player itself now starts with no network, through the single-worker setup.
 
 ## Not built yet
 

@@ -457,8 +457,10 @@ export class H5PPlayerElement extends HTMLElement {
         // The source cannot be reached — no network, or the hub is down — but a bundle
         // downloaded from it before serves as well now as it did then. This is what lets an
         // installed app play a stripped export offline once it has played one online.
-        const reply = await this.send({ type: 'find-downloaded-libraries', url })
-        const earlier = reply.ok && reply.type === 'downloaded-libraries' ? reply.pkgId : null
+        // Briefly, and a silence is a no: a worker older than 0.1.7 — an `h5p-sw.js` copied
+        // before the element was updated — does not know the question and never answers it.
+        const reply = await this.send({ type: 'find-downloaded-libraries', url }, 3_000).catch(() => null)
+        const earlier = reply?.ok && reply.type === 'downloaded-libraries' ? reply.pkgId : null
         if (!earlier) throw error
 
         this.setState('indexing')
@@ -732,7 +734,7 @@ export class H5PPlayerElement extends HTMLElement {
   }
 
   /** Sends a control message to the worker and waits for its reply on a private port. */
-  private async send(message: ToWorkerMessage): Promise<WorkerReply> {
+  private async send(message: ToWorkerMessage, timeoutMs = 30_000): Promise<WorkerReply> {
     const worker = this.registration?.active
     if (!worker) throw new PlayerError('no-worker', 'The Service Worker is not active')
 
@@ -741,7 +743,7 @@ export class H5PPlayerElement extends HTMLElement {
       const timer = setTimeout(() => {
         channel.port1.close()
         reject(new PlayerError('no-worker', `The worker did not answer "${message.type}"`))
-      }, 30_000)
+      }, timeoutMs)
 
       channel.port1.onmessage = (event: MessageEvent<WorkerReply>) => {
         clearTimeout(timer)

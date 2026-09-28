@@ -78,7 +78,9 @@ The element does one thing: play a package.
   sw="…"               worker URL (default: h5p-sw.js next to the element, same-origin)
   assets-base="…"      directory of frame assets (default: folder of the element)
   libraries="…"        `hub`, or the URL of a `.h5p` carrying library folders, for packages
-                       exported without their own (default: unset — such packages are refused)
+                       exported without their own (default: unset — such packages are refused).
+                       Downloaded once and cached; when the URL cannot be reached later, the
+                       copy downloaded before is used, so it also plays offline after that
   allow-origins="…"    extra origins for the frame's CSP, space separated — for a tenant's own
                        video host or an in-house CDN
   preload="…"          `auto` pulls large deflated media once the content is up, instead of

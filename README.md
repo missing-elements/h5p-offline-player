@@ -232,7 +232,8 @@ input.onchange = () => (player.file = input.files[0])
 
 The element renders the content and nothing else — no URL field, no file picker, no progress bar,
 no "open in another browser" banner. Those belong to the host page, built out of these events.
-`index.html` in this repo is a working example of one.
+The demo's [player page](https://github.com/missing-elements/h5p-offline-player/blob/main/apps/demo/index.html)
+is a working example of one.
 
 ## Requirements
 
@@ -266,6 +267,7 @@ pnpm normalize course.h5p   # rewrite a package so it streams (see above)
 pnpm build:demo             # the hosted demo, as Vercel builds it, into apps/demo/dist-demo/
 pnpm preview:demo           # serve it locally with the production headers
 pnpm demo:content           # rebuild the demo's content packages from their sources
+pnpm demo:icons             # re-render the installable app's icons
 ```
 
 `pnpm dev` serves the player page with real content — a quiz, an interactive video, an

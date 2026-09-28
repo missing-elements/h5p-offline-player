@@ -150,7 +150,7 @@ input.addEventListener('change', () =&gt; { player.file = input.files[0] })</pre
           <tr><td><code>auto-resize</code></td><td>Follow the content's own height. Without it, listen to the <code>resize</code> event and size the element yourself.</td></tr>
           <tr><td><code>sw</code></td><td>Where the worker script is. Default: <code>h5p-sw.js</code> next to the element. Must be same-origin.</td></tr>
           <tr><td><code>assets-base</code></td><td>The folder of the frame assets. Default: <code>frame-assets/</code> next to the element. May be a CDN.</td></tr>
-          <tr><td><code>libraries</code></td><td><code>hub</code>, or the URL of a <code>.h5p</code> that carries library folders, for exports that ship without their own. Default: such packages are refused, with the missing libraries named.</td></tr>
+          <tr><td><code>libraries</code></td><td><code>hub</code>, or the URL of a <code>.h5p</code> that carries library folders, for exports that ship without their own. Downloaded once and cached; when the URL cannot be reached later, the earlier copy is used. Default: such packages are refused, with the missing libraries named.</td></tr>
           <tr><td><code>preload</code></td><td><code>auto</code> pulls large compressed media once the content is up, instead of when the learner presses play.</td></tr>
           <tr><td><code>allow-origins</code></td><td>Extra origins the frame's Content Security Policy should permit, space separated: a tenant's video host, an in-house CDN.</td></tr>
         </tbody>
