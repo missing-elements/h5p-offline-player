@@ -83,17 +83,56 @@ const ready = controlled().then(
 
 /* ---------------------------------------------------------------- opening a file */
 
-let current = null
+/** Replays the last open, for the retry once missing libraries may be fetched. */
+let reopen = null
+/** The URL last opened, so a launch that repeats it does not load it twice. */
+let lastUrl = null
 
-async function open(file) {
-  current = file
+const opening = (label, again) => {
+  reopen = again
   offer.hidden = true
   show('')
-  fileName.textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB`
+  fileName.textContent = label
   fileName.hidden = false
+}
+
+async function open(file) {
+  lastUrl = null
+  opening(`${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB`, () => open(file))
   document.title = `${file.name} — H5P Offline Player`
   await ready
   player.file = file
+}
+
+/**
+ * A package at a URL: `/app/?src=…`, the link a teacher sends. With the app installed, Chrome
+ * opens such a link in the app's window — its "supported links" — and when that window is
+ * already open, hands it the URL through `launchQueue` instead of loading the page again.
+ */
+async function openUrl(src) {
+  let url
+  try {
+    url = new URL(src, location.href)
+  } catch {
+    show(`That is not a URL: ${src}`, 'error')
+    return
+  }
+  const name = decodeURIComponent(url.pathname.split('/').pop() || url.host)
+  lastUrl = url.href
+  opening(url.href, () => openUrl(url.href))
+  document.title = `${name} — H5P Offline Player`
+  await ready
+  // Removed first, so opening the same link again still counts as a change.
+  player.removeAttribute('src')
+  player.setAttribute('src', url.href)
+}
+
+const srcOf = (href) => {
+  try {
+    return new URL(href).searchParams.get('src')
+  } catch {
+    return null
+  }
 }
 
 fileInput.addEventListener('change', () => {
@@ -103,12 +142,25 @@ fileInput.addEventListener('change', () => {
   fileInput.value = ''
 })
 
-// A `.h5p` opened from the file manager, once the app is installed: the manifest's
-// `file_handlers` route it here, and `launchQueue` hands it over.
+// The page's own address first: `/app/?src=…` opened in a tab, or the link that launched the
+// app. A launch with a file opens at the manifest's action, `/app/`, which has no `src`.
+const initial = srcOf(location.href)
+if (initial) void openUrl(initial)
+
+// How an installed app is handed what it was launched with. A `.h5p` opened from the file
+// manager arrives as a file handle (the manifest's `file_handlers`); a link to `/app/?src=…`
+// clicked while the window is open arrives as the target URL (`launch_handler` keeps the one
+// window). The launch that opened this page comes through here too, with this page's address
+// as its target, which `openUrl` already has.
 if ('launchQueue' in window) {
   window.launchQueue.setConsumer(async (params) => {
     const [handle] = params.files ?? []
-    if (handle) void open(await handle.getFile())
+    if (handle) {
+      void open(await handle.getFile())
+      return
+    }
+    const src = params.targetURL ? srcOf(params.targetURL) : null
+    if (src && new URL(src, location.href).href !== lastUrl) void openUrl(src)
   })
 }
 
@@ -139,7 +191,9 @@ document.addEventListener('drop', (event) => {
 
 const EXPLANATIONS = {
   'no-worker': 'This page needs a Service Worker. Open it over https:// in Chrome or Edge.',
-  network: 'The libraries could not be fetched. Check the connection, and try again.'
+  'no-cors':
+    'That host does not let other sites read the file. Download the .h5p and open it with "Open file".',
+  network: 'The package could not be fetched. Check the address and the connection, and try again.'
 }
 
 player.addEventListener('statechange', (event) => {
@@ -162,6 +216,14 @@ player.addEventListener('error', (event) => {
         'device yet. Open it once while online, and it plays offline after that.',
       'error'
     )
+    offer.hidden = true
+    return
+  }
+
+  // A package at a URL needs the network to be read, whatever was cached from it before: the
+  // probe that finds out how to read it is a request.
+  if (!navigator.onLine && (code === 'no-cors' || code === 'network')) {
+    show('This package is on the web, and this device is offline. Open a downloaded .h5p with "Open file" instead.', 'error')
     offer.hidden = true
     return
   }
@@ -199,7 +261,7 @@ document.querySelector('#fetch-libraries').addEventListener('click', () => {
   } catch {
     // Not kept; the next visit asks again.
   }
-  if (current) void open(current)
+  void reopen?.()
 })
 
 /* ---------------------------------------------------------------- installing */

@@ -854,7 +854,13 @@ SPA-fallback trap described above cannot happen there.
   app manifest is linked with `vite-ignore` and copied as it is, because a hashed copy under
   `/assets/` would resolve its relative icon URLs to nothing. `file_handlers` makes the
   installed app the handler for `.h5p` in the operating system and `launchQueue` hands the file
-  to the page; `navigator.storage.persist()` is asked for once installed. In dev the worker is
+  to the page. `/app/?src=<url>` plays a package from the web, the link a teacher sends: Chrome
+  lists `/app/*` as the installed app's "supported links", so the link opens in the app's window,
+  and with `launch_handler: focus-existing` a link clicked while that window is open arrives on
+  `launchQueue` as `targetURL` rather than as a navigation — so `app.js` reads `?src=` from both,
+  and skips a target it has already opened, since the launch that opened the page carries the
+  page's own address too. A URL needs the network whatever was cached, because the probe is a
+  request; offline the page says so; `navigator.storage.persist()` is asked for once installed. In dev the worker is
   bundled per request with an empty precache, so dev always goes to the server. Checked in
   Chromium against `pnpm preview:demo`: installable with no manifest errors, and after going
   offline and reloading, the Interactive Video and the Accordion play from picked files, the video

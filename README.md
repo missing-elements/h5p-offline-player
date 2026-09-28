@@ -279,7 +279,8 @@ linked from there.
 The demo site deploys to Vercel from `vercel.json`: the pages, the element, its worker and the
 frame assets as static files, plus one function that plays a host without `Range` support. Its
 `/app/` page is the player as an installable app: in Chrome or Edge it installs, opens `.h5p`
-files from the file manager and plays them with no network.
+files from the file manager and plays them with no network. `/app/?src=<url of a .h5p>` is a
+link that opens a package from the web in the installed app.
 
 Working on the code? Start with [AGENTS.md](https://github.com/missing-elements/h5p-offline-player/blob/main/AGENTS.md).
 
