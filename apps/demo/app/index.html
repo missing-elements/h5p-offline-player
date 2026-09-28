@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>H5P Offline Player — install it, open .h5p files with no network</title>
+    <meta name="description" content="An installable H5P player. Open a .h5p file from your computer and play it with no server and, once installed, no network." />
+    <link rel="canonical" href="%SITE_URL%/app/" />
+    <meta name="theme-color" content="#2f6df6" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="h5p-offline-player" />
+    <meta property="og:title" content="H5P Offline Player — install it, open .h5p files with no network" />
+    <meta property="og:description" content="An installable H5P player. Open a .h5p file from your computer and play it with no server and, once installed, no network." />
+    <meta property="og:url" content="%SITE_URL%/app/" />
+    <meta property="og:image" content="%SITE_URL%/demo/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <!-- Left alone by Vite: the manifest names its icons relative to itself, and a hashed copy
+         under /assets/ would point them at nothing. The build copies both as they are. -->
+    <link rel="manifest" href="/app/manifest.webmanifest" vite-ignore />
+    <link rel="icon" type="image/svg+xml" href="/demo/favicon.svg" />
+    <link rel="stylesheet" href="/demo/player-page.css" />
+    <link rel="stylesheet" href="/app/app.css" />
+    <script type="module" src="/demo/element.js"></script>
+    <script type="module" src="/app/app.js"></script>
+    <script type="module" src="/demo/analytics.js"></script>
+  </head>
+
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/app/"><span class="brand-mark" aria-hidden="true">H5</span>H5P Offline Player</a>
+      <nav aria-label="Site">
+        <a href="/">Player</a>
+        <a href="/app/" aria-current="page">App</a>
+        <a href="/demo/setup.html">Setup</a>
+        <a href="/demo/normalize.html">Normalize</a>
+        <a href="/demo/">Examples</a>
+        <a href="https://github.com/missing-elements/h5p-offline-player" rel="noopener">GitHub</a>
+      </nav>
+    </header>
+
+    <main>
+      <h1>Open an H5P file</h1>
+      <p class="lede">
+        Pick a <code>.h5p</code> from your computer, or drop it on this page. It is read in place,
+        on this device — nothing is uploaded. Install the app and it works with no network, and
+        opens <code>.h5p</code> files from your file manager.
+      </p>
+
+      <div class="controls">
+        <label class="file primary">
+          Open file
+          <input type="file" id="file" accept=".h5p" />
+        </label>
+        <button type="button" id="install" hidden>Install app</button>
+        <span class="offline" id="offline" data-state="preparing">Preparing the offline copy…</span>
+      </div>
+
+      <div class="status" id="status" data-state="idle">
+        <span class="badge" id="state" data-state="idle">idle</span>
+        <span class="file-name" id="file-name" hidden></span>
+      </div>
+
+      <p class="message" id="message" hidden></p>
+      <p class="message hint" id="offer" hidden>
+        <button type="button" id="fetch-libraries">Fetch them from h5p.org and retry</button>
+      </p>
+
+      <h5p-player auto-resize></h5p-player>
+
+      <p class="drop-hint" id="drop-hint" aria-hidden="true">Drop the .h5p file to open it</p>
+
+      <footer>
+        <p>
+          A package that does not carry its own libraries — what h5p.com and h5p.org export by
+          default — needs them from the H5P hub, which takes a network. Everything else plays
+          offline. Files you open are not kept: open one again next time, and what was already
+          extracted comes from this device's cache.
+        </p>
+        <p class="credit">
+          The player's own code is MIT; the H5P core runtime it loads is GPL-3.0, see
+          <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/packages/player/NOTICE.md" rel="noopener">NOTICE.md</a>.
+        </p>
+      </footer>
+    </main>
+  </body>
+</html>

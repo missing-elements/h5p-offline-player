@@ -7,6 +7,7 @@ import {
   jobsWorkerPlugin,
   noRangeFixturesPlugin
 } from '../../packages/player/vite.plugins'
+import { bundleHostWorker } from '../../packages/player/scripts/lib/worker-bundle.mjs'
 
 /**
  * The demo app: the dev server for the whole repository, and the hosted demo — the player page
@@ -50,11 +51,41 @@ function siteUrlPlugin(siteUrl: string): Plugin {
   }
 }
 
+/**
+ * Serves the installable app's worker, `app/sw.js`, in dev: bundled on each request with the
+ * player's handlers built from source, and an empty precache, so dev always goes to the server.
+ * The build writes the real one — see `scripts/build-demo.mjs`. Registered as a middleware ahead
+ * of Vite's own, which would otherwise serve the file as an ES module, imports unresolved.
+ */
+function appWorkerPlugin(): Plugin {
+  const entry = resolve(rootDir, 'app', 'sw.js')
+  return {
+    name: 'h5p-app-worker',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.url?.split('?')[0] !== '/app/sw.js') return next()
+        bundleHostWorker(entry, { dev: true, define: { __APP_PRECACHE__: JSON.stringify({ version: 'dev', urls: [] }) } }).then(
+          (source) => {
+            res.setHeader('content-type', 'text/javascript; charset=utf-8')
+            res.setHeader('cache-control', 'no-store')
+            res.end(source)
+          },
+          (error: unknown) => {
+            res.statusCode = 500
+            res.end(`// Failed to bundle the app worker\n// ${String(error)}`)
+          }
+        )
+      })
+    }
+  }
+}
+
 export default defineConfig(({ command }) => ({
   // `SITE_URL` is set by `scripts/build-demo.mjs`; alone, this config builds for a local preview.
   plugins: [
     jobsWorkerPlugin(),
     devServiceWorkerPlugin(),
+    appWorkerPlugin(),
     // The demo content first, then the player's fixtures: the pages use the former, and the
     // latter stay reachable for trying a fixture against the dev server.
     noRangeFixturesPlugin([resolve(rootDir, 'demo', 'content'), PLAYER_FIXTURES]),
@@ -75,6 +106,9 @@ export default defineConfig(({ command }) => ({
     target: 'es2022',
     outDir: 'dist-demo',
     emptyOutDir: true,
+    // Read by `scripts/build-demo.mjs` for the app's precache list — the files the app page
+    // pulls in, whatever their hashes — and deleted there, so it is not deployed.
+    manifest: true,
     rollupOptions: {
       input: {
         'h5p-player': ELEMENT,
@@ -86,7 +120,8 @@ export default defineConfig(({ command }) => ({
         xapi: resolve(rootDir, 'demo/xapi.html'),
         'local-file': resolve(rootDir, 'demo/local-file.html'),
         'demo-embed': resolve(rootDir, 'demo/embed.html'),
-        'two-players': resolve(rootDir, 'demo/two-players.html')
+        'two-players': resolve(rootDir, 'demo/two-players.html'),
+        app: resolve(rootDir, 'app/index.html')
       },
       output: {
         entryFileNames: (chunk) => (chunk.facadeModuleId === ELEMENT ? 'h5p-player.js' : 'assets/[name]-[hash].js'),

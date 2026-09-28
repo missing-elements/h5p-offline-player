@@ -74,3 +74,35 @@ export async function buildServiceWorker(outfile) {
 export async function buildMountModule(outfile) {
   return build({ ...(await shared()), entryPoints: [resolve(rootDir, 'src/sw/mount.ts')], outfile, format: 'esm' })
 }
+
+/**
+ * Resolves `@missing-elements/h5p-offline-player/sw` to the mount's source, the way the demo's
+ * Vite config resolves the element's name, so a worker in this repository imports the handlers
+ * by the name a host uses and is still built from source.
+ */
+export const mountFromSource = {
+  name: 'mount-from-source',
+  setup(build) {
+    build.onResolve({ filter: /^@missing-elements\/h5p-offline-player\/sw$/ }, () => ({ path: resolve(rootDir, 'src/sw/mount.ts') }))
+  }
+}
+
+/**
+ * A host's own Service Worker with the handlers mounted into it — the demo's installable app is
+ * one — returned as text, for the demo build to write and its dev server to serve. Same
+ * settings, notice and plugins as ours; `define` carries what the host's code needs filled in,
+ * and `dev` leaves it readable and turns the player's dev paths on.
+ */
+export async function bundleHostWorker(entry, { define = {}, dev = false } = {}) {
+  const options = await shared()
+  const result = await build({
+    ...options,
+    entryPoints: [entry],
+    write: false,
+    format: 'iife',
+    minify: !dev,
+    define: { ...options.define, 'import.meta.env.DEV': String(dev), ...define },
+    plugins: [...options.plugins, mountFromSource]
+  })
+  return result.outputFiles[0].text
+}

@@ -89,7 +89,11 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             demo/element.js is the one import of the element every page loads
   demo/content/             the packages the demo plays, committed; built from demo/content/src/ by
                             scripts/build-demo-content.mjs
-  scripts/                  build-demo (the site into dist-demo/), build-demo-content, build-og-image
+  app/                      the installable app, /app/: index.html and app.js the page, sw.js its
+                            worker (the player's handlers mounted, plus the app shell), the web app
+                            manifest and icons/ (rendered by scripts/build-app-icons.mjs, committed)
+  scripts/                  build-demo (the site into dist-demo/), build-demo-content, build-og-image,
+                            build-app-icons
   vite.config.ts            the dev server and the hosted demo: the pages plus dist/'s layout at the
                             site root -> dist-demo/
 
@@ -130,6 +134,7 @@ pnpm normalize course.h5p          # rewrite a package so it streams: media stor
 pnpm build:demo        # the hosted demo into apps/demo/dist-demo/, what Vercel runs
 pnpm demo:content      # rebuild apps/demo/demo/content/*.h5p from their sources; needs the H5P hub
 pnpm demo:og           # re-render the social card, apps/demo/demo/og-image.png
+pnpm demo:icons        # re-render the installable app's icons, apps/demo/app/icons/
 pnpm preview:demo      # serves dist-demo/ with the production headers and the /no-range route
 ```
 
@@ -818,6 +823,34 @@ SPA-fallback trap described above cannot happen there.
   robots file with it. `/embed` stays out of the sitemap and carries `noindex`. The social card,
   `demo/og-image.png`, is rendered by `pnpm demo:og` in Chromium from a small HTML page and
   committed, because link previews want a raster image and the deploy has no browser.
+- **`/app/` is the installable player, and the one place the single-worker setup runs.** A teacher hands out
+  `.h5p` files, a student plays them later with no connection: playing a picked file never
+  needed a network, the player itself did. `app/sw.js` is a host worker with scope `/app/` that
+  calls `mountH5P(self)` first and then serves a precache — the page, the element, every file
+  under `frame-assets/`, the manifest and icons — cache first. **One worker, not two**: the
+  frame is a client of whichever worker serves it, so its requests for the runtime, `h5p.css`
+  and the fonts go to that worker, and `mount.ts` passes anything outside its routes to the
+  network; an app-shell worker beside ours at `/h5p/` would never see them. So the element must
+  find the mounted routes (`findMountedRoutes`, the `_ping` check), which needs the page to be
+  controlled, and `app.js` therefore plays nothing until it is — on a first visit the worker
+  installs, precaches and claims the page, about a second on localhost. A hard reload bypasses
+  the worker for that load; the page then says "online only" and the element registers its own
+  worker at `/h5p/`, which plays but not offline. The precache list is not written by hand:
+  `build-demo.mjs` turns on Vite's build manifest, walks the app page's chunks from it, adds what
+  the built page links, then deletes the manifest so it is not deployed; the cache version is a
+  hash over the files, so the worker's bytes change exactly when something it caches has. The web
+  app manifest is linked with `vite-ignore` and copied as it is, because a hashed copy under
+  `/assets/` would resolve its relative icon URLs to nothing. `file_handlers` makes the
+  installed app the handler for `.h5p` in the operating system and `launchQueue` hands the file
+  to the page; `navigator.storage.persist()` is asked for once installed. In dev the worker is
+  bundled per request with an empty precache, so dev always goes to the server. Checked in
+  Chromium against `pnpm preview:demo`: installable with no manifest errors, and after going
+  offline and reloading, the Interactive Video and the Accordion play from picked files, the video
+  decoding and playing as it does online.
+  Not covered: a package without its own libraries still needs the hub, which is a network
+  fetch and so fails offline; the file is picked again each visit, though what was
+  extracted stays in the chunk store; and nothing here was tried in Safari, which may clear an
+  installed app's storage after weeks unused.
 - **What a public demo means.** The frame is same-origin by design, and a package's libraries
   are JavaScript, so `/?src=<any url>` runs a stranger's code on the demo's origin. That is the
   architecture — a host chooses what it plays — not a flaw in it, and it is why the demo origin
@@ -1008,29 +1041,11 @@ and the same boot pulled 1.4 MB instead of 81 — and because it is not yet know
 player is handed a deflated video nobody can normalize: the h5p.com export analysed above stored
 everything, while this one and the sodix.de one deflated everything.
 
-**Offline app shell (PWA).** Raised on 2026-09-26 by tunapanda/h5p-standalone's "local
-standalone player" issue: a teacher hands out `.h5p` files, a student plays them later with no
-connection, without installing XAMPP or nginx. Playing a picked file already needs no network —
-the element reads the `File` and the Service Worker serves entries from it. What still needs one
-is the player itself: the page, the element, the worker, `frame-assets/` and the fonts. The
-design:
-
-- A web app manifest, so the player installs to the desktop or home screen and opens as a window.
-- One worker, not two. The app's worker precaches the shell and calls `mountH5P(self)` first.
-  A separate app-shell worker at `/` beside ours does **not** work offline: the frame is
-  controlled by our worker (scope `…/h5p/`), and `mount.ts` passes every request outside its
-  routes to the network, so the frame's requests for `h5p.css`, `frame.bundle.js` and the fonts
-  never reach the shell's cache. The single-worker setup already exists for other reasons;
-  this is the first case that needs it.
-- `navigator.storage.persist()` once installed, so the shell and the chunk store are not evicted.
-  Safari may still clear an app left unused for weeks.
-
-What it would not cover. The file is picked again on every visit — a `File` cannot be stored,
-and persistent file handles are out of scope — though the chunk store keeps what was extracted.
-A package without its own libraries needs `libraries="hub"`, which fetches over the network on
-first use; offline it would need the bundle precached, or a probe that falls back to the cached
-copy. How the probe behaves offline has not been checked. The natural home is the demo site
-(`apps/demo/`), which would become the installable player.
+**Offline app shell (PWA) — built**, as `/app/` on the demo site; see *The hosted demo*. What
+it left open: a precached library bundle, or a probe that falls back to a cached one, so a
+package without its own libraries plays offline once it has played online; persistent file
+handles (`showOpenFilePicker` plus a handle kept in IndexedDB) for a recent-files list; and a
+check in Safari and on iOS.
 
 **Version proof on xAPI statements.** Raised on 2026-09-26 from a compliance-training
 perspective: in regulated training the completion record is the audit trail, so it has to land

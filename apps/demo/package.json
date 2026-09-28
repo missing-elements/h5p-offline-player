@@ -8,6 +8,7 @@
     "preview": "vite preview",
     "demo:content": "node scripts/build-demo-content.mjs",
     "demo:og": "node scripts/build-og-image.mjs",
+    "demo:icons": "node scripts/build-app-icons.mjs",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {

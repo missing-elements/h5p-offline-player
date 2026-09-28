@@ -1,0 +1,60 @@
+/* The installable app's additions to the shared sheet. */
+
+label.file.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+label.file.primary:hover { filter: brightness(1.06); }
+
+/* Whether the app can start with no network: set by app.js once the worker controls the page. */
+.offline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.offline::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+
+.offline[data-state="ready"] { color: var(--ok); }
+.offline[data-state="ready"]::before { background: var(--ok); }
+
+.file-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.875rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-name[hidden] { display: none; }
+
+/* Dropping a file anywhere on the page opens it; this is the only sign the page gives. */
+.drop-hint {
+  position: fixed;
+  inset: 0.75rem;
+  z-index: 20;
+  display: none;
+  place-items: center;
+  margin: 0;
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  color: var(--accent);
+  font-size: 1.25rem;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+body.dragging .drop-hint { display: grid; }
+
+/* Installed, the app is a window of its own: the site's navigation leads out of it. */
+@media (display-mode: standalone) {
+  .topbar nav { display: none; }
+}

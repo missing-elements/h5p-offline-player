@@ -163,6 +163,8 @@ mountH5P(self);                       // call before Workbox routing so h5p/* is
 
 Routes then live under the host's scope as `<hostScope>h5p/virtual/…` and `<hostScope>h5p/frame/…` — the same URL shape our own registration produces. The element pings `<hostScope>h5p/virtual/_ping` on the page's controller before registering its own worker and skips registration when the mounted routes answer. The trade-off: the worker version is tied to the host's build, so upgrading the package means rebuilding their worker.
 
+**An app that must work offline needs this setup.** The frame is served by whichever worker mounts the routes, and its own requests — the runtime, `h5p.css`, the fonts — go to that worker; our standalone worker passes them to the network. So the worker that precaches your app shell has to be the one that mounts the handlers, and the page has to be controlled by it before the element loads anything, or the element registers its own worker instead. On a first visit, wait for `controllerchange` after registering. The demo's installable app is a worked example: [`apps/demo/app/sw.js`](https://github.com/missing-elements/h5p-offline-player/blob/main/apps/demo/app/sw.js) and [`app.js`](https://github.com/missing-elements/h5p-offline-player/blob/main/apps/demo/app/app.js).
+
 ## Versioning
 
 - Cache names include the package major version. Minor and patch updates reuse cached packages.

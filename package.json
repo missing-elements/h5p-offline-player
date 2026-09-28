@@ -14,7 +14,8 @@
     "typecheck": "pnpm -r typecheck",
     "normalize": "node packages/normalize/bin/h5p-normalize.mjs",
     "demo:content": "pnpm --filter @missing-elements/h5p-demo demo:content",
-    "demo:og": "pnpm --filter @missing-elements/h5p-demo demo:og"
+    "demo:og": "pnpm --filter @missing-elements/h5p-demo demo:og",
+    "demo:icons": "pnpm --filter @missing-elements/h5p-demo demo:icons"
   },
   "engines": {
     "node": ">=20"
