@@ -28,6 +28,9 @@ import { crc32 } from './crc32.mjs'
 import { planFaststart, readPieces } from './mp4-faststart.mjs'
 import { StreamingZipWriter } from './zip-writer.mjs'
 
+// The byte formatting the command's report uses, for a caller printing its own.
+export { formatBytes } from './format.mjs'
+
 configure({ useWebWorkers: false })
 
 const STORE = 0

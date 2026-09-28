@@ -72,7 +72,7 @@ packages/player/          @missing-elements/h5p-offline-player — the published
   public/                   generated, not in git: the vendored runtime and the test fixtures
   NOTICE.md, licenses/      the package's third-party notices, shipped with it
 
-packages/normalize/       @missing-elements/h5p-normalize — the package rewriter (private for now)
+packages/normalize/       @missing-elements/h5p-normalize — the package rewriter, published as a command
   bin/h5p-normalize.mjs     the command
   lib/                      normalize.mjs (the policy), mp4-faststart.mjs (the remux), zip-writer.mjs,
                             crc32.mjs, format.mjs
@@ -599,9 +599,13 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
 
 `pnpm normalize course.h5p` rewrites a package once so that it streams. It is the fix for
 the deflated, non-faststart video above, applied where it belongs — to the package, by whoever
-publishes it. It is its own package, `packages/normalize`: `lib/normalize.mjs` holds the policy,
-`lib/mp4-faststart.mjs` the remux and `lib/zip-writer.mjs` the output side;
-`bin/h5p-normalize.mjs` is the command. Five things about
+publishes it. It is its own package, `packages/normalize`, published as
+`@missing-elements/h5p-normalize` so that a publisher runs it with `npx` and needs no checkout:
+`lib/normalize.mjs` holds the policy, `lib/mp4-faststart.mjs` the remux and `lib/zip-writer.mjs`
+the output side; `bin/h5p-normalize.mjs` is the command. Its `exports` name `normalizeArchive`
+(and `formatBytes`, re-exported) and nothing else, so the other modules stay free to change;
+the demo's content build is the one caller in this repository. Its `prepublishOnly` runs its
+typecheck and tests, and its `prepack` copies the root LICENSE in. Five things about
 it that the code does not say by itself:
 
 - **It writes the zip itself.** zip.js reads the input — descriptors, zip64, inflate, all

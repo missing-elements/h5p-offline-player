@@ -12,6 +12,8 @@ public
 # Copied from the repository root by the player's `prepack`, so npm finds them in the package.
 packages/player/README.md
 packages/player/LICENSE
+# The same for the normalizer, whose `prepack` copies the LICENSE.
+packages/normalize/LICENSE
 
 # Incremental build state
 *.tsbuildinfo

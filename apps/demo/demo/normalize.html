@@ -200,16 +200,13 @@
 
       <h2>Fix it once: normalize the package</h2>
       <p>
-        The player repository has a script that rewrites a package so it streams. Run it once,
-        wherever the package is published from, and every learner after that gets the fast path.
+        <code>@missing-elements/h5p-normalize</code> is a command that rewrites a package so it
+        streams. Run it once, wherever the package is published from, and every learner after that
+        gets the fast path. It needs Node 20 or later and nothing else.
       </p>
-      <pre class="code">git clone https://github.com/missing-elements/h5p-offline-player
-cd h5p-offline-player
-pnpm install
-
-pnpm normalize course.h5p --dry-run   # report only, write nothing
-pnpm normalize course.h5p             # writes course.normalized.h5p
-pnpm normalize https://host.example/course.h5p -o course.h5p</pre>
+      <pre class="code">npx @missing-elements/h5p-normalize course.h5p --dry-run   # report only, write nothing
+npx @missing-elements/h5p-normalize course.h5p             # writes course.normalized.h5p
+npx @missing-elements/h5p-normalize https://host.example/course.h5p -o course.h5p</pre>
       <p>What it changes, all of it in the zip container:</p>
       <ul class="list">
         <li><strong>Media is stored, not deflated</strong> — video, audio, images, fonts and PDFs, which are already compressed. A <code>Range</code> request can then reach any byte directly.</li>

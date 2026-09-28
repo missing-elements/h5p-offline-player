@@ -1,7 +1,6 @@
 {
   "name": "@missing-elements/h5p-normalize",
   "version": "0.1.0",
-  "private": true,
   "description": "Rewrites an .h5p package so it streams: media stored, mp4 index first, libraries before content. The content is not changed.",
   "license": "MIT",
   "repository": {
@@ -9,22 +8,40 @@
     "url": "git+https://github.com/missing-elements/h5p-offline-player.git",
     "directory": "packages/normalize"
   },
+  "homepage": "https://github.com/missing-elements/h5p-offline-player/tree/main/packages/normalize#readme",
+  "bugs": {
+    "url": "https://github.com/missing-elements/h5p-offline-player/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "bin": {
     "h5p-normalize": "./bin/h5p-normalize.mjs"
   },
   "exports": {
     ".": "./lib/normalize.mjs",
-    "./lib/*": "./lib/*"
+    "./package.json": "./package.json"
   },
   "files": [
     "bin",
     "lib"
   ],
+  "keywords": [
+    "h5p",
+    "normalize",
+    "zip",
+    "mp4",
+    "faststart",
+    "streaming",
+    "cli"
+  ],
   "scripts": {
     "test": "vitest run",
     "test:unit": "vitest run",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "prepack": "node -e \"require('node:fs').copyFileSync('../../LICENSE', 'LICENSE')\"",
+    "prepublishOnly": "pnpm typecheck && pnpm test"
   },
   "dependencies": {
     "@zip.js/zip.js": "^2.17.0"

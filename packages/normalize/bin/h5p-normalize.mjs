@@ -8,7 +8,7 @@
  *   h5p-normalize https://example.org/course.h5p -o course.h5p
  *   h5p-normalize course.h5p --dry-run
  *
- * From the repository root, `pnpm normalize -- course.h5p` runs the same command.
+ * From the repository root, `pnpm normalize course.h5p` runs the same command.
  */
 import { createWriteStream } from 'node:fs'
 import { mkdtemp, rename, rm, stat } from 'node:fs/promises'

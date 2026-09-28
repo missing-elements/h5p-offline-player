@@ -144,12 +144,12 @@ the rate of whichever video is needed first.
 It is off by default: it spends a learner's bandwidth on media they may never reach, and that is
 the host's call. Progress arrives as `progress` events with `phase: 'extract'`.
 
-The real fix belongs to whoever builds the package, and the repository ships it as a command,
-`packages/normalize`:
+The real fix belongs to whoever builds the package, and it ships as a command of its own,
+[`@missing-elements/h5p-normalize`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/normalize):
 
 ```bash
-pnpm normalize course.h5p                     # writes course.normalized.h5p beside it
-pnpm normalize https://…/course.h5p --dry-run  # inspect only
+npx @missing-elements/h5p-normalize course.h5p                     # writes course.normalized.h5p beside it
+npx @missing-elements/h5p-normalize https://…/course.h5p --dry-run  # inspect only
 ```
 
 It rewrites the container and leaves the content alone: media is stored rather than deflated, an
