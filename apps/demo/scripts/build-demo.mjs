@@ -1,17 +1,17 @@
 import { cp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { build as viteBuild } from 'vite'
-import { buildServiceWorker } from './lib/worker-bundle.mjs'
+import { buildServiceWorker } from '../../../packages/player/scripts/lib/worker-bundle.mjs'
 
 /**
- * Builds the hosted demo into `dist-demo/`: the pages through `vite.demo.config.ts`, then the
- * Service Worker, the frame assets and the demo content placed where the pages and the element
- * expect them. Run `npm run sync:assets` first — `npm run build:demo` does — so that the
- * vendored runtime exists.
+ * Builds the hosted demo into `dist-demo/`: the pages through `vite.config.ts`, then the Service
+ * Worker, the frame assets and the demo content placed where the pages and the element expect
+ * them. The player's `sync:assets` has to have run first — `pnpm build:demo` runs it — so that
+ * the vendored runtime exists in `packages/player/public/`.
  */
 
 const rootDir = resolve(import.meta.dirname, '..')
-const publicDir = resolve(rootDir, 'public')
+const publicDir = resolve(rootDir, '..', '..', 'packages', 'player', 'public')
 const outDir = resolve(rootDir, 'dist-demo')
 
 // The origin the pages' absolute URLs use: given, or Vercel's production URL, or the preview.
@@ -21,14 +21,14 @@ const siteUrl = (
 ).replace(/\/$/, '')
 process.env.SITE_URL = siteUrl
 
-await viteBuild({ configFile: resolve(rootDir, 'vite.demo.config.ts') })
+await viteBuild({ configFile: resolve(rootDir, 'vite.config.ts') })
 
 await buildServiceWorker(resolve(outDir, 'h5p-sw.js'))
 
 await rm(resolve(outDir, 'frame-assets'), { recursive: true, force: true })
 await cp(resolve(publicDir, 'frame-assets'), resolve(outDir, 'frame-assets'), { recursive: true })
 
-// The demo content, and nothing from `public/fixtures/`: those are the test suite's stub
+// The demo content, and nothing from the player's `public/fixtures/`: those are the test suite's stub
 // archives, and they are not what a visitor should see.
 const contentDir = resolve(rootDir, 'demo', 'content')
 const packages = (await readdir(contentDir)).filter((name) => name.endsWith('.h5p'))

@@ -1,33 +1,75 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { defineConfig } from 'vite'
-import { jobsWorkerPlugin, noRangeFixturesPlugin, siteUrlPlugin } from './vite.plugins'
+import { defineConfig, type Plugin } from 'vite'
+import {
+  PLAYER_FIXTURES,
+  devServiceWorkerPlugin,
+  jobsWorkerPlugin,
+  noRangeFixturesPlugin
+} from '../../packages/player/vite.plugins'
 
 /**
- * The hosted demo: the player page and the examples under `demo/`, built as a static site into
- * `dist-demo/`. The element is emitted unhashed at `/h5p-player.js`, and `scripts/build-demo.mjs`
- * puts `h5p-sw.js` and `frame-assets/` beside it, so the site root has exactly the layout of the
- * package's `dist/` — the element finds its worker and its assets with no attribute set, the
- * same way it does in a consuming app that serves `dist/` statically.
+ * The demo app: the dev server for the whole repository, and the hosted demo — the player page
+ * and the examples under `demo/`, built as a static site into `dist-demo/`. The element is
+ * emitted unhashed at `/h5p-player.js`, and `scripts/build-demo.mjs` puts `h5p-sw.js` and
+ * `frame-assets/` beside it, so the site root has exactly the layout of the package's `dist/` —
+ * the element finds its worker and its assets with no attribute set, the same way it does in a
+ * consuming app that serves `dist/` statically.
+ *
+ * The element is compiled from the player's source, not taken from its `dist/`: the pages import
+ * `@missing-elements/h5p-offline-player` and the alias below points the name at the source, with
+ * the player's own plugins supplying the Jobs worker and, in dev, the Service Worker.
  */
 
 const rootDir = import.meta.dirname
-const ELEMENT = resolve(rootDir, 'src/h5p-offline-player.ts')
+const repositoryRoot = resolve(rootDir, '..', '..')
+const playerDir = resolve(repositoryRoot, 'packages', 'player')
+const ELEMENT = resolve(playerDir, 'src', 'h5p-offline-player.ts')
 
 /** The production headers, so `vite preview` enforces the same CSP the deployment will. */
 type HeaderRule = { source: string; headers: Array<{ key: string; value: string }> }
-const vercel = JSON.parse(readFileSync(resolve(rootDir, 'vercel.json'), 'utf8')) as { headers: HeaderRule[] }
+const vercel = JSON.parse(readFileSync(resolve(repositoryRoot, 'vercel.json'), 'utf8')) as { headers: HeaderRule[] }
 const siteHeaders = Object.fromEntries(
   (vercel.headers.find((rule) => rule.source === '/(.*)')?.headers ?? []).map((header) => [header.key, header.value])
 )
 
-export default defineConfig({
-  // `SITE_URL` is set by `scripts/build-demo.mjs`; alone, this config builds for a local preview.
-  plugins: [jobsWorkerPlugin(), noRangeFixturesPlugin(), siteUrlPlugin(process.env.SITE_URL ?? 'http://localhost:4173')],
+/**
+ * Replaces `%SITE_URL%` in the pages. Canonical links and social-card URLs have to be absolute,
+ * and the origin is only known where the site is built — Vercel's production URL, or localhost.
+ * It runs before Vite's own `%ENV%` pass, which would otherwise warn about a name it does not
+ * know.
+ */
+function siteUrlPlugin(siteUrl: string): Plugin {
+  const origin = siteUrl.replace(/\/$/, '')
+  return {
+    name: 'h5p-site-url',
+    transformIndexHtml: {
+      order: 'pre',
+      handler: (html) => html.replaceAll('%SITE_URL%', origin)
+    }
+  }
+}
 
-  // Not `public/` wholesale: it also holds whatever real packages were dropped in to try against
-  // the dev server. The build script copies the frame assets and the generated fixtures by name.
-  publicDir: false,
+export default defineConfig(({ command }) => ({
+  // `SITE_URL` is set by `scripts/build-demo.mjs`; alone, this config builds for a local preview.
+  plugins: [
+    jobsWorkerPlugin(),
+    devServiceWorkerPlugin(),
+    // The demo content first, then the player's fixtures: the pages use the former, and the
+    // latter stay reachable for trying a fixture against the dev server.
+    noRangeFixturesPlugin([resolve(rootDir, 'demo', 'content'), PLAYER_FIXTURES]),
+    siteUrlPlugin(process.env.SITE_URL ?? (command === 'serve' ? 'http://localhost:5173' : 'http://localhost:4173'))
+  ],
+
+  resolve: {
+    alias: [{ find: /^@missing-elements\/h5p-offline-player$/, replacement: ELEMENT }]
+  },
+
+  // In dev, the player's generated `public/`: the vendored runtime at `/frame-assets/`, where the
+  // element looks for it in dev, and the fixtures at `/fixtures/`. Not in a build: that folder
+  // also holds whatever real packages were dropped in to try, and the build script copies the
+  // frame assets by name.
+  publicDir: command === 'serve' ? resolve(playerDir, 'public') : false,
 
   build: {
     target: 'es2022',
@@ -57,4 +99,4 @@ export default defineConfig({
   preview: {
     headers: siteHeaders
   }
-})
+}))

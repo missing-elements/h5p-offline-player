@@ -1,5 +1,5 @@
 // Written by scripts/sync-h5p-assets.mjs from the @font-face rules in h5p-standalone
-// 3.8.2's styles/h5p.css. Do not edit; run `npm run sync:assets`.
+// 3.8.2's styles/h5p.css. Do not edit; run `pnpm sync:assets` in packages/player.
 
 /**
  * The text faces the core stylesheet declares, in its order. `file` is the name under

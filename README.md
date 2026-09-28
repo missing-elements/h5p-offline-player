@@ -1,7 +1,7 @@
 # @missing-elements/h5p-offline-player
 
 [![npm](https://img.shields.io/npm/v/%40missing-elements%2Fh5p-offline-player)](https://www.npmjs.com/package/@missing-elements/h5p-offline-player)
-[![licence](https://img.shields.io/npm/l/%40missing-elements%2Fh5p-offline-player)](LICENSE)
+[![licence](https://img.shields.io/npm/l/%40missing-elements%2Fh5p-offline-player)](https://github.com/missing-elements/h5p-offline-player/blob/main/LICENSE)
 
 A browser-only H5P player, as one web component. It plays an arbitrary `.h5p` archive from a URL
 or from disk — no server-side extraction, no backend, nothing to unpack ahead of time.
@@ -71,7 +71,7 @@ input.addEventListener('change', () => { player.file = input.files[0] })
 ```
 
 The full guide, with single-worker hosts and troubleshooting, is
-[h5p-player-setup.md](h5p-player-setup.md).
+[h5p-player-setup.md](https://github.com/missing-elements/h5p-offline-player/blob/main/h5p-player-setup.md).
 
 ## How it works
 
@@ -144,11 +144,12 @@ the rate of whichever video is needed first.
 It is off by default: it spends a learner's bandwidth on media they may never reach, and that is
 the host's call. Progress arrives as `progress` events with `phase: 'extract'`.
 
-The real fix belongs to whoever builds the package, and the repository ships it as a script:
+The real fix belongs to whoever builds the package, and the repository ships it as a command,
+`packages/normalize`:
 
 ```bash
-npm run normalize -- course.h5p                    # writes course.normalized.h5p beside it
-npm run normalize -- https://…/course.h5p --dry-run  # inspect only
+pnpm normalize course.h5p                     # writes course.normalized.h5p beside it
+pnpm normalize https://…/course.h5p --dry-run  # inspect only
 ```
 
 It rewrites the container and leaves the content alone: media is stored rather than deflated, an
@@ -244,25 +245,28 @@ no "open in another browser" banner. Those belong to the host page, built out of
   room the browser gives the site is refused with `error: quota`, naming the size it needed.
 
 Integration details, including bundler-specific setup and single-worker hosts, are in
-[h5p-player-setup.md](h5p-player-setup.md). The design is in
-[h5p-offline-player-architecture.md](h5p-offline-player-architecture.md).
+[h5p-player-setup.md](https://github.com/missing-elements/h5p-offline-player/blob/main/h5p-player-setup.md). The design is in
+[h5p-offline-player-architecture.md](https://github.com/missing-elements/h5p-offline-player/blob/main/h5p-offline-player-architecture.md).
 
 ## Development
 
-```bash
-npm install
-npx playwright install chromium   # once, for the browser tests
+A pnpm workspace: the player in `packages/player`, the normalizer in `packages/normalize`, the
+demo site in `apps/demo`.
 
-npm run dev     # the demo player page on http://localhost:5173
-npm test        # unit tests plus the browser suite
-npm run build
-npm run normalize -- course.h5p   # rewrite a package so it streams (see above)
-npm run build:demo                # the hosted demo, as Vercel builds it, into dist-demo/
-npm run preview:demo              # serve it locally with the production headers
-npm run demo:content              # rebuild the demo's content packages from their sources
+```bash
+pnpm install
+pnpm --filter @missing-elements/h5p-offline-player exec playwright install chromium   # once, for the browser tests
+
+pnpm dev          # the demo player page on http://localhost:5173
+pnpm test         # every package's tests, the player's browser suite included
+pnpm build        # the player package
+pnpm normalize course.h5p   # rewrite a package so it streams (see above)
+pnpm build:demo             # the hosted demo, as Vercel builds it, into apps/demo/dist-demo/
+pnpm preview:demo           # serve it locally with the production headers
+pnpm demo:content           # rebuild the demo's content packages from their sources
 ```
 
-`npm run dev` serves the player page with real content — a quiz, an interactive video, an
+`pnpm dev` serves the player page with real content — a quiz, an interactive video, an
 accordion and dialog cards, built from H5P hub libraries around text written for this player —
 plus, in dev only, generated test archives under `/fixtures/` covering each path the player
 takes: a host that honours `Range` and one that does not, 20 MB of deflated and of stored media,
@@ -273,12 +277,12 @@ linked from there.
 The demo site deploys to Vercel from `vercel.json`: the pages, the element, its worker and the
 frame assets as static files, plus one function that plays a host without `Range` support.
 
-Working on the code? Start with [AGENTS.md](AGENTS.md).
+Working on the code? Start with [AGENTS.md](https://github.com/missing-elements/h5p-offline-player/blob/main/AGENTS.md).
 
 ## Licence
 
 The player's own code — the element, the two workers, the scripts — is MIT, see
-[LICENSE](LICENSE). The package as published is not MIT alone, and its `license` field says so:
+[LICENSE](https://github.com/missing-elements/h5p-offline-player/blob/main/LICENSE). The package as published is not MIT alone, and its `license` field says so:
 `(MIT AND GPL-3.0-only)`.
 
 - `dist/frame-assets/` is the H5P core runtime from
@@ -289,9 +293,10 @@ The player's own code — the element, the two workers, the scripts — is MIT, 
   confirms it in [issue #188](https://github.com/tunapanda/h5p-standalone/issues/188) while
   its npm metadata still says MIT. The directory carries its own `LICENSE.txt` and `NOTICE.txt`.
   Keep them with it when you copy or serve it: a site serving these files is distributing GPL
-  code. A bundler emits the runtime files without the text files beside them, so `h5p.css`
-  carries a notice comment of its own that names the licence. Whether the copyleft reaches the page around the player is a legal question, not one
+  code. A bundler emits the runtime files without the text files beside them, so
+  `frame.bundle.js`, `main.bundle.js` and `h5p.css` each open with a notice comment naming
+  their licences and the corresponding source. Whether the copyleft reaches the page around the player is a legal question, not one
   this README answers.
 - The two Service Worker scripts in `dist/`, `h5p-sw.js` and `h5p-sw-mount.js`, bundle [zip.js](https://github.com/gildas-lormeau/zip.js)
-  (BSD-3-Clause). Minification strips its notice from the files, so
-  [NOTICE.md](NOTICE.md) reproduces it.
+  (BSD-3-Clause). Both open with its licence in full, so the notice travels with them when a
+  bundler emits them on their own, and [NOTICE.md](https://github.com/missing-elements/h5p-offline-player/blob/main/packages/player/NOTICE.md) reproduces it.

@@ -4,9 +4,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { BlobReader, BlobWriter, TextReader, Uint8ArrayReader, Uint8ArrayWriter, ZipReader, ZipWriter, type FileEntry } from '@zip.js/zip.js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { crc32 } from '../../scripts/lib/crc32.mjs'
-import { normalizeArchive, orderEntries, plainRelativeName, targetFormOf } from '../../scripts/lib/normalize.mjs'
-import { StreamingZipWriter } from '../../scripts/lib/zip-writer.mjs'
+import { crc32 } from '../lib/crc32.mjs'
+import { normalizeArchive, orderEntries, plainRelativeName, targetFormOf } from '../lib/normalize.mjs'
+import { StreamingZipWriter } from '../lib/zip-writer.mjs'
 import { atomsIn, concat, sampleMp4 } from './helpers/mp4'
 
 const text = (value: unknown) => new TextReader(JSON.stringify(value))

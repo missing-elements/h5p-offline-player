@@ -205,11 +205,11 @@
       </p>
       <pre class="code">git clone https://github.com/missing-elements/h5p-offline-player
 cd h5p-offline-player
-npm install
+pnpm install
 
-npm run normalize -- course.h5p --dry-run   # report only, write nothing
-npm run normalize -- course.h5p             # writes course.normalized.h5p
-npm run normalize -- https://host.example/course.h5p -o course.h5p</pre>
+pnpm normalize course.h5p --dry-run   # report only, write nothing
+pnpm normalize course.h5p             # writes course.normalized.h5p
+pnpm normalize https://host.example/course.h5p -o course.h5p</pre>
       <p>What it changes, all of it in the zip container:</p>
       <ul class="list">
         <li><strong>Media is stored, not deflated</strong> — video, audio, images, fonts and PDFs, which are already compressed. A <code>Range</code> request can then reach any byte directly.</li>

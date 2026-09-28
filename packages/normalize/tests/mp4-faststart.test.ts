@@ -2,7 +2,7 @@ import { mkdtemp, open, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { planFaststart, readPieces } from '../../scripts/lib/mp4-faststart.mjs'
+import { planFaststart, readPieces } from '../lib/mp4-faststart.mjs'
 import { atom, atomsIn, chunkOffsets, concat, findAtom, sampleMp4, stco, u32s } from './helpers/mp4'
 
 async function withFile<T>(bytes: Uint8Array, run: (file: Awaited<ReturnType<typeof open>>) => Promise<T>): Promise<T> {

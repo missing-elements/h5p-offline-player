@@ -7,8 +7,9 @@ import { build as esbuild } from 'esbuild'
 import { FRAME_BOOT_ENTRY, FRAME_BOOT_VIRTUAL_ID, bundleFrameBoot, frameBootEsbuildPlugin } from './scripts/lib/frame-boot-plugin.mjs'
 
 /**
- * The plugins both Vite configs share. `vite.config.ts` is the library build, the dev server and
- * the test runner; `vite.demo.config.ts` is the hosted demo. Two of the package's three
+ * The plugins the player's own Vite config uses, and which the demo app's config
+ * (`apps/demo/vite.config.ts`) imports as well. `vite.config.ts` here is the library build and
+ * the test runner; the demo is the dev server and the hosted site. Two of the package's three
  * artefacts are not modules the host imports — the Service Worker is registered by URL and the
  * Jobs worker is spawned from a blob — so both are bundled here with esbuild, and dev, test,
  * build and demo all see the same self-contained scripts.
@@ -144,17 +145,24 @@ async function sendThrottled(res: ServerResponse, body: Buffer, bytesPerSecond: 
   res.end()
 }
 
-/** The demo content first, the test fixtures second: the pages use the former, the browser tests the latter, and the names do not collide. */
-function archivePath(name: string): Promise<string> {
-  const inDemo = resolve(rootDir, 'demo/content', name)
-  return stat(inDemo).then(
-    () => inDemo,
-    () => resolve(rootDir, 'public/fixtures', name)
-  )
-}
+/** Where the fixture hosts look for an archive by name, in order. */
+const PLAYER_FIXTURES = resolve(rootDir, 'public/fixtures')
 
-function readArchive(name: string): Promise<Buffer> {
-  return archivePath(name).then((path) => readFile(path))
+/**
+ * The first of `dirs` that holds `name`. The player's tests pass only their fixtures; the demo
+ * passes its content first and the fixtures second, and the names do not collide.
+ */
+async function archivePath(dirs: readonly string[], name: string): Promise<string> {
+  for (const dir of dirs) {
+    const path = resolve(dir, name)
+    try {
+      await stat(path)
+      return path
+    } catch {
+      // Not in this one; try the next.
+    }
+  }
+  throw new Error(`no such fixture: ${name}`)
 }
 
 /** The last path segment of a fixture route, or null for anything that is not a plain name. */
@@ -164,7 +172,7 @@ function fixtureName(pathname: string, prefix: string): string | null {
   return name.includes('/') || name.includes('..') ? null : name
 }
 
-function noRangeHandler(): Connect.NextHandleFunction {
+function noRangeHandler(dirs: readonly string[]): Connect.NextHandleFunction {
   const prefix = '/no-range/'
 
   return (req, res, next) => {
@@ -175,7 +183,7 @@ function noRangeHandler(): Connect.NextHandleFunction {
     // the forward index while the rest of the archive is still on its way.
     const throttle = Number(url.searchParams.get('throttle') ?? 0)
 
-    readArchive(name).then(
+    archivePath(dirs, name).then((path) => readFile(path)).then(
       (body) => {
         res.setHeader('content-type', 'application/zip')
         res.setHeader('content-length', String(body.length))
@@ -204,12 +212,12 @@ function noRangeHandler(): Connect.NextHandleFunction {
  * plain `GET`; see `source.ts`. The gzipped copies are kept per file, since a fixture is
  * compressed once and asked for many times.
  */
-function compressingHostHandler(): Connect.NextHandleFunction {
+function compressingHostHandler(dirs: readonly string[]): Connect.NextHandleFunction {
   const prefix = '/compressing/'
   const gzipped = new Map<string, Buffer>()
 
   const representation = async (name: string, gzip: boolean): Promise<Buffer> => {
-    const path = await archivePath(name)
+    const path = await archivePath(dirs, name)
     const body = await readFile(path)
     if (!gzip) return body
     const key = `${path}@${(await stat(path)).mtimeMs}`
@@ -272,7 +280,7 @@ function compressingHostHandler(): Connect.NextHandleFunction {
  * in flight are destroyed and new requests are answered `503` — a host that is down. Either
  * way nothing is lost that a later request cannot ask for again.
  */
-function stallingHostHandler(): Connect.NextHandleFunction {
+function stallingHostHandler(dirs: readonly string[]): Connect.NextHandleFunction {
   const prefix = '/stalling/'
   const inFlight = new Set<ServerResponse>()
   let outageUntil = 0
@@ -305,7 +313,7 @@ function stallingHostHandler(): Connect.NextHandleFunction {
 
     let body: Buffer
     try {
-      body = await readArchive(name)
+      body = await readFile(await archivePath(dirs, name))
     } catch {
       res.statusCode = 404
       return res.end('no such fixture')
@@ -368,37 +376,23 @@ function stallingHostHandler(): Connect.NextHandleFunction {
   }
 }
 
-export function noRangeFixturesPlugin(): Plugin {
+/** `dirs` defaults to the player's generated fixtures, which is all the browser tests need. */
+export function noRangeFixturesPlugin(dirs: readonly string[] = [PLAYER_FIXTURES]): Plugin {
   return {
     name: 'h5p-no-range-fixtures',
     configureServer(server) {
-      server.middlewares.use(noRangeHandler())
-      server.middlewares.use(compressingHostHandler())
-      server.middlewares.use(stallingHostHandler())
+      server.middlewares.use(noRangeHandler(dirs))
+      server.middlewares.use(compressingHostHandler(dirs))
+      server.middlewares.use(stallingHostHandler(dirs))
     },
     // `vite preview` of the demo build as well, so the built site can be checked end to end
     // before it is deployed — the deployment gets the route from `vercel.json` instead.
     configurePreviewServer(server) {
-      server.middlewares.use(noRangeHandler())
-      server.middlewares.use(compressingHostHandler())
-      server.middlewares.use(stallingHostHandler())
+      server.middlewares.use(noRangeHandler(dirs))
+      server.middlewares.use(compressingHostHandler(dirs))
+      server.middlewares.use(stallingHostHandler(dirs))
     }
   }
 }
 
-/**
- * Replaces `%SITE_URL%` in the pages. Canonical links and social-card URLs have to be absolute,
- * and the origin is only known where the site is built — Vercel's production URL, or localhost.
- * It runs before Vite's own `%ENV%` pass, which would otherwise warn about a name it does not
- * know.
- */
-export function siteUrlPlugin(siteUrl: string): Plugin {
-  const origin = siteUrl.replace(/\/$/, '')
-  return {
-    name: 'h5p-site-url',
-    transformIndexHtml: {
-      order: 'pre',
-      handler: (html) => html.replaceAll('%SITE_URL%', origin)
-    }
-  }
-}
+export { PLAYER_FIXTURES }

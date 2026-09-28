@@ -15,5 +15,6 @@ export const GENERATED_FIXTURES = [
   'needs-libraries.h5p',
   'libraries.h5p',
   'unversioned.h5p',
-  'corrupt.h5p'
+  'corrupt.h5p',
+  'html-page.h5p'
 ]

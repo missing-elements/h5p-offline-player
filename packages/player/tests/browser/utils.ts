@@ -33,7 +33,7 @@ export const FIXTURES = {
   /** A genuine 404. The dev server answers a missing `/fixtures/…` with its HTML fallback. */
   missing: '/no-range/missing.h5p',
   /** A URL that answers 200 with a page instead of an archive — a login wall, in the wild. */
-  htmlInsteadOfArchive: '/fixtures/missing.h5p',
+  htmlInsteadOfArchive: '/fixtures/html-page.h5p',
   /** Content with no libraries: what h5p.com and h5p.org hand you by default. */
   contentOnly: '/fixtures/content-only.h5p',
   /** The same, for a content type this repo can supply locally. */

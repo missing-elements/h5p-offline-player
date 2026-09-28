@@ -5,7 +5,8 @@
   "license": "(MIT AND GPL-3.0-only)",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/missing-elements/h5p-offline-player.git"
+    "url": "git+https://github.com/missing-elements/h5p-offline-player.git",
+    "directory": "packages/player"
   },
   "homepage": "https://github.com/missing-elements/h5p-offline-player#readme",
   "bugs": {
@@ -50,20 +51,15 @@
   "scripts": {
     "sync:assets": "node scripts/sync-h5p-assets.mjs",
     "fixtures": "node scripts/build-fixtures.mjs",
-    "normalize": "node scripts/normalize-h5p.mjs",
-    "demo:content": "node scripts/build-demo-content.mjs",
-    "demo:og": "node scripts/build-og-image.mjs",
-    "prepare:dev": "npm run sync:assets && npm run fixtures",
-    "dev": "npm run prepare:dev && vite",
-    "build": "npm run sync:assets && tsc -b && vite build && node scripts/build-workers.mjs && node scripts/copy-frame-assets.mjs",
-    "build:demo": "npm run sync:assets && node scripts/build-demo.mjs",
-    "preview:demo": "vite preview --config vite.demo.config.ts",
-    "test": "npm run prepare:dev && vitest run",
+    "prepare:dev": "pnpm sync:assets && pnpm fixtures",
+    "build": "pnpm sync:assets && node -e \"for (const p of ['types', 'tsconfig.tsbuildinfo', 'node_modules/.tsc-node']) require('node:fs').rmSync(p, { recursive: true, force: true })\" && tsc -b && vite build && node scripts/build-workers.mjs && node scripts/copy-frame-assets.mjs",
+    "test": "pnpm prepare:dev && vitest run",
     "test:unit": "vitest run --project unit",
-    "test:browser": "npm run prepare:dev && vitest run --project browser --project browser-emulated",
-    "test:watch": "npm run prepare:dev && vitest",
+    "test:browser": "pnpm prepare:dev && vitest run --project browser --project browser-emulated",
+    "test:watch": "pnpm prepare:dev && vitest",
     "typecheck": "tsc -b --force && tsc -p tsconfig.test.json",
-    "prepublishOnly": "npm run typecheck && npm run test:unit && npm run build"
+    "prepack": "node scripts/prepack.mjs",
+    "prepublishOnly": "pnpm typecheck && pnpm test:unit && pnpm build"
   },
   "dependencies": {
     "@zip.js/zip.js": "^2.17.0",
@@ -71,7 +67,6 @@
   },
   "devDependencies": {
     "@types/node": "^22.13.0",
-    "@vercel/analytics": "^2.0.1",
     "@vitest/browser": "^5.0.1",
     "@vitest/browser-playwright": "^5.0.1",
     "esbuild": "^0.25.0",

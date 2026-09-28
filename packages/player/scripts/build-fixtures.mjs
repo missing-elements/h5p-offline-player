@@ -66,7 +66,7 @@ const randomBytes = () => {
 
 // Only the archives this script owns are cleared. `public/fixtures/` is where a real `.h5p`
 // gets dropped to try against the demo, and wiping the directory would delete it on the next
-// `npm run dev`.
+// `pnpm dev`.
 const GENERATED = GENERATED_FIXTURES
 
 await mkdir(outDir, { recursive: true })
@@ -283,6 +283,14 @@ built.push([
 const garbage = new TextEncoder().encode('this is not a zip archive, not even close\n')
 await writeFile(resolve(outDir, 'corrupt.h5p'), garbage)
 built.push(['corrupt.h5p', garbage.length])
+
+// 10. An HTML page where the archive should be: a login wall or an error page a host serves
+// with status 200 is the common version of this in the wild. The test once got it from the dev
+// server's SPA fallback, answering a missing file with the repository's index.html; that page
+// moved to the demo app, and a fixture does not depend on where any page lives.
+const page = new TextEncoder().encode('<!doctype html>\n<html><head><title>Sign in</title></head><body><form>…</form></body></html>\n')
+await writeFile(resolve(outDir, 'html-page.h5p'), page)
+built.push(['html-page.h5p', page.length])
 
 for (const [name, size] of built) {
   console.log(`[fixtures] ${name.padEnd(20)} ${(size / 1024).toFixed(1)} kB`)

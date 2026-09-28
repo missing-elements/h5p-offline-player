@@ -1,0 +1,25 @@
+{
+  "name": "@missing-elements/h5p-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @missing-elements/h5p-offline-player prepare:dev && vite",
+    "build": "pnpm --filter @missing-elements/h5p-offline-player sync:assets && node scripts/build-demo.mjs",
+    "preview": "vite preview",
+    "demo:content": "node scripts/build-demo-content.mjs",
+    "demo:og": "node scripts/build-og-image.mjs",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@missing-elements/h5p-offline-player": "workspace:*",
+    "@vercel/analytics": "^2.0.1"
+  },
+  "devDependencies": {
+    "@missing-elements/h5p-normalize": "workspace:*",
+    "@types/node": "^22.13.0",
+    "@zip.js/zip.js": "^2.17.0",
+    "playwright": "^1.50.0",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.11"
+  }
+}

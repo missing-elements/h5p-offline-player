@@ -1,0 +1,14 @@
+packages:
+  - packages/*
+  - apps/*
+
+# pnpm 10 runs no dependency's install scripts unless it is named here. That is what keeps
+# h5p-standalone's `preinstall: npx only-allow yarn` guard from failing the install — we only
+# consume its prebuilt dist/ files — which npm needed `ignore-scripts=true` for, a setting that
+# also silenced our own `prepublishOnly`. esbuild's postinstall only verifies its binary.
+onlyBuiltDependencies:
+  - esbuild
+
+# Named so the install says nothing about it: its only script is the yarn guard above.
+ignoredBuiltDependencies:
+  - h5p-standalone

@@ -5,8 +5,8 @@ import { basename, join, relative, resolve } from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { BlobReader, BlobWriter, TextReader, Uint8ArrayReader, Uint8ArrayWriter, ZipReader, ZipWriter, configure } from '@zip.js/zip.js'
-import { formatBytes } from './lib/format.mjs'
-import { normalizeArchive } from './lib/normalize.mjs'
+import { formatBytes } from '@missing-elements/h5p-normalize/lib/format.mjs'
+import { normalizeArchive } from '@missing-elements/h5p-normalize'
 
 /**
  * Builds the packages the hosted demo plays, from `demo/content/src/<name>/` into

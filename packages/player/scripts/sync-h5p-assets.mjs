@@ -55,7 +55,7 @@ const packageJson = JSON.parse(await readFile(resolve(rootDir, 'package.json'), 
 const standaloneDir = resolve(rootDir, 'node_modules', 'h5p-standalone', 'dist')
 
 if (!(await exists(standaloneDir))) {
-  fail('node_modules/h5p-standalone is missing. Run "npm install" first.')
+  fail('node_modules/h5p-standalone is missing. Run "pnpm install" at the repository root first.')
 }
 
 const standaloneVersion = JSON.parse(
@@ -157,7 +157,7 @@ await build({
 // Written only when it changes, like the version stamp below, so a sync leaves git clean.
 const fontsModulePath = resolve(rootDir, 'src', 'frame-fonts.ts')
 const fontsModule = `// Written by scripts/sync-h5p-assets.mjs from the @font-face rules in h5p-standalone
-// ${standaloneVersion}'s styles/h5p.css. Do not edit; run \`npm run sync:assets\`.
+// ${standaloneVersion}'s styles/h5p.css. Do not edit; run \`pnpm sync:assets\` in packages/player.
 
 /**
  * The text faces the core stylesheet declares, in its order. \`file\` is the name under

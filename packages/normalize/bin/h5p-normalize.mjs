@@ -2,11 +2,13 @@
 /**
  * Rewrites a `.h5p` so that it streams well: media stored rather than deflated, mp4 indexes at
  * the front, libraries before content and content media last. Run it once, by whoever
- * publishes the package. See `scripts/lib/normalize.mjs` for what each step is for.
+ * publishes the package. See `lib/normalize.mjs` for what each step is for.
  *
- *   node scripts/normalize-h5p.mjs course.h5p
- *   node scripts/normalize-h5p.mjs https://example.org/course.h5p -o course.h5p
- *   node scripts/normalize-h5p.mjs course.h5p --dry-run
+ *   h5p-normalize course.h5p
+ *   h5p-normalize https://example.org/course.h5p -o course.h5p
+ *   h5p-normalize course.h5p --dry-run
+ *
+ * From the repository root, `pnpm normalize -- course.h5p` runs the same command.
  */
 import { createWriteStream } from 'node:fs'
 import { mkdtemp, rename, rm, stat } from 'node:fs/promises'
@@ -15,10 +17,10 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { parseArgs } from 'node:util'
-import { formatBytes } from './lib/format.mjs'
-import { normalizeArchive } from './lib/normalize.mjs'
+import { formatBytes } from '../lib/format.mjs'
+import { normalizeArchive } from '../lib/normalize.mjs'
 
-const HELP = `Usage: node scripts/normalize-h5p.mjs <package.h5p | https://…/package.h5p> [options]
+const HELP = `Usage: h5p-normalize <package.h5p | https://…/package.h5p> [options]
 
 Rewrites an H5P package so that it streams well through the player. The content is not
 changed; only the zip container is:
@@ -130,7 +132,7 @@ function normalizedName(name) {
 
 const METHOD_NAMES = { 0: 'stored', 8: 'deflated', 9: 'deflate64' }
 
-/** @param {import('./lib/normalize.mjs').EntryResult} result */
+/** @param {import('../lib/normalize.mjs').EntryResult} result */
 function describe(result) {
   const from = METHOD_NAMES[result.from.method] ?? `method ${result.from.method}`
   const trailer = [result.detail, result.warning].filter(Boolean).join('; ')
@@ -147,7 +149,7 @@ function describe(result) {
 }
 
 /**
- * @param {import('./lib/normalize.mjs').Report} report
+ * @param {import('../lib/normalize.mjs').Report} report
  * @param {number} bytesIn
  */
 function printSummary(report, bytesIn) {

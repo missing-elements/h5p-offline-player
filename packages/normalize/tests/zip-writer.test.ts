@@ -1,8 +1,8 @@
 import { deflateRawSync } from 'node:zlib'
 import { Uint8ArrayReader, Uint8ArrayWriter, ZipReader, type FileEntry } from '@zip.js/zip.js'
 import { describe, expect, it } from 'vitest'
-import { crc32 } from '../../scripts/lib/crc32.mjs'
-import { StreamingZipWriter, dosDateTimeOf } from '../../scripts/lib/zip-writer.mjs'
+import { crc32 } from '../lib/crc32.mjs'
+import { StreamingZipWriter, dosDateTimeOf } from '../lib/zip-writer.mjs'
 import { concat } from './helpers/mp4'
 
 function memorySink() {

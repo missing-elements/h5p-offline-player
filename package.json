@@ -1,0 +1,22 @@
+{
+  "name": "h5p-offline-player-workspace",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.24.0",
+  "scripts": {
+    "dev": "pnpm --filter @missing-elements/h5p-demo dev",
+    "build": "pnpm --filter @missing-elements/h5p-offline-player build",
+    "build:demo": "pnpm --filter @missing-elements/h5p-demo build",
+    "preview:demo": "pnpm --filter @missing-elements/h5p-demo preview",
+    "test": "pnpm -r test",
+    "test:unit": "pnpm -r test:unit",
+    "test:browser": "pnpm --filter @missing-elements/h5p-offline-player test:browser",
+    "typecheck": "pnpm -r typecheck",
+    "normalize": "node packages/normalize/bin/h5p-normalize.mjs",
+    "demo:content": "pnpm --filter @missing-elements/h5p-demo demo:content",
+    "demo:og": "pnpm --filter @missing-elements/h5p-demo demo:og"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
