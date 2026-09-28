@@ -289,7 +289,7 @@ class VirtualServer {
     // With a bundle attached, `h5p.json` is answered from the merged manifest rather than from
     // the archive: the dependency list in a content-only export names only the main library.
     if (name === 'h5p.json' && reader.hasFallbacks) {
-      return json(reader.mergedManifest())
+      return json(await reader.mergedManifest())
     }
 
     const rangeHeader = event.request.headers.get('range')

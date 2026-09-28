@@ -72,14 +72,17 @@
 
       <footer>
         <p>
-          A package that does not carry its own libraries — what h5p.com and h5p.org export by
-          default — needs them from the H5P hub, which takes a network. Everything else plays
-          offline. Files you open are not kept: open one again next time, and what was already
-          extracted comes from this device's cache.
+          The app carries the H5P libraries for every content type on the H5P hub, so a package
+          exported without its own — what h5p.com and h5p.org do by default — plays offline too.
+          Only a package that needs a newer version than the app carries asks to fetch it from
+          h5p.org, once. Files you open are not kept: open one again next time, and what was
+          already extracted comes from this device's cache.
         </p>
         <p class="credit">
           The player's own code is MIT; the H5P core runtime it loads is GPL-3.0, see
           <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/packages/player/NOTICE.md" rel="noopener">NOTICE.md</a>.
+          The libraries it carries are listed with their licences in
+          <a href="/app/libraries.txt">libraries.txt</a>.
         </p>
       </footer>
     </main>

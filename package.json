@@ -15,7 +15,8 @@
     "normalize": "node packages/normalize/bin/h5p-normalize.mjs",
     "demo:content": "pnpm --filter @missing-elements/h5p-demo demo:content",
     "demo:og": "pnpm --filter @missing-elements/h5p-demo demo:og",
-    "demo:icons": "pnpm --filter @missing-elements/h5p-demo demo:icons"
+    "demo:icons": "pnpm --filter @missing-elements/h5p-demo demo:icons",
+    "demo:libraries": "pnpm --filter @missing-elements/h5p-demo demo:libraries"
   },
   "engines": {
     "node": ">=20"

@@ -214,6 +214,23 @@ URL before is used instead, so a stripped export plays offline once one has play
 It is off by default. `libraries="hub"` is a request to a third party on every cold load, which is
 the host's decision to make, not the element's.
 
+**A ready-made bundle.** The repository ships one: the H5P hub's runtime libraries for every
+content type it serves, 98 libraries in 9.5 MB, each at its newest minor version — the pack the
+[offline app](https://h5p-offline-player.vercel.app/app/) carries. Download
+[`libraries.h5p`](https://github.com/missing-elements/h5p-offline-player/raw/main/apps/demo/app/libraries.h5p)
+and serve it from your own site, next to the element:
+
+```html
+<h5p-player src="stripped.h5p" libraries="/h5p/libraries.h5p"></h5p-player>
+```
+
+Take [`libraries.txt`](https://github.com/missing-elements/h5p-offline-player/blob/main/apps/demo/app/libraries.txt)
+with it: it lists each library's licence and authors, and the licences — mostly MIT, a few MPL
+and GPL-3.0 — ask for their notices to travel with the code. Serve it yourself rather than
+pointing at the demo site's copy, which is not sent with CORS headers and changes when the pack
+is refreshed. A package that needs a newer minor than the bundle carries is still refused with
+the missing libraries named; `pnpm demo:libraries` rebuilds the bundle from the hub.
+
 Properties: `src`, `file` (a `File` from a picker — setting it loads), `pkgId`, `state`
 (`idle | probing | downloading | indexing | ready | error`), `scope` (read-only), `revision`
 (read-only, see below).
@@ -318,8 +335,9 @@ linked from there.
 The demo site deploys to Vercel from `vercel.json`: the pages, the element, its worker and the
 frame assets as static files, plus one function that plays a host without `Range` support. Its
 `/app/` page is the player as an installable app: in Chrome or Edge it installs, opens `.h5p`
-files from the file manager and plays them with no network. `/app/?src=<url of a .h5p>` is a
-link that opens a package from the web in the installed app.
+files from the file manager and plays them with no network — including packages exported without
+their libraries, since the app carries the H5P hub's libraries for every content type.
+`/app/?src=<url of a .h5p>` is a link that opens a package from the web in the installed app.
 
 Working on the code? Start with [AGENTS.md](https://github.com/missing-elements/h5p-offline-player/blob/main/AGENTS.md).
 

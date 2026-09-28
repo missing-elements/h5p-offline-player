@@ -1,0 +1,103 @@
+H5P Offline Player library pack: the H5P hub runtime libraries the installable app carries,
+so that a package exported without its own libraries plays offline. Each library is used here
+under the licence below; its source is the library folder itself, as shipped by the hub
+(https://api.h5p.org/v1/content-types/<content type>). Built by apps/demo/scripts/build-app-libraries.mjs.
+
+flowplayer-1.0  1.0.5  GPL-3.0 (header of scripts/flowplayer-3.2.12.min.js)
+FontAwesome-4.5  4.5.4  MIT (library.json)  — Dave Gandy
+H5P.Accordion-1.0  1.0.33  MIT (library.json)  — Joubel
+H5P.AdvancedText-1.1  1.1.14  MIT (README of github.com/h5p/h5p-advanced-text)  — Joubel
+H5P.AdventCalendar-0.3  0.3.4  MIT (library.json)  — Oliver Tacke
+H5P.Agamotto-1.6  1.6.11  MIT (library.json)  — Oliver Tacke
+H5P.ArithmeticQuiz-1.1  1.1.25  MIT (library.json)  — Joubel, fabforge
+H5P.Audio-1.5  1.5.12  MIT (README of github.com/h5p/h5p-audio)  — Joubel
+H5P.AudioRecorder-1.0  1.0.33  MIT (library.json)  — Joubel
+H5P.Blanks-1.14  1.14.13  MIT (library.json)  — Joubel
+H5P.BranchingQuestion-1.0  1.0.20  MIT (library.json)  — Joubel AS
+H5P.BranchingScenario-1.8  1.8.14  MIT (library.json)  — Joubel AS
+H5P.Chart-1.2  1.2.22  MIT (library.json)  — Joubel
+H5P.CKEditor-1.0  1.0.24  MIT (library.json)  — Joubel
+H5P.Collage-0.3  0.3.25  MIT (library.json)  — Joubel
+H5P.Column-1.18  1.18.8  MIT (library.json)  — Joubel
+H5P.ContinuousText-1.2  1.2.16  MIT (README of github.com/h5p/h5p-continuous-text)  — Joubel
+H5P.Cornell-0.3  0.3.2  MIT (library.json)  — Oliver Tacke
+H5P.CoursePresentation-1.26  1.26.3  MIT (library.json)  — Joubel
+H5P.Crossword-0.5  0.5.13  MIT (library.json)  — Language Training Center GmbH, Oliver Tacke
+H5P.Dialogcards-1.9  1.9.18  MIT (library.json)  — Joubel
+H5P.Dictation-1.3  1.3.3  MIT (library.json)  — Oliver Tacke
+H5P.DocumentationTool-1.8  1.8.27  MIT (library.json)  — Joubel
+H5P.DocumentExportPage-1.5  1.5.19  MIT (library.json)  — Joubel
+H5P.DragNBar-1.5  1.5.22  MIT (README of github.com/h5p/h5p-drag-n-bar)  — Joubel
+H5P.DragNDrop-1.1  1.1.5  MIT (README of github.com/h5p/h5p-drag-n-drop)  — Frode Petterson
+H5P.DragNResize-1.2  1.2.6  MIT (README of github.com/h5p/h5p-drag-n-resize)  — Frode Petterson
+H5P.DragQuestion-1.14  1.14.23  MIT (library.json)  — Joubel
+H5P.DragText-1.10  1.10.17  MIT (library.json)  — Joubel
+H5P.Essay-1.5  1.5.13  MIT (library.json)  — Oliver Tacke
+H5P.ExportableTextArea-1.3  1.3.18  MIT (README of github.com/h5p/h5p-exportable-text-area)  — H5P Group
+H5P.FindTheWords-1.4  1.4.4  MIT (library.json)  — JithinSpace
+H5P.Flashcards-1.7  1.7.10  MIT (library.json)  — Joubel
+H5P.FontIcons-1.0  1.0.6  MIT (README of github.com/h5p/h5p-font-icons)  — Joubel
+H5P.FreeTextQuestion-1.0  1.0.16  MIT (library.json)  — Joubel
+H5P.GameMap-1.5  1.5.4  MIT (library.json)  — Oliver Tacke
+H5P.GoalsAssessmentPage-1.4  1.4.17  MIT (library.json)  — Joubel
+H5P.GoalsPage-1.5  1.5.21  MIT (library.json)  — Joubel
+H5P.GoToQuestion-1.3  1.3.15  MIT (library.json)  — Joubel
+H5P.GoToScene-0.1  0.1.0  MIT (library.json)  — Joubel
+H5P.GuessTheAnswer-1.5  1.5.3  MIT (library.json)  — Joubel
+H5P.GuidedTour-1.0  1.0.6  MIT (library.json)  — Joubel
+H5P.IFrameEmbed-1.0  1.0.29  MIT (library.json)  — Joubel
+H5P.Image-1.1  1.1.22  MIT (README of github.com/h5p/h5p-image)  — Joubel
+H5P.ImageHotspotQuestion-1.8  1.8.22  MIT (library.json)  — Joubel
+H5P.ImageHotspots-1.10  1.10.18  MIT (library.json)  — Joubel
+H5P.ImageJuxtaposition-1.5  1.5.4  MPL (library.json)  — Oliver Tacke
+H5P.ImageMultipleHotspotQuestion-1.0  1.0.1  MIT (README of github.com/h5p/h5p-image-multiple-hotspot-question)  — Luke Muller
+H5P.ImagePair-1.4  1.4.0  MIT (library.json)  — JithinSpace
+H5P.ImageSequencing-1.1  1.1.0  MIT (library.json)  — Jithin Thankachan
+H5P.ImageSlide-1.1  1.1.4  MIT (library.json)  — Falcon
+H5P.ImageSlider-1.1  1.1.9  MIT (library.json)  — Falcon
+H5P.InfoWall-0.4  0.4.9  MIT (library.json)  — Oliver Tacke
+H5P.InteractiveBook-1.11  1.11.11  MIT (library.json)  — Joubel
+H5P.InteractiveVideo-1.27  1.27.9  MIT (library.json)  — Joubel
+H5P.IVHotspot-1.2  1.2.17  MIT (library.json)  — Joubel
+H5P.JoubelUI-1.3  1.3.19  MIT (README of github.com/h5p/h5p-joubel-ui)  — Joubel
+H5P.KewArCode-1.2  1.2.2  MIT (library.json)  — Oliver Tacke
+H5P.Link-1.3  1.3.18  MIT (README of github.com/h5p/h5p-link)  — Joubel
+H5P.MarkTheWords-1.11  1.11.9  MIT (library.json)  — Joubel
+H5P.MaterialDesignIcons-1.0  1.0.0  GPL3 (library.json)  — Joubel
+H5P.MemoryGame-1.3  1.3.29  MIT (library.json)  — Joubel
+H5P.MultiChoice-1.16  1.16.14  MIT (library.json)  — Joubel
+H5P.MultiMediaChoice-0.3  0.3.44  MIT (library.json)  — H5P Group AS
+H5P.Nil-1.0  1.0.14  MIT (README of github.com/h5p/h5p-nil)  — Frode Petterson
+H5P.OpenEndedQuestion-1.0  1.0.28  MIT (library.json)  — Joubel
+H5P.PersonalityQuiz-1.0  1.0.8  MIT (library.json)  — Lumenia AS
+H5P.Question-1.5  1.5.15  MIT (library.json)  — Joubel
+H5P.Questionnaire-1.3  1.3.11  MIT (library.json)  — Joubel
+H5P.QuestionSet-1.20  1.20.31  MIT (library.json)  — Joubel
+H5P.Row-1.0  1.0.12  MIT (library.json)  — Joubel
+H5P.RowColumn-1.0  1.0.4  MIT (library.json)  — Joubel
+H5P.Shape-1.0  1.0.5  MIT (library.json)  — Joubel
+H5P.SimpleMultiChoice-1.1  1.1.22  MIT (library.json)  — thomasmars
+H5P.SingleChoiceSet-1.11  1.11.44  MIT (library.json)  — Joubel
+H5P.SortParagraphs-0.11  0.11.9  MIT (library.json)  — Oliver Tacke
+H5P.SoundJS-1.0  1.0.2  MIT (library.json)  — The createjs team
+H5P.SpeakTheWords-1.5  1.5.7  MIT (library.json)  — Thomasmars
+H5P.SpeakTheWordsSet-1.3  1.3.4  MIT (library.json)  — Joubel
+H5P.StandardPage-1.5  1.5.16  MIT (library.json)  — Joubel
+H5P.StructureStrip-1.0  1.0.6  MIT (library.json)  — Oliver Tacke
+H5P.Summary-1.10  1.10.22  MIT (library.json)  — Joubel
+H5P.Table-1.2  1.2.2  MIT (README of github.com/h5p/h5p-table)  — Joubel
+H5P.Text-1.1  1.1.17  MIT (README of github.com/h5p/h5p-text)  — Joubel
+H5P.TextInputField-1.2  1.2.17  MIT (library.json)  — Joubel
+H5P.TextUtilities-1.3  1.3.0  pd (library.json)  — Oliver Tacke
+H5P.ThreeImage-0.5  0.5.8  MIT (library.json)  — Joubel AS
+H5P.ThreeJS-1.0  1.0.108  MIT (library.json)  — three.js authors
+H5P.ThreeSixty-0.3  0.3.7  MIT (library.json)  — Joubel AS (icc)
+H5P.Timeline-1.1  1.1.25  MIT (library.json)  — Joubel
+H5P.Timer-0.4  0.4.2  pd (library.json)  — Oliver Tacke
+H5P.Transition-1.0  1.0.4  MIT (library.json)  — Joubel
+H5P.TrueFalse-1.8  1.8.11  MIT (library.json)  — Joubel
+H5P.TwitterUserFeed-1.0  1.0.21  MIT (library.json)  — Joubel
+H5P.Video-1.6  1.6.66  MIT (library.json)  — Joubel
+jQuery.ui-1.10  1.10.22  MIT (library.json)  — Jupiter
+Shepherd-1.0  1.0.7  MIT (library.json)  — Hubspot. Wrapped as H5P by Joubel (fnoks)
+TimelineJS-1.1  1.1.1  MPL2 (library.json)  — KnightLab

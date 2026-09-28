@@ -92,9 +92,11 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             scripts/build-demo-content.mjs
   app/                      the installable app, /app/: index.html and app.js the page, sw.js its
                             worker (the player's handlers mounted, plus the app shell), the web app
-                            manifest and icons/ (rendered by scripts/build-app-icons.mjs, committed)
+                            manifest and icons/ (rendered by scripts/build-app-icons.mjs, committed),
+                            libraries.h5p the hub's runtime libraries and libraries.txt their
+                            licences (built by scripts/build-app-libraries.mjs, committed)
   scripts/                  build-demo (the site into dist-demo/), build-demo-content, build-og-image,
-                            build-app-icons
+                            build-app-icons, build-app-libraries
   vite.config.ts            the dev server and the hosted demo: the pages plus dist/'s layout at the
                             site root -> dist-demo/
 
@@ -136,6 +138,7 @@ pnpm build:demo        # the hosted demo into apps/demo/dist-demo/, what Vercel 
 pnpm demo:content      # rebuild apps/demo/demo/content/*.h5p from their sources; needs the H5P hub
 pnpm demo:og           # re-render the social card, apps/demo/demo/og-image.png
 pnpm demo:icons        # re-render the installable app's icons, apps/demo/app/icons/
+pnpm demo:libraries    # rebuild the app's library pack from the H5P hub; before a release
 pnpm preview:demo      # serves dist-demo/ with the production headers and the /no-range route
 ```
 
@@ -330,8 +333,16 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
 - **When a bundle is attached, `h5p.json` is synthesized, not served.** A content-only export
   strips `preloadedDependencies` down to the main library as well as dropping the folders, so the
   runtime would load Interactive Video and none of the interaction types inside it — "Unable to
-  find constructor for: H5P.Text". `mergedManifest()` unions the two dependency lists and keeps
-  only entries whose folder is actually reachable, with the content's own version winning.
+  find constructor for: H5P.Text". `mergedManifest()` lists, in this order: the content's own
+  dependencies; every sub-content library `content/content.json` names (`librariesNamedIn`,
+  objects whose `library` is `"<machineName> <major>.<minor>"`), which is what a full export's
+  `h5p.json` would have listed; and the bundle's own dependencies. Each is kept only if it is
+  reachable — its folder exactly, or a compatible newer minor by the rule `get()` serves with — and
+  as the content wrote it, since the file server maps the folder. The middle step is not a
+  refinement: it was found on 2026-09-29 building the app's library pack, whose `h5p.json` lists
+  nothing, when three of four stripped demo exports booted and then threw on their sub-content.
+  Until then only the hub had been attached, and a hub bundle's manifest happens to list its
+  content type's usual set, which covered for it. `merged-manifest.test.ts` pins all three.
 - **An unreachable library source falls back to a bundle downloaded from it before.** When the
   probe of `libraries`' URL fails — offline, the hub down, a 5xx — the element asks the worker
   (`find-downloaded-libraries`) for the newest `role: 'libraries'` row with the same URL whose
@@ -909,10 +920,21 @@ SPA-fallback trap described above cannot happen there.
   Chromium against `pnpm preview:demo`: installable with no manifest errors, and after going
   offline and reloading, the Interactive Video and the Accordion play from picked files, the video
   decoding and playing as it does online.
-  A package without its own libraries plays offline once its content type has been fetched
-  from the hub online (the fallback above); the app remembers the viewer's consent to the hub in
-  `localStorage`, so the offline visit does not ask again, and says what to do when nothing was
-  fetched. Checked in the same setup with a stripped export of the demo quiz and the real hub.
+  **A package without its own libraries plays offline from the first open**, because the app
+  carries them: `app/libraries.h5p` is the H5P hub's runtime libraries for every content type it
+  serves — 98 folders from 52 content types, 9.5 MB, measured on 2026-09-29 — kept at the newest
+  minor of each major and precached with the rest of `app/`, and `app.js` sets it as `libraries`
+  on every open. The hub is the fallback for what the pack lacks — a newer minor than it was built
+  with, a content type added since — asked for once and then remembered in `localStorage`, and
+  offline the element's own fallback uses a hub bundle downloaded earlier. `pnpm demo:libraries`
+  rebuilds it, and should before a release; it stops on a library whose `library.json` names no
+  licence unless `UNDECLARED` in the script names one found in its repository — fifteen H5P
+  libraries state MIT in their README only, and flowplayer's GPL-3.0 is in its script's header —
+  and writes `libraries.txt`, linked from the page, with each library's licence and authors. The
+  licences are MIT (92), public domain (2), MPL (2) and GPL-3.0 (2); the site already serves the
+  GPL runtime. Committed, like the demo content, so a deploy does not depend on the hub. Checked:
+  stripped exports of the four demo packages played offline in a fresh browser that had never
+  consented to the hub, with no request to h5p.org.
   Not covered: the file is picked again each visit, though what was extracted stays in the
   chunk store; and nothing here was tried in Safari, which may clear an
   installed app's storage after weeks unused.
@@ -1112,13 +1134,8 @@ and the same boot pulled 1.4 MB instead of 81 — and because it is not yet know
 player is handed a deflated video nobody can normalize: the h5p.com export analysed above stored
 everything, while this one and the sodix.de one deflated everything.
 
-**Offline app shell (PWA) — built**, as `/app/` on the demo site; see *The hosted demo*. What
-it left open: an opt-in offline library pack — the hub's runtime libraries for the common
-content types, measured on 2026-09-28 at 73 folders and 7.9 MB compressed for fifteen of them —
-so a stripped export plays offline without having played online first; it needs a licence pass
-first (54 of those declare MIT, TimelineJS MPL-2.0, H5P.MaterialDesignIcons GPL-3.0, fifteen
-nothing) and a rebuild each release, since a library serves only packages of its major and an
-equal or lower minor. Also persistent file
+**Offline app shell (PWA) — built**, as `/app/` on the demo site, library pack included; see
+*The hosted demo*. What it left open: persistent file
 handles (`showOpenFilePicker` plus a handle kept in IndexedDB) for a recent-files list; and a
 check in Safari and on iOS.
 

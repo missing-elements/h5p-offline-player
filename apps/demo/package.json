@@ -9,7 +9,8 @@
     "demo:content": "node scripts/build-demo-content.mjs",
     "demo:og": "node scripts/build-og-image.mjs",
     "demo:icons": "node scripts/build-app-icons.mjs",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "demo:libraries": "node scripts/build-app-libraries.mjs"
   },
   "dependencies": {
     "@missing-elements/h5p-offline-player": "workspace:*",

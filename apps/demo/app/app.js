@@ -83,7 +83,15 @@ const ready = controlled().then(
 
 /* ---------------------------------------------------------------- opening a file */
 
-/** Replays the last open, for the retry once missing libraries may be fetched. */
+/**
+ * Where a package missing its own libraries gets them: the pack the app carries — every content
+ * type's runtime libraries from the H5P hub, precached with the app — so a stripped export plays
+ * offline. The hub itself only for what the pack lacks: a newer minor than it was built with, or
+ * a content type added since, and only with the viewer's consent.
+ */
+const PACK = '/app/libraries.h5p'
+
+/** Replays the last open with a library source, for the retry against the hub. */
 let reopen = null
 /** The URL last opened, so a launch that repeats it does not load it twice. */
 let lastUrl = null
@@ -96,11 +104,12 @@ const opening = (label, again) => {
   fileName.hidden = false
 }
 
-async function open(file) {
+async function open(file, libraries = PACK) {
   lastUrl = null
-  opening(`${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB`, () => open(file))
+  opening(`${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB`, (source) => open(file, source))
   document.title = `${file.name} — H5P Offline Player`
   await ready
+  player.setAttribute('libraries', libraries)
   player.file = file
 }
 
@@ -109,7 +118,7 @@ async function open(file) {
  * opens such a link in the app's window — its "supported links" — and when that window is
  * already open, hands it the URL through `launchQueue` instead of loading the page again.
  */
-async function openUrl(src) {
+async function openUrl(src, libraries = PACK) {
   let url
   try {
     url = new URL(src, location.href)
@@ -119,9 +128,10 @@ async function openUrl(src) {
   }
   const name = decodeURIComponent(url.pathname.split('/').pop() || url.host)
   lastUrl = url.href
-  opening(url.href, () => openUrl(url.href))
+  opening(url.href, (source) => openUrl(url.href, source))
   document.title = `${name} — H5P Offline Player`
   await ready
+  player.setAttribute('libraries', libraries)
   // Removed first, so opening the same link again still counts as a change.
   player.removeAttribute('src')
   player.setAttribute('src', url.href)
@@ -208,15 +218,27 @@ player.addEventListener('error', (event) => {
   const { code, message: detail, missingLibraries } = event.detail
   const late = code === 'runtime' && player.state === 'ready'
 
-  // Offline, a package without its own libraries plays only if they were fetched from the hub
-  // before; the element uses that copy by itself. Reaching this means there is none.
-  if (missingLibraries && !navigator.onLine) {
-    show(
-      'This package does not carry its own libraries, and they have not been fetched on this ' +
-        'device yet. Open it once while online, and it plays offline after that.',
-      'error'
-    )
-    offer.hidden = true
+  // Missing even with the pack attached: the package needs a newer minor than the pack was built
+  // with, or a content type added since. The hub has it — asked for, not assumed, since it is a
+  // request to a third party; once the viewer has agreed, every later case retries on its own,
+  // and offline the element then uses a hub bundle downloaded before, if there is one.
+  if (missingLibraries) {
+    const from = player.getAttribute('libraries')
+    if (from === PACK && remembered()) {
+      void reopen?.('hub')
+      return
+    }
+    const newer = 'This package needs a newer version of an H5P library than the app carries'
+    if (!navigator.onLine) {
+      show(`${newer}, and it has not been fetched on this device yet. Open it once while online, and it plays offline after that.`, 'error')
+      offer.hidden = true
+    } else if (from === PACK) {
+      show(`${newer}. It can be fetched from h5p.org.`, 'error')
+      offer.hidden = false
+    } else {
+      show(detail, 'error')
+      offer.hidden = true
+    }
     return
   }
 
@@ -229,8 +251,7 @@ player.addEventListener('error', (event) => {
   }
 
   show(late ? `The content reported an error and kept running: ${detail}` : (EXPLANATIONS[code] ?? detail), late ? 'hint' : 'error')
-  // The hub is the one thing that needs a network, so it is asked for, not assumed.
-  offer.hidden = !missingLibraries || player.getAttribute('libraries') === 'hub'
+  offer.hidden = true
 })
 
 player.addEventListener('resize', (event) => {
@@ -238,7 +259,7 @@ player.addEventListener('resize', (event) => {
 })
 
 /**
- * Whether this viewer has agreed to fetch missing libraries from h5p.org. Kept, so the next
+ * Whether this viewer has agreed to fetch from h5p.org what the pack lacks. Kept, so the next
  * visit — offline, say — does not ask again: the element then falls back to the bundle it
  * fetched before by itself. A per-viewer convenience, so browser storage, and a page that works
  * without it.
@@ -251,17 +272,14 @@ const remembered = () => {
     return false
   }
 }
-if (remembered()) player.setAttribute('libraries', 'hub')
-
 document.querySelector('#fetch-libraries').addEventListener('click', () => {
   offer.hidden = true
-  player.setAttribute('libraries', 'hub')
   try {
     localStorage.setItem(HUB_CONSENT, 'yes')
   } catch {
     // Not kept; the next visit asks again.
   }
-  void reopen?.()
+  void reopen?.('hub')
 })
 
 /* ---------------------------------------------------------------- installing */

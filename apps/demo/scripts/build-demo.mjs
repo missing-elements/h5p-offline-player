@@ -42,6 +42,11 @@ for (const name of packages) {
 // manifest with `vite-ignore`, and the manifest names its icons relative to itself.
 await cp(resolve(rootDir, 'app', 'manifest.webmanifest'), resolve(outDir, 'app', 'manifest.webmanifest'))
 await cp(resolve(rootDir, 'app', 'icons'), resolve(outDir, 'app', 'icons'), { recursive: true })
+// The library pack the app attaches to packages without their own, and its licence notice;
+// both precached below with the rest of `app/`. Built by `pnpm demo:libraries`.
+for (const name of ['libraries.h5p', 'libraries.txt']) {
+  await cp(resolve(rootDir, 'app', name), resolve(outDir, 'app', name))
+}
 
 /**
  * What the app needs to start with no network: the page, everything it pulls in — read from

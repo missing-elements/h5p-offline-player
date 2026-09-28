@@ -384,22 +384,53 @@ export class PackageReader {
    * was published with, so the two are merged: a dependency is kept only if its folder is
    * actually reachable, and the content's own version wins when both archives have one.
    */
-  mergedManifest(): PackageManifest {
+  async mergedManifest(): Promise<PackageManifest> {
     const names = this.entryNames()
+    const available = this.availableLibraries()
     const kept = new Map<string, LibraryDependency>()
 
+    // Reachable as written, or through a compatible newer minor — the same rule `get()` serves
+    // library files by, so a 1.20 kept here is answered from the bundle's 1.21 folder.
     const consider = (dependency: LibraryDependency) => {
       if (kept.has(dependency.machineName)) return
-      if (!libraryFolderNames(dependency).some((folder) => names.has(`${folder}/library.json`))) return
+      const exact = libraryFolderNames(dependency).some((folder) => names.has(`${folder}/library.json`))
+      const compatible = resolveLibraryFolder(available, {
+        machineName: dependency.machineName,
+        major: Number(dependency.majorVersion),
+        minor: Number(dependency.minorVersion)
+      })
+      if (!exact && !compatible) return
       kept.set(dependency.machineName, dependency)
     }
 
     for (const dependency of this.manifest.preloadedDependencies ?? []) consider(dependency)
+    // A stripped export cuts the list down to the main library, but its parameters still name
+    // every sub-content library they use — a Question Set's questions, an Interactive Video's
+    // interactions. A full export lists those in h5p.json; this puts them back.
+    for (const dependency of await this.contentLibraries()) consider(dependency)
+    // A hub bundle's own manifest, which lists its content type's usual set: kept for a package
+    // whose parameters name a library only through another one.
     for (const fallback of this.fallbacks) {
       for (const dependency of fallback.manifest.preloadedDependencies ?? []) consider(dependency)
     }
 
     return { ...this.manifest, preloadedDependencies: [...kept.values()] }
+  }
+
+  private namedInContent: Promise<LibraryDependency[]> | null = null
+
+  /** The sub-content libraries `content/content.json` names; none when it cannot be read. */
+  private contentLibraries(): Promise<LibraryDependency[]> {
+    this.namedInContent ??= (async () => {
+      const located = this.locate('content/content.json')
+      if (!located || located.reader !== this) return []
+      try {
+        return librariesNamedIn(await new Response(this.inflate(located.entry)).json())
+      } catch {
+        return []
+      }
+    })()
+    return this.namedInContent
   }
 
   assertLibrariesPresent(): void {
@@ -686,6 +717,32 @@ async function readManifest(reader: PackageReader): Promise<PackageManifest> {
   } catch (error) {
     throw new PlayerError('bad-archive', 'h5p.json is not readable JSON', { cause: error })
   }
+}
+
+/**
+ * Every library a content's parameters name, as sub-content does it: an object whose `library`
+ * is `"<machineName> <major>.<minor>"`, anywhere in the tree. In archive order of discovery,
+ * each once. Pure, and the parameters are untrusted, so anything else is ignored.
+ */
+export function librariesNamedIn(params: unknown): LibraryDependency[] {
+  const found = new Map<string, LibraryDependency>()
+  const walk = (value: unknown, depth: number) => {
+    if (depth > 64 || !value || typeof value !== 'object') return
+    if (Array.isArray(value)) {
+      for (const item of value) walk(item, depth + 1)
+      return
+    }
+    const library = (value as { library?: unknown }).library
+    if (typeof library === 'string') {
+      const match = /^([A-Za-z0-9_.-]+) (\d+)\.(\d+)$/.exec(library)
+      if (match && !found.has(match[1])) {
+        found.set(match[1], { machineName: match[1], majorVersion: Number(match[2]), minorVersion: Number(match[3]) })
+      }
+    }
+    for (const child of Object.values(value)) walk(child, depth + 1)
+  }
+  walk(params, 0)
+  return [...found.values()]
 }
 
 /**
