@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import '../../src/h5p-offline-player'
 import {
   FIXTURES,
+  clearPackageCaches,
   createPlayer,
   frameDocument,
   frameFetch,
@@ -108,5 +109,61 @@ describe('supplying missing libraries', () => {
     if (result.ok) expect.fail('expected the package to be refused')
     expect(result.detail.code).toBe('bad-archive')
     expect(result.detail.message).toContain('H5P.OfflineTest-1.0')
+  })
+})
+
+/**
+ * A library source that cannot be reached — no network, or the hub down — when a bundle was
+ * downloaded from it before. `/stalling/` in `reset` mode answers every request `503`, which is
+ * what the probe meets. Each play uses a content URL of its own: the worker keeps a package's
+ * reader with its bundle attached, and a replay of the same package would never need the
+ * libraries again, so it would never reach the fallback.
+ */
+describe('a library source that cannot be reached', () => {
+  const outage = (ms: number) => fetch(`/stalling/__outage?ms=${ms}&mode=reset`, { cache: 'no-store' })
+  const content = (tag: string) => `${FIXTURES.needsLibraries}?case=${tag}-${Date.now()}`
+
+  const settle = async (src: string, libraries: string) => {
+    const player = createPlayer({ libraries })
+    const settled = waitForSettled(player)
+    player.setAttribute('src', src)
+    return { player, result: await settled }
+  }
+
+  afterEach(async () => {
+    await outage(0)
+  })
+
+  it('plays from the bundle downloaded from it before', async () => {
+    const libraries = `/stalling/libraries.h5p?case=earlier-${Date.now()}`
+    const first = await settle(content('online'), libraries)
+    expect(first.result).toEqual({ ok: true })
+
+    await outage(30_000)
+    const { player, result } = await settle(content('offline'), libraries)
+    if (!result.ok) expect.fail(`${result.detail.code} — ${result.detail.message}`)
+    expect(frameDocument(player).querySelector('.h5p-offline-test-message')?.textContent).toBe(
+      'Libraries came from somewhere else.'
+    )
+  })
+
+  it('still fails, naming what is missing, when nothing was downloaded from it', async () => {
+    await outage(30_000)
+    const { result } = await settle(content('never'), `/stalling/libraries.h5p?case=never-${Date.now()}`)
+    if (result.ok) expect.fail('expected the package to be refused')
+    expect(result.detail.code).toBe('bad-archive')
+    expect(result.detail.message).toContain('H5P.OfflineTest-1.0')
+  })
+
+  it('does not use a bundle whose bytes are gone', async () => {
+    const libraries = `/stalling/libraries.h5p?case=evicted-${Date.now()}`
+    const first = await settle(content('before'), libraries)
+    expect(first.result).toEqual({ ok: true })
+
+    await clearPackageCaches()
+    await outage(30_000)
+    const { result } = await settle(content('after'), libraries)
+    if (result.ok) expect.fail('expected the package to be refused')
+    expect(result.detail.code).toBe('bad-archive')
   })
 })

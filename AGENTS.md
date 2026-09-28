@@ -331,6 +331,18 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   runtime would load Interactive Video and none of the interaction types inside it — "Unable to
   find constructor for: H5P.Text". `mergedManifest()` unions the two dependency lists and keeps
   only entries whose folder is actually reachable, with the content's own version winning.
+- **An unreachable library source falls back to a bundle downloaded from it before.** When the
+  probe of `libraries`' URL fails — offline, the hub down, a 5xx — the element asks the worker
+  (`find-downloaded-libraries`) for the newest `role: 'libraries'` row with the same URL whose
+  archive is complete in the chunk store, and attaches that instead of failing. Complete, not
+  just registered: a row outlives an eviction and a cut-short download. The URL, not the
+  `pkgId`, is the key, because the id hashes the host's validator as well, which the failed
+  probe never got. Online the probe still runs first, so a bundle the hub has changed is
+  downloaded again under its new id. This is what lets the installable app play a stripped
+  export offline; the fallback lives in the element, so any host gets it. Its tests in
+  `libraries.test.ts` take the bundle host down with `/stalling/`'s `reset` outage, and give each
+  play a content URL of its own — the worker keeps a package's reader with its bundle attached,
+  and a replay would never need the libraries again.
 - **A library bundle is downloaded, never range-read.** It is read exhaustively — every library's
   JSON, scripts and styles — so the element registers it as `chunked` even when the host honours
   `Range`. Against the real H5P hub this was the difference between 76 and 7 seconds.
@@ -847,9 +859,12 @@ SPA-fallback trap described above cannot happen there.
   Chromium against `pnpm preview:demo`: installable with no manifest errors, and after going
   offline and reloading, the Interactive Video and the Accordion play from picked files, the video
   decoding and playing as it does online.
-  Not covered: a package without its own libraries still needs the hub, which is a network
-  fetch and so fails offline; the file is picked again each visit, though what was
-  extracted stays in the chunk store; and nothing here was tried in Safari, which may clear an
+  A package without its own libraries plays offline once its content type has been fetched
+  from the hub online (the fallback above); the app remembers the viewer's consent to the hub in
+  `localStorage`, so the offline visit does not ask again, and says what to do when nothing was
+  fetched. Checked in the same setup with a stripped export of the demo quiz and the real hub.
+  Not covered: the file is picked again each visit, though what was extracted stays in the
+  chunk store; and nothing here was tried in Safari, which may clear an
   installed app's storage after weeks unused.
 - **What a public demo means.** The frame is same-origin by design, and a package's libraries
   are JavaScript, so `/?src=<any url>` runs a stranger's code on the demo's origin. That is the
@@ -1042,8 +1057,12 @@ player is handed a deflated video nobody can normalize: the h5p.com export analy
 everything, while this one and the sodix.de one deflated everything.
 
 **Offline app shell (PWA) — built**, as `/app/` on the demo site; see *The hosted demo*. What
-it left open: a precached library bundle, or a probe that falls back to a cached one, so a
-package without its own libraries plays offline once it has played online; persistent file
+it left open: an opt-in offline library pack — the hub's runtime libraries for the common
+content types, measured on 2026-09-28 at 73 folders and 7.9 MB compressed for fifteen of them —
+so a stripped export plays offline without having played online first; it needs a licence pass
+first (54 of those declare MIT, TimelineJS MPL-2.0, H5P.MaterialDesignIcons GPL-3.0, fifteen
+nothing) and a rebuild each release, since a library serves only packages of its major and an
+equal or lower minor. Also persistent file
 handles (`showOpenFilePicker` plus a handle kept in IndexedDB) for a recent-files list; and a
 check in Safari and on iOS.
 

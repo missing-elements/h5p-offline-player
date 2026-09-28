@@ -16,6 +16,7 @@ import {
   type H5PResizerMessage,
   type PackageRecord,
   type PrefetchEntry,
+  type RemoteSourceDescriptor,
   type SourceDescriptor,
   type ToJobsMessage,
   type ToWorkerMessage,
@@ -448,7 +449,23 @@ export class H5PPlayerElement extends HTMLElement {
     const url = libraryBundleUrl(missing, source)
 
     try {
-      const descriptor = await probeSource(url, signal)
+      let descriptor: RemoteSourceDescriptor
+      try {
+        descriptor = await probeSource(url, signal)
+      } catch (error) {
+        if (signal.aborted) throw error
+        // The source cannot be reached — no network, or the hub is down — but a bundle
+        // downloaded from it before serves as well now as it did then. This is what lets an
+        // installed app play a stripped export offline once it has played one online.
+        const reply = await this.send({ type: 'find-downloaded-libraries', url })
+        const earlier = reply.ok && reply.type === 'downloaded-libraries' ? reply.pkgId : null
+        if (!earlier) throw error
+
+        this.setState('indexing')
+        await this.send({ type: 'index', pkgId: earlier })
+        await this.send({ type: 'attach-libraries', pkgId, libraryPkgId: earlier })
+        return
+      }
       const libraryPkgId = await remotePkgId(url, descriptor.validator)
 
       // Downloaded once rather than read over `Range`, even when the host supports ranges. A

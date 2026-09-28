@@ -153,18 +153,52 @@ player.addEventListener('statechange', (event) => {
 player.addEventListener('error', (event) => {
   const { code, message: detail, missingLibraries } = event.detail
   const late = code === 'runtime' && player.state === 'ready'
+
+  // Offline, a package without its own libraries plays only if they were fetched from the hub
+  // before; the element uses that copy by itself. Reaching this means there is none.
+  if (missingLibraries && !navigator.onLine) {
+    show(
+      'This package does not carry its own libraries, and they have not been fetched on this ' +
+        'device yet. Open it once while online, and it plays offline after that.',
+      'error'
+    )
+    offer.hidden = true
+    return
+  }
+
   show(late ? `The content reported an error and kept running: ${detail}` : (EXPLANATIONS[code] ?? detail), late ? 'hint' : 'error')
   // The hub is the one thing that needs a network, so it is asked for, not assumed.
-  offer.hidden = !missingLibraries
+  offer.hidden = !missingLibraries || player.getAttribute('libraries') === 'hub'
 })
 
 player.addEventListener('resize', (event) => {
   player.style.height = `${Math.max(event.detail.height, 240)}px`
 })
 
+/**
+ * Whether this viewer has agreed to fetch missing libraries from h5p.org. Kept, so the next
+ * visit — offline, say — does not ask again: the element then falls back to the bundle it
+ * fetched before by itself. A per-viewer convenience, so browser storage, and a page that works
+ * without it.
+ */
+const HUB_CONSENT = 'h5p-app:libraries-from-hub'
+const remembered = () => {
+  try {
+    return localStorage.getItem(HUB_CONSENT) === 'yes'
+  } catch {
+    return false
+  }
+}
+if (remembered()) player.setAttribute('libraries', 'hub')
+
 document.querySelector('#fetch-libraries').addEventListener('click', () => {
   offer.hidden = true
   player.setAttribute('libraries', 'hub')
+  try {
+    localStorage.setItem(HUB_CONSENT, 'yes')
+  } catch {
+    // Not kept; the next visit asks again.
+  }
   if (current) void open(current)
 })
 

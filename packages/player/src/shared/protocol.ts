@@ -134,6 +134,11 @@ export type ToWorkerMessage =
   | { type: 'file'; pkgId: string; file: File }
   /** Points a package at another one, already registered and indexed, for its libraries. */
   | { type: 'attach-libraries'; pkgId: string; libraryPkgId: string }
+  /**
+   * Asks for a library bundle already downloaded whole from `url`, for when `url` cannot be
+   * reached now. Answered `downloaded-libraries`, with `null` when there is none.
+   */
+  | { type: 'find-downloaded-libraries'; url: string }
 
 /**
  * An entry a cold load cannot serve without a background inflate: large and deflated, so there is
@@ -212,6 +217,7 @@ export type WorkerReply =
       ready?: boolean
     }
   | { ok: true; type: 'ack' }
+  | { ok: true; type: 'downloaded-libraries'; pkgId: string | null }
   | { ok: false; code: ErrorCode; message: string; missingLibraries?: MissingLibraries }
 
 /* ------------------------------------------------------------------ Service Worker → page */

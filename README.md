@@ -201,7 +201,9 @@ instead:
 Entries then resolve against the package first and the bundle second, and the two `h5p.json`
 manifests are merged — a stripped export also cuts `preloadedDependencies` down to the main
 library, so without the merge an Interactive Video would load but its interactions would not. The
-bundle is downloaded once, cached, and shared by every package that uses it.
+bundle is downloaded once, cached, and shared by every package that uses it. When the source
+cannot be reached later — no network, or the hub down — a bundle downloaded whole from the same
+URL before is used instead, so a stripped export plays offline once one has played online.
 
 It is off by default. `libraries="hub"` is a request to a third party on every cold load, which is
 the host's decision to make, not the element's.

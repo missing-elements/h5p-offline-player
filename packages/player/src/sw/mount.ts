@@ -170,6 +170,10 @@ class VirtualServer {
           return
         }
 
+        case 'find-downloaded-libraries':
+          reply({ ok: true, type: 'downloaded-libraries', pkgId: await this.downloadedBundle(message.url) })
+          return
+
         case 'file': {
           this.files.set(message.pkgId, message.file)
           const pending = this.pendingFiles.get(message.pkgId)
@@ -590,6 +594,23 @@ class VirtualServer {
     // window we control and let the one that owns the package act on it.
     const clients = await this.worker.clients.matchAll({ type: 'window' })
     for (const each of clients) each.postMessage(message)
+  }
+
+  /**
+   * The newest library bundle downloaded whole from `url`, if one is still in the chunk store.
+   * Whole, not merely registered: a download cut short, or a bundle evicted since, has a row and
+   * not the bytes. More than one row can name the same URL, because the id also hashes the
+   * host's validator, so a hub bundle that changed was downloaded again under a new one.
+   */
+  private async downloadedBundle(url: string): Promise<string | null> {
+    const rows = (await db.allPackages())
+      .filter((row) => row.role === 'libraries' && row.source.type === 'chunked' && row.source.url === url)
+      .sort((a, b) => b.lastPlayed - a.lastPlayed)
+
+    for (const row of rows) {
+      if ((await new ChunkStore(row.pkgId).getArchiveMeta())?.complete) return row.pkgId
+    }
+    return null
   }
 
   /* ---------------------------------------------------------------- readers */
