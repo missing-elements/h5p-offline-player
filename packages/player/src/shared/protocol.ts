@@ -215,6 +215,11 @@ export type WorkerReply =
       partial?: boolean
       /** For a partial index: whether everything the runtime needs to boot has arrived. */
       ready?: boolean
+      /**
+       * The xAPI `context.revision` for this package: its index fingerprint and any attached
+       * bundle's. Absent for a partial index, which has no central directory yet.
+       */
+      revision?: string
     }
   | { ok: true; type: 'ack' }
   | { ok: true; type: 'downloaded-libraries'; pkgId: string | null }

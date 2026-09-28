@@ -5,6 +5,7 @@ import {
   FIXTURES,
   clearPackageCaches,
   createPlayer,
+  frameDocument,
   frameFetch,
   play,
   virtualUrl,
@@ -32,6 +33,55 @@ function watchDownload(player: H5PPlayerElement): () => number {
 }
 
 describe('a host that ignores Range', () => {
+  it('lets a held statement go, without its revision, when the page is hidden', async () => {
+    await clearPackageCaches()
+    const player = createPlayer()
+    const settled = waitForSettled(player, 60_000)
+    player.setAttribute('src', `${THROTTLED}&case=hidden`)
+    expect(await settled).toEqual({ ok: true })
+    expect(player.revision).toBeNull()
+
+    const statements: Array<{ context?: { revision?: string; platform?: string } }> = []
+    player.addEventListener('xapi', (event) => {
+      statements.push((event as unknown as CustomEvent<{ statement: (typeof statements)[number] }>).detail.statement)
+    })
+    frameDocument(player).querySelector<HTMLButtonElement>('.h5p-offline-test-complete')!.click()
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(statements).toHaveLength(0)
+
+    // The tab closing, or hidden on a phone and never shown again: the record goes out now.
+    window.dispatchEvent(new Event('pagehide'))
+    expect(statements).toHaveLength(1)
+    expect(statements[0].context?.revision).toBeUndefined()
+    expect(statements[0].context?.platform).toMatch(/^h5p-offline-player /)
+  })
+
+  it('holds a statement sent before the download ends until the revision is known', async () => {
+    await clearPackageCaches()
+    const player = createPlayer()
+    const downloaded = watchDownload(player)
+    const settled = waitForSettled(player, 60_000)
+    player.setAttribute('src', THROTTLED)
+    expect(await settled).toEqual({ ok: true })
+
+    // Booted from the forward index: there is no central directory yet, so no fingerprint.
+    expect(downloaded()).toBeLessThan(1)
+    expect(player.revision).toBeNull()
+
+    const statements: Array<{ revision?: string; downloaded: number }> = []
+    player.addEventListener('xapi', (event) => {
+      const { statement } = (event as unknown as CustomEvent<{ statement: { context?: { revision?: string } } }>).detail
+      statements.push({ revision: statement.context?.revision, downloaded: downloaded() })
+    })
+    frameDocument(player).querySelector<HTMLButtonElement>('.h5p-offline-test-complete')!.click()
+
+    await waitFor(() => statements.length > 0, 30_000)
+    // Released only once the archive was whole, and with the revision the element now reports.
+    expect(statements[0].downloaded).toBe(1)
+    expect(statements[0].revision).toMatch(/^sha256:[0-9a-f]{64}$/)
+    expect(statements[0].revision).toBe(player.revision)
+  })
+
   it('boots from the forward index while the archive is still downloading', async () => {
     await clearPackageCaches()
     const player = createPlayer()

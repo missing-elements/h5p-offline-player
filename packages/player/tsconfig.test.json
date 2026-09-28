@@ -6,7 +6,9 @@
     "emitDeclarationOnly": false,
     "noEmit": true,
     "allowJs": true,
-    "rootDir": ".",
+    // `packages/`, not this package: tests/unit/revision.test.ts checks the player's fingerprint
+    // against the normalizer's copy of the recipe. Nothing is emitted, so this moves no output.
+    "rootDir": "..",
     "types": ["vite/client", "node"]
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"],

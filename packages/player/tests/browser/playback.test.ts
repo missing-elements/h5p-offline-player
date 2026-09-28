@@ -68,6 +68,48 @@ describe('playing a package', () => {
     await finished
   })
 
+  it('stamps every statement with the build it came from and the player', async () => {
+    const player = await play(FIXTURES.basic)
+    expect(player.revision).toMatch(/^sha256:[0-9a-f]{64}$/)
+
+    type Stamped = { statement: { context: { revision: string; platform: string } } }
+    const xapi = waitForEvent<Stamped>(player, 'xapi')
+    const finished = waitForEvent<Stamped>(player, 'finished')
+    frameDocument(player).querySelector<HTMLButtonElement>('.h5p-offline-test-complete')!.click()
+
+    for (const event of [await xapi, await finished]) {
+      expect(event.detail.statement.context.revision).toBe(player.revision)
+      expect(event.detail.statement.context.platform).toMatch(/^h5p-offline-player \d+\.\d+\.\d+/)
+    }
+  })
+
+  it('gives another package another revision, and the same one again on a replay', async () => {
+    const basic = (await play(FIXTURES.basic)).revision
+    const streamed = (await play(FIXTURES.streamed)).revision
+    expect(streamed).not.toBe(basic)
+    expect((await play(FIXTURES.basic)).revision).toBe(basic)
+  })
+
+  it("stamps a statement the old frame sends during the next load with the old package's revision", async () => {
+    const player = await play(FIXTURES.basic)
+    const oldRevision = player.revision!
+    const oldButton = frameDocument(player).querySelector<HTMLButtonElement>('.h5p-offline-test-complete')!
+
+    // Hold the next load's probe open, so the old document is still in the frame and the new
+    // package has no id yet — the window a straggler slips through.
+    await fetch('/stalling/__outage?ms=3000&mode=silent', { cache: 'no-store' })
+    try {
+      const xapi = waitForEvent<{ statement: { context?: { revision?: string } } }>(player, 'xapi', 2_500)
+      player.setAttribute('src', '/stalling/streamed.h5p')
+      // Removing the iframe's src does not unload its document: the old content still runs,
+      // and a learner's last click in it is still a statement about the old package.
+      oldButton.click()
+      expect((await xapi).detail.statement.context?.revision).toBe(oldRevision)
+    } finally {
+      await fetch('/stalling/__outage?ms=0&mode=silent', { cache: 'no-store' })
+    }
+  })
+
   it('reloads when src is set again, and ends up on the new package', async () => {
     const player = await play(FIXTURES.basic)
     const firstPkgId = player.pkgId
@@ -91,6 +133,9 @@ describe('playing a package', () => {
     // between would make that sequence unusable, and the demo's retry button does exactly it.
     expect(player.state).toBe('idle')
     expect(player.pkgId).toBeNull()
+    // The two go together: a host recording both must never get one package's id beside
+    // another's revision.
+    expect(player.revision).toBeNull()
     expect(failures).toEqual([])
   })
 

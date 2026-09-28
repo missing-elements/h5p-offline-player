@@ -347,6 +347,43 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   `libraries.test.ts` take the bundle host down with `/stalling/`'s `reset` outage, and give each
   play a content URL of its own — the worker keeps a package's reader with its bundle attached,
   and a replay would never need the libraries again.
+- **Every statement names the build it came from.** Raised on 2026-09-26 from a
+  compliance-training perspective: the completion record is the audit trail, and it has to prove
+  *which version* of the `.h5p` each learner completed. The element fills in the two fields xAPI
+  defines for it on every `xapi` and `finished` statement, just before dispatching
+  (`withProvenance` in `src/shared/revision.ts`): `context.revision`, "revision of the learning
+  activity associated with this Statement. Format is free", and `context.platform`,
+  `h5p-offline-player <version>`. Not a `context.extensions` value under an IRI of ours, as first
+  planned: every xAPI tool understands `revision`, and an extension means nothing without a
+  profile documenting it. H5P core sets neither (checked in `frame.bundle.js`); a value the content
+  set itself is kept, and a statement whose object is not an Activity is left alone, since the
+  spec allows both fields only there. The revision is `indexFingerprint` — SHA-256 over the
+  central directory's records in archive order, each the raw name's length and bytes, the CRC, both
+  sizes as u64 and the method, little-endian — computed by `PackageReader.open` and returned on the
+  `indexed` reply, with each attached bundle's after it (`sha256:…; libraries sha256:…`), because
+  the hub changes what a stripped export plays against. The index rather than the whole file,
+  because it is read anyway and a range-read package never is; decided on 2026-09-28 knowing that
+  CRC-32 can be forged on purpose, so it identifies a build and does not seal one — the kept `.h5p`
+  is what an audit recomputes it from. Dates, comments and extra fields stay out; order is in. On a
+  host without `Range` the frame boots from the forward index, before there is a central directory,
+  so `emitStatement` holds statements until the index answers and releases them in order — and on
+  any end of the load (`abortLoad`), or when the page is hidden (`pagehide`, or `visibilitychange`
+  to hidden, the one mobile browsers fire reliably), with no revision if none came, rather than
+  lose a learner's record with the tab. Removing the iframe's `src` does not unload the document
+  in it, so the old content can still send a statement while the next load probes, when
+  `internalPkgId` is null and the message filter lets it through: `previousStamp` stamps such a
+  straggler with its own package's revision instead of holding it for the next one's — found in
+  review, and `playback.test.ts` clicks the old frame's button mid-load to pin it. `clear()` drops
+  the revision with the `pkgId`, so a host never reads one package's id beside another's build. `packages/normalize/lib/fingerprint.mjs` is the same recipe for Node, and the normalizer
+  prints the output's revision, the line a publisher records at release; `revision.test.ts` checks
+  both against one vector, which is why the player's `tsconfig.test.json` has `rootDir: ".."`.
+  *When* a build was current is deliberately not here: nothing in a package can record that it has
+  been replaced. Researched the same day, prompted by a follow-up comment asking for a manifest of
+  hashes to versions and dates: xAPI says a major change takes a new Activity id and `revision` is
+  for minor fixes, cmi5 and SCORM define no version dates, SCORM Cloud keeps every uploaded version
+  with registrations tied to one, and 21 CFR Part 11 LMSs keep version history as a requirement. So
+  that record is the organisation's — LRS, LMS or document control — and a major change served at a
+  new URL gets a new Activity id under H5P's own scheme, whose id is the content URL.
 - **A library bundle is downloaded, never range-read.** It is read exhaustively — every library's
   JSON, scripts and styles — so the element registers it as `chunked` even when the host honours
   `Range`. Against the real H5P hub this was the difference between 76 and 7 seconds.
@@ -649,7 +686,9 @@ it that the code does not say by itself:
   paths, duplicates after normalisation — read with `filenameValidation: 'tolerant'` for the same
   reason the player uses it. `plainRelativeName` is a copy of the player's `normalizeEntryName`,
   because the normalizer is plain JavaScript run by Node and cannot import the player's
-  TypeScript; keep the two in step.
+  TypeScript; keep the two in step. `lib/fingerprint.mjs` is the same kind of copy, of the
+  player's `indexFingerprint`: the summary prints the output's `revision` for a publisher's
+  version record, and a shared test vector keeps the two recipes equal.
 - **It checks what it decodes, and refuses what it cannot copy faithfully.** The `ZipReader` is
   opened with `checkSignature: true` — zip.js has no default, and `configure` does not reach it —
   so an entry whose bytes do not match their CRC stops the run, named, rather than being written
@@ -1021,6 +1060,8 @@ The architecture and setup documents predate the code. These are deliberate addi
   reads every entry on demand; on a high-latency host that made the boot a matter of minutes.
 - A library source that cannot be reached falls back to a bundle downloaded whole from the same
   URL before. The design has no notion of playing without the network beyond a picked file.
+- Statements carry `context.revision` and `context.platform`. The design emits xAPI untouched;
+  a compliance audit needs to know which build each completion came from.
 - An installable app, on the demo site at `/app/`: the design's "offline management" is still out
   of scope, but the player itself now starts with no network, through the single-worker setup.
 
@@ -1081,21 +1122,10 @@ equal or lower minor. Also persistent file
 handles (`showOpenFilePicker` plus a handle kept in IndexedDB) for a recent-files list; and a
 check in Safari and on iOS.
 
-**Version proof on xAPI statements.** Raised on 2026-09-26 from a compliance-training
-perspective: in regulated training the completion record is the audit trail, so it has to land
-in an LRS the organisation controls — already the case, since xAPI is emitted as events and
-stored nowhere — and it has to prove *which version* of the `.h5p` each learner completed.
-Nothing proves that today. `remotePkgId` hashes the URL plus the host's `ETag` or
-`Last-Modified` when one is sent, so it moves when a well-behaved host's file changes, but it
-names no content and appears in no statement; `filePkgId` is name, size and mtime. The design:
-a content hash attached to every statement, as a `context.extensions` value under an IRI of
-ours, which the element adds before emitting `xapi` and `finished`. Hashing the whole archive
-means reading it all, which a range-read package never does; the central directory is already
-read at index time, is a few kilobytes, and changes with any entry's CRC, size or name, so a
-hash of it — computed in the Service Worker, returned on the `indexed` reply — identifies the
-content at no extra cost. Worth deciding with it: whether the extension also carries the source
-URL and the player version, and how a host reads the hash for its own records (a property on
-the element, beside `pkgId`).
+**Version proof on xAPI statements — built**; see the invariant *Every statement names the build
+it came from*. Open: an element property is all a host has for its own records today; whether the
+`finished` event should also carry the revision at top level, for hosts that do not read
+statements, has not been asked for.
 
 **Accessibility statement.** Raised in the same comment: Section 508 conformance is judged on
 the whole package, the player and the H5P content types together, and a content type that traps
@@ -1123,8 +1153,8 @@ URL — and hands preloaded `contentUserData` to the instance as its `previousSt
   its own store, never evicted with the chunk caches, since it is small and not reproducible.
 - The frame document is built by the worker, which can read that table, so the saved state rides
   in the boot configuration as `contentUserData` and no request is needed at boot.
-- The state is keyed by the package's content, not its source: the central-directory hash from
-  *Version proof* above. State written against one version of a package must not be handed to
+- The state is keyed by the package's build, not its source: the revision every statement
+  carries (`PackageReader.revision()`). State written against one version of a package must not be handed to
   another; H5P core appears to have its own answer for that — a `RESET` state and a "content
   changed, starting over" dialog, found in `frame.bundle.js` and not yet traced — which a hash
   mismatch could feed, rather than silently dropping the state.

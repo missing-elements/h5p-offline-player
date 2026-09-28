@@ -88,7 +88,9 @@ The element does one thing: play a package.
 ></h5p-player>
 ```
 
-Properties: `src`, `file` (a `File` from a picker; setting it loads), `pkgId`, `preload`, `state` (`idle | probing | downloading | indexing | ready | error`), `scope` (read-only, the resolved worker scope).
+Properties: `src`, `file` (a `File` from a picker; setting it loads), `pkgId`, `preload`, `state` (`idle | probing | downloading | indexing | ready | error`), `scope` (read-only, the resolved worker scope), `revision` (read-only: the build playing, as its statements name it).
+
+Every statement carries `context.revision` — `sha256:…` over the archive's index, then `; libraries sha256:…` for an attached bundle — and `context.platform`, `h5p-offline-player <version>`, unless the content set them. Record the revision for each release (the normalizer prints it for the file it writes) and compare statements against that record in an audit; the record, not the package, says when a build was current. On a host without `Range`, statements sent before the download finishes are held until the revision is known, or released without it if the page is hidden first.
 
 Events (all `CustomEvent`, payload in `detail`):
 
@@ -116,7 +118,7 @@ input.onchange = () => (p.file = input.files[0]);
 3. Worker indexes the archive and returns `pkgId`. On a host that honours `Range`, the element then has the page-side worker pull the archive's library spans into the cache in a few requests (`progress` events with `phase: 'warm'`), so the boot that follows asks the host for nothing.
 4. Element sets the iframe (`allow="fullscreen"`) to `<scope>frame/<pkgId>`; the worker answers the navigation with the generated frame document, which boots h5p-standalone against `<scope>virtual/<pkgId>`.
 5. Worker serves each file by strategy: small entries from cache, stored media by slicing, deflated media from chunks — a cold entry starts an extraction job in the page-side worker and is served progressively.
-6. xAPI statements arrive as `xapi` events on the element; nothing is stored.
+6. xAPI statements arrive as `xapi` events on the element, with `context.revision` and `context.platform` filled in; nothing is stored.
 
 ## Licences
 

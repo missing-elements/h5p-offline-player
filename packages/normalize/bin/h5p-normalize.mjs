@@ -171,6 +171,9 @@ function printSummary(report, bytesIn) {
     ? `payload   ${formatBytes(report.payloadIn)} → ${formatBytes(report.payloadOut)}`
     : `size      ${formatBytes(bytesIn)} → ${formatBytes(report.bytesOut)}`
   lines.push(sizeLine)
+  // What the player will stamp on every xAPI statement for this file: the line a publisher
+  // copies into their version record at release.
+  lines.push(`${report.bytesOut === null ? 'revision  (as it is now) ' : 'revision  '}${report.revision}`)
 
   const folders = new Set(
     entries.map((entry) => entry.name.slice(0, entry.name.indexOf('/'))).filter((folder) => folder && folder !== 'content')

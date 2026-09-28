@@ -92,6 +92,11 @@ describe('supplying missing libraries', () => {
     expect((frameWindow(player) as unknown as { h5pOfflineExtraLoaded?: boolean }).h5pOfflineExtraLoaded).toBe(true)
   })
 
+  it('names the bundle in the revision, after the package', async () => {
+    const player = await playWithLibraries(FIXTURES.needsLibraries, FIXTURES.libraries)
+    expect(player.revision).toMatch(/^sha256:[0-9a-f]{64}; libraries sha256:[0-9a-f]{64}$/)
+  })
+
   it("leaves the manifest of a complete package alone", async () => {
     const player = await play(FIXTURES.basic)
 

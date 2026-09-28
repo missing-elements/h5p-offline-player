@@ -43,6 +43,11 @@ The output is checked as it is written: an entry whose bytes do not match their 
 run with its name, and an encrypted entry is refused rather than copied without its key data.
 `unzip -t course.normalized.h5p` is an independent check.
 
+The summary has a `revision` line: what h5p-offline-player will put in `context.revision`
+on every xAPI statement for the file it wrote (for a dry run, the input as it is). Copy it into
+your version record at release, and an audit can match each completion to the build it came from.
+`archiveFingerprint(path)` returns the same from code.
+
 ## From code
 
 ```js

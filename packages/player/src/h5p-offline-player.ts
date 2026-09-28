@@ -24,6 +24,7 @@ import {
 } from './shared/protocol'
 import { packageLockName } from './shared/locks'
 import { filePkgId, remotePkgId } from './shared/pkg-id'
+import { platformOf, withProvenance } from './shared/revision'
 import { probeSource } from './shared/source'
 import { routesFor, type Routes } from './sw/routes'
 
@@ -155,6 +156,24 @@ export class H5PPlayerElement extends HTMLElement {
   private connected = false
   private internalState: PlayerState = 'idle'
   private internalPkgId: string | null = null
+  /** The package's xAPI `context.revision`, once its index says. See `revision`. */
+  private internalRevision: string | null = null
+  /**
+   * Whether the index has answered for the revision — with one, or without, for a worker too old
+   * to compute it. Until then statements are held, so that every one carries it: on a host
+   * without `Range` the frame boots from the forward index, before the central directory the
+   * fingerprint is taken from has arrived.
+   */
+  private revisionSettled = false
+  private heldStatements: HeldStatement[] = []
+  /**
+   * The package this element played before the current load, and its revision. Removing the
+   * iframe's `src` does not unload the document in it, so until the frame navigates to the new
+   * package the old one can still send statements — and while the new load is probing,
+   * `internalPkgId` is null and the message filter lets them through. They are stamped with the
+   * build they came from, not held and released under the next one's.
+   */
+  private previousStamp: { pkgId: string; revision: string | null } | null = null
   /** Large deflated entries, in archive order, waiting to be pulled before the content asks. */
   private prefetchQueue: PrefetchEntry[] = []
   private prefetching: string | null = null
@@ -216,6 +235,15 @@ export class H5PPlayerElement extends HTMLElement {
     return this.internalPkgId
   }
 
+  /**
+   * Which build is playing, as every `xapi` and `finished` statement's `context.revision` says
+   * it: `sha256:…` over the archive's index, then any attached library bundle's. For a host's own
+   * records of what it published. `null` until the package is indexed.
+   */
+  get revision(): string | null {
+    return this.internalRevision
+  }
+
   /** The resolved Service Worker scope the routes live under. Read-only, `null` until registered. */
   get scope(): string | null {
     return this.routes?.base ?? null
@@ -226,6 +254,8 @@ export class H5PPlayerElement extends HTMLElement {
   connectedCallback(): void {
     this.connected = true
     window.addEventListener('message', this.onWindowMessage)
+    window.addEventListener('pagehide', this.onPageHidden)
+    document.addEventListener('visibilitychange', this.onPageHidden)
     navigator.serviceWorker?.addEventListener('message', this.onServiceWorkerMessage)
     if (this.src || this.currentFile) void this.startLoad()
   }
@@ -233,6 +263,8 @@ export class H5PPlayerElement extends HTMLElement {
   disconnectedCallback(): void {
     this.connected = false
     window.removeEventListener('message', this.onWindowMessage)
+    window.removeEventListener('pagehide', this.onPageHidden)
+    document.removeEventListener('visibilitychange', this.onPageHidden)
     window.removeEventListener('resize', this.onWindowResize)
     navigator.serviceWorker?.removeEventListener('message', this.onServiceWorkerMessage)
     this.abortLoad()
@@ -269,6 +301,9 @@ export class H5PPlayerElement extends HTMLElement {
   /* ---------------------------------------------------------------- loading */
 
   private abortLoad(): void {
+    // Statements the content sent before the load ended are still the learner's record: they go
+    // out now, without a revision if none was ever known, rather than nowhere.
+    this.releaseStatements()
     this.load?.abort()
     this.load = null
     this.prefetchQueue = []
@@ -302,8 +337,15 @@ export class H5PPlayerElement extends HTMLElement {
   private clear(): void {
     this.abortLoad()
     this.iframe.removeAttribute('src')
-    this.internalPkgId = null
+    this.forgetPackage()
     this.setState('idle')
+  }
+
+  /** No package loaded here any more; what it was is kept only to stamp its stragglers. */
+  private forgetPackage(): void {
+    if (this.internalPkgId) this.previousStamp = { pkgId: this.internalPkgId, revision: this.internalRevision }
+    this.internalPkgId = null
+    this.internalRevision = null
   }
 
   private async startLoad(): Promise<void> {
@@ -314,7 +356,8 @@ export class H5PPlayerElement extends HTMLElement {
     const { signal } = controller
 
     this.iframe.removeAttribute('src')
-    this.internalPkgId = null
+    this.forgetPackage()
+    this.revisionSettled = false
 
     try {
       this.setState('probing')
@@ -354,6 +397,10 @@ export class H5PPlayerElement extends HTMLElement {
         }
       }
       if (signal.aborted) return
+
+      this.internalRevision = indexed.revision ?? null
+      this.revisionSettled = true
+      this.releaseStatements()
 
       this.prefetchQueue = [...indexed.prefetch]
       // A download that booted early already has its frame; the final index only swapped the
@@ -867,13 +914,11 @@ export class H5PPlayerElement extends HTMLElement {
         return
 
       case 'xapi':
-        this.dispatchEvent(
-          new CustomEvent('xapi', { detail: { statement: data.statement, verb: data.verb } })
-        )
+        this.emitStatement({ type: 'xapi', pkgId: data.pkgId, statement: data.statement, verb: data.verb })
         return
 
       case 'finished':
-        this.dispatchEvent(new CustomEvent('finished', { detail: { statement: data.statement } }))
+        this.emitStatement({ type: 'finished', pkgId: data.pkgId, statement: data.statement })
         return
 
       case 'error':
@@ -984,6 +1029,44 @@ export class H5PPlayerElement extends HTMLElement {
     this.dispatchEvent(new CustomEvent('statechange', { detail: { state } }))
   }
 
+  /** Dispatches a statement from the content, or holds it until the revision is known. */
+  private emitStatement(held: HeldStatement): void {
+    const previous = this.previousStamp
+    if (previous && held.pkgId === previous.pkgId && held.pkgId !== this.internalPkgId) {
+      this.dispatchStatement(held, previous.revision)
+      return
+    }
+    if (!this.revisionSettled) {
+      this.heldStatements.push(held)
+      return
+    }
+    this.dispatchStatement(held, this.internalRevision)
+  }
+
+  private releaseStatements(): void {
+    const held = this.heldStatements
+    this.heldStatements = []
+    for (const each of held) this.dispatchStatement(each, this.internalRevision)
+  }
+
+  /**
+   * The page is going away, or may be: a tab hidden on a phone is often never shown again. A
+   * held statement goes out now, without its revision, because a learner's record lost with the
+   * tab is worse than one that cannot prove its build. `visibilitychange` as well as `pagehide`,
+   * since mobile browsers fire only the first reliably.
+   */
+  private onPageHidden = (event: Event): void => {
+    if (event.type === 'visibilitychange' && document.visibilityState !== 'hidden') return
+    this.releaseStatements()
+  }
+
+  /** `context.revision` and `context.platform` go in here, the one place a statement leaves. */
+  private dispatchStatement({ type, statement, verb }: HeldStatement, revision: string | null): void {
+    const stamped = withProvenance(statement, revision, platformOf(VERSION))
+    const detail = type === 'xapi' ? { statement: stamped, verb } : { statement: stamped }
+    this.dispatchEvent(new CustomEvent(type, { detail }))
+  }
+
   private emitProgress(detail: PlayerProgressDetail): void {
     this.dispatchEvent(new CustomEvent<PlayerProgressDetail>('progress', { detail }))
   }
@@ -1006,11 +1089,21 @@ export class H5PPlayerElement extends HTMLElement {
 
 /* ------------------------------------------------------------------ helpers */
 
+/** A statement from the content, and the package whose frame sent it. */
+interface HeldStatement {
+  type: 'xapi' | 'finished'
+  pkgId: string
+  statement: unknown
+  verb?: string
+}
+
 /** The entries the worker flagged as needing a background inflate, if it flagged any. */
 /** What an index hands the load: the media worth starting early, and the spans worth pulling first. */
 interface IndexResult {
   prefetch: PrefetchEntry[]
   warm: WarmSpan[]
+  /** The xAPI `context.revision`; absent from a worker older than the element. */
+  revision?: string
 }
 
 function nothingIndexed(): IndexResult {
@@ -1019,7 +1112,7 @@ function nothingIndexed(): IndexResult {
 
 function indexResultOf(reply: WorkerReply): IndexResult {
   if (!reply.ok || reply.type !== 'indexed') return nothingIndexed()
-  return { prefetch: reply.prefetch ?? [], warm: reply.warm ?? [] }
+  return { prefetch: reply.prefetch ?? [], warm: reply.warm ?? [], revision: reply.revision }
 }
 
 /**

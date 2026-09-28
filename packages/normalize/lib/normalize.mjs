@@ -27,9 +27,12 @@ import { BlobReader, Uint8ArrayWriter, ZipReader, configure } from '@zip.js/zip.
 import { crc32 } from './crc32.mjs'
 import { planFaststart, readPieces } from './mp4-faststart.mjs'
 import { StreamingZipWriter } from './zip-writer.mjs'
+import { archiveFingerprint } from './fingerprint.mjs'
 
 // The byte formatting the command's report uses, for a caller printing its own.
 export { formatBytes } from './format.mjs'
+// The player's `context.revision` for an archive on disk, for a publisher's version record.
+export { archiveFingerprint } from './fingerprint.mjs'
 
 configure({ useWebWorkers: false })
 
@@ -79,6 +82,8 @@ const CONTROL_CHARS = /[\u0000-\u001f\u007f]/
  * @property {number} payloadIn the sum of the source's compressed sizes
  * @property {number} payloadOut the same for the output
  * @property {number | null} bytesOut the output file's length, `null` for a dry run
+ * @property {string} revision what h5p-offline-player will put in `context.revision` for the
+ *   output — or, for a dry run, for the input as it stands
  */
 
 /**
@@ -242,6 +247,7 @@ export async function normalizeArchive({ input, output, onEntry }) {
       }
       bytesOut = verified.size
     }
+    const revision = await archiveFingerprint(output ?? input)
 
     return {
       entries: results,
@@ -249,7 +255,8 @@ export async function normalizeArchive({ input, output, onEntry }) {
       warnings,
       payloadIn: results.reduce((sum, result) => sum + result.from.compressedSize, 0),
       payloadOut: results.reduce((sum, result) => sum + result.to.compressedSize, 0),
-      bytesOut
+      bytesOut,
+      revision
     }
   } finally {
     await zipReader?.close()

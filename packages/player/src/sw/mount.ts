@@ -157,7 +157,8 @@ class VirtualServer {
                 ? reader.warmSpans()
                 : undefined,
             partial: reader.partial || undefined,
-            ready: reader.partial ? reader.bootReady() : undefined
+            ready: reader.partial ? reader.bootReady() : undefined,
+            revision: reader.revision()
           })
           return
         }

@@ -15,6 +15,7 @@ import type { SourceHandle } from '../shared/source'
 import { SourceReader } from '../shared/source-reader'
 import type { ByteRange } from '../shared/range'
 import type { ForwardEntry, ForwardIndexSnapshot } from '../shared/forward-index'
+import { indexFingerprint, revisionOf } from '../shared/revision'
 
 /**
  * The package reader: a zip central directory turned into a name → entry index, plus the decision
@@ -86,6 +87,11 @@ export class PackageReader {
   private absorbed = 0
   /** Top-level folder of the newest entry: the one folder that may still be receiving files. */
   private lastTopFolder: string | null = null
+  /**
+   * `sha256:…` over the central directory (`indexFingerprint`). Set by `open`; a partial reader
+   * has no central directory and so no fingerprint.
+   */
+  fingerprint: string | undefined
 
   /** Archives consulted, in order, for an entry this one does not have. */
   private readonly fallbacks: PackageReader[] = []
@@ -153,6 +159,17 @@ export class PackageReader {
     const manifest = await readManifest(bare)
 
     const reader = new PackageReader(pkgId, handle, entries, rejected, manifest)
+    // Every record, directories and dropped names included: the fingerprint is of the archive
+    // as published, not of what the player chose to serve from it.
+    reader.fingerprint = await indexFingerprint(
+      zipEntries.map((entry) => ({
+        rawName: entry.rawFilename,
+        crc32: entry.signature ?? 0,
+        compressedSize: entry.compressedSize,
+        size: entry.uncompressedSize,
+        method: entry.compressionMethod
+      }))
+    )
     // A package that will have a library bundle attached is validated after the attach, not here.
     if (options.requireLibraries !== false) reader.assertLibrariesPresent()
 
@@ -256,6 +273,16 @@ export class PackageReader {
     const prefix = `${folder}/`
     for (const name of this.entries.keys()) if (name.startsWith(prefix)) return true
     return false
+  }
+
+  /**
+   * What an xAPI statement's `context.revision` says about this package: its fingerprint, and
+   * each attached bundle's. Undefined until every one of them has a central directory.
+   */
+  revision(): string | undefined {
+    const libraries = this.fallbacks.map((reader) => reader.fingerprint)
+    if (!this.fingerprint || libraries.some((fingerprint) => !fingerprint)) return undefined
+    return revisionOf(this.fingerprint, libraries as string[])
   }
 
   /** Adds an archive to consult for entries this one does not carry. */

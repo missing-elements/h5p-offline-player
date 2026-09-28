@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { BlobReader, BlobWriter, TextReader, Uint8ArrayReader, Uint8ArrayWriter, ZipReader, ZipWriter, type FileEntry } from '@zip.js/zip.js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { crc32 } from '../lib/crc32.mjs'
+import { archiveFingerprint } from '../lib/fingerprint.mjs'
 import { normalizeArchive, orderEntries, plainRelativeName, targetFormOf } from '../lib/normalize.mjs'
 import { StreamingZipWriter } from '../lib/zip-writer.mjs'
 import { atomsIn, concat, sampleMp4 } from './helpers/mp4'
@@ -147,6 +148,18 @@ describe('normalizeArchive', () => {
     ])
     expect(report.payloadOut).toBeGreaterThan(0)
     await expect(stat(join(dir, 'never-written.h5p'))).rejects.toThrow()
+  })
+
+  it('reports the revision the player will stamp: for the output, or for the input on a dry run', async () => {
+    const output = join(dir, 'revision.normalized.h5p')
+    const written = await normalizeArchive({ input, output })
+    expect(written.revision).toMatch(/^sha256:[0-9a-f]{64}$/)
+    expect(written.revision).toBe(await archiveFingerprint(output))
+
+    const dry = await normalizeArchive({ input })
+    expect(dry.revision).toBe(await archiveFingerprint(input))
+    // Rewriting the container is a new build.
+    expect(dry.revision).not.toBe(written.revision)
   })
 
   it('warns about an archive with no manifest', async () => {
