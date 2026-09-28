@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { BlobWriter, TextReader, Uint8ArrayReader, ZipReader, ZipWriter, configure } from '@zip.js/zip.js'
 import { indexFingerprint, platformOf, revisionOf, withProvenance } from '../../src/shared/revision'
 import { PackageReader } from '../../src/sw/package-reader'
+import { VERSION } from '../../src/shared/constants'
 import type { SourceHandle } from '../../src/shared/source'
 // The normalizer's copy of the recipe, which a publisher runs at release. The two must agree.
 import { indexFingerprint as nodeFingerprint } from '../../../normalize/lib/fingerprint.mjs'
@@ -116,12 +117,16 @@ describe('revisionOf', () => {
 })
 
 describe('withProvenance', () => {
-  const platform = platformOf('0.1.8')
+  const platform = platformOf(VERSION)
   const statement = {
     verb: { id: 'http://adlnet.gov/expapi/verbs/completed' },
     object: { id: 'https://host.example/course.h5p', objectType: 'Activity' },
     context: { contextActivities: { parent: [{ id: 'x' }] } }
   }
+
+  it('names the player and the version that stamped it', () => {
+    expect(platform).toBe(`h5p-offline-player ${VERSION}`)
+  })
 
   it('fills in revision and platform, keeping what the context already had', () => {
     const stamped = withProvenance(statement, 'sha256:a', platform) as typeof statement & {
@@ -130,7 +135,7 @@ describe('withProvenance', () => {
     expect(stamped.context).toEqual({
       contextActivities: { parent: [{ id: 'x' }] },
       revision: 'sha256:a',
-      platform: 'h5p-offline-player 0.1.8'
+      platform
     })
     // A copy: the statement the frame sent is left alone.
     expect(statement.context).not.toHaveProperty('revision')
@@ -138,7 +143,7 @@ describe('withProvenance', () => {
 
   it('treats an absent objectType as an Activity, as the spec does', () => {
     const stamped = withProvenance({ object: { id: 'x' } }, 'sha256:a', platform) as { context: object }
-    expect(stamped.context).toEqual({ revision: 'sha256:a', platform: 'h5p-offline-player 0.1.8' })
+    expect(stamped.context).toEqual({ revision: 'sha256:a', platform })
   })
 
   it('leaves a statement about something other than an Activity alone', () => {
@@ -153,6 +158,6 @@ describe('withProvenance', () => {
 
   it('sets the platform even when the revision is not known', () => {
     const stamped = withProvenance({ object: { id: 'x' } }, null, platform) as { context: object }
-    expect(stamped.context).toEqual({ platform: 'h5p-offline-player 0.1.8' })
+    expect(stamped.context).toEqual({ platform })
   })
 })
