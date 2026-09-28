@@ -40,6 +40,7 @@ export default defineConfig({
         embed: resolve(rootDir, 'embed.html'),
         demo: resolve(rootDir, 'demo/index.html'),
         setup: resolve(rootDir, 'demo/setup.html'),
+        normalize: resolve(rootDir, 'demo/normalize.html'),
         xapi: resolve(rootDir, 'demo/xapi.html'),
         'local-file': resolve(rootDir, 'demo/local-file.html'),
         'demo-embed': resolve(rootDir, 'demo/embed.html'),

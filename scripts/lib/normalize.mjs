@@ -174,7 +174,13 @@ export async function normalizeArchive({ input, output, onEntry }) {
 
   try {
     tempDir = await mkdtemp(join(tmpdir(), 'h5p-normalize-'))
-    zipReader = new ZipReader(new BlobReader(await openAsBlob(input)))
+    // `checkSignature` makes every read that decodes an entry compare the result with the CRC
+    // the archive recorded, and throw on a mismatch. zip.js has no default for it, and takes it
+    // from the reader's options or the call's — `configure` does not reach it. Without it, a
+    // media entry whose compressed bytes were damaged but still inflated
+    // was written out stored, under the source's CRC, as though intact. Raw copies
+    // (`passThrough`) are not checked and need not be: their bytes and CRC travel together.
+    zipReader = new ZipReader(new BlobReader(await openAsBlob(input)), { checkSignature: true })
     // Tolerant, as the player is: zip.js's default refuses the whole archive over one hostile
     // name, and the point is to drop that entry and keep the rest.
     const all = await zipReader.getEntries({ filenameValidation: 'tolerant' })
@@ -213,7 +219,13 @@ export async function normalizeArchive({ input, output, onEntry }) {
     const results = []
     let index = 0
     for (const item of orderEntries(planned)) {
-      const result = await processEntry(item, { source, tempDir, writer, index: index++ })
+      let result
+      try {
+        result = await processEntry(item, { source, tempDir, writer, index: index++ })
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error)
+        throw new Error(`${item.name}: ${reason}`, { cause: error })
+      }
       results.push(result)
       onEntry?.(result)
     }
@@ -265,15 +277,18 @@ async function processEntry({ entry, name, target }, { source, tempDir, writer, 
         crc32: entry.signature ?? 0,
         compressedSize: entry.compressedSize,
         uncompressedSize: size,
-        dosDateTime,
-        encrypted: entry.encrypted
+        dosDateTime
       },
       (sink) => entry.getData(sink, { passThrough: true })
     )
     return { ...base, action: /** @type {const} */ ('copy'), to: from, warning }
   }
 
-  if (entry.encrypted) return copyRaw('encrypted; copied as it was')
+  // Refused, not copied. Copying one raw cannot be done faithfully with this writer — an AES
+  // entry reports its inner method and loses its 0x9901 extra field, a classic one written with
+  // sizes after its data carries a password check byte derived from the time rather than the
+  // CRC — and the player cannot play an encrypted entry in any case.
+  if (entry.encrypted) throw new Error('the entry is encrypted, which H5P does not use and the player cannot play')
   if (method !== STORE && method !== DEFLATE && method !== DEFLATE64) {
     return copyRaw(target === 'copy' ? undefined : `compression method ${method} cannot be read here; copied as it was`)
   }
@@ -295,7 +310,7 @@ async function processEntry({ entry, name, target }, { source, tempDir, writer, 
   if (!ISO_MEDIA_EXTENSIONS.has(extensionOf(name))) {
     if (method === STORE) return copyRaw()
     // Inflated straight into the output: the size and CRC are the source's own, and zip.js
-    // verifies the CRC as it inflates.
+    // compares the inflated bytes with that CRC as it goes (`checkSignature` above).
     await writer?.add(
       { name, method: STORE, crc32: entry.signature ?? 0, compressedSize: size, uncompressedSize: size, dosDateTime },
       (sink) => entry.getData(sink)
@@ -329,7 +344,14 @@ async function processEntry({ entry, name, target }, { source, tempDir, writer, 
     }
 
     // The bytes changed, so the CRC has to be measured over the new layout: one pass to
-    // measure, one to write.
+    // measure, one to write. A stored source is read in place, so nothing has checked its bytes
+    // against the CRC the archive recorded; a new CRC over damaged bytes would vouch for them,
+    // so they are checked first. An inflated one was checked on its way into the temp file.
+    if (writer && method === STORE && typeof entry.signature === 'number') {
+      let original = 0
+      for await (const chunk of readPieces(file, [{ start: offset, end: offset + size }])) original = crc32(chunk, original)
+      if (original >>> 0 !== entry.signature >>> 0) throw new Error('the stored bytes do not match the CRC the archive recorded')
+    }
     let crc = 0
     if (writer) {
       for await (const chunk of readPieces(file, plan.pieces)) crc = crc32(chunk, crc)

@@ -1,10 +1,13 @@
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { deflateRawSync } from 'node:zlib'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { BlobReader, BlobWriter, TextReader, Uint8ArrayReader, Uint8ArrayWriter, ZipReader, ZipWriter, type FileEntry } from '@zip.js/zip.js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { crc32 } from '../../scripts/lib/crc32.mjs'
 import { normalizeArchive, orderEntries, plainRelativeName, targetFormOf } from '../../scripts/lib/normalize.mjs'
-import { atomsIn, sampleMp4 } from './helpers/mp4'
+import { StreamingZipWriter } from '../../scripts/lib/zip-writer.mjs'
+import { atomsIn, concat, sampleMp4 } from './helpers/mp4'
 
 const text = (value: unknown) => new TextReader(JSON.stringify(value))
 const noise = (length: number, seed: number) => new Uint8Array(length).map((_, index) => (index * seed + (index >> 3)) & 0xff)
@@ -153,6 +156,74 @@ describe('normalizeArchive', () => {
     await writeFile(path, new Uint8Array(await (await writer.close()).arrayBuffer()))
     const report = await normalizeArchive({ input: path })
     expect(report.warnings).toEqual(['no h5p.json at the root: this is not a content package'])
+  })
+})
+
+/**
+ * An archive whose one entry carries a CRC that does not match its content: the shape of an
+ * entry damaged in transit whose bytes still decode. Written with our own writer, because no
+ * ordinary zip tool will record a wrong CRC on purpose.
+ */
+async function archiveWithWrongCrc(name: string, content: Uint8Array, method: 0 | 8): Promise<Uint8Array> {
+  const chunks: Uint8Array[] = []
+  const writer = new StreamingZipWriter(new WritableStream<Uint8Array>({ write: (chunk) => void chunks.push(chunk.slice()) }))
+  const manifest = new TextEncoder().encode(JSON.stringify({ mainLibrary: 'H5P.Foo' }))
+  await writer.add(
+    { name: 'h5p.json', method: 0, crc32: crc32(manifest), compressedSize: manifest.length, uncompressedSize: manifest.length },
+    (sink) => pourInto(sink, manifest)
+  )
+  const data = method === 8 ? deflateRawSync(content) : content
+  await writer.add(
+    { name, method, crc32: (crc32(content) ^ 0x5a5a5a5a) >>> 0, compressedSize: data.length, uncompressedSize: content.length },
+    (sink) => pourInto(sink, data)
+  )
+  await writer.close()
+  return concat(chunks)
+}
+
+async function pourInto(sink: WritableStream<Uint8Array>, bytes: Uint8Array) {
+  const writer = sink.getWriter()
+  await writer.write(bytes)
+  await writer.close()
+}
+
+describe('normalizeArchive on a damaged or protected archive', () => {
+  let dir: string
+
+  beforeAll(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'normalize-damaged-'))
+  })
+
+  afterAll(async () => {
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  const run = async (label: string, archive: Uint8Array) => {
+    const input = join(dir, `${label}.h5p`)
+    await writeFile(input, archive)
+    return normalizeArchive({ input, output: join(dir, `${label}.out.h5p`) })
+  }
+
+  it('refuses a deflated media entry whose content does not match its CRC, naming it', async () => {
+    // It inflates cleanly; only the CRC says it is wrong. Written out stored under that CRC, the
+    // output would have claimed to be intact.
+    const archive = await archiveWithWrongCrc('content/audio/b.mp3', mp3, 8)
+    await expect(run('deflated-crc', archive)).rejects.toThrow(/content\/audio\/b\.mp3: .*(CRC|signature)/i)
+  })
+
+  it('refuses a stored mp4 it would move whose bytes do not match their CRC', async () => {
+    // Read in place, then rewritten with a CRC measured over the new layout: without a check
+    // first, that fresh CRC would have vouched for the damaged bytes.
+    const archive = await archiveWithWrongCrc('content/videos/a.mp4', video.bytes, 0)
+    await expect(run('stored-crc', archive)).rejects.toThrow(/content\/videos\/a\.mp4: the stored bytes do not match/)
+  })
+
+  it('refuses an encrypted entry instead of copying it into an archive no reader can decrypt', async () => {
+    const writer = new ZipWriter(new BlobWriter('application/zip'))
+    await writer.add('h5p.json', text({ mainLibrary: 'H5P.Foo' }))
+    await writer.add('content/content.json', text({}), { password: 'secret' })
+    const archive = new Uint8Array(await (await writer.close()).arrayBuffer())
+    await expect(run('encrypted', archive)).rejects.toThrow(/content\/content\.json: the entry is encrypted/)
   })
 })
 

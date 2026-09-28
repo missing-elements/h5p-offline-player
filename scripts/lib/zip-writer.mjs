@@ -22,7 +22,6 @@ const MAX_32 = 0xffffffff
 const MAX_16 = 0xffff
 const VERSION_DEFAULT = 20
 const VERSION_ZIP64 = 45
-const FLAG_ENCRYPTED = 0x0001
 const FLAG_UTF8 = 0x0800
 
 const encoder = new TextEncoder()
@@ -36,7 +35,6 @@ const EMPTY = new Uint8Array(0)
  * @property {number} compressedSize the number of bytes `produce` will write
  * @property {number} uncompressedSize
  * @property {number} [dosDateTime] the raw DOS date/time word as a zip stores it; now when omitted
- * @property {boolean} [encrypted] the bytes are copied raw from an encrypted source, so the flag is carried over
  */
 
 /**
@@ -86,7 +84,7 @@ export class StreamingZipWriter {
       meta.compressedSize >= MAX_32 ||
       meta.uncompressedSize >= MAX_32 ||
       this.offset >= MAX_32
-    const flags = (utf8 ? FLAG_UTF8 : 0) | (meta.encrypted ? FLAG_ENCRYPTED : 0)
+    const flags = utf8 ? FLAG_UTF8 : 0
     const dosDateTime = meta.dosDateTime ?? dosDateTimeOf(new Date())
 
     const extra = zip64 ? zip64Extra([meta.uncompressedSize, meta.compressedSize]) : EMPTY

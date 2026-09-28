@@ -160,7 +160,8 @@ async function readTopLevelAtoms(file, base, size) {
 
 /**
  * Walks the atoms between `start` and `end` inside `moov`, descending into the containers that
- * lead to sample tables, and adds `shift(offset)` to every chunk offset it finds. Returns a
+ * lead to sample tables, and adds `shift(offset)` to every chunk offset it finds. Any other
+ * absolute position it knows of — `saio` — makes the file one it will not move. Returns a
  * reason where the table cannot be rewritten, `null` on success.
  *
  * @param {Buffer} moov
@@ -187,6 +188,11 @@ function patchChunkOffsets(moov, start, end, shift) {
     if (atomSize < headerSize || position + atomSize > end) return 'malformed atom inside moov'
 
     if (type === 'cmov') return 'compressed moov is not supported'
+    // Common Encryption keeps the offsets of its per-sample data in `saio`, and in a file that is
+    // not fragmented those are absolute file positions, like the chunk offsets. Moving `moov`
+    // without rewriting them would leave a protected video that can no longer be decrypted, so
+    // such a file is left as it was.
+    if (type === 'saio') return 'encrypted sample data (saio) is not supported'
 
     if (CONTAINERS.has(type)) {
       const problem = patchChunkOffsets(moov, position + headerSize, position + atomSize, shift)

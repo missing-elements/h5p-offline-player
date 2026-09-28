@@ -60,7 +60,9 @@ scripts/                  sync-h5p-assets, build-workers, copy-frame-assets, bui
                           mp4 remux and policy); scripts/lib/frame-boot-plugin.mjs builds the
                           frame's boot script for esbuild and Vite alike
 demo/ + index.html        the hosted player page; demo/index.html is the examples index,
-                          demo/setup.html the setup page for integrators, the rest are the
+                          demo/setup.html the setup page for integrators, demo/normalize.html
+                          why deflated media cannot stream and how the normalizer fixes it
+                          (prose and a CSS-only diagram, no script), the rest are the
                           individual embedding demos, all sharing demo/player-page.css
 embed.html                the embeddable page, /embed: the element alone, driven by the query
                           string (demo/embed-page.js); demo/embed.html is the site that embeds it
@@ -551,7 +553,7 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
 `npm run normalize -- course.h5p` rewrites a package once so that it streams. It is the fix for
 the deflated, non-faststart video above, applied where it belongs — to the package, by whoever
 publishes it. `scripts/lib/normalize.mjs` holds the policy, `mp4-faststart.mjs` the remux and
-`zip-writer.mjs` the output side; `scripts/normalize-h5p.mjs` is the command. Four things about
+`zip-writer.mjs` the output side; `scripts/normalize-h5p.mjs` is the command. Five things about
 it that the code does not say by itself:
 
 - **It writes the zip itself.** zip.js reads the input — descriptors, zip64, inflate, all
@@ -574,6 +576,13 @@ it that the code does not say by itself:
   paths, duplicates after normalisation — read with `filenameValidation: 'tolerant'` for the same
   reason the player uses it. `plainRelativeName` is a copy of `normalizeEntryName`, because the
   scripts cannot import TypeScript; keep the two in step.
+- **It checks what it decodes, and refuses what it cannot copy faithfully.** The `ZipReader` is
+  opened with `checkSignature: true` — zip.js has no default, and `configure` does not reach it —
+  so an entry whose bytes do not match their CRC stops the run, named, rather than being written
+  out stored under the source's CRC as though intact; a stored mp4 it moves is checked by hand,
+  since it is read in place and would otherwise get a fresh CRC over damaged bytes. An encrypted
+  entry is refused: copied raw, AES lost its extra field and classic encryption its check byte.
+  An mp4 with `saio` (Common Encryption) is left unmoved, because those are absolute offsets too.
 
 Measured on the fixtures: `boardgame.h5p` grows 38.1 → 38.8 MB with 158 media entries inflated to
 stored (its mp4s were already faststart); the h5p.com export keeps its media as it was and only

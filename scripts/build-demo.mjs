@@ -39,7 +39,7 @@ for (const name of packages) {
 
 // What crawlers and link previews ask for. `/embed` is left out: it carries `noindex`.
 await cp(resolve(rootDir, 'demo', 'og-image.png'), resolve(outDir, 'demo', 'og-image.png'))
-const pages = ['/', '/demo/', '/demo/setup.html', '/demo/xapi.html', '/demo/local-file.html', '/demo/two-players.html', '/demo/embed.html']
+const pages = ['/', '/demo/', '/demo/setup.html', '/demo/normalize.html', '/demo/xapi.html', '/demo/local-file.html', '/demo/two-players.html', '/demo/embed.html']
 const today = new Date().toISOString().slice(0, 10)
 await writeFile(
   resolve(outDir, 'sitemap.xml'),

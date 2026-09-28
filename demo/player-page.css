@@ -504,6 +504,82 @@ footer .credit {
   margin-top: 0.4rem;
 }
 
+/* ---------------------------------------------------------------- the normalize page's diagram */
+
+/* Three archives drawn as bars, with the part that has to cross the network shaded. Classes
+   only, no inline styles: the demo's CSP is `style-src 'self'`, which refuses a style attribute
+   as it does a <style> block. The widths are proportions, not measurements. */
+
+.lanes { display: grid; gap: 1.25rem; margin: 1.5rem 0 1.75rem; padding: 0; }
+.lane { display: grid; gap: 0.45rem; }
+.lane-title { margin: 0; }
+.lane-note { margin: 0; color: var(--muted); font-size: 0.925rem; max-width: 48rem; }
+
+.lane-bar {
+  position: relative;
+  display: flex;
+  height: 2.25rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.seg {
+  display: flex;
+  align-items: center;
+  padding: 0 0.6rem;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  color: var(--muted);
+  border-right: 1px solid var(--line-strong);
+}
+.seg-libs { flex: 0 0 18%; background: var(--surface-2); }
+.seg-json { flex: 0 0 7%; background: var(--surface); }
+.seg-media { flex: 1 1 auto; border-right: 0; color: var(--fg); }
+
+/* What has to be downloaded, laid over the bar. */
+.read {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 34%, transparent) 0 6px,
+    color-mix(in srgb, var(--accent) 18%, transparent) 6px 12px
+  );
+  border-inline: 2px solid var(--accent);
+}
+.read-slice { left: 70%; width: 4%; }
+.read-front { left: 25%; width: 49%; }
+.read-whole { left: 25%; right: 0; border-right: 0; }
+
+/* The point the learner wants to play from. */
+.want {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  left: 72%;
+  width: 2px;
+  background: var(--danger);
+}
+
+.seg-moov {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 0.45rem;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font: 600 0.72rem / 1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.lanes figcaption { color: var(--muted); font-size: 0.875rem; }
+
 /* ---------------------------------------------------------------- narrow screens */
 
 @media (max-width: 40rem) {
@@ -519,4 +595,7 @@ footer .credit {
   .status { flex-wrap: wrap; }
   /* The bar takes a line of its own below the state and the clock. */
   progress { flex-basis: 100%; order: 1; }
+  /* With the header row hidden, a comparison table names each value in front of it. */
+  .table td[data-label]::before { content: attr(data-label) ": "; color: var(--muted); }
+  .seg { padding: 0 0.35rem; font-size: 0.7rem; }
 }

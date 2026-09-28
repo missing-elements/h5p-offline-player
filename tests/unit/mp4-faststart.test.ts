@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { planFaststart, readPieces } from '../../scripts/lib/mp4-faststart.mjs'
-import { atom, atomsIn, chunkOffsets, concat, findAtom, sampleMp4, u32s } from './helpers/mp4'
+import { atom, atomsIn, chunkOffsets, concat, findAtom, sampleMp4, stco, u32s } from './helpers/mp4'
 
 async function withFile<T>(bytes: Uint8Array, run: (file: Awaited<ReturnType<typeof open>>) => Promise<T>): Promise<T> {
   const dir = await mkdtemp(join(tmpdir(), 'faststart-test-'))
@@ -96,7 +96,16 @@ describe('planFaststart', () => {
       [concat([atom('ftyp', u32s(1, 2)), atom('mdat', new Uint8Array(20))]), /no moov/],
       [concat([atom('ftyp', u32s(1, 2)), atom('moov', atom('mvhd', new Uint8Array(8)))]), /no mdat/],
       [concat([atom('ftyp', u32s(1)), atom('mdat', new Uint8Array(8)), atom('moof', new Uint8Array(8)), atom('moov', new Uint8Array(8))]), /fragmented/],
-      [concat([atom('ftyp', u32s(1)), atom('mdat', new Uint8Array(8)), atom('moov', atom('cmov', new Uint8Array(8)))]), /compressed moov/]
+      [concat([atom('ftyp', u32s(1)), atom('mdat', new Uint8Array(8)), atom('moov', atom('cmov', new Uint8Array(8)))]), /compressed moov/],
+      // Common Encryption: `saio` holds absolute positions the remux does not rewrite.
+      [
+        concat([
+          atom('ftyp', u32s(1)),
+          atom('mdat', new Uint8Array(8)),
+          atom('moov', atom('trak', atom('mdia', atom('minf', atom('stbl', atom('saio', u32s(0, 1, 16)), stco([16]))))))
+        ]),
+        /encrypted sample data/
+      ]
     ]
     for (const [bytes, reason] of cases) {
       await withFile(bytes, async (file) => {
