@@ -62,4 +62,10 @@ body.dragging .drop-hint { display: grid; }
    before that one, so a rule that relied on coming later lost, and the menu stayed. */
 @media (display-mode: standalone) {
   .topbar nav[aria-label="Site"] { display: none; }
+  .controls #install { display: none; }
 }
+
+/* `hidden` has to be said again for the install button: the shared sheet gives every button
+   `display: inline-flex`, which beats the browser's own `[hidden]` rule, so the button showed on
+   every visit — installed or not, with nothing behind it to click. */
+#install[hidden] { display: none; }

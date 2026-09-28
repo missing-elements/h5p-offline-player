@@ -268,10 +268,18 @@ document.querySelector('#fetch-libraries').addEventListener('click', () => {
 
 let deferredPrompt = null
 
+/** True in the installed app's own window, where there is nothing left to install. */
+const standalone = matchMedia('(display-mode: standalone)')
+
 window.addEventListener('beforeinstallprompt', (event) => {
   event.preventDefault()
   deferredPrompt = event
-  installButton.hidden = false
+  // Chrome can still offer the prompt inside the installed window — for another copy installed
+  // from a different origin, say — and the offer only makes sense in a tab.
+  installButton.hidden = standalone.matches
+})
+standalone.addEventListener('change', () => {
+  if (standalone.matches) installButton.hidden = true
 })
 
 installButton.addEventListener('click', async () => {
@@ -292,4 +300,4 @@ window.addEventListener('appinstalled', () => {
   installButton.hidden = true
   void persist()
 })
-if (matchMedia('(display-mode: standalone)').matches) void persist()
+if (standalone.matches) void persist()
