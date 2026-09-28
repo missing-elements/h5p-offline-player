@@ -1,7 +1,10 @@
 /* The installable app's additions to the shared sheet. */
 
+/* The hover rule names the background again: the shared sheet's `label.file:hover` weighs the
+   same as `label.file.primary`, and the build emits that sheet after this one, so it won and the
+   button went grey behind white text. The extra `:hover` here outweighs it in either order. */
 label.file.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-label.file.primary:hover { filter: brightness(1.06); }
+label.file.primary:hover { background: var(--accent); filter: brightness(1.06); }
 
 /* Whether the app can start with no network: set by app.js once the worker controls the page. */
 .offline {
