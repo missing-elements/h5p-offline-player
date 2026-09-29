@@ -24,7 +24,7 @@ The hard constraints that shape every file here:
 
 ## Layout
 
-A pnpm workspace of three parts. Paths elsewhere in this file are relative to the part they
+A pnpm workspace of four parts. Paths elsewhere in this file are relative to the part they
 belong to — `src/…` and `scripts/…` mean the player's unless a section says otherwise.
 
 ```
@@ -79,6 +79,11 @@ packages/normalize/       @missing-elements/h5p-normalize — the package rewrit
                             crc32.mjs, format.mjs
   tests/                    node tests; tests/helpers/mp4.ts builds structurally honest mp4s
 
+packages/verify/          @missing-elements/h5p-verify — plays a package headless and reports whether it works
+  bin/h5p-verify.mjs        the command
+  lib/verify.mjs            the static server, the browser run and the report; lib/page.html the page it drives
+  tests/                    node tests that run the real thing against the demo's committed content
+
 apps/demo/                the demo app: the dev server for the whole repository, and the hosted site
   index.html                the hosted player page
   embed.html                the embeddable page, /embed: the element alone, driven by the query
@@ -99,6 +104,11 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             build-app-icons, build-app-libraries
   vite.config.ts            the dev server and the hosted demo: the pages plus dist/'s layout at the
                             site root -> dist-demo/
+
+skills/                   agent skills, one directory per skill, at the root because that is where
+                          `npx skills add <owner/repo>` looks: h5p-verify (when to run the verifier and how
+                          to read its report), h5p-player-setup (putting the player on a site), h5p-normalize (when
+                          a package needs rewriting to stream, and how to read the dry run)
 
 api/no-range.js           the Vercel function that stands in for a host without Range on the demo
 vercel.json               the deployment: build command, the /no-range rewrite, caching and security headers
@@ -128,12 +138,13 @@ pnpm install           # pnpm 10: dependency install scripts stay off, see pnpm-
 pnpm --filter @missing-elements/h5p-offline-player exec playwright install chromium   # once, for the browser tests
 
 pnpm dev               # vendors assets, builds fixtures, serves the demo on :5173
-pnpm test              # every package: the player's unit + browser suites, the normalizer's tests
+pnpm test              # every package: the player's unit + browser suites, the normalizer's and verifier's tests
 pnpm test:unit         # fast, no browser
 pnpm test:browser
 pnpm typecheck         # every package
 pnpm build             # the player: types, element, both workers, frame assets
 pnpm normalize course.h5p          # rewrite a package so it streams: media stored, mp4 index first
+pnpm verify course.h5p             # play a package in a headless browser and report whether it works
 pnpm build:demo        # the hosted demo into apps/demo/dist-demo/, what Vercel runs
 pnpm demo:content      # rebuild apps/demo/demo/content/*.h5p from their sources; needs the H5P hub
 pnpm demo:og           # re-render the social card, apps/demo/demo/og-image.png
@@ -715,6 +726,50 @@ output. What the script cannot do is make a host that ignores `Range` serve a vi
 video has arrived: an entry enters the forward index only once it is complete, so on such a host
 a normalized package gains the early boot and the seekable video, and still waits for the bytes.
 
+## The verifier
+
+`pnpm verify course.h5p` plays a package through the real element in a headless Chromium and
+says whether it worked. Built on 2026-09-29 after generating three packages with h5p-cli by
+hand: two of the three were broken in ways no zip check would find — a Course Presentation
+whose `content.json` lacked a field the library reads at start, a Drag and Drop whose sizes were
+in the wrong unit — and the player was what found them, in seconds, with no server. That is the
+tool's whole purpose: the last step of a pipeline that generates or rewrites packages, an AI
+agent's included, so "verified" means "played" rather than "parsed". It is its own package,
+`packages/verify`, published as `@missing-elements/h5p-verify`, because it brings a browser
+driver along and the normalizer should not.
+
+- **It plays the package the way the app does: as a picked file.** `lib/page.html` is one
+  element and a hidden file input; the tool serves it and the player's `dist/` from a static
+  server on a random localhost port (a Service Worker is allowed on `localhost`), and hands the
+  file to the input through Playwright. So it needs no `Range` support, no network and no
+  storage, and every path it exercises is the one a learner's browser takes.
+- **An uncaught error while booting fails the check, even when the content comes up.** Found on
+  the first run: a CLI export lists editor libraries as runtime dependencies, six scripts threw
+  `H5PEditor is not defined` as they loaded, the content rendered around them, and the tool
+  said pass. A script that throws at load is a defect in the package — the part that threw is
+  missing from what was drawn — so it is a `fail` with the messages listed and deduplicated.
+  An error after `ready` is a warning, for the reason the element treats it as an event: content
+  types throw non-fatal exceptions routinely, on resize in particular.
+- **The runtime's `library.json` probe 404s are filtered out**, from the response listener by
+  URL and from the console by dropping every `Failed to load resource` line, since the console's
+  copy names no URL and the response listener already has the real failures. Without that,
+  every run carried one spurious warning.
+- **A CSP violation is caught with an init script** on the browser context, because the event
+  fires in the document it happens in and the frame is created after the page loads.
+- **The browser is Chrome or Edge if installed, else Playwright's Chromium**, through
+  `playwright-core` rather than `playwright`, so installing the package downloads nothing; the
+  error names `npx playwright install chromium` as the way to get one.
+- **`skills/h5p-verify/SKILL.md` at the repository root is the contract with an agent.** It says when to run the tool, what each verdict
+  and warning means and what to do about it, to look at the screenshot because layout mistakes
+  raise no error, never to make the check pass by removing what fails, and what a pass does not
+  claim: nothing about the content's correctness, level, licensing or accessibility.
+
+Not built, deliberately: steps that click through the content and check the xAPI it sends, a
+content digest for reviewing what was generated, and a check of library versions against the
+hub's catalogue — the last of which is the commonest reason a package that plays here is refused
+on upload, since h5p-cli builds from GitHub `master` and h5p.com carries the hub's versions.
+The tests need the player built (`pnpm build`); the package's `test` script does that first.
+
 ## The element's own box
 
 The shadow CSS is `src/shadow.css`, imported `?inline`: Vite hands it to the element as a string,
@@ -1078,6 +1133,8 @@ The architecture and setup documents predate the code. These are deliberate addi
 - Generated types live in `types/`, not `dist/index.d.ts`.
 - A normalizer script. The design leaves the package's layout to whoever built it; the script
   is how they get the layout the player streams best.
+- A verifier command. The design has the player play packages; the command has it judge them,
+  headless, for whoever produces packages by machine.
 - The libraries are warmed into the cache before the frame boots on a `Range` host. The design
   reads every entry on demand; on a high-latency host that made the boot a matter of minutes.
 - A library source that cannot be reached falls back to a bundle downloaded whole from the same

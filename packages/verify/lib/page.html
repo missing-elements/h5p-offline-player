@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>h5p-verify</title>
+    <script type="module" src="/h5p-player.js"></script>
+    <style>
+      body { margin: 0; padding: 16px; background: #fff; font: 14px system-ui, sans-serif; }
+      h5p-player { display: block; width: 1024px; min-height: 240px; }
+    </style>
+  </head>
+  <body>
+    <input type="file" id="file" hidden />
+    <h5p-player auto-resize></h5p-player>
+    <script>
+      // What the driver reads back: every state, error and statement the element reported,
+      // stamped with the page's clock so the report can say how long the boot took.
+      const report = (window.__verify = { started: null, states: [], errors: [], xapi: [] })
+      const player = document.querySelector('h5p-player')
+      const libraries = new URLSearchParams(location.search).get('libraries')
+      if (libraries) player.setAttribute('libraries', libraries)
+
+      player.addEventListener('statechange', (event) => {
+        report.states.push({ state: event.detail.state, at: performance.now() })
+      })
+      player.addEventListener('error', (event) => {
+        report.errors.push({
+          code: event.detail.code,
+          message: event.detail.message,
+          missingLibraries: event.detail.missingLibraries ?? null,
+          // A runtime error once the content is up leaves the state at `ready`: the content
+          // kept running. Before that it is the boot failing.
+          afterReady: player.state === 'ready',
+          at: performance.now()
+        })
+      })
+      player.addEventListener('xapi', (event) => {
+        report.xapi.push(event.detail.verb ?? null)
+      })
+      document.querySelector('#file').addEventListener('change', (event) => {
+        const [file] = event.target.files
+        if (!file) return
+        report.started = performance.now()
+        player.file = file
+      })
+    </script>
+  </body>
+</html>

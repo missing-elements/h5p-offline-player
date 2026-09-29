@@ -305,10 +305,41 @@ Integration details, including bundler-specific setup and single-worker hosts, a
 [h5p-player-setup.md](https://github.com/missing-elements/h5p-offline-player/blob/main/h5p-player-setup.md). The design is in
 [h5p-offline-player-architecture.md](https://github.com/missing-elements/h5p-offline-player/blob/main/h5p-offline-player-architecture.md).
 
+## Checking that a package plays
+
+A zip that opens and JSON that parses prove nothing; most broken packages are valid zips that
+fail in the runtime. [`@missing-elements/h5p-verify`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/verify)
+plays a package through the player in a headless browser and says whether it worked:
+
+```bash
+npx @missing-elements/h5p-verify course.h5p        # exit 0: it plays; 1: it does not; report.json and a screenshot beside it
+```
+
+It names the libraries a package lacks, fails on an uncaught error while the runtime boots, and
+checks that the content drew something. Made for the last step of a pipeline that generates or
+rewrites packages — an AI agent's included: the repository ships a skill (`skills/h5p-verify/`),
+which tells an agent when to run it and how to read the result.
+
+## Agent skills
+
+The repository ships three [agent skills](https://agentskills.io) under `skills/`, for Claude
+Code, Cursor, Copilot, Codex and the rest:
+
+```bash
+npx skills add missing-elements/h5p-offline-player                       # all three
+npx skills add missing-elements/h5p-offline-player --skill h5p-verify    # one
+```
+
+| Skill | For an agent that |
+|---|---|
+| `h5p-player-setup` | is asked to put H5P content on a website: which setup, the exact lines, how to check it, what goes wrong |
+| `h5p-normalize` | hears that a package's video takes minutes to start, or publishes packages to a static host: diagnose with a dry run, rewrite once, keep the revision |
+| `h5p-verify` | generates or rewrites `.h5p` packages: run `h5p-verify` before claiming one works, and read what it reports |
+
 ## Development
 
 A pnpm workspace: the player in `packages/player`, the normalizer in `packages/normalize`, the
-demo site in `apps/demo`.
+verifier in `packages/verify`, the demo site in `apps/demo`.
 
 ```bash
 pnpm install
@@ -318,6 +349,7 @@ pnpm dev          # the demo player page on http://localhost:5173
 pnpm test         # every package's tests, the player's browser suite included
 pnpm build        # the player package
 pnpm normalize course.h5p   # rewrite a package so it streams (see above)
+pnpm verify course.h5p      # play a package headless and report whether it works (see above)
 pnpm build:demo             # the hosted demo, as Vercel builds it, into apps/demo/dist-demo/
 pnpm preview:demo           # serve it locally with the production headers
 pnpm demo:content           # rebuild the demo's content packages from their sources

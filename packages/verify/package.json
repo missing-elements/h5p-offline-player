@@ -1,0 +1,59 @@
+{
+  "name": "@missing-elements/h5p-verify",
+  "version": "0.1.0",
+  "description": "Plays an .h5p package in a headless browser through h5p-offline-player and reports whether it works: start-up, errors, missing libraries, a screenshot. The last check before a generated package is handed to anyone.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/missing-elements/h5p-offline-player.git",
+    "directory": "packages/verify"
+  },
+  "homepage": "https://github.com/missing-elements/h5p-offline-player/tree/main/packages/verify#readme",
+  "bugs": {
+    "url": "https://github.com/missing-elements/h5p-offline-player/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "bin": {
+    "h5p-verify": "./bin/h5p-verify.mjs"
+  },
+  "exports": {
+    ".": "./lib/verify.mjs",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "bin",
+    "lib"
+  ],
+  "keywords": [
+    "h5p",
+    "verify",
+    "test",
+    "playwright",
+    "headless",
+    "elearning",
+    "cli",
+    "agent-skill"
+  ],
+  "scripts": {
+    "test": "pnpm --filter @missing-elements/h5p-offline-player build && vitest run",
+    "typecheck": "tsc -p tsconfig.json",
+    "prepack": "node -e \"require('node:fs').copyFileSync('../../LICENSE', 'LICENSE')\"",
+    "prepublishOnly": "pnpm typecheck && pnpm test"
+  },
+  "dependencies": {
+    "@missing-elements/h5p-offline-player": "workspace:^",
+    "playwright-core": "^1.50.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "@zip.js/zip.js": "^2.17.0",
+    "typescript": "^5.7.3",
+    "vitest": "^5.0.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -12,8 +12,12 @@ public
 # Copied from the repository root by the player's `prepack`, so npm finds them in the package.
 packages/player/README.md
 packages/player/LICENSE
-# The same for the normalizer, whose `prepack` copies the LICENSE.
+# The same for the normalizer and the verifier, whose `prepack` copies the LICENSE.
 packages/normalize/LICENSE
+packages/verify/LICENSE
+
+# h5p-verify writes its report and screenshot to <package>.verify/ beside the package by default.
+*.verify/
 
 # Incremental build state
 *.tsbuildinfo
