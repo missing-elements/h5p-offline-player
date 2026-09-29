@@ -83,11 +83,6 @@
         </label>
       </form>
 
-      <label class="toggle">
-        <input type="checkbox" id="use-hub" />
-        Fetch missing libraries from h5p.org when a package does not carry its own
-      </label>
-
       <div class="samples">
         <button type="button" data-src="/demo/content/quiz.h5p">Quiz</button>
         <button type="button" data-src="/demo/content/video.h5p">Interactive video</button>
@@ -103,8 +98,10 @@
       </div>
 
       <p class="message" id="message" hidden></p>
-      <p class="message hint" id="offer" hidden>
-        <button type="button" id="fetch-libraries">Fetch them from h5p.org and retry</button>
+      <p class="message hint offer" id="offer" hidden>
+        <span>Load the libraries from</span>
+        <button type="button" id="use-bundle">this site's bundle · ~10 MB</button>
+        <button type="button" id="use-hub">h5p.org</button>
       </p>
 
       <h5p-player auto-resize preload="auto"></h5p-player>

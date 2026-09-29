@@ -14,8 +14,9 @@ const timer = document.querySelector('#timer')
 const bar = document.querySelector('#progress')
 const message = document.querySelector('#message')
 const log = document.querySelector('#log')
-const useHub = document.querySelector('#use-hub')
 const offer = document.querySelector('#offer')
+const useBundle = document.querySelector('#use-bundle')
+const useHub = document.querySelector('#use-hub')
 
 const write = (line) => {
   const stamp = new Date().toLocaleTimeString([], { hour12: false })
@@ -141,18 +142,41 @@ player.addEventListener('error', (event) => {
   show(late ? `The content reported an error and kept running: ${detail}` : (EXPLANATIONS[code] ?? detail), late ? 'hint' : 'error')
   write(`error  ${code}: ${detail}`)
 
-  // The element reports what a package is missing; offering to go and get it is the host's call,
-  // because it means a request to a third party.
-  offer.hidden = !missingLibraries || useHub.checked
+  // The element reports what a package is missing; where to get it is the host's call, and here
+  // the visitor's: this site's bundle, or h5p.org, which is a request to a third party. Only the
+  // sources not tried yet are offered — the bundle is built from the hub, so after the hub has
+  // failed it would not help either.
+  const tried = player.getAttribute('libraries')
+  // The element's own text is written for the developer ("set the libraries attribute"); the
+  // visitor gets the buttons instead.
+  if (missingLibraries && !tried) {
+    show(
+      `This package was exported without its H5P libraries, as h5p.com and h5p.org do by default. Missing: ${missingLibraries.folders.join(', ')}.`,
+      'warning'
+    )
+  }
+  useBundle.hidden = tried === BUNDLE || tried === 'hub'
+  useHub.hidden = tried === 'hub'
+  offer.hidden = !missingLibraries || (useBundle.hidden && useHub.hidden)
 })
 
 player.addEventListener('resize', (event) => {
   player.style.height = `${Math.max(event.detail.height, 240)}px`
 })
 
+/**
+ * The same bundle the installable app carries: every H5P hub content type's runtime libraries.
+ * Fetched only once a visitor picks it for a package that lacks its own — the player page stays
+ * light, and nothing is downloaded for packages that carry their libraries.
+ */
+const BUNDLE = '/app/libraries.h5p'
+
+/** Where missing libraries come from: `null` until the visitor has chosen, then for every load. */
+let librarySource = null
+
 /** `libraries` has to be set before `src`: it is read when a load discovers it needs it. */
-const applyLibrarySource = (value) => {
-  if (value) player.setAttribute('libraries', value)
+const applyLibrarySource = () => {
+  if (librarySource) player.setAttribute('libraries', librarySource)
   else player.removeAttribute('libraries')
 }
 
@@ -162,11 +186,11 @@ const applyLibrarySource = (value) => {
  */
 let reload = null
 
-const loadUrl = (url, librarySource) => {
+const loadUrl = (url) => {
   log.textContent = ''
   offer.hidden = true
-  reload = () => loadUrl(url, librarySource)
-  applyLibrarySource(librarySource)
+  reload = () => loadUrl(url)
+  applyLibrarySource()
   write(`loading  ${url}`)
   startClock()
   // Removed first so re-setting the same URL still counts as a change.
@@ -178,7 +202,7 @@ const loadFile = (file) => {
   log.textContent = ''
   offer.hidden = true
   reload = () => loadFile(file)
-  applyLibrarySource(useHub.checked ? 'hub' : null)
+  applyLibrarySource()
   write(`loading  ${file.name} (${(file.size / 1024).toFixed(0)} kB, from disk)`)
   startClock()
   urlInput.value = ''
@@ -188,20 +212,17 @@ const loadFile = (file) => {
 form.addEventListener('submit', (event) => {
   event.preventDefault()
   const url = urlInput.value.trim()
-  if (url) loadUrl(url, useHub.checked ? 'hub' : null)
+  if (url) loadUrl(url)
 })
 
-useHub.addEventListener('change', () => {
-  if (useHub.checked) offer.hidden = true
-})
-
-document.querySelector('#fetch-libraries').addEventListener('click', () => {
-  useHub.checked = true
+const retryWith = (source, label) => {
+  librarySource = source
   offer.hidden = true
-  applyLibrarySource('hub')
-  write('retrying with libraries from h5p.org')
+  write(`retrying with libraries from ${label}`)
   reload?.()
-})
+}
+useBundle.addEventListener('click', () => retryWith(BUNDLE, "this site's bundle"))
+useHub.addEventListener('click', () => retryWith('hub', 'h5p.org'))
 
 fileInput.addEventListener('change', () => {
   const [file] = fileInput.files
@@ -211,8 +232,7 @@ fileInput.addEventListener('change', () => {
 for (const button of document.querySelectorAll('.samples button')) {
   button.addEventListener('click', () => {
     urlInput.value = button.dataset.src
-    // A sample may bring its own library bundle, which is the local stand-in for the hub.
-    loadUrl(button.dataset.src, button.dataset.libraries ?? (useHub.checked ? 'hub' : null))
+    loadUrl(button.dataset.src)
   })
 }
 
@@ -220,5 +240,5 @@ for (const button of document.querySelectorAll('.samples button')) {
 const initial = new URLSearchParams(location.search).get('src')
 if (initial) {
   urlInput.value = initial
-  loadUrl(initial, useHub.checked ? 'hub' : null)
+  loadUrl(initial)
 }

@@ -17,6 +17,7 @@
   --accent-ink: #ffffff;
   --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
   --danger: #b4232a;
+  --warn: #8a5a00;
   --ok: #1d7a42;
 
   --radius: 12px;
@@ -39,6 +40,7 @@
     --accent: #7aa2ff;
     --accent-ink: #0b1a3a;
     --danger: #ff8f8f;
+    --warn: #f0c060;
     --ok: #62d094;
     --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 14px 36px -20px rgb(0 0 0 / 0.7);
   }
@@ -222,17 +224,6 @@ button.primary:hover { filter: brightness(1.06); }
 button:disabled { opacity: 0.5; cursor: default; transform: none; }
 label.file input { display: none; }
 
-.toggle {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.6rem;
-  margin: 0.875rem 0 0;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.toggle input { margin: 0.3em 0 0; accent-color: var(--accent); }
-
 .samples { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.875rem 0 0; }
 
 .samples button {
@@ -349,7 +340,17 @@ progress[hidden] { display: none; }
   color: var(--danger);
 }
 
+.message.warning {
+  border-color: color-mix(in srgb, var(--warn) 35%, transparent);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  color: var(--warn);
+}
+
 .message.hint { border-color: var(--line); background: var(--surface); color: var(--muted); }
+
+/* The choice of library source. `button`'s own display beats the UA `[hidden]` rule. */
+.message.offer:not([hidden]) { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.offer button[hidden] { display: none; }
 
 /* ---------------------------------------------------------------- the player's box */
 
