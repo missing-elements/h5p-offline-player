@@ -10,7 +10,7 @@ or from disk — no server-side extraction, no backend, nothing to unpack ahead 
 
 [Player](https://h5p-offline-player.vercel.app/) — paste a URL or pick a file
 
-[Offline app](https://h5p-offline-player.vercel.app/app/) — install it in Chrome or Edge and play `.h5p` files with no network
+[Offline app (PWA)](https://h5p-offline-player.vercel.app/app/) — install it in Chrome or Edge and play `.h5p` files with no network
 
 ```html
 <script type="module" src="h5p-player.js"></script>

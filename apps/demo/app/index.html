@@ -3,17 +3,34 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>H5P Offline Player — install it, open .h5p files with no network</title>
-    <meta name="description" content="An installable H5P player. Open a .h5p file from your computer and play it with no server and, once installed, no network." />
+    <title>H5P Offline Player — an installable H5P app (PWA) that plays .h5p files offline</title>
+    <meta name="description" content="A free H5P player you install from the browser (PWA). Open a .h5p file from your computer and play it with no server, no account and, once installed, no network. Chrome and Edge on Windows, macOS, Linux, ChromeOS and Android." />
     <link rel="canonical" href="%SITE_URL%/app/" />
     <meta name="theme-color" content="#2f6df6" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="h5p-offline-player" />
-    <meta property="og:title" content="H5P Offline Player — install it, open .h5p files with no network" />
-    <meta property="og:description" content="An installable H5P player. Open a .h5p file from your computer and play it with no server and, once installed, no network." />
+    <meta property="og:title" content="H5P Offline Player — an installable H5P app (PWA) that plays .h5p files offline" />
+    <meta property="og:description" content="A free H5P player you install from the browser (PWA). Open a .h5p file from your computer and play it with no server, no account and, once installed, no network. Chrome and Edge on Windows, macOS, Linux, ChromeOS and Android." />
     <meta property="og:url" content="%SITE_URL%/app/" />
     <meta property="og:image" content="%SITE_URL%/demo/og-image.png" />
     <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "H5P Offline Player",
+        "description": "A free H5P player you install from the browser (PWA). Open a .h5p file from your computer and play it with no server, no account and, once installed, no network.",
+        "url": "%SITE_URL%/app/",
+        "applicationCategory": "EducationalApplication",
+        "operatingSystem": "Windows, macOS, Linux, ChromeOS, Android",
+        "browserRequirements": "Chrome or Edge to install; any browser with Service Worker support to play",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "isAccessibleForFree": true,
+        "featureList": ["Plays .h5p files with no network once installed", "Opens .h5p files from the file manager", "Carries the H5P libraries for every H5P hub content type", "Nothing is uploaded"],
+        "sameAs": ["https://github.com/missing-elements/h5p-offline-player"],
+        "author": { "@type": "Organization", "name": "missing-elements", "url": "https://github.com/missing-elements" }
+      }
+    </script>
     <!-- Left alone by Vite: the manifest names its icons relative to itself, and a hashed copy
          under /assets/ would point them at nothing. The build copies both as they are. -->
     <link rel="manifest" href="/app/manifest.webmanifest" vite-ignore />
@@ -70,15 +87,37 @@
 
       <p class="drop-hint" id="drop-hint" aria-hidden="true">Drop the .h5p file to open it</p>
 
-      <footer>
+      <section class="about" aria-labelledby="about-title">
+        <h2 id="about-title">An H5P player that works offline</h2>
         <p>
-          The app carries the H5P libraries for every content type on the H5P hub, so a package
-          exported without its own — what h5p.com and h5p.org do by default — plays offline too.
-          They are about 10 MB, downloaded once with the app.
-          Only a package that needs a newer version than the app carries asks to fetch it from
-          h5p.org, once. Files you open are not kept: open one again next time, and what was
-          already extracted comes from this device's cache.
+          H5P Offline Player is a web app you install from the browser — a PWA — that plays
+          <code>.h5p</code> files without Moodle, WordPress, Lumi or any other server. Teachers hand
+          out the files; learners open them here, at home or in class, with or without a connection.
         </p>
+
+        <h3 class="install-help">Install it</h3>
+        <ul class="list install-help">
+          <li>In Chrome or Edge on Windows, macOS, Linux or ChromeOS, press <strong>Install app</strong> above, or the install icon at the end of the address bar.</li>
+          <li>On Android, open this page in Chrome and choose <strong>Install app</strong> from the menu.</li>
+          <li>Safari and Firefox cannot install it, but this page plays files in them all the same while online.</li>
+        </ul>
+
+        <h3>Open a file</h3>
+        <ul class="list">
+          <li>Press <strong>Open file</strong>, or drop a <code>.h5p</code> on the page.</li>
+          <li>Once installed, the app opens <code>.h5p</code> files from your file manager: double-click one, or use <em>Open with</em>.</li>
+          <li>A link to <code>/app/?src=</code> and a package's address opens that package in the app, for a teacher sending a course by link.</li>
+        </ul>
+
+        <h3>What works offline</h3>
+        <ul class="list">
+          <li>The player, the H5P runtime and its fonts are stored on install.</li>
+          <li>The app carries the H5P libraries for every content type on the H5P hub, about 10 MB, so a package exported without its own — what h5p.com and h5p.org do by default — plays offline too. Only a package that needs a newer version than the app carries asks to fetch it from h5p.org, once.</li>
+          <li>Files are read on this device and never uploaded. They are not kept either: open one again next time, and what was already extracted comes from this device's cache.</li>
+        </ul>
+      </section>
+
+      <footer>
         <p class="credit">
           The player's own code is MIT; the H5P core runtime it loads is GPL-3.0, see
           <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/packages/player/NOTICE.md" rel="noopener">NOTICE.md</a>.
