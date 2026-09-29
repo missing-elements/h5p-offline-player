@@ -115,6 +115,12 @@
           <li>The app carries the H5P libraries for every content type on the H5P hub, about 10 MB, so a package exported without its own — what h5p.com and h5p.org do by default — plays offline too. Only a package that needs a newer version than the app carries asks to fetch it from h5p.org, once.</li>
           <li>Files are read on this device and never uploaded. They are not kept either: open one again next time, and what was already extracted comes from this device's cache.</li>
         </ul>
+
+        <h3>What it does not keep</h3>
+        <ul class="list">
+          <li>Answers, scores and progress are not saved. The content reports them as xAPI statements, but the app neither stores them on this device nor sends them anywhere, so closing a file or the app starts it over next time.</li>
+          <li>For results that are recorded — a class, a course, a compliance record — use the <a href="/demo/setup.html">player component</a> on a site that sends its xAPI statements to an LRS or an LMS.</li>
+        </ul>
       </section>
 
       <footer>
