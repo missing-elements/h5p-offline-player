@@ -1,0 +1,123 @@
+# ADL's CATAPULT cmi5 player with the two services it needs, for `pnpm cmi5:catapult`: the
+# player validates every statement an assignable unit sends against the cmi5 requirements and
+# rejects the ones that break one, which is the conformance check for /demo/cmi5.html. MySQL is
+# the player's own store; Yet Analytics' SQL LRS is the LRS it forwards accepted statements to.
+# The player is built from adlnet/CATAPULT at the commit the script pins, fetched into
+# ./CATAPULT, which git ignores. The secrets are for a local stack only, and the two published
+# ports listen on 127.0.0.1 so nothing else on the network reaches them.
+name: h5p-cmi5-catapult
+
+services:
+  lrs:
+    # Pinned: the release this check passed against. Published for amd64 only, so on an arm64
+    # machine Docker runs it under emulation, which is slower to start and otherwise the same.
+    image: yetanalytics/lrsql:v0.9.8
+    environment:
+      LRSQL_API_KEY_DEFAULT: catapult
+      LRSQL_API_SECRET_DEFAULT: catapult-secret
+      LRSQL_ADMIN_USER_DEFAULT: admin
+      LRSQL_ADMIN_PASS_DEFAULT: admin-password-1
+      # The player forwards the browser's requests, `Origin` header included, and the LRS's own
+      # CORS policy answers a plain 403 for an origin it was not told about.
+      LRSQL_ALLOW_ALL_ORIGINS: "true"
+    ports:
+      - "127.0.0.1:${LRS_PORT:-63390}:8080"
+
+  rdbms:
+    image: mysql:8.0
+    environment:
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+      MYSQL_USER: catapult
+      MYSQL_PASSWORD: quartz
+      MYSQL_DATABASE: catapult_player
+    command:
+      - mysqld
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "catapult", "-pquartz"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  player:
+    # Upstream's Dockerfile, but for its `npm ci --only=production`: the npm in node:18 no
+    # longer accepts `--only`, and the clone's lockfile is out of step with its package.json, so
+    # `npm ci` refuses either way. Same steps, resolved from package.json instead.
+    build:
+      context: ./CATAPULT/player
+      dockerfile_inline: |
+        FROM node:18
+        RUN apt-get update && apt-get install -y dumb-init
+        ENV NODE_ENV production
+        WORKDIR /usr/src/app
+        COPY --chown=node:node entrypoint.sh /usr/src/app
+        COPY --chown=node:node service /usr/src/app
+        COPY --chown=node:node migrations /usr/src/app/migrations
+        RUN mkdir -p /usr/src/app/var/content && chown node:node /usr/src/app/var/content
+        RUN npm install --omit=dev --no-audit --no-fund
+        RUN npm install -g nodemon
+        USER node
+        ENTRYPOINT []
+        CMD ["dumb-init", "./entrypoint.sh"]
+        EXPOSE 3398/tcp
+    depends_on:
+      rdbms:
+        condition: service_healthy
+      lrs:
+        condition: service_started
+    environment:
+      DB_HOST: rdbms
+      DB_NAME: catapult_player
+      DB_USERNAME: catapult
+      DB_PASSWORD: quartz
+      CONTENT_URL: http://localhost:${PLAYER_PORT:-63398}/content
+      API_KEY: catapult
+      API_SECRET: catapult-secret
+      TOKEN_SECRET: catapult-token-secret
+      LRS_ENDPOINT: http://lrs:8080/xapi/
+      LRS_USERNAME: catapult
+      LRS_PASSWORD: catapult-secret
+      LRS_XAPI_VERSION: 1.0.3
+      # What the browser reaches the player at — the gateway below: the launch URL's `endpoint`
+      # and `fetch` are built from it.
+      PLAYER_STANDALONE_LAUNCH_URL_BASE: http://localhost:${PLAYER_PORT:-63398}
+
+  # The player answers no preflight and sends no CORS headers on its fetch route: CATAPULT puts
+  # it behind an nginx that serves the content from the same host. An assignable unit on another
+  # origin — this dev server, the hosted demo — needs both, so this gateway answers OPTIONS
+  # itself and puts the headers on every response, and the player is reached only through it.
+  gateway:
+    image: nginx:alpine
+    depends_on:
+      - player
+    ports:
+      - "127.0.0.1:${PLAYER_PORT:-63398}:80"
+    configs:
+      - source: gateway.conf
+        target: /etc/nginx/conf.d/default.conf
+
+configs:
+  gateway.conf:
+    content: |
+      server {
+        listen 80;
+        client_max_body_size 512m;
+        location / {
+          if ($$request_method = OPTIONS) {
+            add_header Access-Control-Allow-Origin "*" always;
+            add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS" always;
+            add_header Access-Control-Allow-Headers "Authorization, Content-Type, X-Experience-API-Version, If-Match, If-None-Match" always;
+            add_header Access-Control-Max-Age 86400 always;
+            return 204;
+          }
+          proxy_pass http://player:3398;
+          proxy_set_header Host $$http_host;
+          proxy_hide_header Access-Control-Allow-Origin;
+          proxy_hide_header Access-Control-Allow-Credentials;
+          proxy_hide_header Access-Control-Expose-Headers;
+          add_header Access-Control-Allow-Origin "*" always;
+          add_header Access-Control-Expose-Headers "ETag, X-Experience-API-Version, Content-Type" always;
+        }
+      }

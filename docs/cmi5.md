@@ -1,0 +1,176 @@
+# cmi5
+
+cmi5 is xAPI with a launch contract: the LMS opens content by URL, hands it a one-time token
+and an LRS to talk to, and the content sends its statements there. It is the integration that
+fits this player, for four reasons. The package stays on a static host, since the LMS imports
+only a small course structure. The assignable unit can demand its own window, which keeps the
+player out of a cross-origin iframe, where Safari and every browser on iOS give it no Service
+Worker. No LRS credentials sit in page code; the token is per launch. And every statement keeps
+`context.revision`, so the LRS knows which build each completion came from.
+
+The alternatives each break one of those. SCORM is the one nearly every LMS supports, but a
+SCORM package has to contain the player and the `.h5p` and be hosted inside the LMS, which often
+serves it from a content domain in an iframe, bringing the iOS gap back; and its data model has
+no field for the build. LTI 1.3 is how Moodle, Canvas and Blackboard embed external tools, with
+grade passback, but it is an OpenID Connect exchange that needs a server holding keys, which a
+static host does not have, and it embeds in an iframe by default. Plain xAPI works already, through
+the `xapi` event, for a portal the organisation controls, and has no launch contract. What cmi5
+does not have is SCORM's reach: some older LMSs support only SCORM.
+
+The element does not change for it. The demo site's `/demo/cmi5.html` is the assignable unit:
+the element plus about two hundred lines of wiring, `demo/cmi5-page.js`, on top of
+[`@xapi/cmi5`](https://www.npmjs.com/package/@xapi/cmi5). Copy both to your own site, or launch
+the demo's page directly to try it. Opened without a launch, the page explains one and offers
+`?simulate`: the same code against a stand-in for the LMS inside the page, every statement
+shown in the page's log instead of sent, with a mastery score of 0.8 to pass or fail against.
+
+## The launch
+
+The course structure names the page and the package:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<courseStructure xmlns="https://w3id.org/xapi/profiles/cmi5/v1/CourseStructure.xsd">
+  <course id="https://your-site.example/courses/quiz">
+    <title><langstring lang="en-US">Quiz</langstring></title>
+    <description><langstring lang="en-US">A question set</langstring></description>
+  </course>
+  <au id="https://your-site.example/courses/quiz/au" moveOn="CompletedAndPassed" masteryScore="0.8"
+      launchMethod="OwnWindow">
+    <title><langstring lang="en-US">Quiz</langstring></title>
+    <description><langstring lang="en-US">A question set</langstring></description>
+    <url>https://player.example/demo/cmi5.html?src=https://host.example/course.h5p</url>
+  </au>
+</courseStructure>
+```
+
+Zip it as `cmi5.xml` and import the zip. The LMS appends `endpoint`, `fetch`, `actor`,
+`registration` and `activityId` to the URL when a learner opens the course. `?src=` names the
+package; `<launchParameters>` in the AU is the alternative, and the page reads it from the LMS
+when the URL carries no `src`. The package URL needs CORS headers, as in every setup.
+
+`launchMethod="OwnWindow"` is not decoration. It obliges the LMS to open the page top level,
+and a top-level page gets a Service Worker in every browser. Without it, an LMS may frame the
+page, and on iOS the player then shows nothing.
+
+## What the page sends
+
+1. **`initialized`**, once the token, the launch data and the learner preferences are in.
+   Statements the content emits before that wait, since cmi5 wants `initialized` first.
+2. **Every statement the content emits**, as a "cmi5 allowed" statement: the launch actor in
+   place of H5P's, the registration, and the LMS's context template underneath the statement's
+   own context, so the course grouping and the session id are on it and `context.revision` and
+   `context.platform` stay. H5P's own category, the content type's library, stays too; the cmi5
+   category is not added, because that marks a cmi5-defined statement.
+3. **On the content's completion** — the `finished` event, which H5P raises with the score —
+   `passed` or `failed` by the mastery score when the launch set one, then `completed`. Without
+   a mastery score, `completed` with the score on it. In `Browse` and `Review` mode, nothing:
+   cmi5 forbids it.
+4. **`terminated`** from the Exit button, which then goes to the launch's `returnURL` or closes
+   the window. A learner who closes the tab instead leaves the session open, and the LMS closes
+   it: cmi5 has the LMS record `abandoned` for a session that was never terminated. The page does
+   not try to send `terminated` as it unloads, because a page cannot tell a closed tab from a
+   reload, and a `terminated` sent on a reload ends a session the reloaded page goes on using.
+
+The page listens to the element before the handshake starts, since the package loads
+meanwhile: anything the content emits before `initialized` has gone out waits, and is sent
+after it. The `fetch` URL answers once, so a reload of the page does not ask again: the token,
+the time `initialized` went out and whether the outcome was recorded are kept in the browser's
+storage for that launch, and the reload resumes the session without a second `initialized` or
+a second `completed`. Every relayed statement gets an id, which the player checks for. A score
+on `passed`, `failed` or `completed` carries `min` and `max` beside `raw`, as cmi5 requires;
+H5P gives `raw` and `max`, and its minimum is 0. `returnURL` is read from the launch data, where
+cmi5 puts it, and followed only if it is an `http` or `https` address: a `javascript:` value
+would run in the page when the learner presses Exit. When the LMS refuses a statement, the
+page's log shows the reason it gave, which for a cmi5 launching system is the number and text
+of the requirement the statement broke.
+
+The content keeps running after completion, and its later statements are still relayed, until
+Exit. A learner who retries a quiz is recorded; the `completed` and `passed`/`failed` go out
+once.
+
+## Checking it
+
+Conformance is proven against a launching system, not by a library. The check here is ADL's
+[CATAPULT](https://github.com/adlnet/CATAPULT) player, the reference cmi5 launching system: it
+validates every statement an assignable unit sends against the numbered cmi5 requirements —
+the context template, the registration, the session id, the order of `initialized`,
+`completed`, `passed` or `failed` and `terminated`, the mastery score — and rejects a statement
+that breaks one, naming the requirement. With Docker running:
+
+```bash
+pnpm cmi5:catapult            # fetches CATAPULT, starts the player, MySQL and Yet Analytics' SQL LRS,
+                              # launches the page headless, reloads it, answers a question of the
+                              # real quiz, completes, presses Exit, prints the verdict
+pnpm cmi5:catapult --open     # prints a launch URL for your own browser, waits until you press Exit
+pnpm cmi5:catapult --au '<AU URL>'  # launches another page instead of this dev server's
+pnpm cmi5:catapult --down     # removes the stack and its data
+```
+
+The script reads the session back from the player and the statements from the LRS, and fails
+if the sequence is incomplete, if `initialized` or `terminated` went out other than once, if no
+statement from the content itself arrived, or if anything was rejected. Passed on 2026-10-01,
+after a reload in mid-session: `initialized` once, the quiz's own `interacted` and `answered`
+with the package's `revision`, `passed`, `completed` and `terminated` once, all accepted, and
+the LMS side added `launched` and `satisfied`. The finish of the quiz is the element's
+`finished` event dispatched by the script, not four questions played through. CATAPULT is
+fetched at a pinned commit and the LRS is a pinned release, the two that passed; the published
+ports listen on `127.0.0.1` only. The stack stays up between runs; the first run builds the
+player's image, which takes a few minutes.
+
+The repository's fast check is `apps/demo/tests/cmi5.test.ts`, which launches the page from a
+mock LMS and LRS and asserts the sequence above, including that `revision` survives the merge.
+SCORM Cloud, which supports cmi5 with a free tier, remains a fair check that a commercial LMS
+launches it.
+
+## Testing by hand
+
+Three ways, from the lightest to the most real.
+
+**In the page alone, no LMS.** Open `/demo/cmi5.html` on the dev server and follow the
+"simulated launch" link, or go straight to `/demo/cmi5.html?simulate&src=/demo/content/quiz.h5p`.
+Answer the quiz and press Exit. The log under the player holds every statement that would have
+gone to an LRS, in full: `initialized`, the content's own statements with the launch actor and
+the context template merged in, `passed` or `failed` against a mastery score of 0.8, `completed`,
+`terminated`. Nothing leaves the page.
+
+**Against the CATAPULT player, in your own browser.** With Docker running:
+
+```bash
+pnpm cmi5:catapult --open
+```
+
+It brings the stack up if it is not, imports the course, creates a session, prints a launch URL
+and waits. Open that URL in any browser: it is a real cmi5 launch with the five parameters
+appended, and every request to the player is in the network tab — the token exchange, the
+launch data, then each statement. Play the quiz to the end, so that H5P reports completion, and
+press Exit. The page goes to the return URL, and the script prints the session as the player
+recorded it and the statements the LRS holds, then exits with the verdict. A statement the
+player refuses appears in the page's log with the number and text of the requirement it broke.
+
+The SQL LRS's admin UI is at `http://localhost:63390/admin`, user `admin`, password
+`admin-password-1`, both set in `apps/demo/cmi5-catapult/docker-compose.yml`; it lists the
+statements by registration. Reloading the launched page is fine: the page keeps the token for
+that launch and resumes without a second `initialized`, as the spec requires. The stack stays
+up between runs, so a second launch takes seconds; `pnpm cmi5:catapult --down` removes it and
+its data.
+
+**Against the hosted site**, once this page is deployed:
+
+```bash
+pnpm cmi5:catapult --open --au 'https://h5p-offline-player.vercel.app/demo/cmi5.html?src=https://h5p-offline-player.vercel.app/demo/content/quiz.h5p'
+```
+
+The same flow, with the page served by Vercel and the LMS on your machine. Not tried yet. The
+hosted site's policy allows the page to reach `localhost`, and a browser does not treat
+`http://localhost` as mixed content, but Chrome may ask the learner's permission before a
+public page reaches a local address, and other browsers may refuse it.
+
+## What it does not do
+
+- It does not turn H5P's interactions into cmi5 interaction statements. H5P's own statements
+  carry the answers, and the LRS keeps them as allowed statements.
+- It does not resume. cmi5 has no state document for content; the player's `resume` attribute
+  keeps state on the device and works alongside if a host sets it.
+- It is not SCORM. An LMS without cmi5 needs a SCORM wrapper, which hosts the player and the
+  package inside the LMS and has the framing caveat above.

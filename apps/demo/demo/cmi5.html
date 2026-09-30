@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>cmi5 — h5p-offline-player</title>
+    <meta name="description" content="The player as a cmi5 assignable unit: launched by an LMS, statements to its LRS, completion by the mastery score, with the build's revision on every statement." />
+    <link rel="canonical" href="%SITE_URL%/demo/cmi5.html" />
+    <meta name="theme-color" content="#2f6df6" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="h5p-offline-player" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:title" content="cmi5 — h5p-offline-player" />
+    <meta property="og:description" content="The player as a cmi5 assignable unit: launched by an LMS, statements to its LRS, completion by the mastery score, with the build's revision on every statement." />
+    <meta property="og:url" content="%SITE_URL%/demo/cmi5.html" />
+    <meta property="og:image" content="%SITE_URL%/demo/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="h5p-offline-player: play H5P packages in the browser, with no server" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="cmi5 — h5p-offline-player" />
+    <meta name="twitter:description" content="The player as a cmi5 assignable unit: launched by an LMS, statements to its LRS, completion by the mastery score, with the build's revision on every statement." />
+    <meta name="twitter:image" content="%SITE_URL%/demo/og-image.png" />
+    <link rel="icon" type="image/svg+xml" href="/demo/favicon.svg" />
+    <link rel="stylesheet" href="/demo/player-page.css" />
+    <script type="module" src="/demo/element.js"></script>
+    <script type="module" src="/demo/cmi5-page.js"></script>
+    <script type="module" src="/demo/analytics.js"></script>
+</head>
+
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">H5</span>h5p-offline-player</a>
+      <nav aria-label="Site">
+        <a href="/">Player</a>
+        <a href="/app/">App</a>
+        <a href="/demo/setup.html">Setup</a>
+        <a href="/demo/normalize.html">Normalize</a>
+        <a href="/demo/" aria-current="page">Examples</a>
+        <a href="https://github.com/missing-elements/h5p-offline-player" rel="noopener">GitHub</a>
+      </nav>
+    </header>
+
+    <main>
+      <h1>cmi5</h1>
+      <p class="lede">
+        This page is a cmi5 assignable unit. An LMS opens it with the launch parameters in the
+        address, the page sends <code>initialized</code>, relays every statement the content emits
+        to the LMS&rsquo;s LRS with the launch actor and registration, records
+        <code>passed</code> or <code>failed</code> by the mastery score and <code>completed</code>
+        when the content finishes, and <code>terminated</code> on Exit. The package stays on this
+        site; the LMS holds only a course structure that names this address.
+      </p>
+
+      <p class="message" id="status" role="status" aria-live="polite"></p>
+
+      <h5p-player></h5p-player>
+
+      <p><button type="button" id="exit" class="primary">Exit</button></p>
+
+      <section id="instructions" hidden>
+        <h2>Launching it</h2>
+        <p>
+          <a href="/demo/cmi5.html?simulate&amp;src=/demo/content/quiz.h5p">Try a simulated launch</a>:
+          the same page, with a stand-in for the LMS in the page&rsquo;s own script, so every
+          statement that would reach an LRS shows in the log below instead. Answer the quiz to see
+          <code>failed</code> or <code>passed</code> against a mastery score of 0.8, then
+          <code>completed</code>, and Exit for <code>terminated</code>.
+        </p>
+        <p>
+          Import a course structure like this one into an LMS that supports cmi5 &mdash; SCORM Cloud
+          does, with a free tier &mdash; and open the course. The LMS appends its five launch
+          parameters to the address. <code>launchMethod="OwnWindow"</code> makes it open the page
+          in a window of its own, top level, which is what lets the player run on every browser,
+          Safari and iOS included.
+        </p>
+        <pre class="code">&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;courseStructure xmlns="https://w3id.org/xapi/profiles/cmi5/v1/CourseStructure.xsd"&gt;
+  &lt;course id="https://your-site.example/courses/quiz"&gt;
+    &lt;title&gt;&lt;langstring lang="en-US"&gt;Quiz&lt;/langstring&gt;&lt;/title&gt;
+    &lt;description&gt;&lt;langstring lang="en-US"&gt;A question set&lt;/langstring&gt;&lt;/description&gt;
+  &lt;/course&gt;
+  &lt;au id="https://your-site.example/courses/quiz/au" moveOn="CompletedAndPassed" masteryScore="0.8"
+      launchMethod="OwnWindow"&gt;
+    &lt;title&gt;&lt;langstring lang="en-US"&gt;Quiz&lt;/langstring&gt;&lt;/title&gt;
+    &lt;description&gt;&lt;langstring lang="en-US"&gt;A question set&lt;/langstring&gt;&lt;/description&gt;
+    &lt;url&gt;%SITE_URL%/demo/cmi5.html?src=%SITE_URL%/demo/content/quiz.h5p&lt;/url&gt;
+  &lt;/au&gt;
+&lt;/courseStructure&gt;</pre>
+        <p>
+          Zip it as <code>cmi5.xml</code> and upload the zip. The package URL must send CORS headers,
+          as for any setup; this site&rsquo;s content does. Instead of <code>?src=</code>, the
+          structure can carry the URL in <code>&lt;launchParameters&gt;</code>, which the page reads
+          from the LMS.
+        </p>
+      </section>
+
+      <h2>What this page sent</h2>
+      <pre class="log" id="log"></pre>
+
+      <footer>
+        <nav class="footer-links" aria-label="More on this site">
+          <a href="/demo/">All examples</a>
+          <a href="/">Player page</a>
+        </nav>
+      </footer>
+    </main>
+  </body>
+</html>

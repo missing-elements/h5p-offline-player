@@ -17,7 +17,8 @@
     "demo:content": "pnpm --filter @missing-elements/h5p-demo demo:content",
     "demo:og": "pnpm --filter @missing-elements/h5p-demo demo:og",
     "demo:icons": "pnpm --filter @missing-elements/h5p-demo demo:icons",
-    "demo:libraries": "pnpm --filter @missing-elements/h5p-demo demo:libraries"
+    "demo:libraries": "pnpm --filter @missing-elements/h5p-demo demo:libraries",
+    "cmi5:catapult": "pnpm --filter @missing-elements/h5p-demo cmi5:catapult"
   },
   "engines": {
     "node": ">=20"

@@ -161,6 +161,8 @@ is a working example of one.
   carries, and what it does and does not prove.
 - [Resuming where the learner left off](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/resume.md) — `resume`, what is stored where,
   and `resume="host"` for a site with its own users.
+- [cmi5](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/cmi5.md) — the player as an assignable unit: the launch, the course structure,
+  what the page sends, and why cmi5 rather than SCORM or LTI for this player.
 - [Checking that a package plays](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/verify.md) — `h5p-verify` plays a package headless
   and says whether it worked, for the last step of a pipeline that makes packages.
 

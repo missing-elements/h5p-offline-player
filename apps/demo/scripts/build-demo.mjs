@@ -95,7 +95,7 @@ await writeFile(
 
 // What crawlers and link previews ask for.
 await cp(resolve(rootDir, 'demo', 'og-image.png'), resolve(outDir, 'demo', 'og-image.png'))
-const pages = ['/', '/app/', '/demo/', '/demo/setup.html', '/demo/normalize.html', '/demo/xapi.html', '/demo/local-file.html', '/demo/two-players.html']
+const pages = ['/', '/app/', '/demo/', '/demo/setup.html', '/demo/normalize.html', '/demo/xapi.html', '/demo/cmi5.html', '/demo/local-file.html', '/demo/two-players.html']
 const today = new Date().toISOString().slice(0, 10)
 await writeFile(
   resolve(outDir, 'sitemap.xml'),

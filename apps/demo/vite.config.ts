@@ -117,6 +117,7 @@ export default defineConfig(({ command }) => ({
         setup: resolve(rootDir, 'demo/setup.html'),
         normalize: resolve(rootDir, 'demo/normalize.html'),
         xapi: resolve(rootDir, 'demo/xapi.html'),
+        cmi5: resolve(rootDir, 'demo/cmi5.html'),
         'local-file': resolve(rootDir, 'demo/local-file.html'),
         'two-players': resolve(rootDir, 'demo/two-players.html'),
         app: resolve(rootDir, 'app/index.html')

@@ -91,7 +91,14 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             integrators, demo/normalize.html why deflated media cannot stream and how
                             the normalizer fixes it (prose and a CSS-only diagram, no script), the rest
                             the individual embedding demos, all sharing demo/player-page.css;
-                            demo/element.js is the one import of the element every page loads
+                            demo/cmi5.html with demo/cmi5-page.js is a cmi5 assignable unit around
+                            the element, on @xapi/cmi5; demo/element.js is the one import of the
+                            element every page loads
+  tests/                    cmi5.test.ts: the cmi5 page against a mock LMS and LRS on a second
+                            origin, through the dev server and a real browser
+  cmi5-catapult/            docker-compose.yml for ADL's CATAPULT player, MySQL and the SQL LRS;
+                            scripts/cmi5-catapult.mjs clones CATAPULT into it (ignored) and proves
+                            the cmi5 page against the player
   demo/content/             the packages the demo plays, committed; built from demo/content/src/ by
                             scripts/build-demo-content.mjs
   app/                      the installable app, /app/: index.html and app.js the page, sw.js its
@@ -105,7 +112,7 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             site root -> dist-demo/
 
 docs/                     the README's longer sections, one file each: streaming video, libraries, the
-                          frame's CSP, the revision on statements, resume, the verifier, development; the README links
+                          frame's CSP, the revision on statements, resume, the verifier, cmi5, development; the README links
                           them by absolute URL because npm renders the same file
 
 skills/                   agent skills, one directory per skill, at the root because that is where
@@ -980,6 +987,71 @@ SPA-fallback trap described above cannot happen there.
   hand-written listener; and `127.0.0.1` against `localhost` is a second origin for a test
   without a second server. The element's own half of the resizer protocol is untouched: it is
   how the element sizes to the content in every setup.
+- **`/demo/cmi5.html` is a cmi5 assignable unit, and the element knows nothing about it.**
+  Chosen on 2026-09-30 over SCORM and LTI: the package stays on a static host, the AU can
+  demand its own window (`launchMethod="OwnWindow"`), which is the one standard way to keep the
+  player out of a cross-origin iframe and so out of the Safari and iOS gap, the token is per
+  launch instead of LRS credentials in page code, and `context.revision` survives to the LRS.
+  `@xapi/cmi5` 1.4.0 does the protocol. Three things about it the code has to know: it has no
+  "send an allowed statement" method, only `sendXapiStatement`, which sends what it is given,
+  so `cmi5-page.js` builds allowed statements itself — the launch actor, the registration, the
+  context template merged under the statement's own context, lists in `contextActivities`
+  joined, and no cmi5 category, which would mark the statement as cmi5-defined; `moveOn` sends
+  `passed`/`failed` by the mastery score and `completed` in one call, and `terminated` too
+  unless `disableSendTerminated`, which the page sets so the learner can keep going until Exit;
+  and it judges `passed` or `failed` only when the launch data's mastery score is truthy. There
+  is no `terminated` on unload: a page cannot tell a reload from a closed tab, and one sent on a
+  reload ended the session the reloaded page went on using, every statement after it refused
+  with 8.1.2.0-2 — found in review on 2026-10-01 and reproduced against CATAPULT. A tab closed
+  without Exit is the LMS's to record as `abandoned`, which is what that verb is for. The page
+  listens to the element before the handshake, because the package loads meanwhile, and holds
+  what the content emits until `initialized` has gone out; it once attached its listeners after
+  the handshake, and anything emitted in between was lost. `returnURL` comes from the launch
+  data only, where cmi5 puts it, and is followed only as an `http` or `https` address — it was
+  once also read from the query string, on an article's word, and a `javascript:` value would
+  have run in the page on Exit. `apps/demo/tests/cmi5.test.ts` runs the page against a mock
+  LMS and LRS on `127.0.0.1` from the dev server on `localhost`, dispatching the element's own
+  `xapi` and `finished` events rather than clicking through content, with a single-use token
+  as the spec has it, and pins the order and the merge, `revision` included, a reload that
+  resumes with no new token and no `terminated`, a statement emitted before the handshake, and
+  a `returnURL` that is not followed. The library's last release was October 2024 and it pins a
+  2.x `@xapi/xapi` while 3.x is current; the AU side of the spec is small enough to write by
+  hand if it stalls. **Proven against ADL's CATAPULT player** — the reference launching
+  system, which validates each statement against the numbered requirements and rejects a
+  breach naming it — by `pnpm cmi5:catapult` (`apps/demo/scripts/cmi5-catapult.mjs`,
+  `apps/demo/cmi5-catapult/docker-compose.yml`): adlnet/CATAPULT fetched at a pinned commit
+  (`CATAPULT_COMMIT`, 2026-01-20), its player built from source beside MySQL and Yet Analytics'
+  SQL LRS pinned at v0.9.8, the published ports on `127.0.0.1` only, a tenant and token through the
+  player's API, the course structure imported as `text/xml` with an absolute AU URL, a launch
+  URL from `POST /course/{id}/launch-url/0`, the page driven headless — reloaded mid-session,
+  one question of the real quiz answered so H5P's own `interacted` and `answered` go through
+  the player's validation, the finish dispatched as the element's `finished` event, Exit — and
+  the session and the LRS's statements read back. Chosen over SCORM Cloud on 2026-10-01: open, local, scriptable,
+  and it says which requirement a wrong statement broke. Passed on 2026-10-01. What it took to
+  get there, in the order it was found: upstream's Dockerfile runs `npm ci --only=production`,
+  which the npm in `node:18` refuses, and its lockfile is out of step with its `package.json`,
+  so the compose file builds the player from an inline Dockerfile with `npm install --omit=dev`;
+  the player answers no preflight and puts no CORS header on its fetch route, since CATAPULT
+  expects an nginx that serves player and content from one host, so the stack has an nginx
+  `gateway` in front of the player that answers `OPTIONS` itself and adds the headers to every
+  response, and the player is reached only through it; the player forwards the browser's
+  `Origin` header to the LRS, whose own CORS policy answers a plain-text 403 for an origin it
+  was not told about, so the SQL LRS runs with `LRSQL_ALLOW_ALL_ORIGINS` — the 403 that looks
+  like the player's is the LRS's, and the way to tell is that the player's errors are JSON with
+  a `violatedReqId`; and a score on `passed` must carry `min` and `max` beside `raw`
+  (requirement 9.5.1.0-3), which H5P's scores lack, so the page adds `min: 0`. Two things it
+  had already made the page do: relayed statements get an `id`, which the player checks for;
+  and the `fetch` URL answers once, so the token and the `initialized` time are kept in
+  `localStorage` per launch and a reload resumes through `initialize(sessionState)` instead of
+  asking again. The page shows the LMS's stated reason for a refused statement, not only the
+  status. The hosted site's CSP allows `connect-src` to `localhost`, so the deployed page can be
+  launched from a local player (`--au`), `http://localhost` being a secure context rather than
+  mixed content; not tried yet, since the page is not deployed, and Chrome may ask permission
+  before a public page reaches a local address. The CTS and LTS parts of
+  CATAPULT are not used: the CTS adds a UI, accounts and nginx over the same player, and the
+  LTS tests the LMS side. The player returns a session's columns in camel case
+  (`isInitialized`), not the snake case of its tables; `--open` once waited on the snake-case
+  names and never returned.
 - **The pages carry their metadata, and the origin is filled in at build time.** Titles,
   descriptions, canonical links, Open Graph and Twitter tags, JSON-LD for the software on the
   front page, `robots.txt` and `sitemap.xml`, and the GitHub link in every page's navigation. The

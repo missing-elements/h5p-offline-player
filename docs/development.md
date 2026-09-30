@@ -25,7 +25,7 @@ accordion and dialog cards, built from H5P hub libraries around text written for
 plus, in dev only, generated test archives under `/fixtures/` covering each path the player
 takes: a host that honours `Range` and one that does not, 20 MB of deflated and of stored media,
 hostile entry names, a file that is not an H5P package. `/demo/` is the two-line integration,
-with the other ways to embed it — xAPI, a file from disk, two players on one page —
+with the other ways to embed it — xAPI, cmi5, a file from disk, two players on one page —
 linked from there.
 
 The demo site deploys to Vercel from `vercel.json`: the pages, the element, its worker and the
