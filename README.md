@@ -158,6 +158,8 @@ is a working example of one.
   carries, and what it does and does not prove.
 - [Resuming where the learner left off](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/resume.md) — `resume`, what is stored where,
   and `resume="host"` for a site with its own users.
+- [Checking that a package plays](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/verify.md) — `h5p-verify` plays a package headless
+  and says whether it worked, for the last step of a pipeline that makes packages.
 
 ## Requirements
 
@@ -181,21 +183,6 @@ Conformance is judged on the player and the content type together. [ACCESSIBILIT
 says which part is whose, what the player does (no focus trap, the frame named after the
 package, fullscreen from the keyboard), what a host page should do, and what a keyboard-only
 run over seven content types found.
-
-## Checking that a package plays
-
-A zip that opens and JSON that parses prove nothing; most broken packages are valid zips that
-fail in the runtime. [`@missing-elements/h5p-verify`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/verify)
-plays a package through the player in a headless browser and says whether it worked:
-
-```bash
-npx @missing-elements/h5p-verify course.h5p        # exit 0: it plays; 1: it does not; report.json and a screenshot beside it
-```
-
-It names the libraries a package lacks, fails on an uncaught error while the runtime boots, and
-checks that the content drew something. Made for the last step of a pipeline that generates or
-rewrites packages — an AI agent's included: the repository ships a skill (`skills/h5p-verify/`),
-which tells an agent when to run it and how to read the result.
 
 ## Agent skills
 

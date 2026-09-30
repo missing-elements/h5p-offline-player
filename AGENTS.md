@@ -105,7 +105,7 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             site root -> dist-demo/
 
 docs/                     the README's longer sections, one file each: streaming video, libraries, the
-                          frame's CSP, the revision on statements, resume, development; the README links
+                          frame's CSP, the revision on statements, resume, the verifier, development; the README links
                           them by absolute URL because npm renders the same file
 
 skills/                   agent skills, one directory per skill, at the root because that is where
