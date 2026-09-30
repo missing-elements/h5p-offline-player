@@ -51,22 +51,7 @@ Bundlers that do not analyse `new URL(…, import.meta.url)` — esbuild among t
 
 Download `https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player/dist/h5p-sw.js` once, place it on the site, point `sw` at it. This is the only file that cannot come from the CDN: browsers reject cross-origin Service Worker registration. Frame assets load from the CDN. Placing it at the root is safe: the registration scope becomes `/h5p/`, not `/`, so an existing site worker is left alone.
 
-## Setup C — iframe embed (nothing on the host)
-
-For sites that cannot host even one file, embed the player page:
-
-```html
-<iframe src="https://player.example/embed?src=https://host.example/course.h5p&xapi=https://your-site.example"
-        allow="fullscreen" style="width: 100%; border: 0"></iframe>
-```
-
-Query parameters: `src` (required), `libraries` (`hub` or a URL, as the attribute), `preload=auto`, and `xapi`, your page's origin.
-
-**Sizing.** The page speaks H5P's resizer protocol upward — the `hello` / `resize` exchange h5p.org's embed code uses — so the `h5p-resizer.js` that code includes resizes this iframe as it is. Without it, answer the messages yourself: reply to `{ context: 'h5p', action: 'hello' }` with the same message, and on `{ context: 'h5p', action: 'resize', scrollHeight }` set the iframe's height.
-
-**xAPI.** Relayed to the parent only when `xapi=` names the parent's origin, and posted to that origin only, as `{ context: 'h5p-offline-player', action: 'xapi', verb, statement }` and, at the end, `action: 'finished'` with the final statement. Check `event.origin` against the player's origin and `event.source` against your iframe before trusting one.
-
-**Limits.** Storage lives on the player's origin, partitioned per embedding site, so nothing is shared between two sites that embed the same package. Safari blocks Service Workers in cross-origin iframes and the player cannot run without one: there the embedded page shows a link that opens the player on its own instead of the content. The player's origin runs whatever package it is given, so it must hold nothing else — no accounts, no cookies.
+There is no Setup C. A site that cannot host even one file cannot run the player: the worker must be same-origin, and framing the player page hosted elsewhere gets no Service Worker in Safari — and every browser on iOS is Safari underneath — so it would fail on every iPhone and iPad.
 
 ## Element API
 

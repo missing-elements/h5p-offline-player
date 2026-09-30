@@ -113,13 +113,11 @@ export default defineConfig(({ command }) => ({
       input: {
         'h5p-player': ELEMENT,
         index: resolve(rootDir, 'index.html'),
-        embed: resolve(rootDir, 'embed.html'),
         demo: resolve(rootDir, 'demo/index.html'),
         setup: resolve(rootDir, 'demo/setup.html'),
         normalize: resolve(rootDir, 'demo/normalize.html'),
         xapi: resolve(rootDir, 'demo/xapi.html'),
         'local-file': resolve(rootDir, 'demo/local-file.html'),
-        'demo-embed': resolve(rootDir, 'demo/embed.html'),
         'two-players': resolve(rootDir, 'demo/two-players.html'),
         app: resolve(rootDir, 'app/index.html')
       },

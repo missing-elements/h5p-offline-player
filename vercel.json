@@ -4,7 +4,6 @@
   "buildCommand": "pnpm build:demo",
   "outputDirectory": "apps/demo/dist-demo",
   "rewrites": [
-    { "source": "/embed", "destination": "/embed.html" },
     { "source": "/no-range/:name", "destination": "/api/no-range?name=:name" }
   ],
   "headers": [

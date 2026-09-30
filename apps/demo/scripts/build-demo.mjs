@@ -93,9 +93,9 @@ await writeFile(
   await bundleHostWorker(resolve(rootDir, 'app', 'sw.js'), { define: { __APP_PRECACHE__: JSON.stringify(precache) } })
 )
 
-// What crawlers and link previews ask for. `/embed` is left out: it carries `noindex`.
+// What crawlers and link previews ask for.
 await cp(resolve(rootDir, 'demo', 'og-image.png'), resolve(outDir, 'demo', 'og-image.png'))
-const pages = ['/', '/app/', '/demo/', '/demo/setup.html', '/demo/normalize.html', '/demo/xapi.html', '/demo/local-file.html', '/demo/two-players.html', '/demo/embed.html']
+const pages = ['/', '/app/', '/demo/', '/demo/setup.html', '/demo/normalize.html', '/demo/xapi.html', '/demo/local-file.html', '/demo/two-players.html']
 const today = new Date().toISOString().slice(0, 10)
 await writeFile(
   resolve(outDir, 'sitemap.xml'),

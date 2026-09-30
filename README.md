@@ -60,10 +60,6 @@ Copy `dist/h5p-sw.js` from the same CDN path onto your site and point `sw` at it
 keep loading from the CDN. At the root its scope is `/h5p/`, not `/`, so an existing site worker
 is left alone.
 
-**C · An iframe, nothing on your site:** frame the hosted player page,
-`/embed?src=<package url>`. It sizes itself through H5P's own resizer protocol and relays xAPI
-statements to your page on request. See Setup C in the setup guide.
-
 Requirements: the page is on `https://` or `localhost`, and the package's host sends CORS
 headers. `Range` support on the host is optional; without it the archive is downloaded once and
 played from the browser's cache.
@@ -406,7 +402,7 @@ accordion and dialog cards, built from H5P hub libraries around text written for
 plus, in dev only, generated test archives under `/fixtures/` covering each path the player
 takes: a host that honours `Range` and one that does not, 20 MB of deflated and of stored media,
 hostile entry names, a file that is not an H5P package. `/demo/` is the two-line integration,
-with the other ways to embed it — xAPI, a file from disk, an iframe, two players on one page —
+with the other ways to embed it — xAPI, a file from disk, two players on one page —
 linked from there.
 
 The demo site deploys to Vercel from `vercel.json`: the pages, the element, its worker and the
