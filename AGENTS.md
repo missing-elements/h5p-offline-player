@@ -104,6 +104,10 @@ apps/demo/                the demo app: the dev server for the whole repository,
   vite.config.ts            the dev server and the hosted demo: the pages plus dist/'s layout at the
                             site root -> dist-demo/
 
+docs/                     the README's longer sections, one file each: streaming video, libraries, the
+                          frame's CSP, the revision on statements, resume, development; the README links
+                          them by absolute URL because npm renders the same file
+
 skills/                   agent skills, one directory per skill, at the root because that is where
                           `npx skills add <owner/repo>` looks: h5p-verify (when to run the verifier and how
                           to read its report), h5p-player-setup (putting the player on a site), h5p-normalize (when

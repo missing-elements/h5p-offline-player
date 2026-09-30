@@ -36,7 +36,6 @@ npm install @missing-elements/h5p-offline-player
 pnpm add @missing-elements/h5p-offline-player
 ```
 
-
 ```js
 import '@missing-elements/h5p-offline-player'
 ```
@@ -67,15 +66,6 @@ is left alone.
 Requirements: the page is on `https://` or `localhost`, and the package's host sends CORS
 headers. `Range` support on the host is optional; without it the archive is downloaded once and
 played from the browser's cache.
-
-```js
-const player = document.querySelector('h5p-player')
-player.addEventListener('xapi', (event) => send(event.detail.statement))
-player.addEventListener('error', (event) => {
-  if (event.detail.code === 'no-cors') offerFilePicker()
-})
-input.addEventListener('change', () => { player.file = input.files[0] })
-```
 
 The full guide, with single-worker hosts and troubleshooting, is
 [h5p-player-setup.md](https://github.com/missing-elements/h5p-offline-player/blob/main/h5p-player-setup.md).
@@ -122,122 +112,13 @@ so the page can offer a file picker instead.
                      it follows the content's own height
   preload="auto"     pull large deflated media before the content asks (default: none)
   resume             keep the content's saved state on this device and resume from it
-                     (default: off; `host` hands it to the host page instead — see below)
+                     (default: off; `host` hands it to the host page instead — see Guides)
 ></h5p-player>
 ```
 
-### Video that cannot stream
-
-Most media starts playing while the rest arrives. Two properties of a package stop that, and
-some exports have both:
-
-- the media is **deflated** in the zip rather than stored, so there is no byte a `Range` request
-  can reach without the whole stream up to it — and packagers routinely deflate an mp4 for a
-  0.9% saving;
-- the mp4 is **not faststart**, so its `moov` index is the last few kilobytes of the file, and no
-  frame decodes until the final byte lands.
-
-Together they mean a 220 MB video must transfer completely before it shows anything. Nothing on
-the player's side shortens that: the bytes are genuinely required. What it can do is start
-earlier.
-
-```html
-<h5p-player src="course.h5p" preload="auto"></h5p-player>
-```
-
-After the content is up, the player pulls large deflated entries in archive order, one at a time,
-so the wait happens while the learner is still on the first slide instead of when they press
-play. It waits for the content to appear first — those same bytes would otherwise compete with
-the archive reads that boot the runtime — and it never runs two at once, which would only halve
-the rate of whichever video is needed first.
-
-It is off by default: it spends a learner's bandwidth on media they may never reach, and that is
-the host's call. Progress arrives as `progress` events with `phase: 'extract'`.
-
-The real fix belongs to whoever builds the package, and it ships as a command of its own,
-[`@missing-elements/h5p-normalize`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/normalize):
-
-```bash
-npx @missing-elements/h5p-normalize course.h5p                     # writes course.normalized.h5p beside it
-npx @missing-elements/h5p-normalize https://…/course.h5p --dry-run  # inspect only
-```
-
-It rewrites the container and leaves the content alone: media is stored rather than deflated, an
-mp4 whose index sits at the end is remuxed so the index comes first, entries are ordered so the
-libraries arrive before the media, and text an exporter left stored is deflated. The package
-grows by about 1% and any H5P host still accepts it. For the 220 MB example above, the video
-starts after about a megabyte instead of after the last byte, and seeking works at once.
-
-### What the frame is allowed to reach
-
-The frame runs untrusted content under a generated CSP. Media, images and iframes are open, so
-embedded video works; scripts are same-origin plus a short list of what content types genuinely
-load at runtime — MathJax for H5P.MathDisplay, Google's WebFont loader, and the YouTube, Vimeo
-and Panopto player APIs that H5P.Video puts in the document before it embeds anything.
-
-For a host the list cannot know about — a tenant's own Panopto or Echo360 server, an in-house
-CDN — `allow-origins` adds it:
-
-```html
-<h5p-player src="…" allow-origins="https://tenant.panopto.com https://cdn.corp.example"></h5p-player>
-```
-
-It only ever adds hosts. Anything that is not plainly a host is dropped, so a stray value cannot
-append directives of its own. A blocked resource names its directive and origin in the console.
-
-The policy allows `'unsafe-eval'`. Packages that bundle EmbeddedJS — board games, older question
-sets — compile their templates with `eval` and render nothing without it. It gives an attacker no
-reach the archive's own scripts lack: those are served from the frame's origin and already run
-under `'self'`, so anyone who can put a file in the package can already run what they like. What
-the policy is for is limiting where code and data can come *from*, and this does not widen that.
-
-### Packages without libraries
-
-Exports from h5p.com and h5p.org routinely contain `content/` and nothing else: the site they
-came from already has the libraries, so bundling them would be waste. Anywhere else such a
-package cannot run, and the runtime's only symptom is a 404 for `<MainLibrary>/library.json`.
-
-The player refuses these up front and names what is absent. `libraries` tells it where to look
-instead:
-
-```html
-<!-- the official H5P content-type server, keyed on the package's mainLibrary -->
-<h5p-player src="stripped.h5p" libraries="hub"></h5p-player>
-
-<!-- or any .h5p that carries the library folders -->
-<h5p-player src="stripped.h5p" libraries="/h5p/libraries-bundle.h5p"></h5p-player>
-```
-
-Entries then resolve against the package first and the bundle second, and the two `h5p.json`
-manifests are merged — a stripped export also cuts `preloadedDependencies` down to the main
-library, so without the merge an Interactive Video would load but its interactions would not. The
-bundle is downloaded once, cached, and shared by every package that uses it. When the source
-cannot be reached later — no network, or the hub down — a bundle downloaded whole from the same
-URL before is used instead, so a stripped export plays offline once one has played online.
-
-It is off by default. `libraries="hub"` is a request to a third party on every cold load, which is
-the host's decision to make, not the element's.
-
-**A ready-made bundle.** The repository ships one: the H5P hub's runtime libraries for every
-content type it serves, 98 libraries in ~10 MB, each at its newest minor version — the pack the
-[offline app](https://h5p-offline-player.vercel.app/app/) carries. Download
-[`libraries.h5p`](https://github.com/missing-elements/h5p-offline-player/raw/main/apps/demo/app/libraries.h5p)
-and serve it from your own site, next to the element:
-
-```html
-<h5p-player src="stripped.h5p" libraries="/h5p/libraries.h5p"></h5p-player>
-```
-
-Take [`libraries.txt`](https://github.com/missing-elements/h5p-offline-player/blob/main/apps/demo/app/libraries.txt)
-with it: it lists each library's licence and authors, and the licences — mostly MIT, a few MPL
-and GPL-3.0 — ask for their notices to travel with the code. Serve it yourself rather than
-pointing at the demo site's copy, which is not sent with CORS headers and changes when the pack
-is refreshed. A package that needs a newer minor than the bundle carries is still refused with
-the missing libraries named; `pnpm demo:libraries` rebuilds the bundle from the hub.
-
 Properties: `src`, `file` (a `File` from a picker — setting it loads), `pkgId`, `state`
 (`idle | probing | downloading | indexing | ready | error`), `scope` (read-only), `revision`
-(read-only, see below), `resume` (`off | device | host`), `userData` (the state a host hands in
+(read-only, the build's fingerprint — see Guides), `resume` (`off | device | host`), `userData` (the state a host hands in
 under `resume="host"`). Methods: `clearUserData()`.
 
 | Event | When |
@@ -260,73 +141,23 @@ player.addEventListener('error', (e) => {
 input.onchange = () => (player.file = input.files[0])
 ```
 
-### Which build a learner completed
-
-Every `xapi` and `finished` statement leaves with two fields xAPI defines for exactly this,
-filled in when the content has not set them itself:
-
-```json
-"context": {
-  "revision": "sha256:500da158…",
-  "platform": "h5p-offline-player 0.1.10"
-}
-```
-
-`revision` identifies the build: a SHA-256 over the archive's index — every file's name, size
-and checksum — so any change to the package gives a new one, and replaying the same file gives
-the same one. When `libraries` supplied the libraries, their bundle's follows:
-`sha256:…; libraries sha256:…`. The element's `revision` property has the same value once the
-package is indexed. It is a build identifier, not a forgery-proof seal: keep the published
-`.h5p`, and anyone can recompute it. The normalizer prints it for the file it writes, which is
-the line to put in your version record at release.
-
-*When* a build was the current one is not something a statement or a package can say — a package
-cannot know it will be replaced. That is your version record: your LMS or LRS, or the document
-control you already run. An audit compares each statement's `revision` and timestamp against it.
-For a major change, publish at a new URL, which also gives the content a new xAPI activity id.
-
-On a host without `Range` the content can start before the download has finished, when the
-index is not known yet; statements sent in that window are held and released, in order, with
-their revision, once it is — or at once, without it, if the page is hidden first, so a learner's
-record never goes down with the tab.
-
-### Resuming where the learner left off
-
-Without `resume`, the player keeps nothing of what a learner did: close the tab, and the
-content starts over. With it, the content picks up where it was:
-
-```html
-<h5p-player src="course.h5p" resume></h5p-player>
-```
-
-The content then saves its state the way H5P content types do on h5p.com or in Moodle — the
-slide reached, the answers given so far, the position in a video, whatever the content type's
-`getCurrentState()` returns — every ten seconds, three seconds after a `completed` or
-`progressed` statement, and as the frame goes away. The next load of the same package hands it
-back. A content type without `getCurrentState()` starts over regardless.
-
-What is stored, and where: the content's own state, as the JSON it produced, in the browser's
-storage for the site the player runs on (IndexedDB), on that device. It never leaves the device.
-The player sends nothing anywhere, and neither does the content; xAPI statements are still not
-stored, with or without `resume`. The state is keyed by the package and the build it was saved
-against, the same `revision` the statements carry, so a state from one version of a package is
-never handed to another: the content shows H5P's own "This content has changed since you last
-used it. You'll be starting over.", and the old state is dropped.
-
-It is off by default because a browser is not a learner: on a shared machine, the state one
-person leaves is what the next one finds. A site that knows its users keeps the state itself
-with `resume="host"`, which stores nothing on the device. The element fires `userdata` on every
-save; the host keeps the latest `data` per `dataType` and `subContentId`, under its own user and
-package, and before the next load of that package sets `userData` to those entries,
-`[{ dataType, subContentId, data }]`. With `resume` on the device, `clearUserData()` forgets what
-it holds for the package loaded now; set `src` again afterwards to start over. The demo's
-[installable app](https://github.com/missing-elements/h5p-offline-player/blob/main/apps/demo/app/app.js)
-uses `resume` with a Start over button.
-
 The element renders the content and nothing else — no URL field, no file picker, no progress bar,
 no "open in another browser" banner. Those belong to the host page, built out of these events.
 The demo's [player page](https://github.com/missing-elements/h5p-offline-player/blob/main/apps/demo/index.html)
 is a working example of one.
+
+### Guides
+
+- [Video that cannot stream](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/streaming-video.md) — why a deflated, non-faststart mp4
+  waits for its last byte, what `preload="auto"` changes, and the normalizer that fixes the package.
+- [Packages without libraries](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/libraries.md) — `libraries="hub"`, or a bundle you host;
+  a ready-made one with every hub content type is in the repository.
+- [What the frame is allowed to reach](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/frame-csp.md) — the generated CSP,
+  `allow-origins`, and why `'unsafe-eval'` is in it.
+- [Which build a learner completed](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/revision.md) — the `revision` every statement
+  carries, and what it does and does not prove.
+- [Resuming where the learner left off](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/resume.md) — `resume`, what is stored where,
+  and `resume="host"` for a site with its own users.
 
 ## Requirements
 
@@ -385,39 +216,9 @@ npx skills add missing-elements/h5p-offline-player --skill h5p-verify    # one
 ## Development
 
 A pnpm workspace: the player in `packages/player`, the normalizer in `packages/normalize`, the
-verifier in `packages/verify`, the demo site in `apps/demo`.
-
-```bash
-pnpm install
-pnpm --filter @missing-elements/h5p-offline-player exec playwright install chromium   # once, for the browser tests
-
-pnpm dev          # the demo player page on http://localhost:5173
-pnpm test         # every package's tests, the player's browser suite included
-pnpm build        # the player package
-pnpm normalize course.h5p   # rewrite a package so it streams (see above)
-pnpm verify course.h5p      # play a package headless and report whether it works (see above)
-pnpm build:demo             # the hosted demo, as Vercel builds it, into apps/demo/dist-demo/
-pnpm preview:demo           # serve it locally with the production headers
-pnpm demo:content           # rebuild the demo's content packages from their sources
-pnpm demo:icons             # re-render the installable app's icons
-```
-
-`pnpm dev` serves the player page with real content — a quiz, an interactive video, an
-accordion and dialog cards, built from H5P hub libraries around text written for this player —
-plus, in dev only, generated test archives under `/fixtures/` covering each path the player
-takes: a host that honours `Range` and one that does not, 20 MB of deflated and of stored media,
-hostile entry names, a file that is not an H5P package. `/demo/` is the two-line integration,
-with the other ways to embed it — xAPI, a file from disk, two players on one page —
-linked from there.
-
-The demo site deploys to Vercel from `vercel.json`: the pages, the element, its worker and the
-frame assets as static files, plus one function that plays a host without `Range` support. Its
-`/app/` page is the player as an installable app: in Chrome or Edge it installs, opens `.h5p`
-files from the file manager and plays them with no network — including packages exported without
-their libraries, since the app carries the H5P hub's libraries for every content type.
-`/app/?src=<url of a .h5p>` is a link that opens a package from the web in the installed app.
-
-Working on the code? Start with [AGENTS.md](https://github.com/missing-elements/h5p-offline-player/blob/main/AGENTS.md).
+verifier in `packages/verify`, the demo site in `apps/demo`. The commands, the demo site and the
+installable app are in [docs/development.md](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/development.md); working on the code
+starts with [AGENTS.md](https://github.com/missing-elements/h5p-offline-player/blob/main/AGENTS.md).
 
 ## Licence
 
