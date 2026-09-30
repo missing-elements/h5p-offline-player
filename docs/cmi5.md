@@ -58,7 +58,10 @@ The course structure names the page and the package:
 </courseStructure>
 ```
 
-Zip it as `cmi5.xml` and import the zip. The LMS appends `endpoint`, `fetch`, `actor`,
+Zip it as `cmi5.xml` and import the zip. For the demo's own page and quiz, the zip is ready:
+`apps/demo/demo/cmi5-course.zip`, served by the site as `/demo/cmi5-course.zip` and linked from
+the page. It holds only `cmi5.xml`, with the hosted page's address; `zip cmi5-course.zip
+cmi5.xml` rebuilds it after an edit. The LMS appends `endpoint`, `fetch`, `actor`,
 `registration` and `activityId` to the URL when a learner opens the course. `?src=` names the
 package; `<launchParameters>` in the AU is the alternative, and the page reads it from the LMS
 when the URL carries no `src`. The package URL needs CORS headers, as in every setup.
@@ -171,16 +174,14 @@ that launch and resumes without a second `initialized`, as the spec requires. Th
 up between runs, so a second launch takes seconds; `pnpm cmi5:catapult --down` removes it and
 its data.
 
-**Against the hosted site**, once this page is deployed:
-
-```bash
-pnpm cmi5:catapult --open --au 'https://h5p-offline-player.vercel.app/demo/cmi5.html?src=https://h5p-offline-player.vercel.app/demo/content/quiz.h5p'
-```
-
-The same flow, with the page served by Vercel and the LMS on your machine. Not tried yet. The
-hosted site's policy allows the page to reach `localhost`, and a browser does not treat
-`http://localhost` as mixed content, but Chrome may ask the learner's permission before a
-public page reaches a local address, and other browsers may refuse it.
+**Against another page**, with `--au`: the same flow, with that page as the assignable unit and
+the LMS on your machine. The page's own security policy has to let it reach
+`http://localhost:63398`, and Chrome asks the person at the keyboard before a public site
+reaches a local address ("Access other apps and services on this device"). The hosted demo was
+launched this way on 2026-10-01, with that prompt answered, under a policy widened for the run;
+the widening is gone, so the hosted page no longer reaches a local player. The same prompt is
+what learners would see from a public page whose LMS, LRS or package sits on an internal network,
+which is why an organisation with an internal LMS serves the page from an internal host too.
 
 ## What it does not do
 

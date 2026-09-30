@@ -68,8 +68,10 @@
           <code>completed</code>, and Exit for <code>terminated</code>.
         </p>
         <p>
-          Import a course structure like this one into an LMS that supports cmi5 &mdash; SCORM Cloud
-          does, with a free tier &mdash; and open the course. The LMS appends its five launch
+          <a href="/demo/cmi5-course.zip" download>Download the course structure</a>, zipped as an
+          LMS wants it, and import it into an LMS that supports cmi5 &mdash; SCORM Cloud does, with a
+          free tier &mdash; then open the course. It is the structure below, naming this page and
+          the quiz. The LMS appends its five launch
           parameters to the address. <code>launchMethod="OwnWindow"</code> makes it open the page
           in a window of its own, top level, which is what lets the player run on every browser,
           Safari and iOS included.
@@ -88,7 +90,8 @@
   &lt;/au&gt;
 &lt;/courseStructure&gt;</pre>
         <p>
-          Zip it as <code>cmi5.xml</code> and upload the zip. The package URL must send CORS headers,
+          For a page and package of your own, zip a structure like it as <code>cmi5.xml</code>
+          and upload the zip. The package URL must send CORS headers,
           as for any setup; this site&rsquo;s content does. Instead of <code>?src=</code>, the
           structure can carry the URL in <code>&lt;launchParameters&gt;</code>, which the page reads
           from the LMS.

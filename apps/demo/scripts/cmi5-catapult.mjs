@@ -6,7 +6,7 @@
  *   pnpm cmi5:catapult              headless: launches the page, answers a question of the real quiz,
  *                                   reloads, completes, prints the verdict
  *   pnpm cmi5:catapult --open       prints a launch URL to open in a browser, waits until the session ends
- *   pnpm cmi5:catapult --au <url>   the AU to launch instead of this dev server's page (the hosted site, say)
+ *   pnpm cmi5:catapult --au <url>   the AU to launch instead of this dev server's page; its CSP has to allow localhost
  *   pnpm cmi5:catapult --down       stops the stack and deletes its data
  *
  * What it does: fetches CATAPULT at a pinned commit into cmi5-catapult/CATAPULT, brings up the player,

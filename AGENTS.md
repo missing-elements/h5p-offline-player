@@ -98,8 +98,9 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             the normalizer fixes it (prose and a CSS-only diagram, no script), the rest
                             the individual embedding demos, all sharing demo/player-page.css;
                             demo/cmi5.html with demo/cmi5-page.js is a cmi5 assignable unit around
-                            the element, on @missing-elements/h5p-cmi5; demo/element.js is the one
-                            import of the element every page loads
+                            the element, on @missing-elements/h5p-cmi5, and demo/cmi5-course.zip the
+                            course structure for importing it into an LMS, naming the hosted page;
+                            demo/element.js is the one import of the element every page loads
   tests/                    cmi5.test.ts: the cmi5 page against a mock LMS and LRS on a second
                             origin, through the dev server and a real browser
   cmi5-catapult/            docker-compose.yml for ADL's CATAPULT player, MySQL and the SQL LRS;
@@ -1058,10 +1059,12 @@ SPA-fallback trap described above cannot happen there.
   and the `fetch` URL answers once, so the token and the `initialized` time are kept in
   `localStorage` per launch and a reload resumes through `initialize(sessionState)` instead of
   asking again. The page shows the LMS's stated reason for a refused statement, not only the
-  status. The hosted site's CSP allows `connect-src` to `localhost`, so the deployed page can be
-  launched from a local player (`--au`), `http://localhost` being a secure context rather than
-  mixed content; not tried yet, since the page is not deployed, and Chrome may ask permission
-  before a public page reaches a local address. The CTS and LTS parts of
+  status. The deployed page was launched from the local player once (`--au`), on 2026-10-01,
+  under a `connect-src` widened to `http://localhost:*` for the run and narrowed again after:
+  it worked, with Chrome's Local Network Access prompt ("Access other apps and services on this
+  device") to answer first, since a public site was reaching a local address. Learners see that
+  prompt only when a public page's LMS, LRS or package is on a private network; a public LMS
+  prompts no one. The CTS and LTS parts of
   CATAPULT are not used: the CTS adds a UI, accounts and nginx over the same player, and the
   LTS tests the LMS side. The player returns a session's columns in camel case
   (`isInitialized`), not the snake case of its tables; `--open` once waited on the snake-case
