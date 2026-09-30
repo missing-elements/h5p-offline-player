@@ -81,7 +81,7 @@
       <p>Vite, webpack 5 and Rollup. Install it, import it once, use the element.</p>
       <pre class="code">npm i @missing-elements/h5p-offline-player</pre>
       <pre class="code">import '@missing-elements/h5p-offline-player'</pre>
-      <pre class="code">&lt;h5p-player src="https://host.example/course.h5p" auto-resize&gt;&lt;/h5p-player&gt;</pre>
+      <pre class="code">&lt;h5p-player src="https://host.example/course.h5p"&gt;&lt;/h5p-player&gt;</pre>
       <p>
         That is the whole setup. The element finds its worker and its runtime files with
         <code>new URL('./h5p-sw.js', import.meta.url)</code>, which these bundlers recognise: they
@@ -104,7 +104,7 @@
       <pre class="code">&lt;script type="module"
   src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player/dist/h5p-player.js"&gt;&lt;/script&gt;
 
-&lt;h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js" auto-resize&gt;&lt;/h5p-player&gt;</pre>
+&lt;h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js"&gt;&lt;/h5p-player&gt;</pre>
       <p>
         Download <code>dist/h5p-sw.js</code> from the same CDN path, place it on your site, and point
         <code>sw</code> at it. The frame assets keep loading from the CDN. Putting the worker at the
@@ -145,7 +145,7 @@ input.addEventListener('change', () =&gt; { player.file = input.files[0] })</pre
       <table class="table">
         <tbody>
           <tr><td><code>src</code></td><td>The package URL. Setting it loads; setting it again aborts and reloads.</td></tr>
-          <tr><td><code>auto-resize</code></td><td>Follow the content's own height. Without it, listen to the <code>resize</code> event and size the element yourself.</td></tr>
+          <tr><td><code>auto-resize</code></td><td>The element follows the content's own height by default. <code>off</code> leaves the height to you, from CSS or the <code>resize</code> event; the height the element writes is an inline style, which would beat your rule.</td></tr>
           <tr><td><code>sw</code></td><td>Where the worker script is. Default: <code>h5p-sw.js</code> next to the element. Must be same-origin.</td></tr>
           <tr><td><code>assets-base</code></td><td>The folder of the frame assets. Default: <code>frame-assets/</code> next to the element. May be a CDN.</td></tr>
           <tr><td><code>libraries</code></td><td><code>hub</code>, or the URL of a <code>.h5p</code> that carries library folders, for exports that ship without their own. Downloaded once and cached; when the URL cannot be reached later, the earlier copy is used. A ready-made bundle of every hub content type's libraries is <a href="https://github.com/missing-elements/h5p-offline-player/raw/main/apps/demo/app/libraries.h5p" rel="noopener"><code>libraries.h5p</code></a> in the repository, ~10 MB, with their licences in <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/apps/demo/app/libraries.txt" rel="noopener"><code>libraries.txt</code></a>; serve both from your own site. Default: such packages are refused, with the missing libraries named.</td></tr>

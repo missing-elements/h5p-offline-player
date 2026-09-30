@@ -41,7 +41,7 @@ import '@missing-elements/h5p-offline-player'
 ```
 
 ```html
-<h5p-player src="https://host.example/course.h5p" auto-resize></h5p-player>
+<h5p-player src="https://host.example/course.h5p"></h5p-player>
 ```
 
 Nothing else: the element names its files with `new URL('./file', import.meta.url)`, which
@@ -57,7 +57,7 @@ static path and set `sw="/that/path/h5p-sw.js" assets-base="/that/path/frame-ass
 ```html
 <script type="module"
   src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@<version>/dist/h5p-player.js"></script>
-<h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js" auto-resize></h5p-player>
+<h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js"></h5p-player>
 ```
 
 Download `https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@<version>/dist/h5p-sw.js`
@@ -67,8 +67,10 @@ and place it on the site; `sw` points at it. The root is fine: its scope becomes
 moves and the copied worker does not — and re-download `h5p-sw.js` on every upgrade; the
 console warns when the two differ.
 
-**Always:** `auto-resize` so the element follows the content's height, or handle the `resize`
-event yourself. Any CSS goes on the `h5p-player` tag itself; the inside is shadow DOM.
+**Sizing:** the element follows the content's own height by default. Set `auto-resize="off"`
+only when the page sizes it itself, from CSS or from the `resize` event, because the height the
+element writes is an inline style and would beat the page's rule. Any CSS goes on the
+`h5p-player` tag itself; the inside is shadow DOM.
 
 **Resume, only when asked for.** By default a reload starts the content over and nothing is
 stored. `resume` keeps the content's own saved state — the slide reached, the answers so far, the
@@ -102,7 +104,7 @@ takes `host`, a kiosk or a classroom device takes neither, and a learner's own d
 | `error: bad-archive`, "contains no libraries" | an h5p.com / h5p.org export: `content/` only | set `libraries="hub"` to fetch them from h5p.org, or `libraries="/path/libraries.h5p"` pointing at a bundle you host (the repository ships one with every hub content type's libraries, plus its `libraries.txt` of licences) |
 | worker or `frame-assets/` 404 after a build | the bundler did not rewrite `new URL` (esbuild) | serve `dist/` statically and set `sw` and `assets-base` |
 | the frame renders the host page inside itself | an SPA fallback answered a virtual route with `index.html`: the worker is not registered | check the registration; after "clear site data" reload once |
-| content collapsed to 150 px | the element has no height: no `auto-resize` and none set by CSS; or the host's CSP has `style-src 'self'` and the browser lacks `adoptedStyleSheets`, so the fallback `<style>` is blocked | add `auto-resize`, or give the `h5p-player` tag a height; update the browser |
+| content collapsed to 150 px | `auto-resize="off"` with no height from CSS; or the host's CSP has `style-src 'self'` and the browser lacks `adoptedStyleSheets`, so the fallback `<style>` is blocked | remove `auto-resize="off"`, or give the `h5p-player` tag a height; update the browser |
 | `error: runtime` after `ready` | a content type threw a non-fatal exception, common on resize | log it; do not hide the player |
 | Vite dev only: worker or assets 404 | the package is hoisted somewhere Vite does not serve (a monorepo); the element's own fallback for `.vite/deps/` covers the normal layout | add the package to `optimizeDeps.exclude`, or set `sw` and `assets-base` |
 | a video takes minutes to start, then plays | the package, not the player: the video is compressed inside the zip and its index is at the end | the `h5p-normalize` skill; `preload="auto"` only moves the wait earlier |

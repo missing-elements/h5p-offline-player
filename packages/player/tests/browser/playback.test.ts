@@ -214,7 +214,7 @@ describe('playing a package', () => {
   })
 
   it('reports a content height over H5P\'s own resizer protocol', async () => {
-    const player = createPlayer()
+    const player = createPlayer({ 'auto-resize': 'off' })
     player.style.height = '600px'
 
     const resized = waitForEvent<{ height: number }>(player, 'resize')
@@ -237,8 +237,8 @@ describe('playing a package', () => {
     expect(body.style.overflow).toBe('hidden')
   })
 
-  it('follows the content height when auto-resize is set', async () => {
-    const player = createPlayer({ 'auto-resize': '' })
+  it('follows the content height by default', async () => {
+    const player = createPlayer()
     player.style.removeProperty('height')
 
     const resized = waitForEvent<{ height: number }>(player, 'resize')
@@ -249,8 +249,31 @@ describe('playing a package', () => {
     expect(Math.round(player.getBoundingClientRect().height)).toBe(height)
   })
 
+  it('leaves the height to the host with auto-resize="off", and hands it back when set later', async () => {
+    const player = createPlayer({ 'auto-resize': 'off' })
+    player.style.height = '600px'
+
+    const resized = waitForEvent<{ height: number }>(player, 'resize')
+    player.setAttribute('src', FIXTURES.basic)
+    const { height } = (await resized).detail
+    expect(height).toBeLessThan(600)
+
+    // The host's own inline height is not the element's to remove; only one it wrote is.
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    expect(player.style.height).toBe('600px')
+    expect(Math.round(player.getBoundingClientRect().height)).toBe(600)
+
+    // Back to the default: the next report sizes the element.
+    player.removeAttribute('auto-resize')
+    const followed = waitForEvent<{ height: number }>(player, 'resize')
+    window.dispatchEvent(new Event('resize'))
+    await followed
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    expect(Math.round(player.getBoundingClientRect().height)).toBe(height)
+  })
+
   it('fills a host sized only by min-height', async () => {
-    const player = createPlayer()
+    const player = createPlayer({ 'auto-resize': 'off' })
     player.style.minHeight = '420px'
     player.style.removeProperty('height')
 

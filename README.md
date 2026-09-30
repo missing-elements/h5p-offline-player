@@ -38,7 +38,7 @@ import '@missing-elements/h5p-offline-player'
 ```
 
 ```html
-<h5p-player src="https://host.example/course.h5p" auto-resize></h5p-player>
+<h5p-player src="https://host.example/course.h5p"></h5p-player>
 ```
 
 That is all: nothing to copy, nothing to configure. The element names every file it needs —
@@ -53,7 +53,7 @@ package's `dist/` folder from a static path and set `sw` and `assets-base` to it
 ```html
 <script type="module"
   src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player/dist/h5p-player.js"></script>
-<h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js" auto-resize></h5p-player>
+<h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js"></h5p-player>
 ```
 
 Copy `dist/h5p-sw.js` from the same CDN path onto your site and point `sw` at it. The frame assets
@@ -114,7 +114,8 @@ so the page can offer a file picker instead.
   assets-base="…"    directory of the frame assets (default: next to the element)
   libraries="…"      where to get libraries a package does not carry (default: nowhere)
   allow-origins="…"  extra origins the frame's CSP should permit, space separated
-  auto-resize        follow the content's own height
+  auto-resize="off"  size the element yourself, from CSS or the `resize` event; by default
+                     it follows the content's own height
   preload="auto"     pull large deflated media before the content asks (default: none)
   resume             keep the content's saved state on this device and resume from it
                      (default: off; `host` hands it to the host page instead — see below)

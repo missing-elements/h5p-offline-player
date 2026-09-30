@@ -68,6 +68,9 @@ The element does one thing: play a package.
                        copy downloaded before is used, so it also plays offline after that
   allow-origins="…"    extra origins for the frame's CSP, space separated — for a tenant's own
                        video host or an in-house CDN
+  auto-resize="off"    size the element yourself, from CSS or the `resize` event. By default it
+                       follows the content's own height, as an inline style — which is why a
+                       page that sizes it has to say so
   preload="…"          `auto` pulls large deflated media once the content is up, instead of
                        waiting for the runtime to ask (default: `none`)
   resume               keep the content's saved state — what its `getCurrentState()` returns —

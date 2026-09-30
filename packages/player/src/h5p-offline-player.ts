@@ -363,7 +363,20 @@ export class H5PPlayerElement extends HTMLElement {
 
     // `sw` and `assets-base` only take effect on the next load; a running package keeps the
     // worker and assets it was loaded with.
-    if (name === 'auto-resize' && next === null) this.style.removeProperty('height')
+    // Handing the height back to the host: the inline height this element wrote would otherwise
+    // outlive the choice, since an inline style beats any rule in the host's stylesheet.
+    if (name === 'auto-resize' && next === 'off') this.style.removeProperty('height')
+  }
+
+  /**
+   * Whether the element follows the content's height, which it does unless told
+   * `auto-resize="off"`. On by default because every host wants it and the alternative is a
+   * 150px frame; off for a host that sizes the element itself, from a stylesheet or the `resize`
+   * event, since the inline height written here beats any rule of theirs. A bare `auto-resize`
+   * is what pages written while it was opt-in carry, and it means the default.
+   */
+  private get autoResizes(): boolean {
+    return this.getAttribute('auto-resize') !== 'off'
   }
 
   /* ---------------------------------------------------------------- loading */
@@ -1169,7 +1182,7 @@ export class H5PPlayerElement extends HTMLElement {
         if (this.iframe.clientHeight === scrollHeight && scrollHeight === clientHeight) return
 
         // Let the content fall back to its own height before it measures, so a shrink is seen.
-        if (this.hasAttribute('auto-resize') && clientHeight > 0) {
+        if (this.autoResizes && clientHeight > 0) {
           this.style.height = `${clientHeight}px`
         }
         respond('resizePrepared')
@@ -1181,7 +1194,7 @@ export class H5PPlayerElement extends HTMLElement {
         if (height <= 0) return
 
         this.dispatchEvent(new CustomEvent('resize', { detail: { height } }))
-        if (this.hasAttribute('auto-resize')) this.style.height = `${height}px`
+        if (this.autoResizes) this.style.height = `${height}px`
         return
       }
     }

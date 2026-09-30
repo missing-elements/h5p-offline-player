@@ -830,6 +830,14 @@ The element speaks H5P's own resizer protocol, the exchange `h5p-resizer.js` imp
 site embedding h5p.org content. The frame sends `hello`, `prepareResize` and `resize` to
 `window.parent` with `context: 'h5p'`; `onResizerMessage` answers them.
 
+Following the reported height is the default (`autoResizes`), and the reason a host can turn it
+off is the way it is applied: an inline `height` on the element, which beats any rule in the
+host's stylesheet. A page that sizes the element from CSS, or as a flex or grid cell that should
+scroll inside, sets `auto-resize="off"`; setting it removes the inline height the element wrote,
+and nothing else, since a host's own inline height is not the element's to touch. The bare
+attribute is accepted and means the default, so pages from before the change keep working.
+`playback.test.ts` pins the default, the opt-out and the return to the default.
+
 Answering `hello` is load-bearing. Until it is answered H5P leaves its document at full height
 and never reports a content size — so a missing reply looks like "sizing does not work" rather
 than like a failed handshake. On the reply it sets `body { height: auto; overflow: hidden }` and
@@ -1147,8 +1155,11 @@ runs in the same document and calls its API.
 
 The architecture and setup documents predate the code. These are deliberate additions, not drift:
 
-- A `resize` event and an `auto-resize` attribute. H5P content sizes itself, and without these
-  every host page has to reimplement the same listener.
+- A `resize` event, and the element follows the content's height by default. H5P content sizes
+  itself, and without these every host page has to reimplement the same listener. Following was
+  opt-in as `auto-resize` until 2026-09-30, when every snippet in the repository was found to
+  set it; now `auto-resize="off"` is the opt-out, for a host that sizes the element itself, and
+  a bare `auto-resize` is still accepted and means the default.
 - A `statechange` event, so a host can mirror `state` without polling.
 - A `runtime` error after `ready` does not move the state to `error`. The design's state machine
   has one `error` state; a content type that throws once after booting is not that.
