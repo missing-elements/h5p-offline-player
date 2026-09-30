@@ -306,6 +306,13 @@ Integration details, including bundler-specific setup and single-worker hosts, a
 [h5p-player-setup.md](https://github.com/missing-elements/h5p-offline-player/blob/main/h5p-player-setup.md). The design is in
 [h5p-offline-player-architecture.md](https://github.com/missing-elements/h5p-offline-player/blob/main/h5p-offline-player-architecture.md).
 
+## Accessibility
+
+Conformance is judged on the player and the content type together. [ACCESSIBILITY.md](https://github.com/missing-elements/h5p-offline-player/blob/main/ACCESSIBILITY.md)
+says which part is whose, what the player does (no focus trap, the frame named after the
+package, fullscreen from the keyboard), what a host page should do, and what a keyboard-only
+run over seven content types found.
+
 ## Checking that a package plays
 
 A zip that opens and JSON that parses prove nothing; most broken packages are valid zips that

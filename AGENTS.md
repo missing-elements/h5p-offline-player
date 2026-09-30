@@ -1201,7 +1201,20 @@ it came from*. Open: an element property is all a host has for its own records t
 `finished` event should also carry the revision at top level, for hosts that do not read
 statements, has not been asked for.
 
-**Accessibility statement.** Raised in the same comment: Section 508 conformance is judged on
+**Accessibility statement — started.** `ACCESSIBILITY.md` is the statement: whose part is
+whose, what the player does, what a host should do, and a keyboard-only run on 2026-09-29 over
+seven content types in Chromium — no focus trap anywhere, every task doable by keys. The run
+found one thing on the player's side, the fixed frame title, and the element now names the
+frame after `h5p.json`'s title (the `indexed` reply's `title`; "H5P content" before a load and
+for a package without one; `playback.test.ts` pins both paths, including the early boot on a
+host without `Range`). Two lessons from writing that run, for the next one: read focus along
+the real path — page, the element's shadow root, the iframe, its document — since a frame
+document's `activeElement` is its `<body>` when it does not have focus, and matching that
+body's text "found" every control on the first Tab; and a focus indicator can be a border or
+a background, so an outline-and-box-shadow check is only a hint. Still open: a real screen
+reader (NVDA, JAWS, VoiceOver), Firefox and Safari, zoom and contrast.
+
+The original note, raised in the same comment: Section 508 conformance is judged on
 the whole package, the player and the H5P content types together, and a content type that traps
 keyboard focus is a non-starter for compliance audiences. The player's own surface is small —
 the element renders one iframe and no controls — so the work is a keyboard-only and

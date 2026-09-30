@@ -181,7 +181,7 @@ export class H5PPlayerElement extends HTMLElement {
   constructor() {
     super()
     const root = this.attachShadow({ mode: 'open' })
-    root.innerHTML = `<div class="viewport"><iframe part="frame" allow="fullscreen" title="H5P content"></iframe></div>`
+    root.innerHTML = `<div class="viewport"><iframe part="frame" allow="fullscreen" title="${FRAME_TITLE}"></iframe></div>`
     adoptShadowStyles(root)
     this.iframe = root.querySelector('iframe')!
   }
@@ -337,6 +337,7 @@ export class H5PPlayerElement extends HTMLElement {
   private clear(): void {
     this.abortLoad()
     this.iframe.removeAttribute('src')
+    this.iframe.title = FRAME_TITLE
     this.forgetPackage()
     this.setState('idle')
   }
@@ -356,6 +357,7 @@ export class H5PPlayerElement extends HTMLElement {
     const { signal } = controller
 
     this.iframe.removeAttribute('src')
+    this.iframe.title = FRAME_TITLE
     this.forgetPackage()
     this.revisionSettled = false
 
@@ -398,6 +400,7 @@ export class H5PPlayerElement extends HTMLElement {
       }
       if (signal.aborted) return
 
+      this.iframe.title = frameTitle(indexed.title)
       this.internalRevision = indexed.revision ?? null
       this.revisionSettled = true
       this.releaseStatements()
@@ -437,6 +440,7 @@ export class H5PPlayerElement extends HTMLElement {
           if (signal.aborted || booted) return
           if (reply.ok && reply.type === 'indexed' && reply.ready !== false) {
             booted = true
+            this.iframe.title = frameTitle(reply.title)
             this.iframe.src = frameUrl
           }
         })
@@ -1102,8 +1106,22 @@ interface HeldStatement {
 interface IndexResult {
   prefetch: PrefetchEntry[]
   warm: WarmSpan[]
+  /** `h5p.json`'s title, which names the frame for assistive technology. */
+  title?: string
   /** The xAPI `context.revision`; absent from a worker older than the element. */
   revision?: string
+}
+
+/**
+ * What a screen reader announces for the frame: "frame, <title>". The package's own title says
+ * which content it is; the generic name is for before a package has been indexed, and for one
+ * whose `h5p.json` has no title.
+ */
+const FRAME_TITLE = 'H5P content'
+
+function frameTitle(title: string | undefined): string {
+  const trimmed = title?.trim()
+  return trimmed ? trimmed : FRAME_TITLE
 }
 
 function nothingIndexed(): IndexResult {
@@ -1112,7 +1130,7 @@ function nothingIndexed(): IndexResult {
 
 function indexResultOf(reply: WorkerReply): IndexResult {
   if (!reply.ok || reply.type !== 'indexed') return nothingIndexed()
-  return { prefetch: reply.prefetch ?? [], warm: reply.warm ?? [], revision: reply.revision }
+  return { prefetch: reply.prefetch ?? [], warm: reply.warm ?? [], title: reply.title, revision: reply.revision }
 }
 
 /**

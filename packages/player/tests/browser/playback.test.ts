@@ -139,6 +139,23 @@ describe('playing a package', () => {
     expect(failures).toEqual([])
   })
 
+  it('names the frame after the package, for assistive technology, and forgets it when cleared', async () => {
+    const player = await play(FIXTURES.basic)
+    const iframe = player.shadowRoot?.querySelector('iframe') as HTMLIFrameElement
+
+    // What a screen reader announces for the frame; "H5P content" says nothing about which.
+    expect(iframe.title).toBe('Offline player test')
+
+    player.removeAttribute('src')
+    expect(iframe.title).toBe('H5P content')
+  })
+
+  it('names the frame after the package on a host that ignores Range too, which boots early', async () => {
+    const player = await play(FIXTURES.noRangeBasic)
+    const iframe = player.shadowRoot?.querySelector('iframe') as HTMLIFrameElement
+    expect(iframe.title).toBe('Offline player test')
+  })
+
   it('reloads when the same src is set again after being removed', async () => {
     const player = await play(FIXTURES.basic)
     player.removeAttribute('src')
