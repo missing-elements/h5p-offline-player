@@ -116,8 +116,10 @@ export class PackageReader {
     this.partial = partial
   }
 
+  /** `h5p.json`'s title, when it is a string: the manifest is untrusted, and three things render it. */
   get title(): string | undefined {
-    return this.manifest.title
+    const { title } = this.manifest as { title?: unknown }
+    return typeof title === 'string' ? title : undefined
   }
 
   static async open(

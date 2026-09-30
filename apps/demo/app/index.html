@@ -78,7 +78,12 @@
         <span class="file-name" id="file-name" hidden></span>
       </div>
 
-      <p class="message" id="message" role="status" aria-live="polite" hidden></p>
+      <!-- The live region is on the page from the start and the message is put into it, which is
+           what screen readers announce reliably; a region that appears with its text already
+           in it may be read or may not. -->
+      <div role="status" aria-live="polite">
+        <p class="message" id="message" hidden></p>
+      </div>
       <p class="message hint" id="offer" hidden>
         <button type="button" id="fetch-libraries">Fetch them from h5p.org and retry</button>
       </p>

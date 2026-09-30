@@ -107,3 +107,19 @@ describe('PackageReader.use', () => {
     expect(reader.missingLibraries()).toBeNull()
   })
 })
+
+describe('PackageReader.title', () => {
+  const open = async (h5pJson: string) =>
+    PackageReader.open('t', memoryHandle(await zipOf({ 'h5p.json': h5pJson, 'content/content.json': '{}' })).handle, {
+      requireLibraries: false
+    })
+
+  it('is the manifest’s title when it is a string, and nothing otherwise', async () => {
+    // The manifest is untrusted, and the title names the frame, its document and the package row:
+    // a number or an object there must not throw in any of the three.
+    expect((await open('{"title":"A course","mainLibrary":"H5P.A"}')).title).toBe('A course')
+    expect((await open('{"mainLibrary":"H5P.A"}')).title).toBeUndefined()
+    expect((await open('{"title":42,"mainLibrary":"H5P.A"}')).title).toBeUndefined()
+    expect((await open('{"title":{"en":"x"},"mainLibrary":"H5P.A"}')).title).toBeUndefined()
+  })
+})

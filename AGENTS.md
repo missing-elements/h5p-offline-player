@@ -1219,12 +1219,11 @@ the whole package, the player and the H5P content types together, and a content 
 keyboard focus is a non-starter for compliance audiences. The player's own surface is small —
 the element renders one iframe and no controls — so the work is a keyboard-only and
 screen-reader pass and a page stating what the player handles and what depends on the content
-type. Known candidates on the player's side: the iframe's `title` is a fixed "H5P content"
-(`h5p-offline-player.ts`) where the package's own title, which `h5p.json` carries, would say
-something; focus moving into and out of the frame; keyboard access in and out of fullscreen;
-and whether an `error` reaches assistive technology, which today it does only if the host page
-renders it. The content-type side is H5P's own per-type accessibility list, to be linked rather
-than restated.
+type. What remains on the player's side: an `error` reaches assistive technology only if the
+host page renders it, so the demo pages put the message into a live region that is on the page
+from the start — a region that appears together with its text is announced by some screen
+readers and not by others — and `ACCESSIBILITY.md` tells a host to do the same. The
+content-type side is H5P's own per-type accessibility list, linked rather than restated.
 
 **Save and resume.** Raised on 2026-09-28 comparing the player with Lumi, whose server stores
 learner state so a learner comes back where they left off; here a reload starts over. Listed as

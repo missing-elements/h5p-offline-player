@@ -32,13 +32,15 @@ inside the package.
   Exit fullscreen button leaves it, and focus comes back to the Fullscreen button.
 - **Failures are events, not messages.** The element renders nothing when a package fails; it
   fires `error` with a sentence written for a person in `detail.message`. The host page decides
-  how that reaches the learner; put it in an element with `role="alert"` or `aria-live`.
+  how that reaches the learner: put it into a live region (`role="status"` or `role="alert"`)
+  that is already on the page, empty. A region that appears together with its text is announced
+  by some screen readers and not by others.
 
 ## What a host page should do
 
 - Give the player a heading or label nearby that says what the content is.
-- Show `error` messages in a live region, and do not hide the player on a `runtime` error
-  after `ready`: the content is still running.
+- Show `error` messages in a live region that is on the page from the start, and do not hide
+  the player on a `runtime` error after `ready`: the content is still running.
 - Do not set `tabindex="-1"` on the element or wrap it in something that takes focus.
 - Prefer packages built with current library versions; see *Who is responsible*.
 
