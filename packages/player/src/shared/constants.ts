@@ -144,3 +144,21 @@ export const PACKAGES_STORE = 'packages'
  * never fetched, so an unresolvable TLD keeps them from ever reaching the network.
  */
 export const CHUNK_KEY_ORIGIN = 'https://chunks.h5p-player.invalid/'
+
+/**
+ * The learner's saved state, for `resume`. Its own database, not a second store in `DB_NAME`:
+ * the Service Worker holds a long-lived connection to that one at `DB_VERSION`, and a page that
+ * bumped the version would leave a worker still running the older code unable to open it at all.
+ * Only the page opens this one.
+ */
+export const USER_DATA_DB_NAME = 'h5p-player-userdata'
+export const USER_DATA_STORE = 'states'
+
+/**
+ * How often, in seconds, the runtime asks each content instance for its state while `resume` is
+ * on. H5P also saves three seconds after a `completed` or `progressed` statement and when the
+ * frame's document goes away, so this bounds what a closed tab loses between those. Unchanged
+ * state costs one `getCurrentState()` call and nothing else: the frame sends only what differs
+ * from the last save.
+ */
+export const SAVE_INTERVAL_S = 10

@@ -132,7 +132,9 @@
 
       <h2>Listening to it</h2>
       <p>
-        Everything the player learns arrives as a DOM event on the element. Nothing is stored.
+        Everything the player learns arrives as a DOM event on the element. Nothing is stored
+        unless the <code>resume</code> attribute is set, and then only the content's own saved
+        state, in the browser's storage on that device.
         Every statement carries <code>context.revision</code>, a fingerprint of the package it
         came from, and <code>context.platform</code>, the player's version, so a completion can be
         matched to the build the learner played; <code>player.revision</code> holds the same value.
@@ -158,6 +160,7 @@ input.addEventListener('change', () =&gt; { player.file = input.files[0] })</pre
           <tr><td><code>libraries</code></td><td><code>hub</code>, or the URL of a <code>.h5p</code> that carries library folders, for exports that ship without their own. Downloaded once and cached; when the URL cannot be reached later, the earlier copy is used. A ready-made bundle of every hub content type's libraries is <a href="https://github.com/missing-elements/h5p-offline-player/raw/main/apps/demo/app/libraries.h5p" rel="noopener"><code>libraries.h5p</code></a> in the repository, ~10 MB, with their licences in <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/apps/demo/app/libraries.txt" rel="noopener"><code>libraries.txt</code></a>; serve both from your own site. Default: such packages are refused, with the missing libraries named.</td></tr>
           <tr><td><code>preload</code></td><td><code>auto</code> pulls large compressed media once the content is up, instead of when the learner presses play.</td></tr>
           <tr><td><code>allow-origins</code></td><td>Extra origins the frame's Content Security Policy should permit, space separated: a tenant's video host, an in-house CDN.</td></tr>
+          <tr><td><code>resume</code></td><td>Keep the content's own saved state &mdash; the slide reached, the answers so far, the position in a video &mdash; in the browser's storage on that device, and pick up there on the next load of the package. <code>host</code> keeps nothing on the device: the page gets a <code>userdata</code> event on every save and hands the state back through <code>userData</code> before the next load. Default: off, nothing is kept. Nothing is sent in either case.</td></tr>
         </tbody>
       </table>
 

@@ -70,6 +70,7 @@
           <input type="file" id="file" accept=".h5p" />
         </label>
         <button type="button" id="install" hidden>Install app</button>
+        <button type="button" id="start-over" hidden>Start over</button>
         <span class="offline" id="offline" data-state="preparing">Preparing the offline copy…</span>
       </div>
 
@@ -88,7 +89,9 @@
         <button type="button" id="fetch-libraries">Fetch them from h5p.org and retry</button>
       </p>
 
-      <h5p-player auto-resize></h5p-player>
+      <!-- `resume`: the content's own saved state stays in this browser's storage, on this
+           device, so a file opened again picks up where it was. See "What it keeps" below. -->
+      <h5p-player auto-resize resume></h5p-player>
 
       <p class="drop-hint" id="drop-hint" aria-hidden="true">Drop the .h5p file to open it</p>
 
@@ -121,9 +124,10 @@
           <li>Files are read on this device and never uploaded. They are not kept either: open one again next time, and what was already extracted comes from this device's cache.</li>
         </ul>
 
-        <h3>What it does not keep</h3>
+        <h3>What it keeps on this device, and what it does not</h3>
         <ul class="list">
-          <li>Answers, scores and progress are not saved. The content reports them as xAPI statements, but the app neither stores them on this device nor sends them anywhere, so closing a file or the app starts it over next time.</li>
+          <li>Where you were. When a file is open, the content saves its own state — the slide or chapter reached, the answers given so far, the position in a video, whatever that content type keeps — in this browser's storage, on this device only. Open the same file again (same name, size and date) and it picks up there; <strong>Start over</strong> forgets it. On a shared device, the next person to open the file finds where the last one left it, so press Start over first. Nothing is sent anywhere.</li>
+          <li>Not results. The scores and completions the content reports as xAPI statements are neither stored on this device nor sent anywhere, so nothing here is a record that a course was completed.</li>
           <li>For results that are recorded — a class, a course, a compliance record — use the <a href="/demo/setup.html">player component</a> on a site that sends its xAPI statements to an LRS or an LMS.</li>
         </ul>
       </section>

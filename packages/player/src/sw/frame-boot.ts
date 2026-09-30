@@ -16,10 +16,34 @@ interface BootConfig {
   frameCss: string
 }
 
+interface UserDataEntry {
+  dataType: string
+  subContentId: string
+  data: string | null
+}
+
+interface UserDataPreload {
+  channel: 'h5p-player'
+  type: 'user-data'
+  session: string
+  saveInterval: number
+  entries: UserDataEntry[]
+}
+
+type UserDataDone = (error?: unknown, data?: unknown) => void
+
 declare global {
   interface Window {
     H5PStandalone: { H5P: new (root: HTMLElement, options: object) => Promise<unknown> }
-    H5P?: { externalDispatcher?: { on(name: string, handler: (event: { data?: { statement?: XapiStatement } }) => void): void } }
+    H5P?: {
+      externalDispatcher?: { on(name: string, handler: (event: { data?: { statement?: XapiStatement } }) => void): void }
+      init?: () => void
+      preventInit?: boolean
+      getUserData?: (contentId: unknown, dataType: string, done: UserDataDone, subContentId?: unknown) => void
+      setUserData?: (contentId: unknown, dataType: string, data: unknown, options?: { subContentId?: unknown; errorCallback?: (error: unknown) => void }) => void
+      deleteUserData?: (contentId: unknown, dataType: string, subContentId?: unknown) => void
+    }
+    H5PIntegration?: { saveFreq?: number | false }
   }
 }
 
@@ -63,14 +87,100 @@ var options = {
   export: false,
   icon: false,
   fullScreen: true,
-  // No result endpoints exist here. xAPI leaves as events; nothing is posted or stored.
+  // No result endpoint exists here. xAPI leaves as events; nothing is posted.
   postUserStatistics: false,
-  saveFreq: false
+  // Off unless the element says otherwise below, before the runtime loads. A number, and the
+  // runtime hands the saved state to the content, asks it for its state that often, and saves as
+  // the document goes away — that last handler it registers as it loads, on the value it sees
+  // then, which is why the element is asked first.
+  saveFreq: false as number | false,
+  // The runtime is initialised here, not by h5p-standalone: the saved state has to be in place
+  // first, and it comes from the element.
+  preventH5PInit: false
 };
 
-new window.H5PStandalone.H5P(root, options)
+/**
+ * Whether the element opened this frame with `resume`. In the URL rather than in the boot
+ * configuration so that an element older than the worker, which never sets it, boots as before,
+ * and a worker older than the element, whose boot script does not know it, ignores it.
+ */
+var resume = /[?&]resume=1(?:&|$)/.test(location.search);
+
+/**
+ * The saved state lives with the element, which either keeps it on this device or takes it from
+ * the host page; the runtime asks for it through `H5P.getUserData` and saves it through
+ * `H5P.setUserData`. Those normally reach a site's `contentUserData` endpoint by AJAX, and refuse
+ * to run at all without a signed-in `H5PIntegration.user` — which would also rewrite the actor of
+ * every xAPI statement. So the three are replaced with versions that talk to the element instead,
+ * keeping the semantics the runtime relies on: a value is handed over synchronously, a save goes
+ * out only when it differs from the last, and `null` in a preload means "saved against another
+ * build", which the runtime answers with its own "starting over" dialog.
+ */
+var installUserData = function (preload: UserDataPreload) {
+  var H5P = window.H5P!;
+  var known: Record<string, string | null> = {};
+  for (var i = 0; i < preload.entries.length; i++) {
+    var entry = preload.entries[i];
+    known[entry.dataType + '/' + entry.subContentId] = entry.data;
+  }
+  var keyOf = function (dataType: string, subContentId: unknown) {
+    return dataType + '/' + String(subContentId || 0);
+  };
+  var save = function (dataType: string, subContentId: unknown, data: string | null) {
+    post({ type: 'user-data', session: preload.session, dataType: dataType, subContentId: String(subContentId || 0), data: data });
+  };
+
+  H5P.getUserData = function (_contentId, dataType, done, subContentId) {
+    var value = known[keyOf(dataType, subContentId)];
+    if (value === undefined) return done();
+    if (value === null) return done(undefined, null);
+    try { done(undefined, JSON.parse(value)); } catch (error) { done(error); }
+  };
+  H5P.setUserData = function (_contentId, dataType, data, userOptions) {
+    var opts = userOptions || {};
+    var json: string;
+    try { json = JSON.stringify(data); } catch (error) { if (opts.errorCallback) opts.errorCallback(error); return; }
+    var key = keyOf(dataType, opts.subContentId);
+    if (json === known[key]) return;
+    known[key] = json;
+    save(dataType, opts.subContentId, json);
+  };
+  H5P.deleteUserData = function (_contentId, dataType, subContentId) {
+    delete known[keyOf(dataType, subContentId)];
+    save(dataType, subContentId, null);
+  };
+};
+
+/** Asks the element for the saved state and waits for it; nothing to wait for without `resume`. */
+var askForUserData = function (): Promise<UserDataPreload | null> {
+  if (!resume) return Promise.resolve(null);
+  return new Promise(function (resolve) {
+    var onMessage = function (event: MessageEvent) {
+      var data = event.data as UserDataPreload | undefined;
+      if (event.origin !== location.origin || event.source !== parent) return;
+      if (!data || data.channel !== 'h5p-player' || data.type !== 'user-data') return;
+      window.removeEventListener('message', onMessage);
+      resolve(data);
+    };
+    window.addEventListener('message', onMessage);
+    post({ type: 'need-user-data' });
+  });
+};
+
+askForUserData()
+  .then(function (preload) {
+    if (preload) options.saveFreq = preload.saveInterval;
+    return new window.H5PStandalone.H5P(root, options).then(function () {
+      if (preload) installUserData(preload);
+    });
+  })
   .then(function () {
-    var dispatcher = window.H5P && window.H5P.externalDispatcher;
+    // What h5p-standalone would have done itself but for `preventH5PInit`.
+    var H5P = window.H5P!;
+    if (typeof H5P.init === 'function') H5P.init();
+    H5P.preventInit = false;
+
+    var dispatcher = H5P.externalDispatcher;
     if (dispatcher) {
       dispatcher.on('xAPI', function (event) {
         var statement = event && event.data ? event.data.statement : undefined;

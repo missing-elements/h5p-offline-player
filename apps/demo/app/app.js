@@ -10,6 +10,7 @@
 const player = document.querySelector('h5p-player')
 const fileInput = document.querySelector('#file')
 const installButton = document.querySelector('#install')
+const startOver = document.querySelector('#start-over')
 const offline = document.querySelector('#offline')
 const status = document.querySelector('#status')
 const stateBadge = document.querySelector('#state')
@@ -212,6 +213,14 @@ player.addEventListener('statechange', (event) => {
   stateBadge.dataset.state = state
   status.dataset.state = state
   if (state !== 'error') show('')
+  startOver.hidden = state !== 'ready'
+})
+
+// The element keeps the content's saved state on this device (`resume`); this forgets it for
+// the open file and opens the file again, from the start.
+startOver.addEventListener('click', async () => {
+  await player.clearUserData()
+  void reopen?.(player.getAttribute('libraries'))
 })
 
 player.addEventListener('error', (event) => {

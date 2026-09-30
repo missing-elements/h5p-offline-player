@@ -77,6 +77,15 @@ third party's origin.
 **Always:** `auto-resize` so the element follows the content's height, or handle the `resize`
 event yourself. Any CSS goes on the `h5p-player` tag itself; the inside is shadow DOM.
 
+**Resume, only when asked for.** By default a reload starts the content over and nothing is
+stored. `resume` keeps the content's own saved state — the slide reached, the answers so far, the
+position in a video — in the browser's storage on that device and hands it back on the next
+load; `resume="host"` keeps nothing on the device and gives the host page a `userdata` event on
+every save, to hand back through `userData` before the next load. Ask before setting it: on a
+shared machine the state one person leaves is what the next one finds, so a site with accounts
+takes `host`, a kiosk or a classroom device takes neither, and a learner's own device takes
+`resume`. Either way nothing is sent anywhere, and xAPI statements are still not stored.
+
 ## 3. Check it
 
 1. The page is served over `https://` or `localhost`, never `file://`.
@@ -104,13 +113,17 @@ event yourself. Any CSS goes on the `h5p-player` tag itself; the inside is shado
 | `error: runtime` after `ready` | a content type threw a non-fatal exception, common on resize | log it; do not hide the player |
 | Vite dev only: worker or assets 404 | the package is hoisted somewhere Vite does not serve (a monorepo); the element's own fallback for `.vite/deps/` covers the normal layout | add the package to `optimizeDeps.exclude`, or set `sw` and `assets-base` |
 | a video takes minutes to start, then plays | the package, not the player: the video is compressed inside the zip and its index is at the end | the `h5p-normalize` skill; `preload="auto"` only moves the wait earlier |
+| the content starts over on every reload | `resume` is not set, which is the default | set `resume` (or `resume="host"`) if the user wants that, see section 2 |
+| "This content has changed since you last used it. You'll be starting over." | the package at that URL was replaced since the state was saved; the state is keyed by the build | expected, H5P's own dialog; OK drops the old state and the content saves afresh under the new build |
 
 ## 5. Hand over
 
 Tell the user three things. The runtime under `frame-assets/` is the H5P core, GPL-3.0, and its
 `LICENSE.txt` and `NOTICE.txt` must stay with it; the player's own code is MIT. Results arrive
 only as `xapi` and `finished` events on the element, stored nowhere, so an LRS or their own
-backend has to listen. And if they generate or rewrite packages, `npx @missing-elements/h5p-verify
+backend has to listen; a learner's place in the content is kept only with the `resume`
+attribute, in the browser's storage on that device (or handed to the host with
+`resume="host"`), never sent. And if they generate or rewrite packages, `npx @missing-elements/h5p-verify
 course.h5p` checks a package plays before it is published.
 
 The full guide, with the element's API, the events, single-worker hosts and every symptom:

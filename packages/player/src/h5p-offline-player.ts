@@ -1,7 +1,7 @@
 import jobsWorkerSource from 'virtual:h5p-jobs-worker'
 import SHADOW_CSS from './shadow.css?inline'
 import { FRAME_FONTS } from './frame-fonts'
-import { VERSION, WARM_ENTRY } from './shared/constants'
+import { SAVE_INTERVAL_S, VERSION, WARM_ENTRY } from './shared/constants'
 import {
   HUB_CONTENT_TYPE_URL,
   PlayerError,
@@ -20,6 +20,8 @@ import {
   type SourceDescriptor,
   type ToJobsMessage,
   type ToWorkerMessage,
+  type UserDataEntry,
+  type UserDataPreload,
   type WorkerReply
 } from './shared/protocol'
 import { packageLockName } from './shared/locks'
@@ -27,6 +29,7 @@ import { filePkgId, remotePkgId } from './shared/pkg-id'
 import { platformOf, withProvenance } from './shared/revision'
 import { probeSource } from './shared/source'
 import { routesFor, type Routes } from './sw/routes'
+import { adoptRevision, clearUserData, readUserData, removeUserData, writeUserData } from './user-data-store'
 
 /**
  * `<h5p-player>` — the package's public surface. It plays a package and nothing else: no URL
@@ -98,11 +101,28 @@ const DEFAULT_ASSETS: FrameAssets = import.meta.env.DEV
 
 export type PlayerState = 'idle' | 'probing' | 'downloading' | 'indexing' | 'ready' | 'error'
 
+export type { UserDataEntry } from './shared/protocol'
+
 export interface PlayerErrorDetail {
   code: ErrorCode
   message: string
   /** Present when a package declared libraries it does not carry. See the `libraries` attribute. */
   missingLibraries?: MissingLibraries
+}
+
+/**
+ * What `resume` does with the state the content saves. `off`: nothing, a reload starts over.
+ * `device`: kept in this browser's storage, keyed by the package and the build it was saved
+ * against, and handed back on the next load. `host`: the host page keeps it — it gets a
+ * `userdata` event on every save and sets `userData` before a load — and nothing is stored here.
+ */
+export type ResumeMode = 'off' | 'device' | 'host'
+
+/** The `userdata` event: one value the content saved, or deleted (`data: null`). */
+export interface UserDataDetail extends UserDataEntry {
+  pkgId: string
+  /** The build it was saved against, as the statements say it; `null` before the index has said. */
+  revision: string | null
 }
 
 export interface PlayerProgressDetail {
@@ -142,7 +162,7 @@ function adoptShadowStyles(root: ShadowRoot): void {
 
 export class H5PPlayerElement extends HTMLElement {
   static get observedAttributes(): string[] {
-    return ['src', 'sw', 'assets-base', 'auto-resize', 'libraries', 'allow-origins', 'preload']
+    return ['src', 'sw', 'assets-base', 'auto-resize', 'libraries', 'allow-origins', 'preload', 'resume']
   }
 
   private iframe: HTMLIFrameElement
@@ -176,6 +196,15 @@ export class H5PPlayerElement extends HTMLElement {
   private previousStamp: { pkgId: string; revision: string | null } | null = null
   /** Large deflated entries, in archive order, waiting to be pulled before the content asks. */
   private prefetchQueue: PrefetchEntry[] = []
+  /** What the host handed in for the next load under `resume="host"`. */
+  private hostUserData: UserDataEntry[] | null = null
+  /**
+   * The token the frame's document saves under, handed to it when it asked for its state. A save
+   * carrying any other token is dropped: `clearUserData()` withdraws the token so that the
+   * document still running — and its last save, sent as it goes away — cannot bring back what
+   * the host just cleared before the next load reads the store.
+   */
+  private userDataSession: string | null = null
   private prefetching: string | null = null
 
   constructor() {
@@ -211,6 +240,45 @@ export class H5PPlayerElement extends HTMLElement {
 
   set preload(value: 'none' | 'auto') {
     this.setAttribute('preload', value)
+  }
+
+  /**
+   * Whether the content resumes where the learner left off. Off by default: a browser is not a
+   * learner, and on a shared machine the state one student leaves would be picked up by the
+   * next. Takes effect on the next load. See `ResumeMode`.
+   */
+  get resume(): ResumeMode {
+    const value = this.getAttribute('resume')
+    if (value === null || value === 'off') return 'off'
+    return value === 'host' ? 'host' : 'device'
+  }
+
+  set resume(value: ResumeMode) {
+    if (value === 'off') this.removeAttribute('resume')
+    else this.setAttribute('resume', value)
+  }
+
+  /**
+   * Under `resume="host"`, the state to hand the content on the next load: what earlier
+   * `userdata` events carried, as the host kept it. Read by the load, so set it before `src`.
+   */
+  get userData(): UserDataEntry[] | null {
+    return this.hostUserData
+  }
+
+  set userData(value: UserDataEntry[] | null) {
+    this.hostUserData = value
+  }
+
+  /**
+   * Forgets the state kept on this device for the package loaded now, or the one loaded last.
+   * The content keeps running as it is; set `src` again to start it over. Saves from the running
+   * document are dropped from here on, so what was cleared stays cleared until the next load.
+   */
+  async clearUserData(): Promise<void> {
+    const pkgId = this.internalPkgId ?? this.previousStamp?.pkgId
+    this.userDataSession = null
+    if (pkgId) await clearUserData(pkgId)
   }
 
   /** A `File` from a picker. Setting it loads, and takes precedence over `src`. */
@@ -381,7 +449,10 @@ export class H5PPlayerElement extends HTMLElement {
         await this.send({ type: 'file', pkgId, file: this.currentFile })
       }
 
-      const frameUrl = `${routes.frame}${pkgId}`
+      // `?resume=1` tells the frame's boot script to ask for the saved state before the runtime
+      // initialises. In the URL, not the frame document, so that a worker and an element of
+      // different versions each do what they know: see `frame-boot.ts`.
+      const frameUrl = `${routes.frame}${pkgId}${this.resume === 'off' ? '' : '?resume=1'}`
       let indexed: IndexResult
 
       if (descriptor.type === 'chunked') {
@@ -404,6 +475,11 @@ export class H5PPlayerElement extends HTMLElement {
       this.internalRevision = indexed.revision ?? null
       this.revisionSettled = true
       this.releaseStatements()
+      // A state saved before this answer — by a frame booted early on a host without `Range` —
+      // is stamped with the build now that it is known, so the next load can check it.
+      if (this.resume === 'device' && this.internalRevision) {
+        adoptRevision(pkgId, this.internalRevision).catch(() => {})
+      }
 
       this.prefetchQueue = [...indexed.prefetch]
       // A download that booted early already has its frame; the final index only swapped the
@@ -896,9 +972,20 @@ export class H5PPlayerElement extends HTMLElement {
   private onWindowMessage = (event: MessageEvent<FromFrameMessage | H5PResizerMessage>): void => {
     const data = event.data
     if (!data) return
-    if (event.source !== this.iframe.contentWindow) return
     // The frame is same-origin by construction; anything else claiming to be it is not it.
     if (event.origin !== location.origin) return
+
+    // Before the source check and the package filter: the runtime saves as its document goes
+    // away, which for the previous package happens when the frame navigates to the next one —
+    // after `internalPkgId` has moved on, and by the time the message is handled the document
+    // that sent it is gone and `event.source` no longer names it. The token it carries says
+    // which document it was, and nothing outside that document ever had the token.
+    if ('channel' in data && data.channel === 'h5p-player' && data.type === 'user-data') {
+      this.onUserData(data)
+      return
+    }
+
+    if (event.source !== this.iframe.contentWindow) return
 
     if ('context' in data && data.context === 'h5p') {
       this.onResizerMessage(data)
@@ -909,6 +996,10 @@ export class H5PPlayerElement extends HTMLElement {
     if (this.internalPkgId && data.pkgId !== this.internalPkgId) return
 
     switch (data.type) {
+      case 'need-user-data':
+        void this.answerUserData(data.pkgId)
+        return
+
       case 'ready':
         this.setState('ready')
         // Only now: until the content is up, the archive reads that boot it are competing for
@@ -941,6 +1032,83 @@ export class H5PPlayerElement extends HTMLElement {
       case 'relay':
         this.handleWorkerRequest(data.payload)
     }
+  }
+
+  /**
+   * The frame asked for the saved state before initialising the runtime. From this device's
+   * store, or from what the host handed in; either way with a fresh token for this document's
+   * saves. A value saved against another build of the package is handed over as `null`, which
+   * the runtime shows as "this content has changed, you'll be starting over" and then deletes
+   * — H5P's own answer to the situation, rather than a silent restart or a state the content
+   * was not written for. Not checked while the build is unknown: on a host without `Range` the
+   * frame boots before the index can say, and the package id already separates builds on any
+   * host that sends a validator.
+   */
+  private async answerUserData(pkgId: string): Promise<void> {
+    const mode = this.resume
+    let entries: UserDataEntry[] = []
+    if (mode === 'host') {
+      entries = (this.hostUserData ?? []).map(({ dataType, subContentId, data }) => ({
+        dataType: String(dataType),
+        subContentId: String(subContentId),
+        data: data === null ? null : String(data)
+      }))
+    } else if (mode === 'device') {
+      let rows: Awaited<ReturnType<typeof readUserData>> = []
+      try {
+        rows = await readUserData(pkgId)
+      } catch {
+        // No store, no state: the content starts over, and the saves to come will fail the same way.
+      }
+      if (pkgId !== this.internalPkgId) return
+      const revision = this.internalRevision
+      entries = rows.map((row) => ({
+        dataType: row.dataType,
+        subContentId: row.subContentId,
+        data: revision && row.revision && row.revision !== revision ? null : row.data
+      }))
+    }
+
+    const session = createNonce()
+    this.userDataSession = session
+    const preload: UserDataPreload = {
+      channel: 'h5p-player',
+      type: 'user-data',
+      session,
+      saveInterval: SAVE_INTERVAL_S,
+      entries
+    }
+    this.iframe.contentWindow?.postMessage(preload, location.origin)
+  }
+
+  /** The runtime saved a value, or deleted one. Kept here, or handed to the host, and told either way. */
+  private onUserData(message: Extract<FromFrameMessage, { type: 'user-data' }>): void {
+    if (!this.userDataSession || message.session !== this.userDataSession) return
+    const { pkgId, dataType, subContentId, data } = message
+    const previous = this.previousStamp
+    const revision =
+      pkgId === this.internalPkgId
+        ? this.internalRevision
+        : previous && previous.pkgId === pkgId
+          ? previous.revision
+          : null
+
+    if (this.resume === 'device') {
+      const write =
+        data === null
+          ? removeUserData(pkgId, dataType, subContentId)
+          : writeUserData({ pkgId, dataType, subContentId, revision, data, updatedAt: Date.now() })
+      write.catch(() => {
+        // Storage refused or gone. The content keeps running; the host hears the save below and
+        // can keep it itself.
+      })
+    }
+
+    this.dispatchEvent(
+      new CustomEvent<UserDataDetail>('userdata', {
+        detail: { pkgId, revision, dataType, subContentId, data }
+      })
+    )
   }
 
   /** The worker can also reach the element directly when the page itself is controlled. */
@@ -1149,6 +1317,12 @@ function libraryBundleUrl(missing: MissingLibraries, source: LibrarySource): str
   }
 
   return `${HUB_CONTENT_TYPE_URL}${encodeURIComponent(missing.mainLibrary)}`
+}
+
+/** A token the frame cannot guess: which document's saves the element accepts. */
+function createNonce(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
 /** False once a registration has been torn down, which clearing site data does silently. */

@@ -85,10 +85,17 @@ The element does one thing: play a package.
                        video host or an in-house CDN
   preload="…"          `auto` pulls large deflated media once the content is up, instead of
                        waiting for the runtime to ask (default: `none`)
+  resume               keep the content's saved state — what its `getCurrentState()` returns —
+                       in the browser's storage on this device, and resume from it on the next
+                       load of the package (default: off, nothing is kept). `host` keeps nothing
+                       on the device: the host page gets a `userdata` event on every save and
+                       sets `userData` before the next load
 ></h5p-player>
 ```
 
-Properties: `src`, `file` (a `File` from a picker; setting it loads), `pkgId`, `preload`, `state` (`idle | probing | downloading | indexing | ready | error`), `scope` (read-only, the resolved worker scope), `revision` (read-only: the build playing, as its statements name it).
+Properties: `src`, `file` (a `File` from a picker; setting it loads), `pkgId`, `preload`, `resume` (`off | device | host`), `userData` (the entries a host hands in under `resume="host"`), `state` (`idle | probing | downloading | indexing | ready | error`), `scope` (read-only, the resolved worker scope), `revision` (read-only: the build playing, as its statements name it). `clearUserData()` forgets the state kept on the device for the package loaded now; set `src` again to start it over.
+
+`resume` is off by default because a browser is not a learner: on a shared machine, the state one person leaves is what the next one finds. With it on, the saved state is keyed by the package and the build it was saved against (the `revision`), so a state from another version of the package is not handed over — the content shows H5P's own "content has changed, starting over" instead. Nothing is sent anywhere in either mode, and xAPI statements are never stored.
 
 Every statement carries `context.revision` — `sha256:…` over the archive's index, then `; libraries sha256:…` for an attached bundle — and `context.platform`, `h5p-offline-player <version>`, unless the content set them. Record the revision for each release (the normalizer prints it for the file it writes) and compare statements against that record in an audit; the record, not the package, says when a build was current. On a host without `Range`, statements sent before the download finishes are held until the revision is known, or released without it if the page is hidden first.
 
@@ -97,8 +104,9 @@ Events (all `CustomEvent`, payload in `detail`):
 | Event | When |
 |---|---|
 | `ready` | Runtime initialised, content visible |
-| `xapi` | Any xAPI statement from the content — the only channel for results; nothing is stored |
+| `xapi` | Any xAPI statement from the content — the only channel for results; statements are never stored |
 | `finished` | Content reported completion / score |
+| `userdata` | With `resume`: the content saved its state — `dataType`, `subContentId`, `data` (the JSON it produced), `revision`. `data: null` means the content deleted it: drop your copy. Under `host`, keep the latest per `dataType` and `subContentId`, by user and package, and hand them back as `userData` |
 | `progress` | Download, warm-up or extraction progress for the current package, `fraction` 0–1; `phase` is `download`, `libraries`, `warm` or `extract` |
 | `error` | `code`: `no-cors`, `no-worker`, `network`, `quota`, `bad-archive`, `runtime` (content type failed inside the frame, e.g. a library missing from the package). A `runtime` error after `ready` leaves `state` at `ready`: the content threw but is still running, so do not hide the player on it |
 
@@ -118,7 +126,7 @@ input.onchange = () => (p.file = input.files[0]);
 3. Worker indexes the archive and returns `pkgId`. On a host that honours `Range`, the element then has the page-side worker pull the archive's library spans into the cache in a few requests (`progress` events with `phase: 'warm'`), so the boot that follows asks the host for nothing.
 4. Element sets the iframe (`allow="fullscreen"`) to `<scope>frame/<pkgId>`; the worker answers the navigation with the generated frame document, which boots h5p-standalone against `<scope>virtual/<pkgId>`.
 5. Worker serves each file by strategy: small entries from cache, stored media by slicing, deflated media from chunks — a cold entry starts an extraction job in the page-side worker and is served progressively.
-6. xAPI statements arrive as `xapi` events on the element, with `context.revision` and `context.platform` filled in; nothing is stored.
+6. xAPI statements arrive as `xapi` events on the element, with `context.revision` and `context.platform` filled in; they are not stored. With `resume`, and only then, the content's saved state is kept in the browser's storage on the device, or handed to the host page.
 
 ## Licences
 

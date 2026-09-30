@@ -120,6 +120,8 @@ so the page can offer a file picker instead.
   allow-origins="…"  extra origins the frame's CSP should permit, space separated
   auto-resize        follow the content's own height
   preload="auto"     pull large deflated media before the content asks (default: none)
+  resume             keep the content's saved state on this device and resume from it
+                     (default: off; `host` hands it to the host page instead — see below)
 ></h5p-player>
 ```
 
@@ -234,13 +236,15 @@ the missing libraries named; `pnpm demo:libraries` rebuilds the bundle from the 
 
 Properties: `src`, `file` (a `File` from a picker — setting it loads), `pkgId`, `state`
 (`idle | probing | downloading | indexing | ready | error`), `scope` (read-only), `revision`
-(read-only, see below).
+(read-only, see below), `resume` (`off | device | host`), `userData` (the state a host hands in
+under `resume="host"`). Methods: `clearUserData()`.
 
 | Event | When |
 |---|---|
 | `ready` | The runtime is up and the content is visible |
-| `xapi` | Any xAPI statement from the content — the only channel for results; nothing is stored |
+| `xapi` | Any xAPI statement from the content — the only channel for results; statements are never stored |
 | `finished` | The content reported completion, with its score |
+| `userdata` | With `resume`: the content saved its state (`dataType`, `subContentId`, `data` as the JSON it produced) and the `revision` it was saved against. `data: null` means the content deleted it: drop your copy |
 | `progress` | Download, warm-up or extraction progress, `fraction` 0–1 (or `null` when the total is unknown); `phase` is `download`, `libraries`, `warm` or `extract` |
 | `resize` | The content's height changed |
 | `statechange` | `state` changed |
@@ -284,6 +288,39 @@ On a host without `Range` the content can start before the download has finished
 index is not known yet; statements sent in that window are held and released, in order, with
 their revision, once it is — or at once, without it, if the page is hidden first, so a learner's
 record never goes down with the tab.
+
+### Resuming where the learner left off
+
+Without `resume`, the player keeps nothing of what a learner did: close the tab, and the
+content starts over. With it, the content picks up where it was:
+
+```html
+<h5p-player src="course.h5p" resume></h5p-player>
+```
+
+The content then saves its state the way H5P content types do on h5p.com or in Moodle — the
+slide reached, the answers given so far, the position in a video, whatever the content type's
+`getCurrentState()` returns — every ten seconds, three seconds after a `completed` or
+`progressed` statement, and as the frame goes away. The next load of the same package hands it
+back. A content type without `getCurrentState()` starts over regardless.
+
+What is stored, and where: the content's own state, as the JSON it produced, in the browser's
+storage for the site the player runs on (IndexedDB), on that device. It never leaves the device.
+The player sends nothing anywhere, and neither does the content; xAPI statements are still not
+stored, with or without `resume`. The state is keyed by the package and the build it was saved
+against, the same `revision` the statements carry, so a state from one version of a package is
+never handed to another: the content shows H5P's own "This content has changed since you last
+used it. You'll be starting over.", and the old state is dropped.
+
+It is off by default because a browser is not a learner: on a shared machine, the state one
+person leaves is what the next one finds. A site that knows its users keeps the state itself
+with `resume="host"`, which stores nothing on the device. The element fires `userdata` on every
+save; the host keeps the latest `data` per `dataType` and `subContentId`, under its own user and
+package, and before the next load of that package sets `userData` to those entries,
+`[{ dataType, subContentId, data }]`. With `resume` on the device, `clearUserData()` forgets what
+it holds for the package loaded now; set `src` again afterwards to start over. The demo's
+[installable app](https://github.com/missing-elements/h5p-offline-player/blob/main/apps/demo/app/app.js)
+uses `resume` with a Start over button.
 
 The element renders the content and nothing else — no URL field, no file picker, no progress bar,
 no "open in another browser" banner. Those belong to the host page, built out of these events.

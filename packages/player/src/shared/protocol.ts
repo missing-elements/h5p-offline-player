@@ -279,3 +279,36 @@ export type FromFrameMessage =
   | { channel: 'h5p-player'; type: 'finished'; pkgId: string; statement: unknown }
   | { channel: 'h5p-player'; type: 'error'; pkgId: string; message: string }
   | { channel: 'h5p-player'; type: 'relay'; pkgId: string; payload: FromWorkerMessage }
+  /** Sent before the runtime initialises, when the frame was opened with `resume`. Answered `user-data`. */
+  | { channel: 'h5p-player'; type: 'need-user-data'; pkgId: string }
+  /**
+   * The runtime saved a state, or deleted one (`data: null`). `session` is the token the element
+   * handed this document at boot; a save from a document the element has since told to forget —
+   * `clearUserData()` — carries a token it no longer accepts.
+   */
+  | { channel: 'h5p-player'; type: 'user-data'; pkgId: string; session: string } & UserDataEntry
+
+/* ------------------------------------------------------------------ element → frame */
+
+/**
+ * One saved value, as H5P core keeps it: a data type (`state`, for what `getCurrentState()`
+ * returns), the sub-content it belongs to (`'0'` for the content itself) and the value as the
+ * JSON string the runtime produced. `null` means: in a preload, the state was saved against
+ * another build of this package, and the runtime shows its "content has changed, starting over"
+ * dialog; in a save, the runtime deleted the value.
+ */
+export interface UserDataEntry {
+  dataType: string
+  subContentId: string
+  data: string | null
+}
+
+/** The answer to `need-user-data`: what to preload, how often to save, and the token to save under. */
+export interface UserDataPreload {
+  channel: 'h5p-player'
+  type: 'user-data'
+  session: string
+  /** Seconds between saves; what H5P core calls `saveFreq`. */
+  saveInterval: number
+  entries: UserDataEntry[]
+}
