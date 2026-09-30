@@ -112,12 +112,6 @@
         the console when the worker and the element are different versions, so update both together.
       </p>
 
-      <p>
-        There is no third way. A site that cannot host even one file cannot run the player: the
-        worker has to come from the site's own origin, and framing the player page hosted elsewhere
-        gets no Service Worker in Safari &mdash; and every browser on iOS is Safari underneath.
-      </p>
-
       <h2>Requirements</h2>
       <ul class="list">
         <li>The page is served over <code>https://</code> or from <code>localhost</code>. Service Workers do not run on <code>http://</code> or <code>file://</code>.</li>
