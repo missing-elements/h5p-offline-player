@@ -30,8 +30,12 @@ anywhere else. The other two can come from your bundle or from a CDN.
 **A · With a bundler** (Vite, webpack 5, Rollup):
 
 ```bash
-npm i @missing-elements/h5p-offline-player
+# With npm
+npm install @missing-elements/h5p-offline-player
+# With pnpm
+pnpm add @missing-elements/h5p-offline-player
 ```
+
 
 ```js
 import '@missing-elements/h5p-offline-player'
