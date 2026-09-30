@@ -101,36 +101,39 @@ so the page can offer a file picker instead.
 
 ## API
 
-```html
-<h5p-player
-  src="…"            package URL — setting it loads; setting it again aborts and reloads
-  sw="…"             worker URL (default: h5p-sw.js next to the element, same-origin)
-  assets-base="…"    directory of the frame assets (default: next to the element)
-  libraries="…"      where to get libraries a package does not carry (default: nowhere)
-  allow-origins="…"  extra origins the frame's CSP should permit, space separated
-  auto-resize="off"  size the element yourself, from CSS or the `resize` event; by default
-                     it follows the content's own height
-  preload="auto"     pull large deflated media before the content asks (default: none)
-  resume             keep the content's saved state on this device and resume from it
-                     (default: off; `host` hands it to the host page instead — see Guides)
-></h5p-player>
-```
+| Name | Set as | What it does |
+|---|---|---|
+| `src` | attribute, property | The package URL. Setting it loads; setting it again aborts and reloads; removing it empties the player |
+| `file` | property | A `File` from a picker. Setting it loads with no network and wins over `src`; `null` empties the player |
+| `sw` | attribute | The worker's URL. Default: `h5p-sw.js` next to the element. Must be same-origin |
+| `assets-base` | attribute | The directory of the frame assets. Default: `frame-assets/` next to the element; may be a CDN |
+| `libraries` | attribute | `hub`, or the URL of a `.h5p` that carries library folders, for packages that ship without their own. Default: unset, and such packages are refused (see Guides) |
+| `allow-origins` | attribute | Extra origins the frame's CSP should permit, space separated (see Guides) |
+| `auto-resize` | attribute | `off` to size the element yourself, from CSS or the `resize` event. By default it follows the content's own height |
+| `preload` | attribute, property | `auto` pulls large deflated media before the content asks (see Guides). Default: `none` |
+| `resume` | attribute, property | `device` (or the bare attribute) keeps the content's saved state on this device and resumes from it; `host` hands it to the host page instead (see Guides). Default: `off` |
+| `userData` | property | Under `resume="host"`, the state to hand the content: `[{ dataType, subContentId, data }]` as earlier `userdata` events carried it. Read by the load, so set it before `src` |
+| `state` | property, read-only | `idle`, `probing`, `downloading`, `indexing`, `ready` or `error` |
+| `pkgId` | property, read-only | The id of the package loaded now; `null` before one is |
+| `revision` | property, read-only | The build's fingerprint, the same value the statements carry (see Guides); `null` until the package is indexed |
+| `scope` | property, read-only | The Service Worker scope the virtual routes live under; `null` until registered |
 
-Properties: `src`, `file` (a `File` from a picker — setting it loads), `pkgId`, `state`
-(`idle | probing | downloading | indexing | ready | error`), `scope` (read-only), `revision`
-(read-only, the build's fingerprint — see Guides), `resume` (`off | device | host`), `userData` (the state a host hands in
-under `resume="host"`). Methods: `clearUserData()`.
-
-| Event | When |
+| Method | What it does |
 |---|---|
-| `ready` | The runtime is up and the content is visible |
-| `xapi` | Any xAPI statement from the content — the only channel for results; statements are never stored |
-| `finished` | The content reported completion, with its score |
-| `userdata` | With `resume`: the content saved its state (`dataType`, `subContentId`, `data` as the JSON it produced) and the `revision` it was saved against. `data: null` means the content deleted it: drop your copy |
-| `progress` | Download, warm-up or extraction progress, `fraction` 0–1 (or `null` when the total is unknown); `phase` is `download`, `libraries`, `warm` or `extract` |
-| `resize` | The content's height changed |
-| `statechange` | `state` changed |
-| `error` | `code`: `no-cors`, `no-worker`, `network`, `quota`, `bad-archive`, `runtime`. A `runtime` error after `ready` leaves `state` at `ready`: the content threw but is still running |
+| `clearUserData()` | Forgets the state kept on this device for the package loaded now, or the one loaded last. The content keeps running; set `src` again to start it over. Returns a promise |
+
+Every event is a `CustomEvent`; what it carries is in `event.detail`.
+
+| Event | `detail` | When |
+|---|---|---|
+| `ready` | `{ pkgId }` | The runtime is up and the content is visible |
+| `xapi` | `{ statement, verb }` | Any xAPI statement from the content, `verb` its verb's id (`http://adlnet.gov/expapi/verbs/answered`, …) — the only channel for results; statements are never stored |
+| `finished` | `{ statement }` | The content reported completion; the score is in the statement's `result` |
+| `userdata` | `{ pkgId, dataType, subContentId, data, revision }` | With `resume`: the content saved its state, `data` as the JSON it produced, against the build `revision` names. `data: null` means the content deleted it: drop your copy |
+| `progress` | `{ phase, fraction, loaded, total, entry? }` | `phase` is `download`, `libraries`, `warm` or `extract`; `fraction` is 0–1, or `null` with `total` when the size is unknown |
+| `resize` | `{ height }` | The content reported a new height, in CSS pixels |
+| `statechange` | `{ state }` | `state` changed |
+| `error` | `{ code, message, missingLibraries? }` | `code` is `no-cors`, `no-worker`, `network`, `quota`, `bad-archive` or `runtime`; `missingLibraries` comes with a package that lacks the libraries it declares. A `runtime` error after `ready` leaves `state` at `ready`: the content threw but is still running |
 
 ```js
 const player = document.querySelector('h5p-player')
