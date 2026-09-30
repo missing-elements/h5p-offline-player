@@ -3,7 +3,7 @@
 The repository, its commands, and what the demo site is.
 
 A pnpm workspace: the player in `packages/player`, the normalizer in `packages/normalize`, the
-verifier in `packages/verify`, the demo site in `apps/demo`.
+verifier in `packages/verify`, the cmi5 wiring in `packages/cmi5`, the demo site in `apps/demo`.
 
 ```bash
 pnpm install

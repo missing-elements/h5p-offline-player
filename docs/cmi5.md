@@ -17,12 +17,26 @@ static host does not have, and it embeds in an iframe by default. Plain xAPI wor
 the `xapi` event, for a portal the organisation controls, and has no launch contract. What cmi5
 does not have is SCORM's reach: some older LMSs support only SCORM.
 
-The element does not change for it. The demo site's `/demo/cmi5.html` is the assignable unit:
-the element plus about two hundred lines of wiring, `demo/cmi5-page.js`, on top of
-[`@xapi/cmi5`](https://www.npmjs.com/package/@xapi/cmi5). Copy both to your own site, or launch
-the demo's page directly to try it. Opened without a launch, the page explains one and offers
-`?simulate`: the same code against a stand-in for the LMS inside the page, every statement
-shown in the page's log instead of sent, with a mastery score of 0.8 to pass or fail against.
+The element does not change for it. The wiring is a package of its own,
+[`@missing-elements/h5p-cmi5`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/cmi5), on top of
+[`@xapi/cmi5`](https://www.npmjs.com/package/@xapi/cmi5):
+
+```js
+import '@missing-elements/h5p-offline-player'
+import { isCmi5Launch, startCmi5 } from '@missing-elements/h5p-cmi5'
+
+if (isCmi5Launch()) {
+  startCmi5(document.querySelector('h5p-player')).then((session) => {
+    document.querySelector('#exit').onclick = () => session.exit()
+  })
+}
+```
+
+Its README lists the options. The demo site's `/demo/cmi5.html` is a page built on it,
+`demo/cmi5-page.js`, with a log and a status line around those lines. Opened without a launch,
+the page explains one and offers `?simulate`: the same code against a stand-in for the LMS
+inside the page, every statement shown in the page's log instead of sent, with a mastery score
+of 0.8 to pass or fail against.
 
 ## The launch
 
@@ -118,8 +132,10 @@ fetched at a pinned commit and the LRS is a pinned release, the two that passed;
 ports listen on `127.0.0.1` only. The stack stays up between runs; the first run builds the
 player's image, which takes a few minutes.
 
-The repository's fast check is `apps/demo/tests/cmi5.test.ts`, which launches the page from a
-mock LMS and LRS and asserts the sequence above, including that `revision` survives the merge.
+The fast checks are the package's own unit tests, `packages/cmi5/tests/`, which run the wiring
+against a fake client and a fake element in Node, and `apps/demo/tests/cmi5.test.ts`, which
+launches the demo page in a browser from a mock LMS and LRS and asserts the sequence above,
+including that `revision` survives the merge.
 SCORM Cloud, which supports cmi5 with a free tier, remains a fair check that a commercial LMS
 launches it.
 

@@ -15,13 +15,13 @@
     "cmi5:catapult": "node scripts/cmi5-catapult.mjs"
   },
   "dependencies": {
+    "@missing-elements/h5p-cmi5": "workspace:*",
     "@missing-elements/h5p-offline-player": "workspace:*",
     "@vercel/analytics": "^2.0.1"
   },
   "devDependencies": {
     "@missing-elements/h5p-normalize": "workspace:*",
     "@types/node": "^22.13.0",
-    "@xapi/cmi5": "^1.4.0",
     "@zip.js/zip.js": "^2.17.0",
     "playwright": "^1.50.0",
     "typescript": "^5.7.3",

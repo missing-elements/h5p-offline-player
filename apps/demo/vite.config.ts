@@ -26,6 +26,8 @@ const rootDir = import.meta.dirname
 const repositoryRoot = resolve(rootDir, '..', '..')
 const playerDir = resolve(repositoryRoot, 'packages', 'player')
 const ELEMENT = resolve(playerDir, 'src', 'h5p-offline-player.ts')
+// The cmi5 wiring from its source too, so the demo needs no build of it either.
+const CMI5 = resolve(repositoryRoot, 'packages', 'cmi5', 'src', 'index.ts')
 
 /** The production headers, so `vite preview` enforces the same CSP the deployment will. */
 type HeaderRule = { source: string; headers: Array<{ key: string; value: string }> }
@@ -93,7 +95,10 @@ export default defineConfig(({ command }) => ({
   ],
 
   resolve: {
-    alias: [{ find: /^@missing-elements\/h5p-offline-player$/, replacement: ELEMENT }]
+    alias: [
+      { find: /^@missing-elements\/h5p-offline-player$/, replacement: ELEMENT },
+      { find: /^@missing-elements\/h5p-cmi5$/, replacement: CMI5 }
+    ]
   },
 
   // In dev, the player's generated `public/`: the vendored runtime at `/frame-assets/`, where the

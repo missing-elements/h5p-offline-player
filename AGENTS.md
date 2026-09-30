@@ -85,6 +85,12 @@ packages/verify/          @missing-elements/h5p-verify — plays a package headl
   lib/verify.mjs            the static server, the browser run and the report; lib/page.html the page it drives
   tests/                    node tests that run the real thing against the demo's committed content
 
+packages/cmi5/            @missing-elements/h5p-cmi5 — cmi5 for the element, published as a library
+  src/index.ts              startCmi5(player): the launch, the allowed statements, the outcome, terminate;
+                            its pure parts (allowedStatement, cmi5Score, webAddress) exported for tests
+  tests/                    node tests against a fake client and a fake element; @xapi/cmi5 is stubbed,
+                            since it ships only a browser build that Node cannot resolve
+
 apps/demo/                the demo app: the dev server for the whole repository, and the hosted site
   index.html                the hosted player page
   demo/                     demo/index.html is the examples index, demo/setup.html the setup page for
@@ -92,8 +98,8 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             the normalizer fixes it (prose and a CSS-only diagram, no script), the rest
                             the individual embedding demos, all sharing demo/player-page.css;
                             demo/cmi5.html with demo/cmi5-page.js is a cmi5 assignable unit around
-                            the element, on @xapi/cmi5; demo/element.js is the one import of the
-                            element every page loads
+                            the element, on @missing-elements/h5p-cmi5; demo/element.js is the one
+                            import of the element every page loads
   tests/                    cmi5.test.ts: the cmi5 page against a mock LMS and LRS on a second
                             origin, through the dev server and a real browser
   cmi5-catapult/            docker-compose.yml for ADL's CATAPULT player, MySQL and the SQL LRS;
@@ -987,7 +993,15 @@ SPA-fallback trap described above cannot happen there.
   hand-written listener; and `127.0.0.1` against `localhost` is a second origin for a test
   without a second server. The element's own half of the resizer protocol is untouched: it is
   how the element sizes to the content in every setup.
-- **`/demo/cmi5.html` is a cmi5 assignable unit, and the element knows nothing about it.**
+- **cmi5 is `@missing-elements/h5p-cmi5`, `/demo/cmi5.html` is a page on it, and the element
+  knows nothing about either.** The wiring was the demo page's until 2026-10-01, when it moved
+  into the package so a host installs it instead of copying it; the demo aliases the package's
+  name to its source, as it does the element's, and the page keeps only the log, the status
+  line and the simulated LMS, which it passes as `client`. The package loads `@xapi/cmi5` with
+  a dynamic import, only for a real launch, so a page that simulates never downloads it and the
+  demo's build puts it in a chunk of its own; its declarations name none of that library's
+  types, which would drag axios and `@xapi/xapi` into a host's type check. What follows was
+  learned while it was the page.
   Chosen on 2026-09-30 over SCORM and LTI: the package stays on a static host, the AU can
   demand its own window (`launchMethod="OwnWindow"`), which is the one standard way to keep the
   player out of a cross-origin iframe and so out of the Safari and iOS gap, the token is per

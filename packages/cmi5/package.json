@@ -1,0 +1,67 @@
+{
+  "name": "@missing-elements/h5p-cmi5",
+  "version": "0.1.0",
+  "description": "cmi5 for h5p-offline-player: turns a page holding <h5p-player> into a cmi5 assignable unit. Launch handshake, statements to the LMS's LRS with the build's revision, passed or failed by the mastery score, completed, terminated. Checked against ADL's CATAPULT player.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/missing-elements/h5p-offline-player.git",
+    "directory": "packages/cmi5"
+  },
+  "homepage": "https://github.com/missing-elements/h5p-offline-player/tree/main/packages/cmi5#readme",
+  "bugs": {
+    "url": "https://github.com/missing-elements/h5p-offline-player/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "h5p",
+    "cmi5",
+    "xapi",
+    "lms",
+    "lrs",
+    "elearning",
+    "assignable-unit"
+  ],
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
+    "prepack": "pnpm build && node -e \"require('node:fs').copyFileSync('../../LICENSE', 'LICENSE')\"",
+    "prepublishOnly": "pnpm typecheck && pnpm test"
+  },
+  "dependencies": {
+    "@xapi/cmi5": "^1.4.0"
+  },
+  "peerDependencies": {
+    "@missing-elements/h5p-offline-player": ">=0.1.10"
+  },
+  "peerDependenciesMeta": {
+    "@missing-elements/h5p-offline-player": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "typescript": "^5.7.3",
+    "vitest": "^5.0.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

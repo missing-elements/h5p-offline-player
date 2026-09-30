@@ -10,6 +10,9 @@ importers:
 
   apps/demo:
     dependencies:
+      '@missing-elements/h5p-cmi5':
+        specifier: workspace:*
+        version: link:../../packages/cmi5
       '@missing-elements/h5p-offline-player':
         specifier: workspace:*
         version: link:../../packages/player
@@ -23,9 +26,6 @@ importers:
       '@types/node':
         specifier: ^22.13.0
         version: 22.20.4
-      '@xapi/cmi5':
-        specifier: ^1.4.0
-        version: 1.4.0
       '@zip.js/zip.js':
         specifier: ^2.17.0
         version: 2.17.0
@@ -38,6 +38,25 @@ importers:
       vite:
         specifier: ^6.0.11
         version: 6.4.3(@types/node@22.20.4)
+      vitest:
+        specifier: ^5.0.1
+        version: 5.0.1(@types/node@22.20.4)(@vitest/browser-playwright@5.0.1)(@vitest/ui@5.0.1)(vite@6.4.3(@types/node@22.20.4))
+
+  packages/cmi5:
+    dependencies:
+      '@missing-elements/h5p-offline-player':
+        specifier: '>=0.1.10'
+        version: 0.1.10
+      '@xapi/cmi5':
+        specifier: ^1.4.0
+        version: 1.4.0
+    devDependencies:
+      '@types/node':
+        specifier: ^22.13.0
+        version: 22.20.4
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
       vitest:
         specifier: ^5.0.1
         version: 5.0.1(@types/node@22.20.4)(@vitest/browser-playwright@5.0.1)(@vitest/ui@5.0.1)(vite@6.4.3(@types/node@22.20.4))
@@ -284,6 +303,10 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
+
+  '@missing-elements/h5p-offline-player@0.1.10':
+    resolution: {integrity: sha512-8/12nvkR9dlOZIrTKJhqFs0NLTZkJlQrA9hNP68mUmJwuVKJ1DicTDhW3S50OqefpYGFts/GhFpURbwllmEhvw==}
+    engines: {node: '>=20'}
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     resolution: {integrity: sha512-oTXEIha4SsuXdTA4Iyskj0kpdx2yVXdhd75c2v3xGrHFfVMsbhTPZU/nMPL4sWKo4pBHm3aucLaqGlF696dTyQ==}
@@ -960,6 +983,11 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
+
+  '@missing-elements/h5p-offline-player@0.1.10':
+    dependencies:
+      '@zip.js/zip.js': 2.17.0
+      h5p-standalone: 3.8.2
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     optional: true
