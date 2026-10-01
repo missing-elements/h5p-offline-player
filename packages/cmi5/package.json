@@ -1,7 +1,7 @@
 {
   "name": "@missing-elements/h5p-cmi5",
-  "version": "0.1.0",
-  "description": "cmi5 for h5p-offline-player: turns a page holding <h5p-player> into a cmi5 assignable unit. Launch handshake, statements to the LMS's LRS with the build's revision, passed or failed by the mastery score, completed, terminated. Checked against ADL's CATAPULT player.",
+  "version": "0.2.0",
+  "description": "cmi5 for h5p-offline-player: turns a page holding <h5p-player> into a cmi5 assignable unit. Launch handshake, statements to the LMS's LRS with the build's revision, passed or failed by the mastery score, completed, terminated. No dependencies. Checked against ADL's CATAPULT player.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -45,9 +45,6 @@
     "prepack": "pnpm build && node -e \"require('node:fs').copyFileSync('../../LICENSE', 'LICENSE')\"",
     "prepublishOnly": "pnpm typecheck && pnpm test"
   },
-  "dependencies": {
-    "@xapi/cmi5": "^1.4.0"
-  },
   "peerDependencies": {
     "@missing-elements/h5p-offline-player": ">=0.1.10"
   },
@@ -57,6 +54,7 @@
     }
   },
   "devDependencies": {
+    "@cmi5/requirements": "^1.0.0",
     "@types/node": "^22.13.0",
     "typescript": "^5.7.3",
     "vitest": "^5.0.1"

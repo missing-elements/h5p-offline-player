@@ -6,8 +6,9 @@
  * emits as a "cmi5 allowed" statement — the launch actor, the registration and the LMS's context
  * template merged in, the player's `context.revision` kept — and, when the content finishes,
  * sends `passed` or `failed` by the mastery score and `completed`. The session it returns sends
- * `terminated`. `@xapi/cmi5` speaks the protocol; this module is the wiring between it and the
- * element, and it has been run against ADL's CATAPULT player, the reference cmi5 launching system.
+ * `terminated`. `client.ts` speaks the protocol over `fetch`; this module is the wiring between it
+ * and the element, and both have been run against ADL's CATAPULT player, the reference cmi5
+ * launching system.
  *
  * Two rules it keeps that are easy to get wrong. Nothing is sent as the page unloads: a page
  * cannot tell a reload from a closed tab, and a `terminated` sent on a reload ends the session
@@ -15,6 +16,10 @@
  * `abandoned`. And the single-use token is kept per launch, with the start time and whether the
  * outcome went out, so a reload resumes without a second `initialized` or `completed`.
  */
+
+import { createCmi5Client, launchParametersOf } from './client.js'
+
+export { Cmi5RequestError, createCmi5Client, isoDuration, launchParametersOf, type Cmi5ClientOptions } from './client.js'
 
 /* ------------------------------------------------------------------ types */
 
@@ -41,6 +46,12 @@ export interface LaunchData {
   launchMethod?: 'OwnWindow' | 'AnyWindow'
 }
 
+/** The `cmi5LearnerPreferences` agent profile: what the learner set in the LMS, when they set it. */
+export interface LearnerPreferences {
+  languagePreference?: string
+  audioPreference?: 'on' | 'off'
+}
+
 /** A score as cmi5 records it: `min` and `max` are required beside `raw`. */
 export interface Cmi5Score {
   scaled: number
@@ -49,12 +60,14 @@ export interface Cmi5Score {
   max?: number
 }
 
-/** The part of `@xapi/cmi5`'s client this module uses. Another one — a simulated LMS, a test double — can be passed as `client`. */
+/** A cmi5 client, as `createCmi5Client` makes one. Another one — a simulated LMS, a test double — can be passed as `client`. */
 export interface Cmi5Client {
   getLaunchParameters(): LaunchParameters
   getLaunchData(): LaunchData
   getAuthToken(): string
   getInitializedDate(): Date
+  /** The learner's preferences, read on `initialize`; a client without them reports none. */
+  getLearnerPreferences?(): LearnerPreferences
   initialize(state?: { authToken: string; initializedDate: Date }): Promise<unknown>
   sendXapiStatement(statement: Statement): Promise<unknown>
   moveOn(options: { score?: Cmi5Score; disableSendTerminated?: boolean }): Promise<unknown>
@@ -69,6 +82,8 @@ export type Cmi5Event =
       resumed: boolean
       launchParameters: LaunchParameters
       launchData: LaunchData
+      /** What the learner set in the LMS; `audioPreference` is the page's to apply. */
+      learnerPreferences: LearnerPreferences
       /** The address Exit goes to, or null. */
       returnURL: string | null
     }
@@ -88,7 +103,7 @@ export type PlayerLike = Pick<EventTarget, 'addEventListener' | 'removeEventList
 export type SessionStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 
 export interface Cmi5Options {
-  /** The cmi5 client; by default `@xapi/cmi5` on this page's launch, loaded when needed. */
+  /** The cmi5 client; by default `createCmi5Client` on the launch in `url`. */
   client?: Cmi5Client
   /**
    * The package to play. By default the `src` parameter of the page's address, then the AU's
@@ -106,6 +121,8 @@ export interface Cmi5Options {
 export interface Cmi5Session {
   readonly launchParameters: LaunchParameters
   readonly launchData: LaunchData
+  /** The learner's language and audio preferences, from the LMS; empty when none were set. */
+  readonly learnerPreferences: LearnerPreferences
   /** A reload picked this session up. */
   readonly resumed: boolean
   /** The package the element was given, or null when neither the address nor the launch named one. */
@@ -121,41 +138,35 @@ export interface Cmi5Session {
   stop(): void
 }
 
-const LAUNCH_PARAMETERS = ['endpoint', 'fetch', 'actor', 'registration', 'activityId'] as const
-
 /* ------------------------------------------------------------------ pure parts */
 
-/** Whether this address is a cmi5 launch: all five parameters are there. */
+/** Whether this address is a cmi5 launch: all five parameters are there, the actor as JSON. */
 export function isCmi5Launch(url: string = globalThis.location?.href ?? ''): boolean {
-  let search: URLSearchParams
-  try {
-    search = new URL(url).searchParams
-  } catch {
-    return false
-  }
-  return LAUNCH_PARAMETERS.every((name) => Boolean(search.get(name)))
+  return launchParametersOf(url) !== null
 }
 
 /**
  * The content's statement as cmi5 allows it: the launch actor in place of H5P's, the
- * registration, and the LMS's context template underneath the statement's own context, lists in
- * `contextActivities` joined, the template's first. No cmi5 category: that would mark it as a
- * cmi5-defined statement, which it is not. An id is added when it has none.
+ * registration, and the LMS's context template merged into the statement's own context: the
+ * template's values win, lists in `contextActivities` are joined, the template's first. No cmi5
+ * category: that would mark it as a cmi5-defined statement, which it is not. An id is added when
+ * it has none that is a UUID, as every statement an AU issues needs one (9.1.0.0-1).
  */
 export function allowedStatement(statement: Statement, launch: LaunchParameters, data: Pick<LaunchData, 'contextTemplate'>): Statement {
   const template = data.contextTemplate ?? {}
   const own = statement.context ?? {}
   return {
     ...statement,
-    id: statement.id ?? crypto.randomUUID(),
+    id: typeof statement.id === 'string' && UUID.test(statement.id) ? statement.id : crypto.randomUUID(),
     actor: launch.actor,
     timestamp: statement.timestamp ?? new Date().toISOString(),
+    // The template's values win: the AU may add to the context, never overwrite it (10.2.1.0-7).
     context: {
-      ...template,
       ...own,
+      ...template,
       registration: launch.registration,
       contextActivities: mergeActivities(template.contextActivities, own.contextActivities),
-      extensions: { ...(template.extensions ?? {}), ...(own.extensions ?? {}) }
+      extensions: { ...(own.extensions ?? {}), ...(template.extensions ?? {}) }
     }
   }
 }
@@ -188,12 +199,16 @@ export function webAddress(value: unknown): string | null {
 export function rejectionReason(error: unknown): string {
   const data = (error as { response?: { data?: unknown } } | null)?.response?.data
   if (data && typeof data === 'object') {
-    const message = (data as { message?: unknown }).message
-    return typeof message === 'string' ? message : JSON.stringify(data)
+    // A launching system's refusal carries `message`; a refused token, cmi5's `error-text`.
+    const { message, 'error-text': errorText } = data as { message?: unknown; 'error-text'?: unknown }
+    if (typeof message === 'string') return message
+    return typeof errorText === 'string' ? errorText : JSON.stringify(data)
   }
   if (typeof data === 'string' && data) return data
   return error instanceof Error ? error.message : String(error)
 }
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 function mergeActivities(template: Record<string, unknown[]> = {}, own: Record<string, unknown[]> = {}) {
   const merged: Record<string, unknown[]> = {}
@@ -302,7 +317,7 @@ export async function startCmi5(player: PlayerLike, options: Cmi5Options = {}): 
       return
     }
     const score = cmi5Score(detail?.statement?.result?.score)
-    // As the library judges: `passed` or `failed` only with a score and a mastery score.
+    // As the client judges: `passed` or `failed` only with a score and a mastery score.
     const outcome = score && data.masteryScore ? (score.scaled >= data.masteryScore ? 'passed' : 'failed') : null
     try {
       // `terminated` is left for the host's Exit, so the learner can keep going.
@@ -337,7 +352,7 @@ export async function startCmi5(player: PlayerLike, options: Cmi5Options = {}): 
   }
 
   try {
-    client = options.client ?? (await defaultClient())
+    client = options.client ?? createCmi5Client({ url })
     launch = client.getLaunchParameters()
     key = `h5p-cmi5:${launch.fetch}`
     const saved = readKept(storage, key)
@@ -358,7 +373,8 @@ export async function startCmi5(player: PlayerLike, options: Cmi5Options = {}): 
       }
     }
 
-    emit({ type: 'initialized', resumed: Boolean(saved), launchParameters: launch, launchData: data, returnURL })
+    const learnerPreferences = client.getLearnerPreferences?.() ?? {}
+    emit({ type: 'initialized', resumed: Boolean(saved), launchParameters: launch, launchData: data, learnerPreferences, returnURL })
     const boundClient = client
     const boundLaunch = launch
     const boundData = data
@@ -382,6 +398,7 @@ export async function startCmi5(player: PlayerLike, options: Cmi5Options = {}): 
     return {
       launchParameters: boundLaunch,
       launchData: boundData,
+      learnerPreferences,
       resumed: Boolean(saved),
       src,
       returnURL,
@@ -408,10 +425,4 @@ function readSrc(url: string): string | null {
   } catch {
     return null
   }
-}
-
-/** `@xapi/cmi5` on this page's launch. Loaded only here, so a host that passes its own client never downloads it. */
-async function defaultClient(): Promise<Cmi5Client> {
-  const { default: Cmi5 } = await import('@xapi/cmi5')
-  return new Cmi5() as unknown as Cmi5Client
 }

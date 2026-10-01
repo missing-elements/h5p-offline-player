@@ -94,7 +94,20 @@ describe('the pure parts', () => {
     expect(out.context.extensions[SESSION]).toBe('s-1')
     expect(out.context.contextActivities.grouping).toEqual([{ id: 'https://lms.example/course' }])
     expect(out.context.contextActivities.category).toEqual([{ id: 'http://h5p.org/libraries/H5P.QuestionSet-1.20' }])
-    expect(allowedStatement({ ...answered, id: 'kept' }, LAUNCH, {}).id).toBe('kept')
+    const id = '0f8fad5b-d9cb-469f-a165-70867728950e'
+    expect(allowedStatement({ ...answered, id }, LAUNCH, {}).id).toBe(id)
+  })
+
+  it('gives every statement a UUID id (9.1.0.0-1)', () => {
+    expect(allowedStatement({ ...answered, id: 'not-a-uuid' }, LAUNCH, {}).id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+  })
+
+  it('uses the context template and never overwrites it (10.2.1.0-6, 10.2.1.0-7, 9.6.3.1-4)', () => {
+    const own = { ...answered, context: { ...answered.context, language: 'en', extensions: { [SESSION]: 'forged', 'https://h5p.example/x': 1 } } }
+    const out = allowedStatement(own, LAUNCH, { contextTemplate: { ...TEMPLATE, language: 'de' } })
+    expect(out.context.language).toBe('de')
+    expect(out.context.extensions).toEqual({ [SESSION]: 's-1', 'https://h5p.example/x': 1 })
+    expect(out.context.revision).toBe('sha256:abc')
   })
 
   it('scores the cmi5 way: min and max beside raw, 0 as H5P\'s minimum', () => {
@@ -120,6 +133,9 @@ describe('the pure parts', () => {
 })
 
 describe('startCmi5', () => {
+  // 7.1.1.0-1, 7.1.2.0-1, 7.1.3.0-1, 9.3.3.0-1, 9.3.8.0-1, 9.3.8.0-2, and in Normal mode
+  // 10.2.2.0-1, 10.2.2.0-6, 10.2.2.0-7: initialized, then the content, the outcome on
+  // completion, terminated last and nothing after it.
   it('sends initialized, relays the content\'s statements, records the outcome once and terminates', async () => {
     const { client, calls } = fakeClient()
     const player = new FakePlayer()
@@ -156,6 +172,7 @@ describe('startCmi5', () => {
     expect(calls).toHaveLength(before)
   })
 
+  // 9.3.2.0-2: initialized is the first statement of the session, whatever the content emitted.
   it('listens before the handshake, and sends what arrived meanwhile after initialized', async () => {
     const { client, calls, release } = fakeClient({}, { deferInitialize: true })
     const player = new FakePlayer()
@@ -172,6 +189,7 @@ describe('startCmi5', () => {
     expect(player.src).toBeNull()
   })
 
+  // 9.3.2.0-3, 9.5.4.2-2: one initialized per session, durations from the session's own start.
   it('resumes after a reload on the kept token, with no second completed', async () => {
     const storage = memoryStorage()
     const first = fakeClient()
@@ -196,14 +214,17 @@ describe('startCmi5', () => {
     expect(storage.map.size).toBe(0)
   })
 
-  it('records nothing in Browse mode', async () => {
-    const { client, calls } = fakeClient({ launchMode: 'Browse' })
+  // 10.2.2.0-2, 10.2.2.0-3, 10.2.2.0-8, 10.2.2.0-9, 10.2.2.0-10, 10.2.2.0-11: initialized and
+  // terminated, and no outcome.
+  it.each(['Browse', 'Review'] as const)('records nothing in %s mode', async (launchMode) => {
+    const { client, calls } = fakeClient({ launchMode })
     const player = new FakePlayer()
     const events: Cmi5Event[] = []
-    await startCmi5(player, { client, storage: null, src: false, onEvent: (e) => events.push(e) })
+    const session = await startCmi5(player, { client, storage: null, src: false, onEvent: (e) => events.push(e) })
     player.emit('finished', completed(4, 4))
     await tick()
-    expect(calls.filter((c) => c.call === 'moveOn')).toHaveLength(0)
+    await session.terminate()
+    expect(calls.map((c) => c.call)).toEqual(['initialize', 'terminate'])
     expect(events.map((e) => e.type)).toContain('skipped')
   })
 
@@ -213,6 +234,22 @@ describe('startCmi5', () => {
     const session = await startCmi5(player, { client, storage: null, url: 'https://au.example/' })
     expect(player.src).toBe('https://host/from-launch.h5p')
     expect(session.src).toBe('https://host/from-launch.h5p')
+  })
+
+  // 10.2.6.0-1
+  it('goes to the returnURL on exit, after terminated', async () => {
+    const { client, calls } = fakeClient({ returnURL: 'https://lms.example/back' })
+    const session = await startCmi5(new FakePlayer(), { client, storage: null, src: false })
+    const assigned: string[] = []
+    const location = globalThis.location
+    Object.defineProperty(globalThis, 'location', { value: { assign: (to: string) => assigned.push(to) }, configurable: true })
+    try {
+      await session.exit()
+    } finally {
+      Object.defineProperty(globalThis, 'location', { value: location, configurable: true })
+    }
+    expect(calls.at(-1)).toEqual({ call: 'terminate' })
+    expect(assigned).toEqual(['https://lms.example/back'])
   })
 
   it('drops a returnURL that is not a web address, and says so', async () => {

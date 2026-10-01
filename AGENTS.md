@@ -88,8 +88,11 @@ packages/verify/          @missing-elements/h5p-verify — plays a package headl
 packages/cmi5/            @missing-elements/h5p-cmi5 — cmi5 for the element, published as a library
   src/index.ts              startCmi5(player): the launch, the allowed statements, the outcome, terminate;
                             its pure parts (allowedStatement, cmi5Score, webAddress) exported for tests
-  tests/                    node tests against a fake client and a fake element; @xapi/cmi5 is stubbed,
-                            since it ships only a browser build that Node cannot resolve
+  src/client.ts             createCmi5Client(): the AU's side of the protocol over fetch — the token,
+                            LMS.LaunchData, the learner preferences, the cmi5-defined statements
+  tests/                    node tests: the client against a fake fetch, the wiring against a fake
+                            client and a fake element, and requirements.test.ts, which holds every
+                            AU requirement in @cmi5/requirements to a test or a stated reason
 
 apps/demo/                the demo app: the dev server for the whole repository, and the hosted site
   index.html                the hosted player page
@@ -998,23 +1001,36 @@ SPA-fallback trap described above cannot happen there.
   knows nothing about either.** The wiring was the demo page's until 2026-10-01, when it moved
   into the package so a host installs it instead of copying it; the demo aliases the package's
   name to its source, as it does the element's, and the page keeps only the log, the status
-  line and the simulated LMS, which it passes as `client`. The package loads `@xapi/cmi5` with
-  a dynamic import, only for a real launch, so a page that simulates never downloads it and the
-  demo's build puts it in a chunk of its own; its declarations name none of that library's
-  types, which would drag axios and `@xapi/xapi` into a host's type check. What follows was
-  learned while it was the page.
+  line and the simulated LMS, which it passes as `client`. The package has no dependencies:
+  `@xapi/cmi5` 1.4.0 did the protocol until 2026-10-01, and its browser build carried its own
+  copies of axios, `@xapi/xapi`, uuid and deepmerge — 90 kB, against 12.6 kB for the demo page's
+  whole chunk now — for a token `POST`, two reads and statement `POST`s, while its declared
+  dependencies installed a deprecated uuid nobody loaded. `src/client.ts` replaced it, sending
+  what it sent; dropping the learner-preferences read on the way, since nothing uses them, was
+  refused by CATAPULT at once — 11.0.0.0-3, the AU MUST retrieve them on startup — so they are
+  read, and handed to the host for the audio preference the element cannot apply.
+  `tests/requirements.test.ts` reads ADL's own requirement list, `@cmi5/requirements` (a dev
+  dependency, the list CATAPULT checks against), selects the requirements whose subject is the
+  AU, and fails unless each is answered: `tested`, with its number in a comment beside the test
+  that shows it, or `catapult`, `host`, `gap`, `n/a`, `lms` or `umbrella` with a reason. Going
+  through it found two things: the context template was spread *under* the statement's own
+  context, so a statement could overwrite a template value, which 10.2.1.0-7 forbids — the
+  template wins now; and `completed`/`passed` are kept once per launch, not once per
+  registration as 9.3.3.0-2 and 9.3.4.0-3 ask, recorded as a gap, since knowing would take
+  reading the registration's statements from the LRS. What follows was learned while the wiring
+  was the page's.
   Chosen on 2026-09-30 over SCORM and LTI: the package stays on a static host, the AU can
   demand its own window (`launchMethod="OwnWindow"`), which is the one standard way to keep the
   player out of a cross-origin iframe and so out of the Safari and iOS gap, the token is per
   launch instead of LRS credentials in page code, and `context.revision` survives to the LRS.
-  `@xapi/cmi5` 1.4.0 does the protocol. Three things about it the code has to know: it has no
-  "send an allowed statement" method, only `sendXapiStatement`, which sends what it is given,
-  so `cmi5-page.js` builds allowed statements itself — the launch actor, the registration, the
-  context template merged under the statement's own context, lists in `contextActivities`
-  joined, and no cmi5 category, which would mark the statement as cmi5-defined; `moveOn` sends
-  `passed`/`failed` by the mastery score and `completed` in one call, and `terminated` too
-  unless `disableSendTerminated`, which the page sets so the learner can keep going until Exit;
-  and it judges `passed` or `failed` only when the launch data's mastery score is truthy. There
+  The client keeps the shape `@xapi/cmi5` had, so a simulated LMS can stand in for it, and three
+  things about that shape matter: `sendXapiStatement` sends what it is given, so
+  `allowedStatement` builds allowed statements — the launch actor, the registration, the
+  context template merged in, lists in `contextActivities` joined, and no cmi5 category, which
+  would mark the statement as cmi5-defined; `moveOn` sends `passed`/`failed` by the mastery
+  score and `completed` in one call, and `terminated` too unless `disableSendTerminated`, which
+  `startCmi5` sets so the learner can keep going until Exit; and `passed` or `failed` are judged
+  only when the launch data's mastery score is truthy. There
   is no `terminated` on unload: a page cannot tell a reload from a closed tab, and one sent on a
   reload ended the session the reloaded page went on using, every statement after it refused
   with 8.1.2.0-2 — found in review on 2026-10-01 and reproduced against CATAPULT. A tab closed
@@ -1029,9 +1045,7 @@ SPA-fallback trap described above cannot happen there.
   `xapi` and `finished` events rather than clicking through content, with a single-use token
   as the spec has it, and pins the order and the merge, `revision` included, a reload that
   resumes with no new token and no `terminated`, a statement emitted before the handshake, and
-  a `returnURL` that is not followed. The library's last release was October 2024 and it pins a
-  2.x `@xapi/xapi` while 3.x is current; the AU side of the spec is small enough to write by
-  hand if it stalls. **Proven against ADL's CATAPULT player** — the reference launching
+  a `returnURL` that is not followed. **Proven against ADL's CATAPULT player** — the reference launching
   system, which validates each statement against the numbered requirements and rejects a
   breach naming it — by `pnpm cmi5:catapult` (`apps/demo/scripts/cmi5-catapult.mjs`,
   `apps/demo/cmi5-catapult/docker-compose.yml`): adlnet/CATAPULT fetched at a pinned commit

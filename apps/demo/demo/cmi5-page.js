@@ -123,9 +123,9 @@ function mergeActivities(template = {}, own = {}) {
 }
 
 /**
- * An LMS and LRS in one object, for `?simulate`: a `Cmi5Client`, the surface of `@xapi/cmi5`
- * the package uses, with every statement written to the log instead of sent. The launch data is what a course
- * structure with `moveOn="CompletedAndPassed"` and `masteryScore="0.8"` would give.
+ * An LMS and LRS in one object, for `?simulate`: a `Cmi5Client`, the shape `createCmi5Client`
+ * returns, with every statement written to the log instead of sent. The launch data is what a
+ * course structure with `moveOn="CompletedAndPassed"` and `masteryScore="0.8"` would give.
  */
 function simulatedLms() {
   const launch = {

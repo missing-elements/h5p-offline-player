@@ -18,8 +18,9 @@ the `xapi` event, for a portal the organisation controls, and has no launch cont
 does not have is SCORM's reach: some older LMSs support only SCORM.
 
 The element does not change for it. The wiring is a package of its own,
-[`@missing-elements/h5p-cmi5`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/cmi5), on top of
-[`@xapi/cmi5`](https://www.npmjs.com/package/@xapi/cmi5):
+[`@missing-elements/h5p-cmi5`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/cmi5),
+with no dependencies: the assignable unit's side of cmi5 is a handful of `fetch` calls, written
+there.
 
 ```js
 import '@missing-elements/h5p-offline-player'
@@ -75,9 +76,10 @@ page, and on iOS the player then shows nothing.
 1. **`initialized`**, once the token, the launch data and the learner preferences are in.
    Statements the content emits before that wait, since cmi5 wants `initialized` first.
 2. **Every statement the content emits**, as a "cmi5 allowed" statement: the launch actor in
-   place of H5P's, the registration, and the LMS's context template underneath the statement's
+   place of H5P's, the registration, and the LMS's context template merged into the statement's
    own context, so the course grouping and the session id are on it and `context.revision` and
-   `context.platform` stay. H5P's own category, the content type's library, stays too; the cmi5
+   `context.platform` stay. Where both name a value, the template's wins: cmi5 lets the AU add
+   to the template, never overwrite it. H5P's own category, the content type's library, stays too; the cmi5
    category is not added, because that marks a cmi5-defined statement.
 3. **On the content's completion** — the `finished` event, which H5P raises with the score —
    `passed` or `failed` by the mastery score when the launch set one, then `completed`. Without
@@ -133,12 +135,18 @@ the LMS side added `launched` and `satisfied`. The finish of the quiz is the ele
 `finished` event dispatched by the script, not four questions played through. CATAPULT is
 fetched at a pinned commit and the LRS is a pinned release, the two that passed; the published
 ports listen on `127.0.0.1` only. The stack stays up between runs; the first run builds the
-player's image, which takes a few minutes.
+player's image, which takes a few minutes. When the page never gets as far as "Launched", the
+script prints what it said instead, which is the LMS's refusal with its requirement number.
 
-The fast checks are the package's own unit tests, `packages/cmi5/tests/`, which run the wiring
-against a fake client and a fake element in Node, and `apps/demo/tests/cmi5.test.ts`, which
-launches the demo page in a browser from a mock LMS and LRS and asserts the sequence above,
-including that `revision` survives the merge.
+The fast checks are the package's own unit tests, `packages/cmi5/tests/`, which run the client
+against a fake LMS and LRS behind `fetch`, and the wiring against a fake client and a fake
+element, in Node; and `apps/demo/tests/cmi5.test.ts`, which launches the demo page in a browser
+from a mock LMS and LRS and asserts the sequence above, including that `revision` survives the
+merge. `packages/cmi5/tests/requirements.test.ts` holds the package to ADL's list of the
+specification's requirements, `@cmi5/requirements`: every one that falls on the assignable unit
+is either named next to the test that shows it, shown by the CATAPULT run, left to the host
+page, or written down as a gap with the reason, and a requirement added to the list fails the
+test until someone places it.
 SCORM Cloud, which supports cmi5 with a free tier, remains a fair check that a commercial LMS
 launches it.
 
@@ -187,6 +195,13 @@ which is why an organisation with an internal LMS serves the page from an intern
 
 - It does not turn H5P's interactions into cmi5 interaction statements. H5P's own statements
   carry the answers, and the LRS keeps them as allowed statements.
+- It does not apply the learner's audio preference, which cmi5 has the AU apply at startup:
+  the element has no audio control. The preference is on the session as
+  `learnerPreferences.audioPreference`, for the page to act on.
+- It keeps `completed` and `passed` to once per launch, a reload included, rather than once per
+  registration, as cmi5 asks. An LMS that launches a registration again after a completion
+  receives them again; telling would mean reading the registration's statements from the LRS at
+  startup.
 - It does not resume. cmi5 has no state document for content; the player's `resume` attribute
   keeps state on the device and works alongside if a host sets it.
 - It is not SCORM. An LMS without cmi5 needs a SCORM wrapper, which hosts the player and the

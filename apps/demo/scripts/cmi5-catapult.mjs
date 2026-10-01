@@ -164,12 +164,12 @@ async function main() {
     const page = await browser.newPage()
     page.on('pageerror', (error) => log(`page error: ${error.message}`))
     await page.goto(launch.url)
-    await page.waitForFunction(() => document.querySelector('#status')?.textContent?.startsWith('Launched'), null, { timeout: 60_000 })
+    await waitForStatus(page, 'Launched', 60_000)
 
     // A reload mid-session: the page must resume on the token it kept, with no second
     // `initialized` and no `terminated`, or every statement after it is refused.
     await page.reload()
-    await page.waitForFunction(() => document.querySelector('#status')?.textContent?.startsWith('Resumed'), null, { timeout: 60_000 })
+    await waitForStatus(page, 'Resumed', 60_000)
     await page.waitForFunction(() => document.querySelector('h5p-player')?.state === 'ready', null, { timeout: 60_000 })
 
     // The real quiz: start it, pick an answer, check it. What H5P itself emits for that goes
@@ -199,7 +199,7 @@ async function main() {
       return { status, pageLog }
     }
     try {
-      await page.waitForFunction(() => document.querySelector('#status')?.textContent?.startsWith('Recorded'), null, { timeout: 30_000 })
+      await waitForStatus(page, 'Recorded', 30_000)
       await page.click('#exit')
       await page.waitForURL((url) => url.href.startsWith(returnUrl), { timeout: 30_000 }).catch(() => log('did not reach the return URL'))
     } catch (error) {
@@ -249,3 +249,14 @@ main().catch((error) => {
   console.error(`[cmi5-catapult] ${error.stack ?? error}`)
   process.exit(1)
 })
+
+/** Waits for the page's status line to start with `prefix`; on a timeout, says what it showed instead. */
+async function waitForStatus(page, prefix, timeout) {
+  try {
+    await page.waitForFunction((p) => document.querySelector('#status')?.textContent?.startsWith(p), prefix, { timeout })
+  } catch (error) {
+    const shown = await page.locator('#status').textContent().catch(() => null)
+    const logged = await page.locator('#log').textContent().catch(() => '')
+    throw new Error(`the page never said "${prefix}…"; it said: ${shown}${logged ? `\nits log:\n${logged.slice(0, 2000)}` : ''}`, { cause: error })
+  }
+}
