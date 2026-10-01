@@ -242,7 +242,7 @@ export function createCmi5Client(options: Cmi5ClientOptions = {}): Cmi5Client {
         statements.push(defined(passed ? 'passed' : 'failed', {
           result: { ...(score ? { score } : {}), success: passed, duration: duration() },
           category: [MOVE_ON_CATEGORY],
-          ...(mastery ? { extensions: { [MASTERY_SCORE]: mastery } } : {})
+          ...(mastery !== undefined ? { extensions: { [MASTERY_SCORE]: mastery } } : {})
         }))
       }
       // No score here: only `passed` and `failed` may carry one (9.5.1.0-2).
@@ -272,7 +272,7 @@ export function createCmi5Client(options: Cmi5ClientOptions = {}): Cmi5Client {
  * one, which needs a score (9.5.1.0-1, 10.2.4.0-2); without one, by the content's own verdict.
  */
 export function judge(score: Cmi5Score | undefined, success: boolean | undefined, mastery: number | undefined): boolean | null {
-  if (mastery) return score ? score.scaled >= mastery : null
+  if (mastery !== undefined) return score ? score.scaled >= mastery : null
   return typeof success === 'boolean' ? success : null
 }
 

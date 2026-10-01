@@ -88,12 +88,12 @@ run without one. The package URL must send CORS headers, as for any use of the p
 |---|---|---|
 | `onEvent(event)` | none | Told about each step: `initialized`, `sent`, `rejected` with the LMS's reason, `recorded` with what went out now, `skipped` in Browse and Review mode or when an earlier session recorded the result, `registration-unread`, `terminated`, `unsafe-return-url` |
 | `src` | the address's `src`, then `launchParameters` | The package to play; `false` leaves the element's `src` to you |
-| `storage` | `localStorage` | Where the session is kept across a reload; `null` for nowhere |
+| `storage` | `null` | Where the session is kept across a reload; pass it only for a trusted package and origin |
 | `client` | `createCmi5Client()` on this page's launch | A client of your own: a simulated LMS, a test double |
 
-The session has `terminate()`, `exit()`, which terminates and then goes to the launch's return
-address, `stop()`, and the launch's `launchParameters`, `launchData`, `learnerPreferences`,
-`returnURL` and `src`.
+The session has `terminate()`, `retry()` for a completion the LRS rejected, `exit()`, which
+terminates and then goes to the launch's return address, `stop()`, and the launch's
+`launchParameters`, `launchData`, `learnerPreferences`, `returnURL` and `src`.
 
 `createCmi5Client()` is exported too, for a page that wants the protocol without the element:
 `initialize()`, `sendXapiStatement()`, `moveOn()` and `terminate()` on the launch in the
@@ -101,9 +101,10 @@ address.
 
 ## What it takes care of
 
-- **A reload resumes the session.** The launch's token works once, so the package keeps it for
-  that launch, with the start time and whether the result went out. A reload sends no second
-  `initialized` and no second `completed`, which the specification forbids.
+- **Reload recovery is opt-in.** The launch's token works once, so passing `storage` keeps it
+  with the start time and whether the result went out. Do that only when both the package and
+  origin are trusted: H5P library scripts run in a same-origin frame and can read browser
+  storage. With the default `null`, a reload must be launched again by the LMS.
 - **Nothing is sent as the page unloads.** A page cannot tell a reload from a closed tab, and a
   `terminated` sent on a reload ends the session the page goes on using. A learner who closes
   the tab without Exit leaves the session for the LMS to record as `abandoned`, which is what

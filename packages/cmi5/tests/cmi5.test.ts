@@ -3,6 +3,7 @@ import {
   allowedStatement,
   cmi5Score,
   isCmi5Launch,
+  judge,
   rejectionReason,
   startCmi5,
   webAddress,
@@ -123,6 +124,10 @@ describe('the pure parts', () => {
     expect(cmi5Score({ raw: 2 })).toBeUndefined()
   })
 
+  it('treats a zero mastery score as a mastery score', () => {
+    expect(judge({ scaled: 0, raw: 0, min: 0, max: 1 }, false, 0)).toBe(true)
+  })
+
   it('follows only http and https return addresses', () => {
     expect(webAddress('https://lms.example/back')).toBe('https://lms.example/back')
     expect(webAddress('javascript:alert(1)')).toBeNull()
@@ -165,8 +170,7 @@ describe('startCmi5', () => {
     expect(moveOns[0].arg).toEqual({ score: { scaled: 0.75, raw: 3, min: 0, max: 4 }, disableSendTerminated: true })
     expect(events).toContainEqual({ type: 'recorded', outcome: 'failed', completed: true })
 
-    await session.terminate()
-    await session.terminate()
+    await Promise.all([session.terminate(), session.terminate()])
     expect(calls.filter((c) => c.call === 'terminate')).toHaveLength(1)
     expect(session.terminated).toBe(true)
 
@@ -218,6 +222,51 @@ describe('startCmi5', () => {
 
     await session.terminate()
     expect(storage.map.size).toBe(0)
+  })
+
+  it('retains a rejected outcome for retrying in the page or after a trusted-storage reload', async () => {
+    const storage = memoryStorage()
+    const failed = fakeClient()
+    let attempts = 0
+    const failingClient: Cmi5Client = {
+      ...failed.client,
+      async moveOn(options) {
+        failed.calls.push({ call: 'moveOn', arg: options })
+        attempts += 1
+        if (attempts === 1) throw new Error('temporary LRS failure')
+      }
+    }
+    const player = new FakePlayer()
+    const events: Cmi5Event[] = []
+    const session = await startCmi5(player, { client: failingClient, storage, src: false, onEvent: (event) => events.push(event) })
+    player.emit('finished', completed(4, 4))
+    await tick()
+    expect(events.at(-1)).toMatchObject({ type: 'rejected', verb: 'passed' })
+    expect(failed.calls.filter((call) => call.call === 'moveOn')).toHaveLength(1)
+
+    await session.retry()
+    expect(failed.calls.filter((call) => call.call === 'moveOn')).toHaveLength(2)
+    expect(events.at(-1)).toEqual({ type: 'recorded', outcome: 'passed', completed: true })
+
+    const reloadStorage = memoryStorage()
+    const failedAgain = fakeClient()
+    const reloadedClient: Cmi5Client = {
+      ...failedAgain.client,
+      async moveOn(options) {
+        failedAgain.calls.push({ call: 'moveOn', arg: options })
+        throw new Error('temporary LRS failure')
+      }
+    }
+    const reloadedPlayer = new FakePlayer()
+    const failedSession = await startCmi5(reloadedPlayer, { client: reloadedClient, storage: reloadStorage, src: false })
+    reloadedPlayer.emit('finished', completed(4, 4))
+    await tick()
+    failedSession.stop()
+
+    const recovered = fakeClient()
+    await startCmi5(new FakePlayer(), { client: recovered.client, storage: reloadStorage, src: false })
+    await tick()
+    expect(recovered.calls.filter((call) => call.call === 'moveOn')).toHaveLength(1)
   })
 
   // 10.2.2.0-2, 10.2.2.0-3, 10.2.2.0-8, 10.2.2.0-9, 10.2.2.0-10, 10.2.2.0-11: initialized and

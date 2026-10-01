@@ -95,13 +95,14 @@ page, and on iOS the player then shows nothing.
    not try to send `terminated` as it unloads, because a page cannot tell a closed tab from a
    reload, and a `terminated` sent on a reload ends a session the reloaded page goes on using.
 
+a second `completed`. Every relayed statement carries a UUID id, as cmi5 requires: its own if
 The page listens to the element before the handshake starts, since the package loads
 meanwhile: anything the content emits before `initialized` has gone out waits, and is sent
-after it. The `fetch` URL answers once, so a reload of the page does not ask again: the token,
-the time `initialized` went out and whether the outcome was recorded are kept in the browser's
-storage for that launch, and the reload resumes the session without a second `initialized` or
-a second `completed`. Every relayed statement carries a UUID id, as cmi5 requires: its own if
-it has one, a new one if not. A score
+after it. The `fetch` URL answers once. Reload recovery is therefore an explicit trusted-host
+choice: pass `storage` to `startCmi5()` only when both the package and origin are trusted.
+H5P library scripts run in a same-origin frame and can read browser storage, so the default
+keeps no LRS token; with it, a reload must be launched again by the LMS. Every relayed statement
+carries a UUID id, as cmi5 requires: its own if it has one, a new one if not. A score
 on `passed`, `failed` or `completed` carries `min` and `max` beside `raw`, as cmi5 requires;
 H5P gives `raw` and `max`, and its minimum is 0. `returnURL` is read from the launch data, where
 cmi5 puts it, and followed only if it is an `http` or `https` address: a `javascript:` value
@@ -111,7 +112,8 @@ of the requirement the statement broke.
 
 The content keeps running after completion, and its later statements are still relayed, until
 Exit. A learner who retries a quiz is recorded; the `completed` and `passed`/`failed` go out
-once.
+once. If the LRS rejects the completion, the session keeps its score and verdict for
+`session.retry()`; when trusted storage was explicitly enabled, it retries after a reload too.
 
 ## Checking it
 

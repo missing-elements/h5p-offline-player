@@ -218,7 +218,7 @@ it('runs a package as a cmi5 assignable unit', async () => {
   await page.close()
 })
 
-it('resumes after a reload, with no new token, no second initialized and no terminated', async () => {
+it('does not persist LRS credentials across a reload by default', async () => {
   const registration = crypto.randomUUID()
   const page = await browser.newPage()
   await page.goto(launchUrl(registration))
@@ -226,17 +226,9 @@ it('resumes after a reload, with no new token, no second initialized and no term
   await page.waitForFunction(() => document.querySelector('#status')!.textContent!.startsWith('Launched'))
 
   await page.reload()
-  await page.waitForFunction(() => document.querySelector('#status')!.textContent!.startsWith('Resumed'))
-  expect(fetches.get(`${registration}#1`)).toBe(1)
+  await page.waitForFunction(() => document.querySelector('#status')!.textContent!.includes('Already in Use'))
+  expect(fetches.get(`${registration}#1`)).toBe(2)
   expect(ofLaunch(registration).map(verbOf)).toEqual(['initialized'])
-
-  // The session is still open: a statement from the content is accepted after the reload.
-  await page.evaluate(() => {
-    const statement = { actor: { name: 'H5P user' }, verb: { id: 'http://adlnet.gov/expapi/verbs/interacted' }, object: { objectType: 'Activity', id: 'https://x/content' } }
-    document.querySelector('h5p-player')!.dispatchEvent(new CustomEvent('xapi', { detail: { statement, verb: statement.verb.id } }))
-  })
-  await waitForVerb('interacted', false, registration)
-  expect(ofLaunch(registration).filter((s) => verbOf(s) === 'terminated')).toHaveLength(0)
   await page.close()
 })
 

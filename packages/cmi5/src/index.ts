@@ -126,7 +126,7 @@ export type PlayerLike = Pick<EventTarget, 'addEventListener' | 'removeEventList
   setAttribute(name: string, value: string): void
 }
 
-/** Where the per-launch session is kept; `localStorage` by default. */
+/** Where the per-launch session is kept; `null` by default. */
 export type SessionStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 
 export interface Cmi5Options {
@@ -139,7 +139,7 @@ export interface Cmi5Options {
   src?: string | false
   /** The page's address, for `src`; `location.href` by default. */
   url?: string
-  /** Where the session is kept across a reload; `localStorage` by default, `null` for nowhere. */
+  /** Where the session is kept across a reload; `null` by default. */
   storage?: SessionStorage | null
   /** Told about each step. Called synchronously; a throw in it is ignored. */
   onEvent?: (event: Cmi5Event) => void
@@ -159,6 +159,8 @@ export interface Cmi5Session {
   readonly terminated: boolean
   /** Sends `terminated` once; nothing is relayed after it. */
   terminate(): Promise<void>
+  /** Retries a completion outcome that the LRS did not accept. */
+  retry(): Promise<void>
   /** `terminate()`, then the return URL, or closes the window when there is none. */
   exit(): Promise<void>
   /** Stops listening to the element, without terminating. */
@@ -263,6 +265,12 @@ interface KeptSession {
   authToken: string
   initializedDate: Date
   movedOn: boolean
+  pendingOutcome?: Outcome
+}
+
+interface Outcome {
+  score?: Cmi5Score
+  success?: boolean
 }
 
 function readKept(storage: SessionStorage | null, key: string): KeptSession | null {
@@ -270,9 +278,9 @@ function readKept(storage: SessionStorage | null, key: string): KeptSession | nu
   try {
     const raw = storage.getItem(key)
     if (!raw) return null
-    const { authToken, initializedDate, movedOn } = JSON.parse(raw)
+    const { authToken, initializedDate, movedOn, pendingOutcome } = JSON.parse(raw)
     if (!authToken || !initializedDate) return null
-    return { authToken, initializedDate: new Date(initializedDate), movedOn: Boolean(movedOn) }
+    return { authToken, initializedDate: new Date(initializedDate), movedOn: Boolean(movedOn), ...(pendingOutcome ? { pendingOutcome } : {}) }
   } catch {
     return null
   }
@@ -290,14 +298,6 @@ function forgetKept(storage: SessionStorage | null, key: string): void {
   } catch {}
 }
 
-function defaultStorage(): SessionStorage | null {
-  try {
-    return globalThis.localStorage ?? null
-  } catch {
-    return null
-  }
-}
-
 /* ------------------------------------------------------------------ the session */
 
 /**
@@ -313,17 +313,21 @@ export async function startCmi5(player: PlayerLike, options: Cmi5Options = {}): 
     } catch {}
   }
   const url = options.url ?? globalThis.location?.href ?? ''
-  const storage = options.storage === undefined ? defaultStorage() : options.storage
+  // H5P libraries run in a same-origin frame, so browser storage would expose an LRS token to
+  // package code. A host must explicitly opt in when it can protect its chosen storage.
+  const storage = options.storage ?? null
 
   let data: LaunchData | null = null
   let launch: LaunchParameters | null = null
   let client: Cmi5Client | null = null
   let terminated = false
+  let termination: Promise<void> | null = null
   let movedOn = false
+  let recording = false
   let kept: KeptSession | null = null
   let key = ''
   const pending: Statement[] = []
-  let pendingFinished: Statement | null = null
+  let pendingOutcome: Outcome | null = null
 
   const send = async (statement: Statement) => {
     if (terminated || !client) return
@@ -345,16 +349,15 @@ export async function startCmi5(player: PlayerLike, options: Cmi5Options = {}): 
    * The content finished: the outcome, the cmi5 way. Once per session, reloads included, and
    * once per registration as far as the LRS says: what an earlier session sent is not sent again.
    */
-  const record = async (detail: Statement) => {
-    if (!client || !data || movedOn || terminated) return
-    movedOn = true
+  const record = async () => {
+    if (!client || !data || !pendingOutcome || movedOn || recording || terminated) return
+    recording = true
     if (data.launchMode !== 'Normal') {
       emit({ type: 'skipped', reason: `nothing is recorded in ${data.launchMode} mode` })
+      recording = false
       return
     }
-    const score = cmi5Score(detail?.statement?.result?.score)
-    const result = detail?.statement?.result
-    const success = typeof result?.success === 'boolean' ? (result.success as boolean) : undefined
+    const { score, success } = pendingOutcome
     const history = client.getRegistrationHistory?.()
     // As the client judges: against the mastery score, else by the content's own verdict; neither
     // once the registration has passed, and `completed` once per registration.
@@ -363,30 +366,48 @@ export async function startCmi5(player: PlayerLike, options: Cmi5Options = {}): 
     const completes = !history?.completed
     if (!outcome && !completes) {
       emit({ type: 'skipped', reason: 'this registration already recorded its result in an earlier session' })
+      movedOn = true
+      pendingOutcome = null
       keepMovedOn()
+      recording = false
       return
     }
     try {
       // `terminated` is left for the host's Exit, so the learner can keep going.
       await client.moveOn({ ...(score ? { score } : {}), ...(success === undefined ? {} : { success }), disableSendTerminated: true })
+      movedOn = true
+      pendingOutcome = null
       keepMovedOn()
       emit({ type: 'recorded', outcome, completed: completes })
     } catch (error) {
       emit({ type: 'rejected', verb: outcome ?? 'completed', reason: rejectionReason(error) })
+    } finally {
+      recording = false
     }
   }
 
   const keepMovedOn = () => {
     if (!kept) return
-    kept = { ...kept, movedOn: true }
+    kept = { ...kept, movedOn: true, pendingOutcome: undefined }
+    writeKept(storage, key, kept)
+  }
+
+  const keepPendingOutcome = () => {
+    if (!kept || !pendingOutcome) return
+    kept = { ...kept, pendingOutcome }
     writeKept(storage, key, kept)
   }
 
   const onXapi = (event: Event) => relay((event as CustomEvent).detail?.statement)
   const onFinished = (event: Event) => {
     const detail = (event as CustomEvent).detail
-    if (data) void record(detail)
-    else pendingFinished = detail
+    const result = detail?.statement?.result
+    pendingOutcome = {
+      ...(cmi5Score(result?.score) ? { score: cmi5Score(result.score) } : {}),
+      ...(typeof result?.success === 'boolean' ? { success: result.success as boolean } : {})
+    }
+    keepPendingOutcome()
+    if (data) void record()
   }
   player.addEventListener('xapi', onXapi)
   player.addEventListener('finished', onFinished)
@@ -410,6 +431,7 @@ export async function startCmi5(player: PlayerLike, options: Cmi5Options = {}): 
     await client.initialize(saved ? { authToken: saved.authToken, initializedDate: saved.initializedDate } : undefined)
     data = client.getLaunchData()
     kept = saved ?? { authToken: client.getAuthToken(), initializedDate: client.getInitializedDate(), movedOn: false }
+    pendingOutcome = saved?.pendingOutcome ?? pendingOutcome
     if (!saved) writeKept(storage, key, kept)
 
     const returnURL = webAddress(data.returnURL)
@@ -432,19 +454,26 @@ export async function startCmi5(player: PlayerLike, options: Cmi5Options = {}): 
     const boundData = data
 
     for (const statement of pending.splice(0)) void send(allowedStatement(statement, boundLaunch, boundData))
-    if (pendingFinished) void record(pendingFinished)
+    if (pendingOutcome) void record()
 
-    const terminate = async () => {
-      if (terminated) return
-      try {
-        await boundClient.terminate()
-        emit({ type: 'terminated' })
-      } catch (error) {
-        emit({ type: 'rejected', verb: 'terminated', reason: rejectionReason(error) })
-      }
-      terminated = true
-      forgetKept(storage, key)
-      stop()
+    const terminate = (): Promise<void> => {
+      if (terminated) return Promise.resolve()
+      if (termination) return termination
+      termination = boundClient.terminate().then(
+        () => {
+          terminated = true
+          forgetKept(storage, key)
+          stop()
+          emit({ type: 'terminated' })
+        },
+        (error) => {
+          emit({ type: 'rejected', verb: 'terminated', reason: rejectionReason(error) })
+          throw error
+        }
+      ).finally(() => {
+        if (!terminated) termination = null
+      })
+      return termination
     }
 
     return {
@@ -458,6 +487,7 @@ export async function startCmi5(player: PlayerLike, options: Cmi5Options = {}): 
         return terminated
       },
       terminate,
+      retry: record,
       async exit() {
         await terminate()
         if (returnURL) globalThis.location?.assign(returnURL)

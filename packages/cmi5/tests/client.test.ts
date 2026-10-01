@@ -205,6 +205,16 @@ describe('createCmi5Client', () => {
     expect(completed.result.completion).toBe(true)
   })
 
+  it('uses a zero mastery score and includes it in the passed statement', async () => {
+    const net = fakeNetwork({ data: { ...LAUNCH_DATA, masteryScore: 0 } })
+    const client = createCmi5Client({ url: LAUNCH_URL, fetch: net.fetch })
+    await client.initialize()
+    await client.moveOn({ score: { scaled: 0, raw: 0, min: 0, max: 1 }, disableSendTerminated: true })
+    const passed = net.statements()[1]
+    expect(passed.verb.id).toBe('http://adlnet.gov/expapi/verbs/passed')
+    expect(passed.context.extensions['https://w3id.org/xapi/cmi5/context/extensions/masteryscore']).toBe(0)
+  })
+
   // 9.5.1.0-2, 9.5.4.1-1, 9.6.2.2-2: without a mastery score the content's own verdict decides,
   // the score rides on passed or failed only, and terminated has no moveon category.
   it('judges by the content\'s own verdict without a mastery score, and terminates unless told not to', async () => {
