@@ -27,8 +27,17 @@ interface Seen {
 }
 
 /** The LMS and the LRS behind one `fetch`: a token once, the launch data, statements kept. */
-function fakeNetwork({ data = LAUNCH_DATA as Statement, token = { 'auth-token': 'dG9rZW4=' } as Statement, refuse = null as Statement | null, preferences = null as Statement | null } = {}) {
+function fakeNetwork({
+  data = LAUNCH_DATA as Statement,
+  token = { 'auth-token': 'dG9rZW4=' } as Statement,
+  refuse = null as Statement | null,
+  preferences = null as Statement | null,
+  earlier = [] as Statement[],
+  unreadable = false
+} = {}) {
   const seen: Seen[] = []
+  // What the LRS holds: earlier sessions' statements, then what this one posts.
+  const held: Statement[] = [...earlier]
   const fetch = async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const url = String(input)
     const entry: Seen = { method: init.method ?? 'GET', url, headers: { ...(init.headers as Record<string, string>) } }
@@ -38,10 +47,20 @@ function fakeNetwork({ data = LAUNCH_DATA as Statement, token = { 'auth-token': 
     if (url === 'https://lms.example/fetch/1') return reply(200, token)
     if (url.startsWith('https://lrs.example/xapi/activities/state?')) return reply(200, data)
     if (url.startsWith('https://lrs.example/xapi/agents/profile?')) return preferences ? reply(200, preferences) : reply(404, undefined)
-    if (url === 'https://lrs.example/xapi/statements') return refuse ? reply(400, refuse) : reply(200, [entry.body?.id])
+    if (url === 'https://lrs.example/xapi/statements') {
+      if (refuse) return reply(400, refuse)
+      held.push(entry.body!)
+      return reply(200, [entry.body?.id])
+    }
+    if (url.startsWith('https://lrs.example/xapi/statements?')) {
+      if (unreadable) return reply(403, { message: 'This token cannot read statements' })
+      const q = new URL(url).searchParams
+      const found = held.filter((s) => s.verb.id === q.get('verb') && s.object.id === q.get('activity') && s.context?.registration === q.get('registration'))
+      return reply(200, { statements: found.slice(0, Number(q.get('limit') ?? 0) || undefined), more: '' })
+    }
     return reply(404, undefined)
   }
-  const statements = () => seen.filter((s) => s.url.endsWith('/statements')).map((s) => s.body!)
+  const statements = () => seen.filter((s) => s.method === 'POST' && s.url.endsWith('/statements')).map((s) => s.body!)
   return { fetch: fetch as typeof globalThis.fetch, seen, statements }
 }
 
@@ -80,7 +99,8 @@ describe('the launch in the address', () => {
 
 describe('createCmi5Client', () => {
   // 8.1.1.0-3, 8.1.2.0-4, 8.1.2.0-5, 8.1.3.0-3, 8.1.4.0-3, 8.1.5.0-6, 8.2.1.0-2, 8.2.1.0-5,
-  // 8.2.2.0-4, 8.2.2.0-5, 9.4.0.0-2, 10.2.1.0-4, 10.2.1.0-5, 11.0.0.0-1, 11.0.0.0-3: the token
+  // 8.2.2.0-4, 8.2.2.0-5, 9.4.0.0-1, 9.4.0.0-2, 9.6.1.0-1, 9.6.2.0-1, 9.6.2.1-1, 10.2.1.0-4,
+  // 10.2.1.0-5, 11.0.0.0-1, 11.0.0.0-3, 11.0.0.0-4: the token
   // by POST, then only reads, at the endpoint, with the token and the launch's actor, registration
   // and activity.
   it('trades the token, reads the launch data and sends initialized', async () => {
@@ -92,6 +112,8 @@ describe('createCmi5Client', () => {
       'POST https://lms.example/fetch/1',
       'GET https://lrs.example/xapi/activities/state',
       'GET https://lrs.example/xapi/agents/profile',
+      'GET https://lrs.example/xapi/statements',
+      'GET https://lrs.example/xapi/statements',
       'POST https://lrs.example/xapi/statements'
     ])
     const state = new URL(net.seen[1].url).searchParams
@@ -99,7 +121,12 @@ describe('createCmi5Client', () => {
     expect(net.seen[1].headers).toMatchObject({ 'X-Experience-API-Version': '1.0.3', Authorization: 'Basic dG9rZW4=' })
     expect(Object.fromEntries(new URL(net.seen[2].url).searchParams)).toEqual({ profileId: 'cmi5LearnerPreferences', agent: JSON.stringify(ACTOR) })
     expect(net.seen[2].headers).toMatchObject({ Authorization: 'Basic dG9rZW4=' })
-    expect(net.seen[3].headers).toMatchObject({ 'Content-Type': 'application/json', Authorization: 'Basic dG9rZW4=' })
+    expect(net.seen[5].headers).toMatchObject({ 'Content-Type': 'application/json', Authorization: 'Basic dG9rZW4=' })
+    const asked = net.seen.slice(3, 5).map((s) => Object.fromEntries(new URL(s.url).searchParams))
+    expect(asked.map((q) => q.verb).sort()).toEqual(['http://adlnet.gov/expapi/verbs/completed', 'http://adlnet.gov/expapi/verbs/passed'])
+    expect(asked[0]).toMatchObject({ agent: JSON.stringify(ACTOR), activity: 'https://lms.example/au/1', registration: 'reg-1', limit: '1' })
+    expect(net.seen[3].headers).toMatchObject({ Authorization: 'Basic dG9rZW4=' })
+    expect(client.getRegistrationHistory?.()).toEqual({ completed: false, passed: false })
 
     const [initialized] = net.statements()
     expect(initialized).toMatchObject({
@@ -132,12 +159,18 @@ describe('createCmi5Client', () => {
     const client = createCmi5Client({ url: LAUNCH_URL, fetch: net.fetch })
     const started = new Date('2026-10-01T10:00:00Z')
     await client.initialize({ authToken: 'a2VwdA==', initializedDate: started })
-    expect(net.seen.map((s) => `${s.method} ${s.url.split('?')[0]}`)).toEqual(['GET https://lrs.example/xapi/activities/state', 'GET https://lrs.example/xapi/agents/profile'])
+    expect(net.seen.map((s) => `${s.method} ${s.url.split('?')[0]}`)).toEqual([
+      'GET https://lrs.example/xapi/activities/state',
+      'GET https://lrs.example/xapi/agents/profile',
+      'GET https://lrs.example/xapi/statements',
+      'GET https://lrs.example/xapi/statements'
+    ])
     expect(net.seen[0].headers.Authorization).toBe('Basic a2VwdA==')
     expect(client.getInitializedDate()).toBe(started)
   })
 
-  // 9.3.5.0-1, 9.5.1.0-1, 9.5.4.1-2, 9.5.4.1-4, 9.6.3.2-2, 10.2.4.0-2
+  // 9.3.5.0-1, 9.3.5.0-2, 9.5.1.0-1, 9.5.2.0-2, 9.5.3.0-1, 9.5.4.1-2, 9.5.4.1-4, 9.6.2.2-1,
+  // 9.6.3.2-2, 10.2.4.0-2
   it('judges passed or failed by the mastery score, then completed, both in the moveon category', async () => {
     const net = fakeNetwork()
     const client = createCmi5Client({ url: LAUNCH_URL, fetch: net.fetch })
@@ -157,7 +190,7 @@ describe('createCmi5Client', () => {
     expect(completed.context.contextActivities.category).toEqual([CMI5, MOVE_ON])
   })
 
-  // 9.3.4.0-1, 9.5.4.1-3
+  // 9.3.4.0-1, 9.3.4.0-2, 9.5.2.0-1, 9.5.2.0-3, 9.5.3.0-2, 9.5.4.1-3
   it('sends passed at or above the mastery score', async () => {
     const net = fakeNetwork()
     const client = createCmi5Client({ url: LAUNCH_URL, fetch: net.fetch })
@@ -166,19 +199,96 @@ describe('createCmi5Client', () => {
     const passed = net.statements()[1]
     expect(passed.verb.id).toBe('http://adlnet.gov/expapi/verbs/passed')
     expect(passed.result).toMatchObject({ success: true, duration: expect.stringMatching(/^PT/) })
+    expect(passed.result.completion).toBeUndefined()
+    const completed = net.statements()[2]
+    expect(completed.result.success).toBeUndefined()
+    expect(completed.result.completion).toBe(true)
   })
 
-  // 9.5.4.1-1
-  it('puts the score on completed when there is no mastery score, and terminates unless told not to', async () => {
+  // 9.5.1.0-2, 9.5.4.1-1, 9.6.2.2-2: without a mastery score the content's own verdict decides,
+  // the score rides on passed or failed only, and terminated has no moveon category.
+  it('judges by the content\'s own verdict without a mastery score, and terminates unless told not to', async () => {
     const net = fakeNetwork({ data: { ...LAUNCH_DATA, masteryScore: undefined } })
     const client = createCmi5Client({ url: LAUNCH_URL, fetch: net.fetch })
     await client.initialize()
-    await client.moveOn({ score: { scaled: 1, raw: 4, min: 0, max: 4 } })
-    const verbs = net.statements().map((s) => s.verb.id.split('/').pop())
-    expect(verbs).toEqual(['initialized', 'completed', 'terminated'])
-    expect(net.statements()[1].result.score).toEqual({ scaled: 1, raw: 4, min: 0, max: 4 })
-    expect(net.statements()[2].context.contextActivities.category).toEqual([CMI5])
-    expect(net.statements()[2].result.duration).toMatch(/^PT/)
+    await client.moveOn({ score: { scaled: 1, raw: 4, min: 0, max: 4 }, success: true })
+    const [, passed, completed, terminated] = net.statements()
+    expect(net.statements().map((s) => s.verb.display['en-US'])).toEqual(['initialized', 'passed', 'completed', 'terminated'])
+    expect(passed.result).toMatchObject({ score: { scaled: 1, raw: 4, min: 0, max: 4 }, success: true })
+    expect(passed.context.extensions).toEqual({ [SESSION]: 's-1' })
+    expect(completed.result.score).toBeUndefined()
+    expect(completed.result.success).toBeUndefined()
+    expect(terminated.context.contextActivities.category).toEqual([CMI5])
+    expect(terminated.result.duration).toMatch(/^PT/)
+  })
+
+  it('sends completed alone when there is neither a mastery score nor a verdict', async () => {
+    const net = fakeNetwork({ data: { ...LAUNCH_DATA, masteryScore: undefined } })
+    const client = createCmi5Client({ url: LAUNCH_URL, fetch: net.fetch })
+    await client.initialize()
+    await client.moveOn({ score: { scaled: 0.5, raw: 2, min: 0, max: 4 }, disableSendTerminated: true })
+    const sent = net.statements()
+    expect(sent.map((s) => s.verb.display['en-US'])).toEqual(['initialized', 'completed'])
+    expect(sent[1].result).toEqual({ completion: true, duration: expect.stringMatching(/^PT/) })
+  })
+
+  // 9.3.0.0-2, 9.3.0.0-3
+  it('sends one of passed and failed per session, and no verb twice', async () => {
+    const net = fakeNetwork()
+    const client = createCmi5Client({ url: LAUNCH_URL, fetch: net.fetch })
+    await client.initialize()
+    await client.moveOn({ score: { scaled: 0.25, raw: 1, min: 0, max: 4 }, disableSendTerminated: true })
+    await client.moveOn({ score: { scaled: 0.5, raw: 2, min: 0, max: 4 }, disableSendTerminated: true })
+    expect(net.statements().map((s) => s.verb.display['en-US'])).toEqual(['initialized', 'failed', 'completed'])
+  })
+
+  // 9.3.0.0-6, 9.3.0.0-7, 9.3.3.0-2, 9.3.4.0-3: once per registration, across sessions.
+  it('sends no second completed or passed in a later session of the registration', async () => {
+    const first = fakeNetwork()
+    const one = createCmi5Client({ url: LAUNCH_URL, fetch: first.fetch })
+    await one.initialize()
+    await one.moveOn({ score: { scaled: 1, raw: 4, min: 0, max: 4 }, disableSendTerminated: true })
+    // The same session again does not repeat itself either.
+    await one.moveOn({ score: { scaled: 1, raw: 4, min: 0, max: 4 }, disableSendTerminated: true })
+    expect(first.statements().map((s) => s.verb.display['en-US'])).toEqual(['initialized', 'passed', 'completed'])
+
+    const second = fakeNetwork({ earlier: first.statements() })
+    const two = createCmi5Client({ url: LAUNCH_URL, fetch: second.fetch })
+    await two.initialize()
+    expect(two.getRegistrationHistory?.()).toEqual({ completed: true, passed: true })
+    await two.moveOn({ score: { scaled: 0.25, raw: 1, min: 0, max: 4 }, disableSendTerminated: true })
+    await two.terminate()
+    // 9.3.0.0-8: and no failed after the registration passed.
+    expect(second.statements().map((s) => s.verb.display['en-US'])).toEqual(['initialized', 'terminated'])
+  })
+
+  it('lets a later session pass after an earlier one failed, without a second completed', async () => {
+    const first = fakeNetwork()
+    const one = createCmi5Client({ url: LAUNCH_URL, fetch: first.fetch })
+    await one.initialize()
+    await one.moveOn({ score: { scaled: 0.5, raw: 2, min: 0, max: 4 }, disableSendTerminated: true })
+
+    const second = fakeNetwork({ earlier: first.statements() })
+    const two = createCmi5Client({ url: LAUNCH_URL, fetch: second.fetch })
+    await two.initialize()
+    expect(two.getRegistrationHistory?.()).toEqual({ completed: true, passed: false })
+    await two.moveOn({ score: { scaled: 1, raw: 4, min: 0, max: 4 }, disableSendTerminated: true })
+    expect(second.statements().map((s) => s.verb.display['en-US'])).toEqual(['initialized', 'passed'])
+  })
+
+  it('counts this session alone when the LRS will not say, and says why', async () => {
+    const net = fakeNetwork({ unreadable: true })
+    const client = createCmi5Client({ url: LAUNCH_URL, fetch: net.fetch })
+    await client.initialize()
+    expect(client.getRegistrationHistory?.()).toEqual({ completed: false, passed: false, unread: 'This token cannot read statements' })
+    await client.moveOn({ score: { scaled: 1, raw: 4, min: 0, max: 4 }, disableSendTerminated: true })
+    expect(net.statements().map((s) => s.verb.display['en-US'])).toEqual(['initialized', 'passed', 'completed'])
+  })
+
+  it('does not ask what is recorded in a launch that records nothing', async () => {
+    const net = fakeNetwork({ data: { ...LAUNCH_DATA, launchMode: 'Browse' } })
+    await createCmi5Client({ url: LAUNCH_URL, fetch: net.fetch }).initialize()
+    expect(net.seen.filter((s) => s.url.includes('/statements?'))).toEqual([])
   })
 
   // 10.2.2.0-3, 10.2.2.0-11

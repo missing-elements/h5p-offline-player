@@ -104,6 +104,8 @@ const courseStructure = (auUrl) => `<?xml version="1.0" encoding="utf-8"?>
 </courseStructure>
 `
 
+const ACTOR = { name: 'Ada Lovelace', account: { homePage: 'https://lms.example', name: 'ada' } }
+
 async function main() {
   if (flag('--down')) {
     await run('docker', ['compose', 'down', '-v'], { cwd: stackDir })
@@ -144,12 +146,14 @@ async function main() {
   const launch = await api(`/course/${course.id}/launch-url/0`, {
     method: 'POST',
     token,
-    body: { actor: { name: 'Ada Lovelace', account: { homePage: 'https://lms.example', name: 'ada' } }, returnUrl }
+    body: { actor: ACTOR, returnUrl }
   })
   const registration = new URL(launch.url).searchParams.get('registration')
   log(`session #${launch.id}, launchMethod ${launch.launchMethod}`)
 
   let failedSends = []
+  /** The second launch of the registration, in the headless run. */
+  let again = null
   if (flag('--open')) {
     console.log(`\nOpen this in a browser, play, and press Exit:\n\n  ${launch.url}\n`)
     log('waiting for the session to end (Ctrl+C to stop)')
@@ -184,15 +188,7 @@ async function main() {
 
     // Completion stands in for playing all four questions: the element's own `finished` event,
     // with a passing score, which is what H5P raises at the end of the quiz.
-    await page.evaluate(() => {
-      const completed = {
-        actor: { name: 'H5P user' },
-        verb: { id: 'http://adlnet.gov/expapi/verbs/completed', display: { 'en-US': 'completed' } },
-        object: { objectType: 'Activity', id: 'https://player.example/h5p/virtual/pkg/content' },
-        result: { score: { raw: 4, max: 4 }, completion: true }
-      }
-      document.querySelector('h5p-player').dispatchEvent(new CustomEvent('finished', { detail: { statement: completed } }))
-    })
+    await finish(page, 4)
     const dump = async () => {
       const status = await page.evaluate(() => document.querySelector('#status')?.textContent ?? '').catch(() => '')
       const pageLog = await page.evaluate(() => document.querySelector('#log')?.textContent ?? '').catch(() => '')
@@ -208,6 +204,26 @@ async function main() {
     }
     const { pageLog } = await dump()
     failedSends = pageLog.split('\n').filter((line) => /failed to send|could not record/.test(line))
+
+    // The LMS launches the same registration again, in Normal mode, as it may: the result is in,
+    // so the page must send neither a second `passed` or `completed` nor a `failed` after the
+    // `passed`, even for a failing score (9.3.0.0-6 to 9.3.0.0-8).
+    again = await api(`/course/${course.id}/launch-url/0`, {
+      method: 'POST',
+      token,
+      body: { actor: ACTOR, returnUrl, reg: registration, launchMode: 'Normal' }
+    })
+    log(`session #${again.id}, the same registration launched again`)
+    const second = await browser.newPage()
+    second.on('pageerror', (error) => log(`page error: ${error.message}`))
+    await second.goto(again.url)
+    await waitForStatus(second, 'Launched', 60_000)
+    await finish(second, 1)
+    await second.waitForFunction(() => /already recorded its result/.test(document.querySelector('#log')?.textContent ?? ''), null, { timeout: 30_000 })
+    await second.click('#exit')
+    await second.waitForURL((url) => url.href.startsWith(returnUrl), { timeout: 30_000 }).catch(() => log('did not reach the return URL'))
+    const secondLog = await second.evaluate(() => document.querySelector('#log')?.textContent ?? '').catch(() => '')
+    failedSends.push(...secondLog.split('\n').filter((line) => /failed to send|could not record/.test(line)))
     await browser.close()
   }
 
@@ -215,8 +231,10 @@ async function main() {
   const statements = await fetch(`${lrs}/statements?registration=${registration}&ascending=true&limit=100`, {
     headers: { Authorization: LRS_AUTH, 'X-Experience-API-Version': '1.0.3' }
   }).then((r) => r.json())
-  const verbIds = (statements.statements ?? []).map((s) => s.verb.id.slice(s.verb.id.lastIndexOf('/') + 1))
-  const once = (verb) => verbIds.filter((v) => v === verb).length === 1
+  const isDefined = (s) => (s.context?.contextActivities?.category ?? []).some((c) => c.id === 'https://w3id.org/xapi/cmi5/context/categories/cmi5')
+  /** How many cmi5-defined statements with this verb the registration holds. */
+  const defined = (verb) => (statements.statements ?? []).filter((s) => isDefined(s) && s.verb.id.endsWith(`/${verb}`)).length
+  const sessions = again ? 2 : 1
   const realStatements = (statements.statements ?? []).filter((s) => s.context?.revision && !(s.context?.contextActivities?.category ?? []).some((c) => c.id === 'https://w3id.org/xapi/cmi5/context/categories/cmi5'))
   const verbs = (statements.statements ?? []).map((s) => {
     const verb = s.verb.id.slice(s.verb.id.lastIndexOf('/') + 1)
@@ -237,9 +255,18 @@ async function main() {
   await vite?.close()
   const complete = has('isInitialized') && has('isTerminated') && (flag('--open') || (has('isCompleted') && (has('isPassed') || has('isFailed'))))
   const contentReached = flag('--open') || realStatements.length > 0
-  if (!once('initialized') || !once('terminated')) console.log(`\n\`initialized\` and \`terminated\` must each go out once; the LRS has ${verbIds.filter((v) => v === 'initialized').length} and ${verbIds.filter((v) => v === 'terminated').length}`)
+  const perSession = defined('initialized') === sessions && defined('terminated') === sessions
+  if (!perSession) console.log(`\n\`initialized\` and \`terminated\` must each go out once per session, ${sessions} here; the LRS has ${defined('initialized')} and ${defined('terminated')}`)
+  const perRegistration = defined('completed') <= 1 && defined('passed') <= 1 && !(defined('passed') && defined('failed'))
+  if (!perRegistration) console.log(`\n\`completed\` and \`passed\` may each go out once per registration, and \`failed\` not after \`passed\`; the LRS has ${defined('completed')}, ${defined('passed')} and ${defined('failed')}`)
+  let againEnded = true
+  if (again) {
+    const later = await api(`/session/${again.id}`, { token })
+    againEnded = sessionFlag(later, 'isTerminated')
+    console.log(`\nThe second session: ${againEnded ? 'terminated' : 'not terminated'}`)
+  }
   if (!contentReached) console.log('\nNo statement from the content itself reached the LRS')
-  const ok = complete && once('initialized') && once('terminated') && contentReached && failedSends.length === 0
+  const ok = complete && perSession && perRegistration && againEnded && contentReached && failedSends.length === 0
   console.log(`\n${ok ? 'PASS' : 'FAIL'}: ${ok ? 'the sequence is complete and nothing was rejected' : 'see above'}`)
   log(`the stack stays up for the next run; \`pnpm cmi5:catapult --down\` removes it`)
   process.exit(ok ? 0 : 1)
@@ -249,6 +276,19 @@ main().catch((error) => {
   console.error(`[cmi5-catapult] ${error.stack ?? error}`)
   process.exit(1)
 })
+
+/** The element's `finished` event with a score out of four, which is what H5P raises at the end of the quiz. */
+function finish(page, raw) {
+  return page.evaluate((raw) => {
+    const completed = {
+      actor: { name: 'H5P user' },
+      verb: { id: 'http://adlnet.gov/expapi/verbs/completed', display: { 'en-US': 'completed' } },
+      object: { objectType: 'Activity', id: 'https://player.example/h5p/virtual/pkg/content' },
+      result: { score: { raw, max: 4 }, completion: true }
+    }
+    document.querySelector('h5p-player').dispatchEvent(new CustomEvent('finished', { detail: { statement: completed } }))
+  }, raw)
+}
 
 /** Waits for the page's status line to start with `prefix`; on a timeout, says what it showed instead. */
 async function waitForStatus(page, prefix, timeout) {

@@ -13,8 +13,9 @@ What it does, once the LMS opens your page:
 - relays every statement the content emits to the LMS's LRS, with the launch actor, the
   registration and the LMS's context template merged in, and the build's `context.revision`
   kept, so the LRS knows which version of the package each result came from;
-- when the content finishes, sends `passed` or `failed` by the launch's mastery score, and
-  `completed`, once per session;
+- when the content finishes, sends `passed` or `failed` — by the launch's mastery score, or by
+  the content's own pass mark when the launch has none — and `completed`, each once per
+  registration: a later session of the same registration does not send them again;
 - sends `terminated` when your Exit button calls `session.exit()`, then returns the learner to
   the LMS.
 
@@ -85,7 +86,7 @@ run without one. The package URL must send CORS headers, as for any use of the p
 
 | Option | Default | What it is for |
 |---|---|---|
-| `onEvent(event)` | none | Told about each step: `initialized`, `sent`, `rejected` with the LMS's reason, `recorded` with `passed` or `failed`, `skipped` in Browse and Review mode, `terminated`, `unsafe-return-url` |
+| `onEvent(event)` | none | Told about each step: `initialized`, `sent`, `rejected` with the LMS's reason, `recorded` with what went out now, `skipped` in Browse and Review mode or when an earlier session recorded the result, `registration-unread`, `terminated`, `unsafe-return-url` |
 | `src` | the address's `src`, then `launchParameters` | The package to play; `false` leaves the element's `src` to you |
 | `storage` | `localStorage` | Where the session is kept across a reload; `null` for nowhere |
 | `client` | `createCmi5Client()` on this page's launch | A client of your own: a simulated LMS, a test double |
@@ -112,6 +113,15 @@ address.
   and its minimum is 0.
 - **The return address is followed only if it is `http` or `https`.** A `javascript:` value
   would run in your page when the learner presses Exit.
+- **The result goes out once per registration.** At startup the package asks the LRS whether
+  an earlier session of this registration already sent `completed` or `passed`, and does not
+  send them again, nor `failed` after a `passed`; a learner who failed can still pass in a later
+  session. An LRS that will not answer the question leaves each session to count for itself, and
+  the package says so with a `registration-unread` event.
+- **Only `passed` and `failed` carry the score**, as cmi5 requires; `completed` never does.
+  Without a mastery score in the launch, the content's own verdict — H5P's `success`, from its
+  pass percentage — decides between them.
+- **Every statement carries a UUID id and a UTC timestamp.**
 - **Browse and Review launches record no result.**
 - **The LMS's context template is never overwritten.** A statement's own context is kept and
   added to, but where it names a value the template also sets, the template's wins.
@@ -122,10 +132,6 @@ It does not apply the learner's audio preference. The specification has the assi
 turn audio on or off at startup by it, and the element has no audio control; the preference is
 on the session and on the `initialized` event, as `learnerPreferences.audioPreference`, for your
 page to act on.
-
-It keeps `completed` and `passed` to once per launch, a reload included, not once per
-registration. An LMS that launches the same registration again after a completion receives them
-again.
 
 It does not turn H5P's interactions into cmi5 interaction statements. H5P's own statements carry
 the answers, and the LRS keeps them as they are. cmi5 has no state document for content, so the

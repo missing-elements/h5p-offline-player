@@ -17,9 +17,9 @@
  * outcome went out, so a reload resumes without a second `initialized` or `completed`.
  */
 
-import { createCmi5Client, launchParametersOf } from './client.js'
+import { createCmi5Client, judge, launchParametersOf } from './client.js'
 
-export { Cmi5RequestError, createCmi5Client, isoDuration, launchParametersOf, type Cmi5ClientOptions } from './client.js'
+export { Cmi5RequestError, createCmi5Client, isoDuration, judge, launchParametersOf, type Cmi5ClientOptions } from './client.js'
 
 /* ------------------------------------------------------------------ types */
 
@@ -52,6 +52,16 @@ export interface LearnerPreferences {
   audioPreference?: 'on' | 'off'
 }
 
+/**
+ * What earlier sessions of this registration recorded, read from the LRS on `initialize`. With
+ * `unread`, the LRS would not say, and the two flags only count this session.
+ */
+export interface RegistrationHistory {
+  completed: boolean
+  passed: boolean
+  unread?: string
+}
+
 /** A score as cmi5 records it: `min` and `max` are required beside `raw`. */
 export interface Cmi5Score {
   scaled: number
@@ -68,9 +78,15 @@ export interface Cmi5Client {
   getInitializedDate(): Date
   /** The learner's preferences, read on `initialize`; a client without them reports none. */
   getLearnerPreferences?(): LearnerPreferences
+  /** What the registration already holds; a client without it leaves `moveOn` to decide alone. */
+  getRegistrationHistory?(): RegistrationHistory
   initialize(state?: { authToken: string; initializedDate: Date }): Promise<unknown>
   sendXapiStatement(statement: Statement): Promise<unknown>
-  moveOn(options: { score?: Cmi5Score; disableSendTerminated?: boolean }): Promise<unknown>
+  /**
+   * `passed` or `failed`, then `completed`, then `terminated` unless disabled. `success` is the
+   * content's own verdict, used when the launch has no mastery score.
+   */
+  moveOn(options: { score?: Cmi5Score; success?: boolean; disableSendTerminated?: boolean }): Promise<unknown>
   terminate(): Promise<unknown>
 }
 
@@ -89,7 +105,18 @@ export type Cmi5Event =
     }
   | { type: 'sent'; verb: string; statement: Statement }
   | { type: 'rejected'; verb: string; reason: string; statement?: Statement }
-  | { type: 'recorded'; outcome: 'passed' | 'failed' | null }
+  | {
+      type: 'recorded'
+      /** `passed` or `failed` went out now; null when there was no mastery score, or the registration had passed. */
+      outcome: 'passed' | 'failed' | null
+      /** `completed` went out now; false when an earlier session of the registration sent it. */
+      completed: boolean
+    }
+  | {
+      type: 'registration-unread'
+      /** Why the LRS did not say what earlier sessions recorded; `completed` and `passed` are then kept once per session only. */
+      reason: string
+    }
   | { type: 'skipped'; reason: string }
   | { type: 'terminated' }
   | { type: 'unsafe-return-url'; value: string }
@@ -159,7 +186,7 @@ export function allowedStatement(statement: Statement, launch: LaunchParameters,
     ...statement,
     id: typeof statement.id === 'string' && UUID.test(statement.id) ? statement.id : crypto.randomUUID(),
     actor: launch.actor,
-    timestamp: statement.timestamp ?? new Date().toISOString(),
+    timestamp: utcTimestamp(statement.timestamp),
     // The template's values win: the AU may add to the context, never overwrite it (10.2.1.0-7).
     context: {
       ...own,
@@ -206,6 +233,12 @@ export function rejectionReason(error: unknown): string {
   }
   if (typeof data === 'string' && data) return data
   return error instanceof Error ? error.message : String(error)
+}
+
+/** The statement's own time in UTC, which cmi5 requires of every statement (9.7.0.0-2); now, when it has none it can be read by. */
+function utcTimestamp(value: unknown): string {
+  const time = typeof value === 'string' ? Date.parse(value) : NaN
+  return new Date(Number.isNaN(time) ? Date.now() : time).toISOString()
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -308,7 +341,10 @@ export async function startCmi5(player: PlayerLike, options: Cmi5Options = {}): 
     else void send(allowedStatement(statement, launch, data))
   }
 
-  /** The content finished: the outcome, the cmi5 way, once per session, reloads included. */
+  /**
+   * The content finished: the outcome, the cmi5 way. Once per session, reloads included, and
+   * once per registration as far as the LRS says: what an earlier session sent is not sent again.
+   */
   const record = async (detail: Statement) => {
     if (!client || !data || movedOn || terminated) return
     movedOn = true
@@ -317,19 +353,33 @@ export async function startCmi5(player: PlayerLike, options: Cmi5Options = {}): 
       return
     }
     const score = cmi5Score(detail?.statement?.result?.score)
-    // As the client judges: `passed` or `failed` only with a score and a mastery score.
-    const outcome = score && data.masteryScore ? (score.scaled >= data.masteryScore ? 'passed' : 'failed') : null
+    const result = detail?.statement?.result
+    const success = typeof result?.success === 'boolean' ? (result.success as boolean) : undefined
+    const history = client.getRegistrationHistory?.()
+    // As the client judges: against the mastery score, else by the content's own verdict; neither
+    // once the registration has passed, and `completed` once per registration.
+    const passed = judge(score, success, data.masteryScore)
+    const outcome = history?.passed || passed === null ? null : passed ? 'passed' : 'failed'
+    const completes = !history?.completed
+    if (!outcome && !completes) {
+      emit({ type: 'skipped', reason: 'this registration already recorded its result in an earlier session' })
+      keepMovedOn()
+      return
+    }
     try {
       // `terminated` is left for the host's Exit, so the learner can keep going.
-      await client.moveOn({ ...(score ? { score } : {}), disableSendTerminated: true })
-      if (kept) {
-        kept = { ...kept, movedOn: true }
-        writeKept(storage, key, kept)
-      }
-      emit({ type: 'recorded', outcome })
+      await client.moveOn({ ...(score ? { score } : {}), ...(success === undefined ? {} : { success }), disableSendTerminated: true })
+      keepMovedOn()
+      emit({ type: 'recorded', outcome, completed: completes })
     } catch (error) {
       emit({ type: 'rejected', verb: outcome ?? 'completed', reason: rejectionReason(error) })
     }
+  }
+
+  const keepMovedOn = () => {
+    if (!kept) return
+    kept = { ...kept, movedOn: true }
+    writeKept(storage, key, kept)
   }
 
   const onXapi = (event: Event) => relay((event as CustomEvent).detail?.statement)
@@ -374,6 +424,8 @@ export async function startCmi5(player: PlayerLike, options: Cmi5Options = {}): 
     }
 
     const learnerPreferences = client.getLearnerPreferences?.() ?? {}
+    const unread = client.getRegistrationHistory?.().unread
+    if (unread) emit({ type: 'registration-unread', reason: unread })
     emit({ type: 'initialized', resumed: Boolean(saved), launchParameters: launch, launchData: data, learnerPreferences, returnURL })
     const boundClient = client
     const boundLaunch = launch

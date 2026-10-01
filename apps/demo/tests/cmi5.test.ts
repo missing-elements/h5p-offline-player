@@ -29,7 +29,7 @@ let playerOrigin: string
 let lmsOrigin: string
 const received: Statement[] = []
 let returned = 0
-/** Calls to `fetch`, per registration. */
+/** Calls to `fetch`, per launch: a registration, and which of its launches. */
 const fetches = new Map<string, number>()
 /** What a launch's data differs by from the default, per registration. */
 const launchOverrides = new Map<string, Statement>()
@@ -59,9 +59,9 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
   const url = new URL(req.url!, lmsOrigin)
   if (req.method === 'OPTIONS') return void res.writeHead(204).end()
   if (req.method === 'POST' && url.pathname === '/fetch') {
-    const registration = url.searchParams.get('reg') ?? ''
-    const calls = (fetches.get(registration) ?? 0) + 1
-    fetches.set(registration, calls)
+    const launch = `${url.searchParams.get('reg') ?? ''}#${url.searchParams.get('launch') ?? '1'}`
+    const calls = (fetches.get(launch) ?? 0) + 1
+    fetches.set(launch, calls)
     const delay = Number(url.searchParams.get('delay') ?? 0)
     if (delay) await new Promise((r) => setTimeout(r, delay))
     if (calls > 1) return json(res, 200, { 'error-code': '1', 'error-text': 'Already in Use' })
@@ -81,6 +81,12 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     })
   }
   if (url.pathname === '/lrs/agents/profile') return json(res, 404, {})
+  if (url.pathname === '/lrs/statements' && req.method === 'GET') {
+    // The query an LRS answers: by verb, by the object's id, by registration.
+    const q = url.searchParams
+    const found = received.filter((s) => s.verb?.id === q.get('verb') && s.object?.id === q.get('activity') && s.context?.registration === q.get('registration'))
+    return json(res, 200, { statements: found.slice(0, Number(q.get('limit')) || undefined), more: '' })
+  }
   if (url.pathname === '/lrs/statements' && (req.method === 'PUT' || req.method === 'POST')) {
     const parsed = JSON.parse(await body(req))
     const statements: Statement[] = Array.isArray(parsed) ? parsed : [parsed]
@@ -127,11 +133,11 @@ const waitForVerb = async (verb: string, defined = false, registration = REGISTR
 }
 
 /** The address an LMS would open: the AU URL with the five launch parameters, the token endpoint told which launch it is for. */
-const launchUrl = (registration: string, { delay = 0 } = {}) =>
+const launchUrl = (registration: string, { delay = 0, launch = 1 } = {}) =>
   `${playerOrigin}/demo/cmi5.html?${new URLSearchParams({
     src: `${playerOrigin}/demo/content/how-it-works.h5p`,
     endpoint: `${lmsOrigin}/lrs/`,
-    fetch: `${lmsOrigin}/fetch?reg=${registration}${delay ? `&delay=${delay}` : ''}`,
+    fetch: `${lmsOrigin}/fetch?reg=${registration}&launch=${launch}${delay ? `&delay=${delay}` : ''}`,
     actor: JSON.stringify(ACTOR),
     registration,
     activityId: ACTIVITY
@@ -221,7 +227,7 @@ it('resumes after a reload, with no new token, no second initialized and no term
 
   await page.reload()
   await page.waitForFunction(() => document.querySelector('#status')!.textContent!.startsWith('Resumed'))
-  expect(fetches.get(registration)).toBe(1)
+  expect(fetches.get(`${registration}#1`)).toBe(1)
   expect(ofLaunch(registration).map(verbOf)).toEqual(['initialized'])
 
   // The session is still open: a statement from the content is accepted after the reload.
@@ -263,6 +269,36 @@ it('does not send the learner to a returnURL that is not a web address', async (
   expect(await page.title()).not.toBe('ran')
   expect(await page.textContent('#log')).toContain('ignored a returnURL')
   await page.close()
+})
+
+it('sends no second passed or completed in a later launch of the same registration', async () => {
+  const registration = 'a7c3e1f0-5b2d-4e8a-9c6f-1d0b3a2e4f5c'
+  const finish = (page: import('playwright').Page) =>
+    page.evaluate(() => {
+      const statement = { actor: { name: 'H5P user' }, verb: { id: 'http://adlnet.gov/expapi/verbs/completed' }, object: { id: 'https://x/content', objectType: 'Activity' }, result: { score: { raw: 2, max: 2 }, completion: true }, context: { revision: 'sha256:abc' } }
+      document.querySelector('h5p-player')!.dispatchEvent(new CustomEvent('finished', { detail: { statement } }))
+    })
+  const defined = (verb: string) => ofLaunch(registration).filter((s) => verbOf(s) === verb && isDefined(s))
+
+  const first = await browser.newPage()
+  await first.goto(launchUrl(registration))
+  await first.waitForFunction(() => document.querySelector('#status')!.textContent!.startsWith('Launched'))
+  await finish(first)
+  await first.waitForFunction(() => document.querySelector('#status')!.textContent!.startsWith('Recorded'))
+  await first.click('#exit')
+  await waitForVerb('terminated', true, registration)
+  await first.close()
+
+  // The LMS launches the registration again: a new token, a new session, the result already in.
+  const second = await browser.newPage()
+  await second.goto(launchUrl(registration, { launch: 2 }))
+  await second.waitForFunction(() => document.querySelector('#status')!.textContent!.startsWith('Launched'))
+  await finish(second)
+  await second.waitForFunction(() => document.querySelector('#log')!.textContent!.includes('already recorded its result'))
+  expect(defined('initialized')).toHaveLength(2)
+  expect(defined('passed')).toHaveLength(1)
+  expect(defined('completed')).toHaveLength(1)
+  await second.close()
 })
 
 it('simulates a launch with ?simulate, sending nothing', async () => {

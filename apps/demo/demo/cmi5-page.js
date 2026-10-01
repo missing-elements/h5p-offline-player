@@ -11,7 +11,7 @@
  * lands in the log instead.
  */
 
-import { isCmi5Launch, startCmi5 } from '@missing-elements/h5p-cmi5'
+import { isCmi5Launch, judge, startCmi5 } from '@missing-elements/h5p-cmi5'
 
 const player = document.querySelector('h5p-player')
 const status = document.querySelector('#status')
@@ -73,11 +73,14 @@ async function start(client, simulated) {
         note(`failed to send ${event.verb}: ${event.reason}`)
         break
       case 'recorded':
-        if (!simulated) note(`sent  ${event.outcome ? `${event.outcome}, ` : ''}completed`)
+        if (!simulated) note(`sent  ${[event.outcome, event.completed && 'completed'].filter(Boolean).join(', ')}`)
         say(`Recorded. ${simulated ? 'Exit sends terminated.' : returnURL ? 'Exit returns to the course.' : 'You can close this window.'}`)
         break
       case 'skipped':
         note(`finished: ${event.reason}`)
+        break
+      case 'registration-unread':
+        note(`could not read what earlier sessions recorded, so this one counts alone: ${event.reason}`)
         break
       case 'terminated':
         if (!simulated) note('sent  terminated')
@@ -171,14 +174,13 @@ function simulatedLms() {
     },
     // The page logs what it hands over, so nothing to do: the statement is already on screen.
     async sendXapiStatement() {},
-    async moveOn({ score } = {}) {
-      if (score && data.masteryScore) {
-        const passed = score.scaled >= data.masteryScore
-        const statement = defined(passed ? 'passed' : 'failed', { result: { score, success: passed, duration: duration() } })
+    async moveOn({ score, success } = {}) {
+      const passed = judge(score, success, data.masteryScore)
+      if (passed !== null) {
+        const statement = defined(passed ? 'passed' : 'failed', { result: { ...(score ? { score } : {}), success: passed, duration: duration() } })
         note(`sent  ${passed ? 'passed' : 'failed'}\n${JSON.stringify(statement, null, 2)}`)
       }
-      const result = { completion: true, duration: duration(), ...(score && !data.masteryScore ? { score } : {}) }
-      const statement = defined('completed', { result })
+      const statement = defined('completed', { result: { completion: true, duration: duration() } })
       note(`sent  completed\n${JSON.stringify(statement, null, 2)}`)
     },
     async terminate() {

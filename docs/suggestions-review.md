@@ -97,13 +97,19 @@ building when the app gets an LRS setting; without one there is nothing to flush
 The player is the content half of a cmi5 assignable unit. What cmi5 needs is on the page around
 it: reading `endpoint`, `fetch`, `actor`, `registration` and `activityId` from the launch URL,
 posting to `fetch` for the token, fetching the `LMS.LaunchData` state document for the context
-template, sending `initialized`, wrapping H5P's statements as "allowed" statements with that
-template, turning `finished` into `completed` or `passed`/`failed` under the launch data's
-`moveOn` and `masteryScore`, and sending `terminated` on unload. The element already gives a
-page everything it needs for that: `xapi`, `finished` with the score, and `revision`.
+template and the learner preferences, sending `initialized`, wrapping H5P's statements as
+"allowed" statements with that template, turning `finished` into `completed` or
+`passed`/`failed` under the launch data's `moveOn` and `masteryScore`, and sending `terminated`
+on Exit. The element already gives a page everything it needs for that: `xapi`, `finished` with
+the score, and `revision`.
 
-Worth an example page and a guide when a host asks for it; a wrapper package if more than one
-does. Not a change to the element.
+Built on 2026-10-01 as that, not as a change to the element: the package
+[`@missing-elements/h5p-cmi5`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/cmi5)
+and the demo's `/demo/cmi5.html` on it, checked against ADL's CATAPULT player and launched from
+SCORM Cloud; [docs/cmi5.md](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/cmi5.md)
+is the guide. One thing this note had wrong: `terminated` is not sent on unload. A page cannot
+tell a reload from a closed tab, and a `terminated` on a reload ends the session the reloaded
+page goes on using; a tab closed without Exit is the LMS's to record as `abandoned`.
 
 ## In short
 
@@ -116,7 +122,7 @@ does. Not a change to the element.
 | ARIA on the frame | `title` built; `role="application"` is wrong | `frame-title` attribute, if asked |
 | Accessibility linter | premise wrong | the verifier lists content types and versions |
 | Offline statement queue | not built; not for the element | in the app, once it has an LRS setting |
-| cmi5 | not built; a wrapper page | an example page, if asked |
+| cmi5 | built, as `@missing-elements/h5p-cmi5` and a demo page | nothing |
 
 Of the three directions the note asks about, the one that fits the codebase now is the
 verifier's content digest: it serves the same CI/CD audience, it is small, and it makes no

@@ -8,7 +8,7 @@
  * retrieve them on startup (11.0.0.0-3), and CATAPULT refuses the launch when it does not.
  */
 
-import type { Cmi5Client, LaunchData, LaunchParameters, LearnerPreferences, Statement } from './index.js'
+import type { Cmi5Client, Cmi5Score, LaunchData, LaunchParameters, LearnerPreferences, RegistrationHistory, Statement } from './index.js'
 
 const XAPI_VERSION = '1.0.3'
 const VERBS = 'http://adlnet.gov/expapi/verbs/'
@@ -100,6 +100,9 @@ export function createCmi5Client(options: Cmi5ClientOptions = {}): Cmi5Client {
   let initializedDate: Date | null = null
   let data: LaunchData | null = null
   let preferences: LearnerPreferences = {}
+  let history: RegistrationHistory = { completed: false, passed: false }
+  /** One of `passed` and `failed` per session (9.3.0.0-3), whatever the registration holds. */
+  let judgedThisSession = false
 
   const ready = () => {
     if (!authToken || !initializedDate || !data) throw new Error('The cmi5 session is not initialized.')
@@ -155,6 +158,34 @@ export function createCmi5Client(options: Cmi5ClientOptions = {}): Cmi5Client {
     }
   }
 
+  /**
+   * Whether an earlier session of this registration already sent `completed` or `passed`: each
+   * goes out once per registration (9.3.0.0-6, 9.3.0.0-7), and `failed` never after `passed`
+   * (9.3.0.0-8). One statements query per verb, about this AU, this learner, this registration.
+   * An LRS that will not answer leaves the session to its own count, and says why.
+   */
+  const registrationHistory = async (): Promise<RegistrationHistory> => {
+    const has = async (verb: string) => {
+      const query = new URLSearchParams({
+        agent: JSON.stringify(launch.actor),
+        verb: `${VERBS}${verb}`,
+        activity: launch.activityId,
+        registration: launch.registration,
+        limit: '1'
+      })
+      const found = await lrs(`statements?${query}`, { cache: 'no-store' })
+      const statements = (found as { statements?: unknown } | null)?.statements
+      if (!Array.isArray(statements)) throw new Error('the LRS answered the statements query with no statements list')
+      return statements.length > 0
+    }
+    try {
+      const [completed, passed] = await Promise.all([has('completed'), has('passed')])
+      return { completed, passed }
+    } catch (error) {
+      return { completed: false, passed: false, unread: error instanceof Error ? error.message : String(error) }
+    }
+  }
+
   const duration = () => isoDuration(ready().initializedDate, new Date())
 
   return {
@@ -169,6 +200,10 @@ export function createCmi5Client(options: Cmi5ClientOptions = {}): Cmi5Client {
       ready()
       return preferences
     },
+    getRegistrationHistory: () => {
+      ready()
+      return history
+    },
 
     async initialize(state) {
       authToken = state?.authToken ?? (await fetchToken(request, launch.fetch))
@@ -182,6 +217,8 @@ export function createCmi5Client(options: Cmi5ClientOptions = {}): Cmi5Client {
       if (!launchData || typeof launchData !== 'object') throw new Error('The LMS gave no launch data (LMS.LaunchData).')
       data = launchData as LaunchData
       preferences = await learnerPreferences()
+      // Only a Normal launch records an outcome, so only it needs to know what is recorded.
+      if (data.launchMode === 'Normal') history = await registrationHistory()
       if (state) {
         initializedDate = state.initializedDate
         return
@@ -192,32 +229,51 @@ export function createCmi5Client(options: Cmi5ClientOptions = {}): Cmi5Client {
 
     sendXapiStatement: send,
 
-    async moveOn({ score, disableSendTerminated } = {}) {
+    async moveOn({ score, success, disableSendTerminated } = {}) {
       const { data } = ready()
       if (data.launchMode !== 'Normal') throw new Error(`Nothing may be recorded in ${data.launchMode} mode.`)
       const mastery = data.masteryScore
       const statements: Statement[] = []
-      // `passed` or `failed` only against a mastery score; without one the score rides on `completed`.
-      if (score && mastery) {
-        const passed = score.scaled >= mastery
+      const passed = judge(score, success, mastery)
+      // Neither `passed` nor `failed` once the registration has passed (9.3.0.0-7, 9.3.0.0-8),
+      // and no second `completed` (9.3.0.0-6).
+      if (passed !== null && !history.passed && !judgedThisSession) {
+        judgedThisSession = true
         statements.push(defined(passed ? 'passed' : 'failed', {
-          result: { score, success: passed, duration: duration() },
+          result: { ...(score ? { score } : {}), success: passed, duration: duration() },
           category: [MOVE_ON_CATEGORY],
-          extensions: { [MASTERY_SCORE]: mastery }
+          ...(mastery ? { extensions: { [MASTERY_SCORE]: mastery } } : {})
         }))
       }
-      statements.push(defined('completed', {
-        result: { ...(score && !mastery ? { score } : {}), completion: true, duration: duration() },
-        category: [MOVE_ON_CATEGORY]
-      }))
+      // No score here: only `passed` and `failed` may carry one (9.5.1.0-2).
+      if (!history.completed) {
+        statements.push(defined('completed', {
+          result: { completion: true, duration: duration() },
+          category: [MOVE_ON_CATEGORY]
+        }))
+      }
       if (!disableSendTerminated) statements.push(defined('terminated', { result: { duration: duration() } }))
-      for (const statement of statements) await send(statement)
+      for (const statement of statements) {
+        await send(statement)
+        const verb = statement.verb.display['en-US']
+        if (verb === 'completed') history = { ...history, completed: true }
+        if (verb === 'passed') history = { ...history, passed: true }
+      }
     },
 
     async terminate() {
       await send(defined('terminated', { result: { duration: duration() } }))
     }
   }
+}
+
+/**
+ * Passed (true), failed (false) or neither (null). Against the mastery score when the launch has
+ * one, which needs a score (9.5.1.0-1, 10.2.4.0-2); without one, by the content's own verdict.
+ */
+export function judge(score: Cmi5Score | undefined, success: boolean | undefined, mastery: number | undefined): boolean | null {
+  if (mastery) return score ? score.scaled >= mastery : null
+  return typeof success === 'boolean' ? success : null
 }
 
 /** The `fetch` URL answers once with `auth-token`, or with `error-code` and `error-text`, possibly under a 200. */

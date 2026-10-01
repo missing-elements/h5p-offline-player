@@ -1010,15 +1010,28 @@ SPA-fallback trap described above cannot happen there.
   refused by CATAPULT at once — 11.0.0.0-3, the AU MUST retrieve them on startup — so they are
   read, and handed to the host for the audio preference the element cannot apply.
   `tests/requirements.test.ts` reads ADL's own requirement list, `@cmi5/requirements` (a dev
-  dependency, the list CATAPULT checks against), selects the requirements whose subject is the
-  AU, and fails unless each is answered: `tested`, with its number in a comment beside the test
-  that shows it, or `catapult`, `host`, `gap`, `n/a`, `lms` or `umbrella` with a reason. Going
-  through it found two things: the context template was spread *under* the statement's own
-  context, so a statement could overwrite a template value, which 10.2.1.0-7 forbids — the
-  template wins now; and `completed`/`passed` are kept once per launch, not once per
-  registration as 9.3.3.0-2 and 9.3.4.0-3 ask, recorded as a gap, since knowing would take
-  reading the registration's statements from the LRS. What follows was learned while the wiring
-  was the page's.
+  dependency, the list CATAPULT checks against), selects every requirement whose subject is not
+  plainly the LMS, and fails unless each is answered: `tested`, with its number in a comment
+  beside the test that shows it, or `catapult`, `host`, `design`, `course`, `gap`, `n/a`, `lms`
+  or `umbrella` with a reason. The filter once kept only requirements that name the AU, and so
+  missed every rule on the verbs and the result properties, which never do ("Verbs MUST NOT be
+  duplicated"). Going through the list found four things, all fixed on 2026-10-01: the context
+  template was spread *under* the statement's own context, so a statement could overwrite a
+  template value (10.2.1.0-7), and the template wins now; `completed` carried the score when the
+  launch had no mastery score, as `@xapi/cmi5` did, which only `passed` and `failed` may
+  (9.5.1.0-2) — CATAPULT never saw it because the demo course has one — and without a mastery
+  score nothing could send `passed`, so a course with `moveOn="Passed"` could never be
+  satisfied, and the content's own `success` now decides (`judge`); the client alone would send
+  a second `failed` in a session if asked twice (9.3.0.0-3); and `completed` and `passed` were
+  kept once per launch, where cmi5 wants once per registration (9.3.0.0-6 to 9.3.0.0-8).
+  For the last, `initialize` asks the LRS, in a Normal launch, for this registration's
+  `completed` and `passed` about this AU — two statements queries, `limit=1` — and `moveOn`
+  sends neither again, nor `failed` after `passed`; an LRS that refuses the read leaves the
+  session counting for itself and raises `registration-unread`. CATAPULT's proxy passes a `GET`
+  on statements through, and `pnpm cmi5:catapult` launches the registration a second time, with
+  `reg` and `launchMode: 'Normal'` (it defaults to Review once satisfied), and expects
+  `initialized` and `terminated` and nothing else from it. What follows was learned while the
+  wiring was the page's.
   Chosen on 2026-09-30 over SCORM and LTI: the package stays on a static host, the AU can
   demand its own window (`launchMethod="OwnWindow"`), which is the one standard way to keep the
   player out of a cross-origin iframe and so out of the Safari and iOS gap, the token is per

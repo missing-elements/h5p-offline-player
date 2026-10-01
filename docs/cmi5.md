@@ -82,9 +82,13 @@ page, and on iOS the player then shows nothing.
    to the template, never overwrite it. H5P's own category, the content type's library, stays too; the cmi5
    category is not added, because that marks a cmi5-defined statement.
 3. **On the content's completion** — the `finished` event, which H5P raises with the score —
-   `passed` or `failed` by the mastery score when the launch set one, then `completed`. Without
-   a mastery score, `completed` with the score on it. In `Browse` and `Review` mode, nothing:
-   cmi5 forbids it.
+   `passed` or `failed`, then `completed`. With a mastery score in the launch, the score decides;
+   without one, H5P's own verdict does, the `success` its pass percentage sets. The score rides
+   on `passed` or `failed` only: cmi5 allows it on no other defined statement. Each goes out once
+   per registration, not once per session: at startup the page asks the LRS whether an earlier
+   session already sent `completed` or `passed`, and sends neither again, nor a `failed` after a
+   `passed`. An LRS that will not answer leaves the session to count for itself, which the
+   page's log says. In `Browse` and `Review` mode, nothing: cmi5 forbids it.
 4. **`terminated`** from the Exit button, which then goes to the launch's `returnURL` or closes
    the window. A learner who closes the tab instead leaves the session open, and the LMS closes
    it: cmi5 has the LMS record `abandoned` for a session that was never terminated. The page does
@@ -96,7 +100,8 @@ meanwhile: anything the content emits before `initialized` has gone out waits, a
 after it. The `fetch` URL answers once, so a reload of the page does not ask again: the token,
 the time `initialized` went out and whether the outcome was recorded are kept in the browser's
 storage for that launch, and the reload resumes the session without a second `initialized` or
-a second `completed`. Every relayed statement gets an id, which the player checks for. A score
+a second `completed`. Every relayed statement carries a UUID id, as cmi5 requires: its own if
+it has one, a new one if not. A score
 on `passed`, `failed` or `completed` carries `min` and `max` beside `raw`, as cmi5 requires;
 H5P gives `raw` and `max`, and its minimum is 0. `returnURL` is read from the launch data, where
 cmi5 puts it, and followed only if it is an `http` or `https` address: a `javascript:` value
@@ -126,12 +131,16 @@ pnpm cmi5:catapult --au '<AU URL>'  # launches another page instead of this dev 
 pnpm cmi5:catapult --down     # removes the stack and its data
 ```
 
-The script reads the session back from the player and the statements from the LRS, and fails
-if the sequence is incomplete, if `initialized` or `terminated` went out other than once, if no
-statement from the content itself arrived, or if anything was rejected. Passed on 2026-10-01,
-after a reload in mid-session: `initialized` once, the quiz's own `interacted` and `answered`
-with the package's `revision`, `passed`, `completed` and `terminated` once, all accepted, and
-the LMS side added `launched` and `satisfied`. The finish of the quiz is the element's
+After the first session, the headless run has CATAPULT launch the same registration again, in
+Normal mode, and finishes the quiz with a failing score. The script reads both sessions back
+from the player and the statements from the LRS, and fails if the sequence is incomplete, if
+`initialized` or `terminated` went out other than once per session, if the registration holds a
+second `completed` or `passed` or a `failed` after the `passed`, if no statement from the
+content itself arrived, or if anything was rejected. Passed on 2026-10-01: in the first session,
+after a reload in mid-session, `initialized` once, the quiz's own `interacted` and `answered`
+with the package's `revision`, `passed`, `completed` and `terminated`, all accepted, and the
+LMS side added `launched` and `satisfied`; in the second, `initialized` and `terminated` and
+nothing else. The finish of the quiz is the element's
 `finished` event dispatched by the script, not four questions played through. CATAPULT is
 fetched at a pinned commit and the LRS is a pinned release, the two that passed; the published
 ports listen on `127.0.0.1` only. The stack stays up between runs; the first run builds the
@@ -145,8 +154,8 @@ from a mock LMS and LRS and asserts the sequence above, including that `revision
 merge. `packages/cmi5/tests/requirements.test.ts` holds the package to ADL's list of the
 specification's requirements, `@cmi5/requirements`: every one that falls on the assignable unit
 is either named next to the test that shows it, shown by the CATAPULT run, left to the host
-page, or written down as a gap with the reason, and a requirement added to the list fails the
-test until someone places it.
+page or the LMS with the reason, or written down as a gap, and a requirement added to the list
+fails the test until someone places it. None is a gap today.
 
 A commercial LMS has launched it too: the hosted page, imported into SCORM Cloud's free tier
 from `apps/demo/demo/cmi5-course.zip`, played and recorded there on 2026-10-01. That run was
@@ -201,11 +210,8 @@ which is why an organisation with an internal LMS serves the page from an intern
 - It does not apply the learner's audio preference, which cmi5 has the AU apply at startup:
   the element has no audio control. The preference is on the session as
   `learnerPreferences.audioPreference`, for the page to act on.
-- It keeps `completed` and `passed` to once per launch, a reload included, rather than once per
-  registration, as cmi5 asks. An LMS that launches a registration again after a completion
-  receives them again; telling would mean reading the registration's statements from the LRS at
-  startup.
-- It does not resume. cmi5 has no state document for content; the player's `resume` attribute
-  keeps state on the device and works alongside if a host sets it.
+- It does not keep the content's own progress, beyond a reload resuming the session. cmi5 has
+  no state document for content; the player's `resume` attribute keeps it on the device and
+  works alongside if a host sets it.
 - It is not SCORM. An LMS without cmi5 needs a SCORM wrapper, which hosts the player and the
   package inside the LMS and has the framing caveat above.

@@ -70,29 +70,28 @@
         <p>
           <a href="/demo/cmi5-course.zip" download>Download the course structure</a>, zipped as an
           LMS wants it, and import it into an LMS that supports cmi5 &mdash; SCORM Cloud does, with a
-          free tier &mdash; then open the course. It is the structure below, naming this page and
-          the quiz. The LMS appends its five launch
-          parameters to the address. <code>launchMethod="OwnWindow"</code> makes it open the page
-          in a window of its own, top level, which is what lets the player run on every browser,
-          Safari and iOS included.
+          free tier &mdash; then open the course. It holds the structure below, naming this page
+          and the quiz. The LMS appends its five launch parameters to the address.
+          <code>launchMethod="OwnWindow"</code> makes it open the page in a window of its own, top
+          level, which is what lets the player run on every browser, Safari and iOS included.
         </p>
         <pre class="code">&lt;?xml version="1.0" encoding="utf-8"?&gt;
 &lt;courseStructure xmlns="https://w3id.org/xapi/profiles/cmi5/v1/CourseStructure.xsd"&gt;
-  &lt;course id="https://your-site.example/courses/quiz"&gt;
-    &lt;title&gt;&lt;langstring lang="en-US"&gt;Quiz&lt;/langstring&gt;&lt;/title&gt;
-    &lt;description&gt;&lt;langstring lang="en-US"&gt;A question set&lt;/langstring&gt;&lt;/description&gt;
+  &lt;course id="%SITE_URL%/courses/demo-quiz"&gt;
+    &lt;title&gt;&lt;langstring lang="en-US"&gt;h5p-offline-player: quiz&lt;/langstring&gt;&lt;/title&gt;
+    &lt;description&gt;&lt;langstring lang="en-US"&gt;The demo quiz, played by h5p-offline-player as a cmi5 assignable unit.&lt;/langstring&gt;&lt;/description&gt;
   &lt;/course&gt;
-  &lt;au id="https://your-site.example/courses/quiz/au" moveOn="CompletedAndPassed" masteryScore="0.8"
+  &lt;au id="%SITE_URL%/courses/demo-quiz/au" moveOn="CompletedAndPassed" masteryScore="0.8"
       launchMethod="OwnWindow"&gt;
     &lt;title&gt;&lt;langstring lang="en-US"&gt;Quiz&lt;/langstring&gt;&lt;/title&gt;
-    &lt;description&gt;&lt;langstring lang="en-US"&gt;A question set&lt;/langstring&gt;&lt;/description&gt;
+    &lt;description&gt;&lt;langstring lang="en-US"&gt;A four-question quiz on how the player works.&lt;/langstring&gt;&lt;/description&gt;
     &lt;url&gt;%SITE_URL%/demo/cmi5.html?src=%SITE_URL%/demo/content/quiz.h5p&lt;/url&gt;
   &lt;/au&gt;
 &lt;/courseStructure&gt;</pre>
         <p>
-          For a page and package of your own, zip a structure like it as <code>cmi5.xml</code>
-          and upload the zip. The package URL must send CORS headers,
-          as for any setup; this site&rsquo;s content does. Instead of <code>?src=</code>, the
+          For a page and package of your own, write a structure like it with your own ids and
+          address, zip it as <code>cmi5.xml</code> and import the zip. The package URL must send
+          CORS headers, as for any setup; this site&rsquo;s content does. Instead of <code>?src=</code>, the
           structure can carry the URL in <code>&lt;launchParameters&gt;</code>, which the page reads
           from the LMS.
         </p>

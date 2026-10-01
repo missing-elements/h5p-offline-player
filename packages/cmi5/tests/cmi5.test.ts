@@ -98,6 +98,11 @@ describe('the pure parts', () => {
     expect(allowedStatement({ ...answered, id }, LAUNCH, {}).id).toBe(id)
   })
 
+  it('puts every statement in UTC, its own time kept (9.7.0.0-1, 9.7.0.0-2)', () => {
+    expect(allowedStatement({ ...answered, timestamp: '2026-10-01T12:00:00+02:00' }, LAUNCH, {}).timestamp).toBe('2026-10-01T10:00:00.000Z')
+    expect(allowedStatement(answered, LAUNCH, {}).timestamp).toMatch(/Z$/)
+  })
+
   it('gives every statement a UUID id (9.1.0.0-1)', () => {
     expect(allowedStatement({ ...answered, id: 'not-a-uuid' }, LAUNCH, {}).id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
   })
@@ -133,7 +138,7 @@ describe('the pure parts', () => {
 })
 
 describe('startCmi5', () => {
-  // 7.1.1.0-1, 7.1.2.0-1, 7.1.3.0-1, 9.3.3.0-1, 9.3.8.0-1, 9.3.8.0-2, and in Normal mode
+  // 7.1.1.0-1, 7.1.2.0-1, 7.1.3.0-1, 9.3.0.0-5, 9.3.3.0-1, 9.3.8.0-1, 9.3.8.0-2, and in Normal mode
   // 10.2.2.0-1, 10.2.2.0-6, 10.2.2.0-7: initialized, then the content, the outcome on
   // completion, terminated last and nothing after it.
   it('sends initialized, relays the content\'s statements, records the outcome once and terminates', async () => {
@@ -158,7 +163,7 @@ describe('startCmi5', () => {
     const moveOns = calls.filter((c) => c.call === 'moveOn')
     expect(moveOns).toHaveLength(1)
     expect(moveOns[0].arg).toEqual({ score: { scaled: 0.75, raw: 3, min: 0, max: 4 }, disableSendTerminated: true })
-    expect(events).toContainEqual({ type: 'recorded', outcome: 'failed' })
+    expect(events).toContainEqual({ type: 'recorded', outcome: 'failed', completed: true })
 
     await session.terminate()
     await session.terminate()
@@ -172,7 +177,8 @@ describe('startCmi5', () => {
     expect(calls).toHaveLength(before)
   })
 
-  // 9.3.2.0-2: initialized is the first statement of the session, whatever the content emitted.
+  // 9.3.0.0-4, 9.3.2.0-2: initialized is the first statement of the session, whatever the
+  // content emitted.
   it('listens before the handshake, and sends what arrived meanwhile after initialized', async () => {
     const { client, calls, release } = fakeClient({}, { deferInitialize: true })
     const player = new FakePlayer()
@@ -234,6 +240,41 @@ describe('startCmi5', () => {
     const session = await startCmi5(player, { client, storage: null, url: 'https://au.example/' })
     expect(player.src).toBe('https://host/from-launch.h5p')
     expect(session.src).toBe('https://host/from-launch.h5p')
+  })
+
+  it('passes the content\'s own verdict on when the launch has no mastery score', async () => {
+    const { client, calls } = fakeClient({ masteryScore: undefined })
+    const events: Cmi5Event[] = []
+    const player = new FakePlayer()
+    await startCmi5(player, { client, storage: null, src: false, onEvent: (e) => events.push(e) })
+    player.emit('finished', { ...completed(3, 4), result: { score: { raw: 3, max: 4 }, success: true } })
+    await tick()
+    expect(calls.find((c) => c.call === 'moveOn')?.arg).toEqual({ score: { scaled: 0.75, raw: 3, min: 0, max: 4 }, success: true, disableSendTerminated: true })
+    expect(events.at(-1)).toEqual({ type: 'recorded', outcome: 'passed', completed: true })
+  })
+
+  it('reports what an earlier session of the registration already recorded', async () => {
+    const recorded = async (history: { completed: boolean; passed: boolean; unread?: string }, raw: number) => {
+      const { client, calls } = fakeClient()
+      const events: Cmi5Event[] = []
+      const player = new FakePlayer()
+      await startCmi5(player, { client: { ...client, getRegistrationHistory: () => history }, storage: null, src: false, onEvent: (e) => events.push(e) })
+      player.emit('finished', completed(raw, 4))
+      await tick()
+      return { events, moveOns: calls.filter((c) => c.call === 'moveOn').length }
+    }
+
+    const done = await recorded({ completed: true, passed: true }, 4)
+    expect(done.moveOns).toBe(0)
+    expect(done.events.at(-1)).toMatchObject({ type: 'skipped', reason: expect.stringMatching(/earlier session/) })
+
+    const retried = await recorded({ completed: true, passed: false }, 4)
+    expect(retried.moveOns).toBe(1)
+    expect(retried.events.at(-1)).toEqual({ type: 'recorded', outcome: 'passed', completed: false })
+
+    const unread = await recorded({ completed: false, passed: false, unread: 'no read access' }, 4)
+    expect(unread.events).toContainEqual({ type: 'registration-unread', reason: 'no read access' })
+    expect(unread.events.at(-1)).toEqual({ type: 'recorded', outcome: 'passed', completed: true })
   })
 
   // 10.2.6.0-1
