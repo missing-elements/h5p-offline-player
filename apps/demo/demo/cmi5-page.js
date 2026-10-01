@@ -176,12 +176,14 @@ function simulatedLms() {
     async sendXapiStatement() {},
     async moveOn({ score, success } = {}) {
       const passed = judge(score, success, data.masteryScore)
+      const outcome = passed === null ? null : passed ? 'passed' : 'failed'
       if (passed !== null) {
         const statement = defined(passed ? 'passed' : 'failed', { result: { ...(score ? { score } : {}), success: passed, duration: duration() } })
         note(`sent  ${passed ? 'passed' : 'failed'}\n${JSON.stringify(statement, null, 2)}`)
       }
       const statement = defined('completed', { result: { completion: true, duration: duration() } })
       note(`sent  completed\n${JSON.stringify(statement, null, 2)}`)
+      return { outcome, completed: true }
     },
     async terminate() {
       const statement = defined('terminated', { result: { duration: duration() } })

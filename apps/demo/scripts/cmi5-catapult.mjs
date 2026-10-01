@@ -4,7 +4,7 @@
  * requirements and rejects the ones that break one.
  *
  *   pnpm cmi5:catapult              headless: launches the page, answers a question of the real quiz,
- *                                   reloads, completes, prints the verdict
+ *                                   completes, prints the verdict
  *   pnpm cmi5:catapult --open       prints a launch URL to open in a browser, waits until the session ends
  *   pnpm cmi5:catapult --au <url>   the AU to launch instead of this dev server's page; its CSP has to allow localhost
  *   pnpm cmi5:catapult --down       stops the stack and deletes its data
@@ -170,10 +170,6 @@ async function main() {
     await page.goto(launch.url)
     await waitForStatus(page, 'Launched', 60_000)
 
-    // A reload mid-session: the page must resume on the token it kept, with no second
-    // `initialized` and no `terminated`, or every statement after it is refused.
-    await page.reload()
-    await waitForStatus(page, 'Resumed', 60_000)
     await page.waitForFunction(() => document.querySelector('h5p-player')?.state === 'ready', null, { timeout: 60_000 })
 
     // The real quiz: start it, pick an answer, check it. What H5P itself emits for that goes

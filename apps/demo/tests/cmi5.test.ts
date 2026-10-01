@@ -238,7 +238,12 @@ it('holds what the content emits before the handshake, and sends it after initia
   // The token endpoint answers after 1.5 s; the statement goes out before it has.
   await page.goto(launchUrl(registration, { delay: 1500 }))
   await page.evaluate(() => {
-    const statement = { actor: { name: 'H5P user' }, verb: { id: 'http://adlnet.gov/expapi/verbs/attempted' }, object: { objectType: 'Activity', id: 'https://x/content' } }
+    const statement = {
+      actor: { name: 'H5P user' },
+      verb: { id: 'http://adlnet.gov/expapi/verbs/attempted' },
+      object: { objectType: 'Activity', id: 'https://x/content' },
+      context: { revision: 'sha256:abc', platform: 'h5p-offline-player 0.1.10' }
+    }
     document.querySelector('h5p-player')!.dispatchEvent(new CustomEvent('xapi', { detail: { statement, verb: statement.verb.id } }))
   })
   expect(ofLaunch(registration)).toHaveLength(0)

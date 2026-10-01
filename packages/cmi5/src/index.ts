@@ -13,11 +13,13 @@
  * Two rules it keeps that are easy to get wrong. Nothing is sent as the page unloads: a page
  * cannot tell a reload from a closed tab, and a `terminated` sent on a reload ends the session
  * the reloaded page goes on using; a session left without `terminated` is the LMS's to record as
- * `abandoned`. And the single-use token is kept per launch, with the start time and whether the
- * outcome went out, so a reload resumes without a second `initialized` or `completed`.
+ * `abandoned`. The single-use token stays in memory by default, so a reload must be launched
+ * again by the LMS; a trusted host may opt into storing it across reloads.
  */
 
-import { createCmi5Client, judge, launchParametersOf } from './client.js'
+import { createCmi5Client, launchParametersOf } from './client.js'
+import { ReadyPhase } from './ready-phase.js'
+import { adaptPlayerStatement, allowedStatement as adaptAllowedStatement } from './statement-adapter.js'
 
 export { Cmi5RequestError, createCmi5Client, isoDuration, judge, launchParametersOf, type Cmi5ClientOptions } from './client.js'
 
@@ -70,6 +72,12 @@ export interface Cmi5Score {
   max?: number
 }
 
+/** What `moveOn()` sent to the LRS in this call. */
+export interface MoveOnResult {
+  outcome: 'passed' | 'failed' | null
+  completed: boolean
+}
+
 /** A cmi5 client, as `createCmi5Client` makes one. Another one — a simulated LMS, a test double — can be passed as `client`. */
 export interface Cmi5Client {
   getLaunchParameters(): LaunchParameters
@@ -84,9 +92,10 @@ export interface Cmi5Client {
   sendXapiStatement(statement: Statement): Promise<unknown>
   /**
    * `passed` or `failed`, then `completed`, then `terminated` unless disabled. `success` is the
-   * content's own verdict, used when the launch has no mastery score.
+    * content's own verdict, used when the launch has no mastery score. Resolves with only what
+    * this call successfully sent.
    */
-  moveOn(options: { score?: Cmi5Score; success?: boolean; disableSendTerminated?: boolean }): Promise<unknown>
+  moveOn(options: { score?: Cmi5Score; success?: boolean; disableSendTerminated?: boolean }): Promise<MoveOnResult>
   terminate(): Promise<unknown>
 }
 
@@ -182,22 +191,7 @@ export function isCmi5Launch(url: string = globalThis.location?.href ?? ''): boo
  * it has none that is a UUID, as every statement an AU issues needs one (9.1.0.0-1).
  */
 export function allowedStatement(statement: Statement, launch: LaunchParameters, data: Pick<LaunchData, 'contextTemplate'>): Statement {
-  const template = data.contextTemplate ?? {}
-  const own = statement.context ?? {}
-  return {
-    ...statement,
-    id: typeof statement.id === 'string' && UUID.test(statement.id) ? statement.id : crypto.randomUUID(),
-    actor: launch.actor,
-    timestamp: utcTimestamp(statement.timestamp),
-    // The template's values win: the AU may add to the context, never overwrite it (10.2.1.0-7).
-    context: {
-      ...own,
-      ...template,
-      registration: launch.registration,
-      contextActivities: mergeActivities(template.contextActivities, own.contextActivities),
-      extensions: { ...(own.extensions ?? {}), ...(template.extensions ?? {}) }
-    }
-  }
+  return adaptAllowedStatement(statement, launch, data)
 }
 
 /**
@@ -235,23 +229,6 @@ export function rejectionReason(error: unknown): string {
   }
   if (typeof data === 'string' && data) return data
   return error instanceof Error ? error.message : String(error)
-}
-
-/** The statement's own time in UTC, which cmi5 requires of every statement (9.7.0.0-2); now, when it has none it can be read by. */
-function utcTimestamp(value: unknown): string {
-  const time = typeof value === 'string' ? Date.parse(value) : NaN
-  return new Date(Number.isNaN(time) ? Date.now() : time).toISOString()
-}
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-function mergeActivities(template: Record<string, unknown[]> = {}, own: Record<string, unknown[]> = {}) {
-  const merged: Record<string, unknown[]> = {}
-  for (const key of ['parent', 'grouping', 'category', 'other']) {
-    const list = [...(template[key] ?? []), ...(own[key] ?? [])]
-    if (list.length) merged[key] = list
-  }
-  return merged
 }
 
 const verbOf = (statement: Statement | undefined): string => {
@@ -326,7 +303,7 @@ export async function startCmi5(player: PlayerLike, options: Cmi5Options = {}): 
   let recording = false
   let kept: KeptSession | null = null
   let key = ''
-  const pending: Statement[] = []
+  const readyPhase = new ReadyPhase<Statement, Outcome>()
   let pendingOutcome: Outcome | null = null
 
   const send = async (statement: Statement) => {
@@ -341,8 +318,18 @@ export async function startCmi5(player: PlayerLike, options: Cmi5Options = {}): 
 
   const relay = (statement: Statement) => {
     if (!statement) return
-    if (!data || !launch) pending.push(statement)
-    else void send(allowedStatement(statement, launch, data))
+    const readyStatement = readyPhase.statement(statement)
+    if (readyStatement) sendPlayerStatement(readyStatement)
+  }
+
+  const sendPlayerStatement = (statement: Statement) => {
+    if (!launch || !data) return
+    const adapted = adaptPlayerStatement(statement, launch, data)
+    if ('reason' in adapted) {
+      emit({ type: 'rejected', verb: verbOf(statement), reason: adapted.reason, statement })
+      return
+    }
+    void send(adapted.statement)
   }
 
   /**
@@ -358,29 +345,19 @@ export async function startCmi5(player: PlayerLike, options: Cmi5Options = {}): 
       return
     }
     const { score, success } = pendingOutcome
-    const history = client.getRegistrationHistory?.()
-    // As the client judges: against the mastery score, else by the content's own verdict; neither
-    // once the registration has passed, and `completed` once per registration.
-    const passed = judge(score, success, data.masteryScore)
-    const outcome = history?.passed || passed === null ? null : passed ? 'passed' : 'failed'
-    const completes = !history?.completed
-    if (!outcome && !completes) {
-      emit({ type: 'skipped', reason: 'this registration already recorded its result in an earlier session' })
-      movedOn = true
-      pendingOutcome = null
-      keepMovedOn()
-      recording = false
-      return
-    }
     try {
       // `terminated` is left for the host's Exit, so the learner can keep going.
-      await client.moveOn({ ...(score ? { score } : {}), ...(success === undefined ? {} : { success }), disableSendTerminated: true })
+      const result = await client.moveOn({ ...(score ? { score } : {}), ...(success === undefined ? {} : { success }), disableSendTerminated: true })
       movedOn = true
       pendingOutcome = null
       keepMovedOn()
-      emit({ type: 'recorded', outcome, completed: completes })
+      if (!result.outcome && !result.completed) {
+        emit({ type: 'skipped', reason: 'this registration already recorded its result in an earlier session' })
+      } else {
+        emit({ type: 'recorded', ...result })
+      }
     } catch (error) {
-      emit({ type: 'rejected', verb: outcome ?? 'completed', reason: rejectionReason(error) })
+      emit({ type: 'rejected', verb: 'move-on', reason: rejectionReason(error) })
     } finally {
       recording = false
     }
@@ -402,18 +379,22 @@ export async function startCmi5(player: PlayerLike, options: Cmi5Options = {}): 
   const onFinished = (event: Event) => {
     const detail = (event as CustomEvent).detail
     const result = detail?.statement?.result
-    pendingOutcome = {
+    const outcome: Outcome = {
       ...(cmi5Score(result?.score) ? { score: cmi5Score(result.score) } : {}),
       ...(typeof result?.success === 'boolean' ? { success: result.success as boolean } : {})
     }
+    const readyOutcome = readyPhase.outcome(outcome)
+    if (!readyOutcome) return
+    pendingOutcome = readyOutcome
     keepPendingOutcome()
-    if (data) void record()
+    void record()
   }
   player.addEventListener('xapi', onXapi)
   player.addEventListener('finished', onFinished)
   const stop = () => {
     player.removeEventListener('xapi', onXapi)
     player.removeEventListener('finished', onFinished)
+    readyPhase.stop()
   }
 
   let src: string | null = null
@@ -453,7 +434,9 @@ export async function startCmi5(player: PlayerLike, options: Cmi5Options = {}): 
     const boundLaunch = launch
     const boundData = data
 
-    for (const statement of pending.splice(0)) void send(allowedStatement(statement, boundLaunch, boundData))
+    const buffered = readyPhase.ready()
+    pendingOutcome = saved?.pendingOutcome ?? buffered.outcome ?? pendingOutcome
+    for (const statement of buffered.statements) sendPlayerStatement(statement)
     if (pendingOutcome) void record()
 
     const terminate = (): Promise<void> => {

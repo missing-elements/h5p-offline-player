@@ -235,10 +235,12 @@ export function createCmi5Client(options: Cmi5ClientOptions = {}): Cmi5Client {
       const mastery = data.masteryScore
       const statements: Statement[] = []
       const passed = judge(score, success, mastery)
+      let outcome: 'passed' | 'failed' | null = null
+      let completed = false
       // Neither `passed` nor `failed` once the registration has passed (9.3.0.0-7, 9.3.0.0-8),
       // and no second `completed` (9.3.0.0-6).
       if (passed !== null && !history.passed && !judgedThisSession) {
-        judgedThisSession = true
+        outcome = passed ? 'passed' : 'failed'
         statements.push(defined(passed ? 'passed' : 'failed', {
           result: { ...(score ? { score } : {}), success: passed, duration: duration() },
           category: [MOVE_ON_CATEGORY],
@@ -256,9 +258,14 @@ export function createCmi5Client(options: Cmi5ClientOptions = {}): Cmi5Client {
       for (const statement of statements) {
         await send(statement)
         const verb = statement.verb.display['en-US']
-        if (verb === 'completed') history = { ...history, completed: true }
+        if (verb === 'completed') {
+          history = { ...history, completed: true }
+          completed = true
+        }
         if (verb === 'passed') history = { ...history, passed: true }
+        if (verb === 'passed' || verb === 'failed') judgedThisSession = true
       }
+      return { outcome, completed }
     },
 
     async terminate() {

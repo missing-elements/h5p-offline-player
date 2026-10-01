@@ -1056,17 +1056,17 @@ SPA-fallback trap described above cannot happen there.
   have run in the page on Exit. `apps/demo/tests/cmi5.test.ts` runs the page against a mock
   LMS and LRS on `127.0.0.1` from the dev server on `localhost`, dispatching the element's own
   `xapi` and `finished` events rather than clicking through content, with a single-use token
-  as the spec has it, and pins the order and the merge, `revision` included, a reload that
-  resumes with no new token and no `terminated`, a statement emitted before the handshake, and
-  a `returnURL` that is not followed. **Proven against ADL's CATAPULT player** — the reference launching
+  as the spec has it, and pins the order and the merge, `revision` included, a rejected second
+  fetch after reload, a statement emitted before the handshake, and a `returnURL` that is not
+  followed. **Proven against ADL's CATAPULT player** — the reference launching
   system, which validates each statement against the numbered requirements and rejects a
   breach naming it — by `pnpm cmi5:catapult` (`apps/demo/scripts/cmi5-catapult.mjs`,
   `apps/demo/cmi5-catapult/docker-compose.yml`): adlnet/CATAPULT fetched at a pinned commit
   (`CATAPULT_COMMIT`, 2026-01-20), its player built from source beside MySQL and Yet Analytics'
   SQL LRS pinned at v0.9.8, the published ports on `127.0.0.1` only, a tenant and token through the
   player's API, the course structure imported as `text/xml` with an absolute AU URL, a launch
-  URL from `POST /course/{id}/launch-url/0`, the page driven headless — reloaded mid-session,
-  one question of the real quiz answered so H5P's own `interacted` and `answered` go through
+  URL from `POST /course/{id}/launch-url/0`, the page driven headless — one question of the
+  real quiz answered so H5P's own `interacted` and `answered` go through
   the player's validation, the finish dispatched as the element's `finished` event, Exit — and
   the session and the LRS's statements read back. Chosen over SCORM Cloud on 2026-10-01:
   open, local, scriptable, and it says which requirement a wrong statement broke. SCORM Cloud
@@ -1085,9 +1085,10 @@ SPA-fallback trap described above cannot happen there.
   a `violatedReqId`; and a score on `passed` must carry `min` and `max` beside `raw`
   (requirement 9.5.1.0-3), which H5P's scores lack, so the page adds `min: 0`. Two things it
   had already made the page do: relayed statements get an `id`, which the player checks for;
-  and the `fetch` URL answers once, so the token and the `initialized` time are kept in
-  `localStorage` per launch and a reload resumes through `initialize(sessionState)` instead of
-  asking again. The page shows the LMS's stated reason for a refused statement, not only the
+  and the `fetch` URL answers once, so the default keeps its token only in memory. The
+  `storage` option is for a trusted AU on a trusted origin only: H5P content scripts share the
+  origin and can read browser storage. The page shows the LMS's stated reason for a refused
+  statement, not only the
   status. The deployed page was launched from the local player once (`--au`), on 2026-10-01,
   under a `connect-src` widened to `http://localhost:*` for the run and narrowed again after:
   it worked, with Chrome's Local Network Access prompt ("Access other apps and services on this

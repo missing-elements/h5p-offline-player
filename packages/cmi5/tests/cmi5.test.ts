@@ -29,9 +29,10 @@ const TEMPLATE = { contextActivities: { grouping: [{ id: 'https://lms.example/co
 function fakeClient(data: Partial<LaunchData> = {}, { failInitialize = false, deferInitialize = false } = {}) {
   const calls: Array<{ call: string; arg?: any }> = []
   let release: () => void = () => {}
+  const launchData = { contextTemplate: TEMPLATE, launchMode: 'Normal' as const, moveOn: 'CompletedAndPassed' as const, masteryScore: 0.8, ...data }
   const client: Cmi5Client = {
     getLaunchParameters: () => LAUNCH,
-    getLaunchData: () => ({ contextTemplate: TEMPLATE, launchMode: 'Normal', moveOn: 'CompletedAndPassed', masteryScore: 0.8, ...data }),
+    getLaunchData: () => launchData,
     getAuthToken: () => 'token-1',
     getInitializedDate: () => new Date('2026-10-01T10:00:00Z'),
     async initialize(state) {
@@ -44,6 +45,8 @@ function fakeClient(data: Partial<LaunchData> = {}, { failInitialize = false, de
     },
     async moveOn(options) {
       calls.push({ call: 'moveOn', arg: options })
+      const passed = judge(options.score, options.success, launchData.masteryScore)
+      return { outcome: passed === null ? null : passed ? 'passed' : 'failed', completed: true }
     },
     async terminate() {
       calls.push({ call: 'terminate' })
@@ -73,7 +76,7 @@ const answered: Statement = {
   actor: { name: 'H5P user' },
   verb: { id: 'http://adlnet.gov/expapi/verbs/answered' },
   object: { objectType: 'Activity', id: 'https://host/content' },
-  context: { revision: 'sha256:abc', contextActivities: { category: [{ id: 'http://h5p.org/libraries/H5P.QuestionSet-1.20' }] } }
+  context: { revision: 'sha256:abc', platform: 'h5p-offline-player 0.1.10', contextActivities: { category: [{ id: 'http://h5p.org/libraries/H5P.QuestionSet-1.20' }] } }
 }
 const completed = (raw: number, max: number): Statement => ({ ...answered, verb: { id: 'http://adlnet.gov/expapi/verbs/completed' }, result: { score: { raw, max } } })
 
@@ -181,6 +184,32 @@ describe('startCmi5', () => {
     expect(calls).toHaveLength(before)
   })
 
+  it('drops player statements without complete Activity provenance and keeps the session running', async () => {
+    const { client, calls } = fakeClient()
+    const player = new FakePlayer()
+    const events: Cmi5Event[] = []
+    await startCmi5(player, { client, storage: null, src: false, onEvent: (event) => events.push(event) })
+
+    player.emit('xapi', { ...answered, context: { ...answered.context, revision: undefined } })
+    player.emit('xapi', { ...answered, context: { ...answered.context, platform: undefined } })
+    player.emit('xapi', { ...answered, object: { objectType: 'Agent', id: 'https://host/person' } })
+    await tick()
+    expect(calls.filter((call) => call.call === 'send')).toHaveLength(0)
+    expect(events.filter((event) => event.type === 'rejected').map((event) => event.reason)).toEqual([
+      'the player statement has no context.revision',
+      'the player statement has no context.platform',
+      'the player statement does not describe an Activity'
+    ])
+
+    player.emit('xapi', { ...answered, object: { id: 'https://host/content' } })
+    await tick()
+    expect(calls.filter((call) => call.call === 'send')).toHaveLength(1)
+
+    player.emit('xapi', answered)
+    await tick()
+    expect(calls.filter((call) => call.call === 'send')).toHaveLength(2)
+  })
+
   // 9.3.0.0-4, 9.3.2.0-2: initialized is the first statement of the session, whatever the
   // content emitted.
   it('listens before the handshake, and sends what arrived meanwhile after initialized', async () => {
@@ -234,6 +263,7 @@ describe('startCmi5', () => {
         failed.calls.push({ call: 'moveOn', arg: options })
         attempts += 1
         if (attempts === 1) throw new Error('temporary LRS failure')
+        return { outcome: 'passed', completed: true }
       }
     }
     const player = new FakePlayer()
@@ -241,7 +271,7 @@ describe('startCmi5', () => {
     const session = await startCmi5(player, { client: failingClient, storage, src: false, onEvent: (event) => events.push(event) })
     player.emit('finished', completed(4, 4))
     await tick()
-    expect(events.at(-1)).toMatchObject({ type: 'rejected', verb: 'passed' })
+    expect(events.at(-1)).toMatchObject({ type: 'rejected', verb: 'move-on' })
     expect(failed.calls.filter((call) => call.call === 'moveOn')).toHaveLength(1)
 
     await session.retry()
@@ -307,14 +337,30 @@ describe('startCmi5', () => {
       const { client, calls } = fakeClient()
       const events: Cmi5Event[] = []
       const player = new FakePlayer()
-      await startCmi5(player, { client: { ...client, getRegistrationHistory: () => history }, storage: null, src: false, onEvent: (e) => events.push(e) })
+      await startCmi5(player, {
+        client: {
+          ...client,
+          getRegistrationHistory: () => history,
+          async moveOn(options) {
+            calls.push({ call: 'moveOn', arg: options })
+            const passed = judge(options.score, options.success, 0.8)
+            return {
+              outcome: history.passed || passed === null ? null : passed ? 'passed' : 'failed',
+              completed: !history.completed
+            }
+          }
+        },
+        storage: null,
+        src: false,
+        onEvent: (e) => events.push(e)
+      })
       player.emit('finished', completed(raw, 4))
       await tick()
       return { events, moveOns: calls.filter((c) => c.call === 'moveOn').length }
     }
 
     const done = await recorded({ completed: true, passed: true }, 4)
-    expect(done.moveOns).toBe(0)
+    expect(done.moveOns).toBe(1)
     expect(done.events.at(-1)).toMatchObject({ type: 'skipped', reason: expect.stringMatching(/earlier session/) })
 
     const retried = await recorded({ completed: true, passed: false }, 4)

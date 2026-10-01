@@ -31,11 +31,13 @@ function fakeNetwork({
   data = LAUNCH_DATA as Statement,
   token = { 'auth-token': 'dG9rZW4=' } as Statement,
   refuse = null as Statement | null,
+  failVerbOnce = null as string | null,
   preferences = null as Statement | null,
   earlier = [] as Statement[],
   unreadable = false
 } = {}) {
   const seen: Seen[] = []
+  let failedVerb = false
   // What the LRS holds: earlier sessions' statements, then what this one posts.
   const held: Statement[] = [...earlier]
   const fetch = async (input: RequestInfo | URL, init: RequestInit = {}) => {
@@ -49,6 +51,10 @@ function fakeNetwork({
     if (url.startsWith('https://lrs.example/xapi/agents/profile?')) return preferences ? reply(200, preferences) : reply(404, undefined)
     if (url === 'https://lrs.example/xapi/statements') {
       if (refuse) return reply(400, refuse)
+      if (!failedVerb && failVerbOnce && entry.body?.verb?.id === `http://adlnet.gov/expapi/verbs/${failVerbOnce}`) {
+        failedVerb = true
+        return reply(503, { message: 'temporary LRS failure' })
+      }
       held.push(entry.body!)
       return reply(200, [entry.body?.id])
     }
@@ -61,7 +67,7 @@ function fakeNetwork({
     return reply(404, undefined)
   }
   const statements = () => seen.filter((s) => s.method === 'POST' && s.url.endsWith('/statements')).map((s) => s.body!)
-  return { fetch: fetch as typeof globalThis.fetch, seen, statements }
+  return { fetch: fetch as typeof globalThis.fetch, seen, statements, heldStatements: () => held }
 }
 
 describe('the launch in the address', () => {
@@ -195,7 +201,8 @@ describe('createCmi5Client', () => {
     const net = fakeNetwork()
     const client = createCmi5Client({ url: LAUNCH_URL, fetch: net.fetch })
     await client.initialize()
-    await client.moveOn({ score: { scaled: 0.8, raw: 4, min: 0, max: 5 }, disableSendTerminated: true })
+    const result = await client.moveOn({ score: { scaled: 0.8, raw: 4, min: 0, max: 5 }, disableSendTerminated: true })
+    expect(result).toEqual({ outcome: 'passed', completed: true })
     const passed = net.statements()[1]
     expect(passed.verb.id).toBe('http://adlnet.gov/expapi/verbs/passed')
     expect(passed.result).toMatchObject({ success: true, duration: expect.stringMatching(/^PT/) })
@@ -203,6 +210,17 @@ describe('createCmi5Client', () => {
     const completed = net.statements()[2]
     expect(completed.result.success).toBeUndefined()
     expect(completed.result.completion).toBe(true)
+  })
+
+  it('retries an outcome after its first LRS post fails', async () => {
+    const net = fakeNetwork({ failVerbOnce: 'passed' })
+    const client = createCmi5Client({ url: LAUNCH_URL, fetch: net.fetch })
+    await client.initialize()
+    const options = { score: { scaled: 1, raw: 4, min: 0, max: 4 }, disableSendTerminated: true }
+    await expect(client.moveOn(options)).rejects.toThrow('temporary LRS failure')
+    await expect(client.moveOn(options)).resolves.toEqual({ outcome: 'passed', completed: true })
+    expect(net.statements().map((statement) => statement.verb.display['en-US'])).toEqual(['initialized', 'passed', 'passed', 'completed'])
+    expect(net.heldStatements().map((statement) => statement.verb.display['en-US'])).toEqual(['initialized', 'passed', 'completed'])
   })
 
   it('uses a zero mastery score and includes it in the passed statement', async () => {

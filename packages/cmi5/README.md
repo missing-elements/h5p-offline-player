@@ -10,9 +10,9 @@ What it does, once the LMS opens your page:
 - trades the launch's one-time token for LRS credentials and sends `initialized`;
 - reads the launch data and the learner's preferences, as the specification requires on
   startup;
-- relays every statement the content emits to the LMS's LRS, with the launch actor, the
-  registration and the LMS's context template merged in, and the build's `context.revision`
-  kept, so the LRS knows which version of the package each result came from;
+- relays each provenance-stamped Activity statement the player emits to the LMS's LRS, with the
+  launch actor, the registration and the LMS's context template merged in; a statement without
+  the player's `context.revision` and `context.platform` is reported and dropped;
 - when the content finishes, sends `passed` or `failed` — by the launch's mastery score, or by
   the content's own pass mark when the launch has none — and `completed`, each once per
   registration: a later session of the same registration does not send them again;
@@ -26,6 +26,13 @@ assignable unit, from ADL's own list
 ([`@cmi5/requirements`](https://www.npmjs.com/package/@cmi5/requirements)), against the test
 that shows it, or say why it does not apply. It has no dependencies: the protocol is a few
 `fetch` calls, a few kilobytes once a bundler minifies them.
+
+## Refreshes and credentials
+
+An H5P package contains same-origin JavaScript, so it must be treated as able to read browser
+storage. The adapter keeps the LRS token only in memory. A browser refresh is not a resumable
+cmi5 launch: return the learner to the LMS, which starts a new launch with a fresh one-time
+token. This is the secure default for arbitrary H5P content.
 
 ## Usage
 
