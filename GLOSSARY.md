@@ -12,3 +12,9 @@ or non-Activity statements without ending the cmi5 session.
 The internal cmi5 module that buffers player statements and the first completion outcome while
 the launch handshakes, releases them after `initialized`, and drops later input once the session
 stops.
+
+## Simulated LMS transport
+
+The demo's in-memory transport adapter for the cmi5 client. It supplies a launch token, launch
+data and empty LRS history, then records each posted statement in the page log. It does not build
+cmi5 statements itself, so the demo and network launch share the same construction rules.

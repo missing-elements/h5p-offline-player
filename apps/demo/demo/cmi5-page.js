@@ -11,15 +11,13 @@
  * lands in the log instead.
  */
 
-import { isCmi5Launch, judge, startCmi5 } from '@missing-elements/h5p-cmi5'
+import { createCmi5Client, isCmi5Launch, startCmi5 } from '@missing-elements/h5p-cmi5'
 
 const player = document.querySelector('h5p-player')
 const status = document.querySelector('#status')
 const log = document.querySelector('#log')
 const exitButton = document.querySelector('#exit')
 const instructions = document.querySelector('#instructions')
-
-const CMI5_CATEGORY = 'https://w3id.org/xapi/cmi5/context/categories/cmi5'
 
 const say = (text) => {
   status.textContent = text
@@ -115,20 +113,9 @@ async function start(client, simulated) {
   })
 }
 
-/** Context activities from both sides, each list joined; the template's come first. */
-function mergeActivities(template = {}, own = {}) {
-  const merged = {}
-  for (const key of ['parent', 'grouping', 'category', 'other']) {
-    const list = [...(template[key] ?? []), ...(own[key] ?? [])]
-    if (list.length) merged[key] = list
-  }
-  return merged
-}
-
 /**
- * An LMS and LRS in one object, for `?simulate`: a `Cmi5Client`, the shape `createCmi5Client`
- * returns, with every statement written to the log instead of sent. The launch data is what a
- * course structure with `moveOn="CompletedAndPassed"` and `masteryScore="0.8"` would give.
+ * A simulated LMS and LRS transport for `?simulate`. The production client builds every
+ * statement; this transport only returns the LMS data and writes its posted statements to the log.
  */
 function simulatedLms() {
   const launch = {
@@ -147,47 +134,23 @@ function simulatedLms() {
     moveOn: 'CompletedAndPassed',
     masteryScore: 0.8
   }
-  let started = new Date()
-  const duration = () => `PT${((Date.now() - started.getTime()) / 1000).toFixed(2)}S`
-  const defined = (verb, extra = {}) => ({
-    id: crypto.randomUUID(),
-    actor: launch.actor,
-    verb: { id: `http://adlnet.gov/expapi/verbs/${verb}`, display: { 'en-US': verb } },
-    object: { objectType: 'Activity', id: launch.activityId },
-    context: {
-      ...data.contextTemplate,
-      registration: launch.registration,
-      contextActivities: mergeActivities(data.contextTemplate.contextActivities, { category: [{ id: CMI5_CATEGORY }] })
-    },
-    timestamp: new Date().toISOString(),
-    ...extra
-  })
-  return {
-    getLaunchParameters: () => launch,
-    getLaunchData: () => data,
-    getInitializedDate: () => started,
-    getAuthToken: () => 'simulated',
-    async initialize() {
-      started = new Date()
-      const statement = defined('initialized')
-      note(`sent  initialized\n${JSON.stringify(statement, null, 2)}`)
-    },
-    // The page logs what it hands over, so nothing to do: the statement is already on screen.
-    async sendXapiStatement() {},
-    async moveOn({ score, success } = {}) {
-      const passed = judge(score, success, data.masteryScore)
-      const outcome = passed === null ? null : passed ? 'passed' : 'failed'
-      if (passed !== null) {
-        const statement = defined(passed ? 'passed' : 'failed', { result: { ...(score ? { score } : {}), success: passed, duration: duration() } })
-        note(`sent  ${passed ? 'passed' : 'failed'}\n${JSON.stringify(statement, null, 2)}`)
+  const launchUrl = `${location.origin}${location.pathname}?${new URLSearchParams({ endpoint: launch.endpoint, fetch: launch.fetch, actor: JSON.stringify(launch.actor), registration: launch.registration, activityId: launch.activityId })}`
+  const reply = (status, body) => new Response(body === undefined ? null : JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
+  return createCmi5Client({
+    url: launchUrl,
+    async fetch(input, init = {}) {
+      const url = String(input)
+      if (url === launch.fetch) return reply(200, { 'auth-token': 'simulated' })
+      if (url.startsWith(`${launch.endpoint}activities/state?`)) return reply(200, data)
+      if (url.startsWith(`${launch.endpoint}agents/profile?`)) return reply(404)
+      if (url.startsWith(`${launch.endpoint}statements?`)) return reply(200, { statements: [], more: '' })
+      if (url === `${launch.endpoint}statements` && init.method === 'POST') {
+        const statement = JSON.parse(String(init.body))
+        const verb = statement.verb?.display?.['en-US'] ?? 'statement'
+        note(`sent  ${verb}\n${JSON.stringify(statement, null, 2)}`)
+        return reply(200, [statement.id])
       }
-      const statement = defined('completed', { result: { completion: true, duration: duration() } })
-      note(`sent  completed\n${JSON.stringify(statement, null, 2)}`)
-      return { outcome, completed: true }
-    },
-    async terminate() {
-      const statement = defined('terminated', { result: { duration: duration() } })
-      note(`sent  terminated\n${JSON.stringify(statement, null, 2)}`)
+      return reply(404)
     }
-  }
+  })
 }
