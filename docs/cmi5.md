@@ -147,8 +147,11 @@ specification's requirements, `@cmi5/requirements`: every one that falls on the 
 is either named next to the test that shows it, shown by the CATAPULT run, left to the host
 page, or written down as a gap with the reason, and a requirement added to the list fails the
 test until someone places it.
-SCORM Cloud, which supports cmi5 with a free tier, remains a fair check that a commercial LMS
-launches it.
+
+A commercial LMS has launched it too: the hosted page, imported into SCORM Cloud's free tier
+from `apps/demo/demo/cmi5-course.zip`, played and recorded there on 2026-10-01. That run was
+the build on `@xapi/cmi5`; the client that replaced it has been through CATAPULT, and is worth
+one more launch from SCORM Cloud once deployed.
 
 ## Testing by hand
 

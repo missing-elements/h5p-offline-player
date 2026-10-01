@@ -1055,8 +1055,10 @@ SPA-fallback trap described above cannot happen there.
   URL from `POST /course/{id}/launch-url/0`, the page driven headless — reloaded mid-session,
   one question of the real quiz answered so H5P's own `interacted` and `answered` go through
   the player's validation, the finish dispatched as the element's `finished` event, Exit — and
-  the session and the LRS's statements read back. Chosen over SCORM Cloud on 2026-10-01: open, local, scriptable,
-  and it says which requirement a wrong statement broke. Passed on 2026-10-01. What it took to
+  the session and the LRS's statements read back. Chosen over SCORM Cloud on 2026-10-01:
+  open, local, scriptable, and it says which requirement a wrong statement broke. SCORM Cloud
+  launched the hosted page from `demo/cmi5-course.zip` the same day and recorded it, on the
+  `@xapi/cmi5` build. Passed on 2026-10-01. What it took to
   get there, in the order it was found: upstream's Dockerfile runs `npm ci --only=production`,
   which the npm in `node:18` refuses, and its lockfile is out of step with its `package.json`,
   so the compose file builds the player from an inline Dockerfile with `npm install --omit=dev`;
