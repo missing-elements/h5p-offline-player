@@ -6,6 +6,7 @@ import { LocalHeaderScanner } from '../shared/forward-index'
 import { DEFLATE, LOCAL_HEADER_FIXED_SIZE, STORED, localHeaderDataStart } from '../shared/local-header'
 import { packageLockName, packageLockPrefix } from '../shared/locks'
 import {
+  JOBS_READY,
   PlayerError,
   type EntryLocation,
   type ErrorCode,
@@ -103,6 +104,9 @@ scope.addEventListener('message', (event: MessageEvent<ToJobsMessage & { file?: 
 
   void run(message)
 })
+
+// Once the listener is in place: the page holds every job until it hears this.
+scope.postMessage({ type: JOBS_READY })
 
 /* ------------------------------------------------------------------ the extraction queue */
 

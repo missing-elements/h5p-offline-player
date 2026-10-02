@@ -106,6 +106,7 @@ so the page can offer a file picker instead.
 | `src` | attribute, property | The package URL. Setting it loads; setting it again aborts and reloads; removing it empties the player |
 | `file` | property | A `File` from a picker. Setting it loads with no network and wins over `src`; `null` empties the player |
 | `sw` | attribute | The worker's URL. Default: `h5p-sw.js` next to the element. Must be same-origin |
+| `jobs` | attribute | The background worker's URL, for a page whose CSP has no `blob:` in `worker-src`. Default: a `blob:` URL, then `h5p-jobs.js` next to the element. Must be same-origin |
 | `assets-base` | attribute | The directory of the frame assets. Default: `frame-assets/` next to the element; may be a CDN |
 | `libraries` | attribute | `hub`, or the URL of a `.h5p` that carries library folders, for packages that ship without their own. Default: unset, and such packages are refused (see Guides) |
 | `allow-origins` | attribute | Extra origins the frame's CSP should permit, space separated (see Guides) |
@@ -173,6 +174,10 @@ is a working example of one.
   `file://`.
 - `h5p-sw.js` is served from the site's own origin — browsers reject cross-origin Service Worker
   registration. With a bundler this is automatic. Frame assets may come from a CDN.
+- Under a Content-Security-Policy, `worker-src` (or `script-src`, when there is no `worker-src`)
+  allows `'self'`. The element starts its background worker from a `blob:` URL when the policy
+  allows that and from `h5p-jobs.js` beside it when not; set `jobs` to that file to skip the
+  `blob:` attempt, and the violation report it leaves, altogether.
 - Package URLs send CORS headers. `Range` support is optional but avoids a full download first.
 - Storage is optional on a host that honours `Range`, and for a file picked from disk: the
   player caches what fits and serves the rest straight from the archive. A host without `Range`

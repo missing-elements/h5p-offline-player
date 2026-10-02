@@ -1,6 +1,7 @@
 import jobsWorkerSource from 'virtual:h5p-jobs-worker'
 import SHADOW_CSS from './shadow.css?inline'
 import { FRAME_FONTS } from './frame-fonts'
+import { JobsWorkerHandle, type JobsScript } from './jobs-worker-handle'
 import { SAVE_INTERVAL_S, VERSION, WARM_ENTRY } from './shared/constants'
 import {
   HUB_CONTENT_TYPE_URL,
@@ -79,6 +80,18 @@ function unbundled(href: string): string {
 }
 
 const DEFAULT_SW_URL = unbundled(new URL(/* @vite-ignore */ './h5p-sw.js', import.meta.url).href)
+
+/**
+ * The Jobs worker as a file, for a page whose policy refuses a `blob:` worker. The same script
+ * the element carries as a string; a bundler emits it beside the element like the Service Worker.
+ */
+const DEFAULT_JOBS_URL = unbundled(new URL(/* @vite-ignore */ './h5p-jobs.js', import.meta.url).href)
+
+const BLOB_JOBS_SCRIPT: JobsScript = {
+  label: 'blob: URL',
+  url: () => URL.createObjectURL(new Blob([jobsWorkerSource], { type: 'text/javascript' })),
+  release: (url) => URL.revokeObjectURL(url)
+}
 
 /** The runtime inside a directory: the dev server's, or the one an `assets-base` names. */
 function assetsIn(base: string): FrameAssets {
@@ -166,8 +179,7 @@ export class H5PPlayerElement extends HTMLElement {
   }
 
   private iframe: HTMLIFrameElement
-  private jobs: Worker | null = null
-  private jobsUrl: string | null = null
+  private jobs: JobsWorkerHandle | null = null
   private routes: Routes | null = null
   private registration: ServiceWorkerRegistration | null = null
   private currentFile: File | null = null
@@ -338,8 +350,6 @@ export class H5PPlayerElement extends HTMLElement {
     this.abortLoad()
     this.jobs?.terminate()
     this.jobs = null
-    if (this.jobsUrl) URL.revokeObjectURL(this.jobsUrl)
-    this.jobsUrl = null
   }
 
   attributeChangedCallback(name: string, previous: string | null, next: string | null): void {
@@ -905,12 +915,17 @@ export class H5PPlayerElement extends HTMLElement {
 
   /* ---------------------------------------------------------------- Jobs worker */
 
-  private ensureJobs(): Worker {
+  /**
+   * The carried script first, from a `blob:` URL, and `h5p-jobs.js` if the page's policy refuses
+   * that. A host that names its own copy with `jobs` gets that first instead, so a strict policy
+   * never sees the `blob:` attempt — which would otherwise land in its violation reports.
+   */
+  private ensureJobs(): JobsWorkerHandle {
     if (this.jobs) return this.jobs
 
-    const blob = new Blob([jobsWorkerSource], { type: 'text/javascript' })
-    this.jobsUrl = URL.createObjectURL(blob)
-    this.jobs = new Worker(this.jobsUrl)
+    const named = this.getAttribute('jobs')?.trim()
+    const file = (href: string): JobsScript => ({ label: href, url: () => new URL(href, location.href).href })
+    this.jobs = new JobsWorkerHandle(named ? [file(named), BLOB_JOBS_SCRIPT] : [BLOB_JOBS_SCRIPT, file(DEFAULT_JOBS_URL)])
 
     this.jobs.addEventListener('message', (event: MessageEvent<FromJobsMessage>) => {
       const message = event.data

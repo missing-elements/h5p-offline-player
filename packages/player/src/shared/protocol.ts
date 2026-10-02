@@ -254,6 +254,12 @@ export type ToJobsMessage =
   | { type: 'warm'; pkgId: string; source: SourceDescriptor; spans: WarmSpan[] }
   | { type: 'abort'; pkgId: string }
 
+/**
+ * The first thing the Jobs worker posts. Messages sent to a worker whose script never loaded are
+ * dropped, so the page holds its jobs until this arrives; see `JobsWorkerHandle`.
+ */
+export const JOBS_READY = 'jobs-ready'
+
 export type FromJobsMessage =
   | { type: 'progress'; pkgId: string; entry?: string; loaded: number; total: number | null }
   | { type: 'done'; pkgId: string; entry?: string; size: number }

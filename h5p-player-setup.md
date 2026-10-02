@@ -51,6 +51,8 @@ Bundlers that do not analyse `new URL(…, import.meta.url)` — esbuild among t
 
 Download `https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player/dist/h5p-sw.js` once, place it on the site, point `sw` at it. This is the only file that cannot come from the CDN: browsers reject cross-origin Service Worker registration. Frame assets load from the CDN. Placing it at the root is safe: the registration scope becomes `/h5p/`, not `/`, so an existing site worker is left alone.
 
+Under a Content-Security-Policy that does not allow `blob:` workers, download `dist/h5p-jobs.js` as well, place it on the site and point `jobs` at it. The element otherwise starts its background worker — downloads and media extraction — from a `blob:` URL. A worker cannot come from the CDN either.
+
 There is no Setup C. A site that cannot host even one file cannot run the player: the worker must be same-origin, and framing the player page hosted elsewhere gets no Service Worker in Safari — and every browser on iOS is Safari underneath — so it would fail on every iPhone and iPad.
 
 ## Element API
@@ -61,6 +63,8 @@ The element does one thing: play a package.
 <h5p-player
   src="…"              package URL — setting it loads; setting it again aborts and reloads
   sw="…"               worker URL (default: h5p-sw.js next to the element, same-origin)
+  jobs="…"             background worker URL, for a CSP without `blob:` in `worker-src`
+                       (default: a blob: URL, then h5p-jobs.js next to the element, same-origin)
   assets-base="…"      directory of frame assets (default: folder of the element)
   libraries="…"        `hub`, or the URL of a `.h5p` carrying library folders, for packages
                        exported without their own (default: unset — such packages are refused).
@@ -137,6 +141,7 @@ BSD notice, is `NOTICE.md` in the package.
 | `error: no-worker` | Page on `http://`, in-app browser without Service Worker support, or `sw` points cross-origin | Use `https://`; show "Open in Safari / Chrome"; serve `h5p-sw.js` from your origin |
 | Worker or frame assets 404 after build | Bundler does not analyse `new URL(…, import.meta.url)` (esbuild) | Serve `dist/` statically and set `sw` + `assets-base` |
 | Worker blocked by CSP | `script-src` excludes the worker's origin | Keep the default same-origin worker; don't point `sw` at a CDN |
+| Console: creating a worker from `blob:` violates `worker-src` | The page's policy refuses `blob:` workers. Not a fault on its own: the element falls back to `h5p-jobs.js` beside it | Set `jobs` to that file, which skips the attempt and the violation report. If `error: no-worker` says the background worker could not start, `h5p-jobs.js` is missing or not same-origin (Setup B: copy it next to `h5p-sw.js`) |
 | Video won't play in Safari, other browsers fine | Worker older than the element (Setup B) | Re-download `h5p-sw.js`; the console warns on version mismatch |
 | Console: `503` from the worker for a media file, after about 30 s | Nothing of the entry arrived for two 15 s stretches — neither inflated bytes nor network input. The job that extracts it is gone (its tab closed) or the host stopped answering. A slow host on its own no longer does this: while bytes arrive, the player waits | Reload. If it repeats, check that the host answers `Range` requests for the archive at all promptly; the browser's network panel shows them |
 | `error: quota` | The package needs more storage than the browser gives the site, after everything idle has been evicted. On a host that honours `Range`, or from disk, storage is not required — the player serves around a full store — so this comes from a host without `Range`, where the whole archive has to land, or from one large deflated entry | Show `event.detail.message`: it names the size needed and the site's usage against its quota. For the `Range` case, normalize the package (`npx @missing-elements/h5p-normalize course.h5p`) or move it to a host that supports ranges |

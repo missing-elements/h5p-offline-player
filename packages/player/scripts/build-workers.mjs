@@ -1,15 +1,16 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { transform } from 'esbuild'
-import { buildMountModule, buildServiceWorker } from './lib/worker-bundle.mjs'
+import { buildJobsWorker, buildMountModule, buildServiceWorker } from './lib/worker-bundle.mjs'
 
 /**
- * Builds the two artefacts Vite's library build cannot produce.
+ * Builds the artefacts Vite's library build cannot produce.
  *
  * `dist/h5p-sw.js` is a self-contained classic script, because a Service Worker is registered by
  * URL and has to run on a site with no build step at all. `dist/h5p-sw-mount.js` is the same
  * handlers as an ES module, for hosts that enforce a single worker per origin and mount ours
- * into theirs.
+ * into theirs. `dist/h5p-jobs.js` is the Jobs worker the element otherwise spawns from a `blob:`
+ * URL, for a page whose policy does not allow one.
  */
 
 const rootDir = resolve(import.meta.dirname, '..')
@@ -17,6 +18,7 @@ const distDir = resolve(rootDir, 'dist')
 
 await buildServiceWorker(resolve(distDir, 'h5p-sw.js'))
 await buildMountModule(resolve(distDir, 'h5p-sw-mount.js'))
+await buildJobsWorker(resolve(distDir, 'h5p-jobs.js'))
 
 // Vite leaves an ES library's whitespace and comments alone on purpose: esbuild drops the
 // `/* @__PURE__ */` annotations when it minifies whitespace, and a consumer's bundler tree-shakes
@@ -40,4 +42,4 @@ await writeFile(
   'utf8'
 )
 
-console.log(`[build-workers] ${await sizeOf('h5p-player.js')} (minified after Vite), ${await sizeOf('h5p-sw.js')}, ${await sizeOf('h5p-sw-mount.js')}`)
+console.log(`[build-workers] ${await sizeOf('h5p-player.js')} (minified after Vite), ${await sizeOf('h5p-sw.js')}, ${await sizeOf('h5p-sw-mount.js')}, ${await sizeOf('h5p-jobs.js')}`)

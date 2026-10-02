@@ -4,7 +4,7 @@ import { build } from 'esbuild'
 import { frameBootEsbuildPlugin } from './frame-boot-plugin.mjs'
 
 /**
- * The two worker artefacts, built the same way for the package (`build-workers.mjs`) and for the
+ * The worker artefacts, built the same way for the package (`build-workers.mjs`) and for the
  * hosted demo (`build-demo.mjs`).
  */
 
@@ -73,6 +73,16 @@ export async function buildServiceWorker(outfile) {
 /** `h5p-sw-mount.js`: the same handlers as an ES module, for hosts that mount them into their own worker. */
 export async function buildMountModule(outfile) {
   return build({ ...(await shared()), entryPoints: [resolve(rootDir, 'src/sw/mount.ts')], outfile, format: 'esm' })
+}
+
+/**
+ * `h5p-jobs.js`: the Jobs worker the element carries as a string, as a file of its own for a page
+ * whose policy refuses a `blob:` worker. It bundles nothing but our own code — no zip.js, which is
+ * the Service Worker's — so it carries no notice.
+ */
+export async function buildJobsWorker(outfile) {
+  const { banner, plugins, ...options } = await shared()
+  return build({ ...options, plugins: [frameBootEsbuildPlugin(true)], entryPoints: [resolve(rootDir, 'src/jobs/jobs-worker.ts')], outfile, format: 'iife' })
 }
 
 /**

@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { cp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { relative, resolve, sep } from 'node:path'
 import { build as viteBuild } from 'vite'
-import { buildServiceWorker, bundleHostWorker } from '../../../packages/player/scripts/lib/worker-bundle.mjs'
+import { buildJobsWorker, buildServiceWorker, bundleHostWorker } from '../../../packages/player/scripts/lib/worker-bundle.mjs'
 
 /**
  * Builds the hosted demo into `dist-demo/`: the pages through `vite.config.ts`, then the Service
@@ -25,6 +25,7 @@ process.env.SITE_URL = siteUrl
 await viteBuild({ configFile: resolve(rootDir, 'vite.config.ts') })
 
 await buildServiceWorker(resolve(outDir, 'h5p-sw.js'))
+await buildJobsWorker(resolve(outDir, 'h5p-jobs.js'))
 
 await rm(resolve(outDir, 'frame-assets'), { recursive: true, force: true })
 await cp(resolve(publicDir, 'frame-assets'), resolve(outDir, 'frame-assets'), { recursive: true })

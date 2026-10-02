@@ -105,9 +105,12 @@ export function devServiceWorkerPlugin(): Plugin {
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         const url = req.url?.split('?')[0]
-        if (!url?.endsWith('/h5p-sw.js')) return next()
+        // The Jobs worker as a file, which the element falls back to under a policy that
+        // refuses its `blob:` URL; served the same way so that fallback works in dev too.
+        const entry = url?.endsWith('/h5p-sw.js') ? SW_ENTRY : url?.endsWith('/h5p-jobs.js') ? JOBS_ENTRY : null
+        if (!entry) return next()
 
-        void bundleWorker(SW_ENTRY, false).then(
+        void bundleWorker(entry, false).then(
           (source) => {
             res.setHeader('content-type', 'text/javascript; charset=utf-8')
             // The registration already asks for an `h5p/` sub-scope under this file's directory,
@@ -119,7 +122,7 @@ export function devServiceWorkerPlugin(): Plugin {
           },
           (error: unknown) => {
             res.statusCode = 500
-            res.end(`// Failed to bundle the H5P service worker\n// ${String(error)}`)
+            res.end(`// Failed to bundle ${url}\n// ${String(error)}`)
           }
         )
       })
