@@ -68,11 +68,48 @@ viewer, which embeds H5P the usual way, and behaved the same there. None of the 
 comes from the player: they are in the content types' own markup, which the player serves
 unchanged.
 
+## Firefox and WebKit, 2026-10-02
+
+The same seven packages and the same passes, with the scripts of the Chromium run, in
+Playwright's Firefox and WebKit builds on macOS, headless, against the built demo site under its
+production headers. WebKit is Safari's engine, not Safari: what it shows is how the engine moves
+focus, not how Safari's own settings or VoiceOver behave.
+
+| Package | Firefox | WebKit (Option+Tab) |
+|---|---|---|
+| Question Set | in and out; start, answer, check; `answered` sent | the same |
+| Interactive Video | in and out; Enter on the splash plays, focus moves to Pause | the same |
+| Accordion | in and out; Enter opens a panel, Space closes it | the same |
+| Dialog Cards | in and out; Turn and Next reachable | the same |
+| Course Presentation | in and out; Next slide, answer, check; `answered` sent | the same |
+| Interactive Book | in and out; Next page reaches chapter two | the same |
+| Drag and Drop | in and out; both items placed with Space and the arrow keys; check; `answered` sent | the same |
+
+No focus trap in either engine, forward or back, and the frame is announced by the package's
+title in both. The tab stops are those of the Chromium run, with three differences, none of them
+the player's:
+
+- **Safari's Tab skips buttons and links by default.** With macOS's "Keyboard navigation" off —
+  the default — Tab in Safari moves only between text fields and a few other controls, and
+  Option+Tab moves through everything; the WebKit run above used Option+Tab. With plain Tab, a
+  learner reaches only the controls of the content that are not `<button>` or `<a>` elements,
+  and focus goes from the content past the page's links. This is a Safari setting, the same on
+  every site, and the learner's to change (System Settings → Keyboard → Keyboard navigation, or
+  Safari's "Press Tab to highlight each item"). A page aimed at keyboard users on Macs may want
+  to say so.
+- **Firefox gives the frame's document a tab stop of its own** before the first control, and
+  makes two more things focusable that the other engines do not: Interactive Video's `<video>`
+  element, which has no name, and a scrollable text box in Course Presentation, which shows no
+  focus outline. Both are Firefox's rules for media and scrolling containers.
+- **Option groups are one tab stop, chosen with the arrow keys**, in Course Presentation's
+  question as in Drag and Drop; the stop lands on the last option coming back with Shift+Tab.
+  The same in all three engines, and by design, but a learner needs to know about the arrow keys.
+
 ## Not checked yet
 
-- A real screen reader: NVDA or JAWS on Windows, VoiceOver on macOS and iOS. The run above
-  checks names and roles as the browser exposes them, which is necessary, not sufficient.
-- Firefox and Safari.
+- A real screen reader: NVDA or JAWS on Windows, VoiceOver on macOS and iOS. The runs above
+  check names and roles as the browser exposes them, which is necessary, not sufficient.
+- Safari itself, and Safari on iOS, with VoiceOver; Firefox and Chromium on Windows.
 - Zoom to 400% and reflow, colour contrast, reduced motion.
 - Captions and transcripts, which are the content author's to add in the content type.
 

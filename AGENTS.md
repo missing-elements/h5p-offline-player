@@ -1403,8 +1403,10 @@ host without `Range`). Two lessons from writing that run, for the next one: read
 the real path — page, the element's shadow root, the iframe, its document — since a frame
 document's `activeElement` is its `<body>` when it does not have focus, and matching that
 body's text "found" every control on the first Tab; and a focus indicator can be a border or
-a background, so an outline-and-box-shadow check is only a hint. Still open: a real screen
-reader (NVDA, JAWS, VoiceOver), Firefox and Safari, zoom and contrast.
+a background, so an outline-and-box-shadow check is only a hint. Repeated on 2026-10-02 in Playwright's Firefox and WebKit: the same
+results, no trap; WebKit needs Option+Tab, as Safari does by default, and Firefox adds a stop
+for the frame's document and for a `<video>`. Still open: a real screen reader (NVDA, JAWS,
+VoiceOver), Safari itself and iOS, zoom and contrast.
 
 The original note, raised in the same comment: Section 508 conformance is judged on
 the whole package, the player and the H5P content types together, and a content type that traps
