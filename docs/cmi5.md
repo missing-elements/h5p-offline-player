@@ -67,8 +67,7 @@ The course structure names the page and the package:
 
 Zip it as `cmi5.xml` and import the zip. For the demo's own page and quiz, the zip is ready:
 `apps/demo/demo/cmi5-course.zip`, served by the site as `/demo/cmi5-course.zip` and linked from
-the page. It holds only `cmi5.xml`, with the hosted page's address and `OwnWindow` (see
-below); `zip cmi5-course.zip
+the page. It holds only `cmi5.xml`, with the hosted page's address; `zip cmi5-course.zip
 cmi5.xml` rebuilds it after an edit. The LMS appends `endpoint`, `fetch`, `actor`,
 `registration` and `activityId` to the URL when a learner opens the course. `?src=` names the
 package; `<launchParameters>` in the AU is the alternative, and the page reads it from the LMS
@@ -92,8 +91,8 @@ place of the course page. Ask for it when a frame would not do:
 
 A frame also keeps its storage per LMS site, and Safari may clear the storage of a site the
 learner never opens on its own; either costs a download again, not the session. The demo's
-`cmi5-course.zip` still asks for `OwnWindow`: it was launched from SCORM Cloud that way, and
-it changes once it has been launched there framed.
+`cmi5-course.zip` names no `launchMethod` either: SCORM Cloud launched it framed on 2026-10-04,
+and the quiz was recorded as it had been in a window of its own.
 
 ## What the page sends
 

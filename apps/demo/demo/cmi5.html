@@ -72,10 +72,10 @@
           LMS wants it, and import it into an LMS that supports cmi5 &mdash; SCORM Cloud does, with a
           free tier &mdash; then open the course. It holds the structure below, naming this page
           and the quiz. The LMS appends its five launch parameters to the address.
-          <code>launchMethod="OwnWindow"</code> asks for the page in a window of its own, top level.
-          The player runs in an LMS&rsquo;s frame too, Safari and iOS 26 included, so a course of
-          your own can leave it out and let the LMS choose; keep it for an LMS on plain
-          <code>http</code>, or for learners on an older iOS.
+          It names no <code>launchMethod</code>, so the LMS chooses where the page opens, usually
+          in a frame of the course page, where the player runs too, Safari and iOS 26 included.
+          Add <code>launchMethod="OwnWindow"</code> to have it opened in a window of its own: for
+          an LMS on plain <code>http</code>, or for learners on an older iOS.
         </p>
         <pre class="code">&lt;?xml version="1.0" encoding="utf-8"?&gt;
 &lt;courseStructure xmlns="https://w3id.org/xapi/profiles/cmi5/v1/CourseStructure.xsd"&gt;
@@ -83,8 +83,7 @@
     &lt;title&gt;&lt;langstring lang="en-US"&gt;h5p-offline-player: quiz&lt;/langstring&gt;&lt;/title&gt;
     &lt;description&gt;&lt;langstring lang="en-US"&gt;The demo quiz, played by h5p-offline-player as a cmi5 assignable unit.&lt;/langstring&gt;&lt;/description&gt;
   &lt;/course&gt;
-  &lt;au id="%SITE_URL%/courses/demo-quiz/au" moveOn="CompletedAndPassed" masteryScore="0.8"
-      launchMethod="OwnWindow"&gt;
+  &lt;au id="%SITE_URL%/courses/demo-quiz/au" moveOn="CompletedAndPassed" masteryScore="0.8"&gt;
     &lt;title&gt;&lt;langstring lang="en-US"&gt;Quiz&lt;/langstring&gt;&lt;/title&gt;
     &lt;description&gt;&lt;langstring lang="en-US"&gt;A four-question quiz on how the player works.&lt;/langstring&gt;&lt;/description&gt;
     &lt;url&gt;%SITE_URL%/demo/cmi5.html?src=%SITE_URL%/demo/content/quiz.h5p&lt;/url&gt;

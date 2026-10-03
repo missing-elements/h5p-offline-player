@@ -96,7 +96,7 @@ const courseStructure = (auUrl) => `<?xml version="1.0" encoding="utf-8"?>
     <title><langstring lang="en-US">h5p-offline-player demo</langstring></title>
     <description><langstring lang="en-US">The demo's cmi5 page around the player</langstring></description>
   </course>
-  <au id="https://h5p-offline-player.example/courses/demo/au" moveOn="CompletedAndPassed" masteryScore="0.8" launchMethod="OwnWindow">
+  <au id="https://h5p-offline-player.example/courses/demo/au" moveOn="CompletedAndPassed" masteryScore="0.8">
     <title><langstring lang="en-US">Quiz</langstring></title>
     <description><langstring lang="en-US">A question set</langstring></description>
     <url>${auUrl.replace(/&/g, '&amp;')}</url>

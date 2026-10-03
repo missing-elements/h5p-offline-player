@@ -1042,9 +1042,10 @@ SPA-fallback trap described above cannot happen there.
   credentials in page code, and `context.revision` survives to the LRS. `OwnWindow` was then
   taken to be required, to keep the player out of a cross-origin iframe and the Safari gap it
   was believed to have; with framed players measured working on 2026-10-03, the examples
-  dropped it on 2026-10-04 and the LMS chooses (`AnyWindow`, cmi5's default). It stays
-  documented for an LMS on plain `http`, an LMS iframe without `allow="fullscreen"` and iOS
-  before 26, and in `demo/cmi5-course.zip` until SCORM Cloud has launched that course framed.
+  dropped it on 2026-10-04 and the LMS chooses (`AnyWindow`, cmi5's default), as do
+  `demo/cmi5-course.zip` and the CATAPULT course — SCORM Cloud launched the demo course framed
+  that day and recorded the quiz. It stays documented for an LMS on plain `http`, an LMS iframe
+  without `allow="fullscreen"` and iOS before 26.
   Exit in a frame follows 10.2.6.0-1, "the current browser window or frame", to `returnURL`;
   with none, `exit()` closes only a top-level window, and the demo page says to go back to the
   course.
