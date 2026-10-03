@@ -1,0 +1,37 @@
+/* The embeddable page: nothing of its own on screen but the element, so the embedding site's
+   layout is the layout. `flow-root` keeps the body's height honest for the size it reports. */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+
+body {
+  display: flow-root;
+  font: 15px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: #15171c;
+}
+
+h5p-player {
+  display: block;
+}
+
+.notice {
+  margin: 0;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid #e2e6ec;
+  border-radius: 10px;
+  background: #f6f8fa;
+}
+
+.notice.error {
+  border-color: #f0c2c5;
+  background: #fdf2f3;
+  color: #8f1b22;
+}
+
+.notice a {
+  color: inherit;
+  font-weight: 600;
+}

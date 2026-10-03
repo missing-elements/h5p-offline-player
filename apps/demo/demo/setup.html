@@ -41,7 +41,7 @@
 
     <main>
       <p class="eyebrow">Setup</p>
-      <h1>Two ways to put it on a page</h1>
+      <h1>Three ways to put it on a page</h1>
       <p class="lede">
         The player is one web component, one Service Worker script and a folder of H5P runtime
         files. Which setup you need depends on what you can host. In every case, setting
@@ -111,6 +111,15 @@
         root is safe: its scope becomes <code>/h5p/</code>, not <code>/</code>. The element warns in
         the console when the worker and the element are different versions, so update both together.
       </p>
+
+      <h2>C · An iframe, nothing on your site</h2>
+      <p>
+        For a site that cannot host a file at all, frame the player page. It sizes itself through
+        H5P's own resizer protocol and relays xAPI statements to your page on request.
+        <a href="/demo/embed.html">The embed example</a> shows the markup and the two listeners.
+      </p>
+      <pre class="code">&lt;iframe src="%SITE_URL%/embed?src=https://host.example/course.h5p&amp;xapi=https://your-site.example"
+        allow="fullscreen" style="width: 100%; border: 0"&gt;&lt;/iframe&gt;</pre>
 
       <h2>Requirements</h2>
       <ul class="list">

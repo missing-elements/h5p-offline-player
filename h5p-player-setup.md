@@ -53,7 +53,22 @@ Download `https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player/dist
 
 Under a Content-Security-Policy that does not allow `blob:` workers, download `dist/h5p-jobs.js` as well, place it on the site and point `jobs` at it. The element otherwise starts its background worker — downloads and media extraction — from a `blob:` URL. A worker cannot come from the CDN either.
 
-There is no Setup C. A site that cannot host even one file cannot run the player: the worker must be same-origin, and framing the player page hosted elsewhere gets no Service Worker in Safari — and every browser on iOS is Safari underneath — so it would fail on every iPhone and iPad.
+## Setup C — iframe embed (nothing on the host)
+
+For sites that cannot host even one file, embed the player page:
+
+```html
+<iframe src="https://player.example/embed?src=https://host.example/course.h5p&xapi=https://your-site.example"
+        allow="fullscreen" style="width: 100%; border: 0"></iframe>
+```
+
+Query parameters: `src` (required), `libraries` (`hub` or a URL, as the attribute), `preload=auto`, and `xapi`, your page's origin.
+
+**Sizing.** The page speaks H5P's resizer protocol upward — the `hello` / `resize` exchange h5p.org's embed code uses — so the `h5p-resizer.js` that code includes resizes this iframe as it is. Without it, answer the messages yourself: reply to `{ context: 'h5p', action: 'hello' }` with the same message, and on `{ context: 'h5p', action: 'resize', scrollHeight }` set the iframe's height.
+
+**xAPI.** Relayed to the parent only when `xapi=` names the parent's origin, and posted to that origin only, as `{ context: 'h5p-offline-player', action: 'xapi', verb, statement }` and, at the end, `action: 'finished'` with the final statement. Check `event.origin` against the player's origin and `event.source` against your iframe before trusting one.
+
+**Limits.** Storage lives on the player's origin, partitioned per embedding site, so nothing is shared between two sites that embed the same package. The embedding page must itself be served over https (or be on localhost): a frame inside an insecure page is an insecure context and has no Service Worker. Safari and iOS Safari were measured in October 2026 — desktop Safari 26.6.2 and iOS 26.6.1 — and the framed player registers its own worker there with no prompt; older iOS versions have not been tried. The player's origin runs whatever package it is given, so it must hold nothing else — no accounts, no cookies.
 
 ## Element API
 

@@ -21,12 +21,7 @@ site's own origin; where do the packages come from.
 |---|---|
 | Has a bundler: Vite, webpack 5, Rollup, or a framework on one (Next, Nuxt, Astro, SvelteKit) | **A** |
 | Plain HTML, a CMS theme, a static site with no build | **B** |
-| Cannot host even one file: a page builder, a locked-down CMS | none, see below |
-
-A site that cannot host even one file has no setup. The worker has to come from the site's
-own origin, and framing the player page hosted elsewhere is not a way around that: Safari gives a
-cross-origin iframe no Service Worker, and every browser on iOS is Safari underneath, so such an
-embed fails on every iPhone and iPad. Say so to the user rather than build it.
+| Cannot host even one file: a page builder, a locked-down CMS | **C** |
 
 ## 2. Do it
 
@@ -66,6 +61,18 @@ and place it on the site; `sw` points at it. The root is fine: its scope becomes
 @missing-elements/h5p-offline-player version` for the latest) in both URLs — unpinned, the CDN
 moves and the copied worker does not — and re-download `h5p-sw.js` on every upgrade; the
 console warns when the two differ.
+
+**C · iframe, nothing on the site**
+
+```html
+<iframe src="https://h5p-offline-player.vercel.app/embed?src=https://host.example/course.h5p"
+        allow="fullscreen" style="width: 100%; border: 0"></iframe>
+```
+
+Add `&xapi=<your page's origin>` to receive statements by `postMessage`. The embedding page must be
+https (or localhost); the frame then registers its own worker, in Safari and on iOS too (measured on
+Safari 26.6.2 and iOS 26.6.1). Only for a site that truly cannot host a file, and say so to the
+user: their content then runs on a third party's origin, and storage is per embedding site.
 
 **Sizing:** the element follows the content's own height by default. Set `auto-resize="off"`
 only when the page sizes it itself, from CSS or from the `resize` event, because the height the

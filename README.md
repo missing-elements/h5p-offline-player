@@ -63,6 +63,10 @@ Copy `dist/h5p-sw.js` from the same CDN path onto your site and point `sw` at it
 keep loading from the CDN. At the root its scope is `/h5p/`, not `/`, so an existing site worker
 is left alone.
 
+**C · An iframe, nothing on your site:** frame the hosted player page,
+`/embed?src=<package url>`. It sizes itself through H5P's own resizer protocol and relays xAPI
+statements to your page on request. See Setup C in the setup guide.
+
 Requirements: the page is on `https://` or `localhost`, and the package's host sends CORS
 headers. `Range` support on the host is optional; without it the archive is downloaded once and
 played from the browser's cache.

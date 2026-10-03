@@ -97,6 +97,8 @@ packages/cmi5/            @missing-elements/h5p-cmi5 — cmi5 for the element, p
 
 apps/demo/                the demo app: the dev server for the whole repository, and the hosted site
   index.html                the hosted player page
+  embed.html                the embeddable page, /embed: the element alone, driven by the query
+                            string (demo/embed-page.js); demo/embed.html is the site that embeds it
   demo/                     demo/index.html is the examples index, demo/setup.html the setup page for
                             integrators, demo/normalize.html why deflated media cannot stream and how
                             the normalizer fixes it (prose and a CSS-only diagram, no script), the rest
@@ -597,9 +599,9 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
 - **The frame posts to `location.origin`, and the element checks `event.origin`.** Both sides are
   same-origin by construction, so nothing legitimate is lost — but `pkgId` is a hash of the URL,
   so frame URLs are guessable, and a wildcard would hand every xAPI statement to any third-party
-  page that framed one. Not `frame-ancestors 'self'`: that checks every ancestor, and a host page
-  is allowed to be framed itself — an LTI tool inside an LMS is. It would also be silently
-  ignored in a `<meta>` policy, which is where the frame's CSP lives.
+  page that framed one. Not `frame-ancestors 'self'`: that checks every ancestor, and Setup C puts
+  a third-party page at the top of the chain on purpose. It would also be silently ignored in a
+  `<meta>` policy, which is where the frame's CSP lives.
 - **A chunk streams out of the cache; it is not materialised.** `readRange` pipes each chunk's
   body through, slicing a partial one as it flows, so the 64 kB a media element probes with costs
   64 kB rather than the 8 MB chunk around it.
@@ -672,7 +674,8 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   failing and the state goes to `error`; after it the content is up and, in practice, still
   working — H5P content types throw non-fatal exceptions routinely, on resize in particular —
   so the element reports it and leaves `ready` alone. A host that hides the player on `error`
-  must not hide working content. The demo's player page follows and shows it as a note.
+  must not hide working content. The demo pages follow: the player page shows it as a note, the
+  embed page only logs it.
 - **The frame's own CSS pins a YouTube iframe over its box.** H5P.Video's YouTube handler does
   that with `player.g.style = …`, reaching into the YouTube API object's minified internals; the
   field was renamed, so up to 1.6.66 — the version the hub still ships, and the one inside every
@@ -999,20 +1002,6 @@ SPA-fallback trap described above cannot happen there.
   driving the built demo under the production CSP. `CSSStyleSheet.replaceSync` is CSSOM and is
   not subject to it; the `<style>` element remains only as the fallback for a browser without
   `adoptedStyleSheets`.
-- **There is no `/embed` page.** Until 2026-09-30 the site served one — the element alone,
-  driven by the query string, speaking H5P's resizer protocol upward and relaying xAPI to a
-  parent that named its own origin — as Setup C for a site that cannot host a file, and the
-  examples index framed it. Removed the same day, with the setup: Safari gives a cross-origin
-  iframe no Service Worker, every browser on iOS is WebKit, and a page whose whole experience on
-  every iPhone and iPad is an "open it on its own" link is not worth offering or demonstrating.
-  A site that cannot host one file has no setup, and the docs say so. What is worth keeping from
-  it, should a framed page ever come back: the listener in the host page is load-bearing, since
-  an iframe nobody answers stays at 150 px; `src` must be percent-encoded or a package URL with
-  a query string is cut at its first `&`; framed from a second origin, Chromium, Firefox and
-  Playwright's WebKit did reach `ready`, with h5p.org's real `h5p-resizer.js` as well as a
-  hand-written listener; and `127.0.0.1` against `localhost` is a second origin for a test
-  without a second server. The element's own half of the resizer protocol is untouched: it is
-  how the element sizes to the content in every setup.
 - **cmi5 is `@missing-elements/h5p-cmi5`, `/demo/cmi5.html` is a page on it, and the element
   knows nothing about either.** The wiring was the demo page's until 2026-10-01, when it moved
   into the package so a host installs it instead of copying it; the demo aliases the package's
@@ -1115,6 +1104,31 @@ SPA-fallback trap described above cannot happen there.
   LTS tests the LMS side. The player returns a session's columns in camel case
   (`isInitialized`), not the snake case of its tables; `--open` once waited on the snake-case
   names and never returned.
+- **`/embed` is Setup C, and it is a page of its own.** The element alone, `auto-resize`, and
+  the query string for `src`, `libraries`, `preload` and `xapi`. Three decisions in
+  `demo/embed-page.js`: it speaks H5P's resizer protocol *upward* — `hello`, then `resize` with
+  `scrollHeight` — so a site that already includes h5p.org's `h5p-resizer.js` for its h5p.org
+  embeds resizes this frame with no code of its own; it relays xAPI only when `xapi=` names the
+  parent's origin and posts to that origin only, which is the opt-in the frame-to-element channel
+  cannot have; and, for a browser that really cannot register a worker in a frame, it detects
+  that by the `no-worker` error rather than by sniffing the user agent, and answers with a
+  `target="_top"` link to itself. The height it reports is the body's own, not `documentElement.scrollHeight`, for the reason the element
+  measures `#h5p-root` and not the document. `/embed` without `.html` is a Vercel rewrite in
+  production and Vite's own html fallback locally.
+  **Safari and iOS do run it** — measured on 2026-10-03, which reverses the removal of 2026-09-30,
+  made on the belief that Safari gives a cross-origin iframe no Service Worker. A probe with the
+  host page and the deployed demo on two different https sites reached `ready` and played a quiz
+  in desktop Safari 26.6.2, on an iPhone on iOS 26.6.1 and in Chrome; the frame registers its own
+  worker, with no `requestStorageAccess()` and no prompt, and is controlled by it. (That call is
+  not needed. It was rejected with `NotAllowedError` until the framed origin had been visited on
+  its own, and its prompt says the frame wants "to track your activity".) Storage is partitioned
+  by the pair of sites, which the player does not mind: each host site that frames it keeps its
+  own registration and chunk store, so a package is downloaded once per embedding site. The
+  parent must be https or localhost: a plain-http LAN address makes the frame an insecure
+  context with no `serviceWorker`, which is what a first iPhone test looked like. Not measured:
+  iOS before 26, Safari's seven-day limit on script-writable storage for a frame the learner
+  never opens on its own, and video and offline playback in a frame on iOS. The `target="_top"`
+  fallback stays for those, and for an in-app browser.
 - **The pages carry their metadata, and the origin is filled in at build time.** Titles,
   descriptions, canonical links, Open Graph and Twitter tags, JSON-LD for the software on the
   front page, `robots.txt` and `sitemap.xml`, and the GitHub link in every page's navigation. The
@@ -1122,7 +1136,7 @@ SPA-fallback trap described above cannot happen there.
   (`apps/demo/vite.config.ts`), which runs before Vite's own `%ENV%` pass so Vite does not warn about a
   name it does not know. `build-demo.mjs` decides the origin — `SITE_URL` if set, else Vercel's
   `VERCEL_PROJECT_PRODUCTION_URL`, else the preview's localhost — and writes the sitemap and
-  robots file with it. The social card,
+  robots file with it. `/embed` stays out of the sitemap and carries `noindex`. The social card,
   `demo/og-image.png`, is rendered by `pnpm demo:og` in Chromium from a small HTML page and
   committed, because link previews want a raster image and the deploy has no browser.
 - **`/app/` is the installable player, and the one place the single-worker setup runs.** A teacher hands out
@@ -1329,12 +1343,6 @@ The architecture and setup documents predate the code. These are deliberate addi
 - Save and resume, behind a `resume` attribute. The design lists it as out of scope for v1 and
   the element as storing nothing; with the attribute the content's own state is kept on the
   device, or handed to the host, and nothing else changes.
-
-- No `/embed` page. The design has the hosted player page serve `/embed?src=…` to third-party
-  sites, degrading to a link in Safari. Removed on 2026-09-30: every browser on iOS is WebKit,
-  so that degradation is the whole experience on every iPhone and iPad, and a method that fails
-  there is offered to nobody. An untrusted archive still gets the hosted page on its own origin;
-  a third-party site links to it rather than framing it.
 
 ## Not built yet
 

@@ -94,11 +94,11 @@ await writeFile(
   await bundleHostWorker(resolve(rootDir, 'app', 'sw.js'), { define: { __APP_PRECACHE__: JSON.stringify(precache) } })
 )
 
-// What crawlers and link previews ask for.
+// What crawlers and link previews ask for. `/embed` is left out: it carries `noindex`.
 await cp(resolve(rootDir, 'demo', 'og-image.png'), resolve(outDir, 'demo', 'og-image.png'))
 // The course structure the cmi5 page offers for importing into an LMS, zipped as LMSs want it.
 await cp(resolve(rootDir, 'demo', 'cmi5-course.zip'), resolve(outDir, 'demo', 'cmi5-course.zip'))
-const pages = ['/', '/app/', '/demo/', '/demo/setup.html', '/demo/normalize.html', '/demo/xapi.html', '/demo/cmi5.html', '/demo/local-file.html', '/demo/two-players.html']
+const pages = ['/', '/app/', '/demo/', '/demo/setup.html', '/demo/normalize.html', '/demo/xapi.html', '/demo/cmi5.html', '/demo/local-file.html', '/demo/two-players.html', '/demo/embed.html']
 const today = new Date().toISOString().slice(0, 10)
 await writeFile(
   resolve(outDir, 'sitemap.xml'),

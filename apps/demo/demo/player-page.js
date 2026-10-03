@@ -236,7 +236,7 @@ for (const button of document.querySelectorAll('.samples button')) {
   })
 }
 
-// `?src=` makes the page linkable.
+// `?src=` makes the page linkable, which is also what the iframe embed in demo/embed.html uses.
 const initial = new URLSearchParams(location.search).get('src')
 if (initial) {
   urlInput.value = initial

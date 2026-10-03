@@ -4,14 +4,14 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Examples — h5p-offline-player</title>
-    <meta name="description" content="The whole integration in two lines, and the other ways to embed a browser-only H5P player: xAPI, cmi5, a file from disk, two players on one page." />
+    <meta name="description" content="The whole integration in two lines, and the other ways to embed a browser-only H5P player: xAPI, cmi5, a file from disk, an iframe, two players on one page." />
     <link rel="canonical" href="%SITE_URL%/demo/" />
     <meta name="theme-color" content="#2f6df6" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="h5p-offline-player" />
     <meta property="og:locale" content="en_US" />
     <meta property="og:title" content="Examples — h5p-offline-player" />
-    <meta property="og:description" content="The whole integration in two lines, and the other ways to embed a browser-only H5P player: xAPI, cmi5, a file from disk, two players on one page." />
+    <meta property="og:description" content="The whole integration in two lines, and the other ways to embed a browser-only H5P player: xAPI, cmi5, a file from disk, an iframe, two players on one page." />
     <meta property="og:url" content="%SITE_URL%/demo/" />
     <meta property="og:image" content="%SITE_URL%/demo/og-image.png" />
     <meta property="og:image:width" content="1200" />
@@ -19,7 +19,7 @@
     <meta property="og:image:alt" content="h5p-offline-player: play H5P packages in the browser, with no server" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Examples — h5p-offline-player" />
-    <meta name="twitter:description" content="The whole integration in two lines, and the other ways to embed a browser-only H5P player: xAPI, cmi5, a file from disk, two players on one page." />
+    <meta name="twitter:description" content="The whole integration in two lines, and the other ways to embed a browser-only H5P player: xAPI, cmi5, a file from disk, an iframe, two players on one page." />
     <meta name="twitter:image" content="%SITE_URL%/demo/og-image.png" />
     <link rel="icon" type="image/svg+xml" href="/demo/favicon.svg" />
     <link rel="stylesheet" href="/demo/player-page.css" />
@@ -97,6 +97,12 @@
           <a class="card" href="/demo/local-file.html">
             <strong>A file from disk</strong>
             <span>The path around a host with no CORS headers: hand the element a <code>File</code>, read with <code>slice()</code>.</span>
+          </a>
+        </li>
+        <li>
+          <a class="card" href="/demo/embed.html">
+            <strong>iframe embed</strong>
+            <span>For a site that cannot host even one file. The player runs on its own origin.</span>
           </a>
         </li>
         <li>
