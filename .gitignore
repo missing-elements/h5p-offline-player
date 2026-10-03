@@ -36,3 +36,6 @@ coverage
 
 # Vitest browser-mode artefacts (failure screenshots)
 .vitest/
+
+# local agent skills
+.agents/
