@@ -65,7 +65,7 @@ is left alone.
 
 **C · An iframe, nothing on your site:** frame the hosted player page,
 `/embed?src=<package url>`. It sizes itself through H5P's own resizer protocol and relays xAPI
-statements to your page on request. See Setup C in the setup guide.
+statements to your page on request. See Setup C in the setup guide. A third-party site embedding it from GitHub Pages: [alekswebnet.github.io/h5p](https://alekswebnet.github.io/h5p/).
 
 ```html
 <iframe src="https://h5p-offline-player.vercel.app/embed?src=https://h5p-offline-player.vercel.app/demo/content/quiz.h5p&xapi=https://your-site.example"

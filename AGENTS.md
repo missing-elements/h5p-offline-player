@@ -1118,7 +1118,9 @@ SPA-fallback trap described above cannot happen there.
   **Safari and iOS do run it** — measured on 2026-10-03, which reverses the removal of 2026-09-30,
   made on the belief that Safari gives a cross-origin iframe no Service Worker. A probe with the
   host page and the deployed demo on two different https sites reached `ready` and played a quiz
-  in desktop Safari 26.6.2, on an iPhone on iOS 26.6.1 and in Chrome; the frame registers its own
+  in desktop Safari 26.6.2, on an iPhone on iOS 26.6.1 and in Chrome (and the owner's own GitHub
+  Pages site, https://alekswebnet.github.io/h5p/, a third origin, reported it working in every
+  browser tried, 2026-10-04, unchecked here); the frame registers its own
   worker, with no `requestStorageAccess()` and no prompt, and is controlled by it. (That call is
   not needed. It was rejected with `NotAllowedError` until the framed origin had been visited on
   its own, and its prompt says the frame wants "to track your activity".) Storage is partitioned
