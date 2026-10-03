@@ -1038,9 +1038,16 @@ SPA-fallback trap described above cannot happen there.
   `initialized` and `terminated` and nothing else from it. What follows was learned while the
   wiring was the page's.
   Chosen on 2026-09-30 over SCORM and LTI: the package stays on a static host, the AU can
-  demand its own window (`launchMethod="OwnWindow"`), which is the one standard way to keep the
-  player out of a cross-origin iframe and so out of the Safari and iOS gap, the token is per
-  launch instead of LRS credentials in page code, and `context.revision` survives to the LRS.
+  demand its own window (`launchMethod="OwnWindow"`), the token is per launch instead of LRS
+  credentials in page code, and `context.revision` survives to the LRS. `OwnWindow` was then
+  taken to be required, to keep the player out of a cross-origin iframe and the Safari gap it
+  was believed to have; with framed players measured working on 2026-10-03, the examples
+  dropped it on 2026-10-04 and the LMS chooses (`AnyWindow`, cmi5's default). It stays
+  documented for an LMS on plain `http`, an LMS iframe without `allow="fullscreen"` and iOS
+  before 26, and in `demo/cmi5-course.zip` until SCORM Cloud has launched that course framed.
+  Exit in a frame follows 10.2.6.0-1, "the current browser window or frame", to `returnURL`;
+  with none, `exit()` closes only a top-level window, and the demo page says to go back to the
+  course.
   The client keeps the shape `@xapi/cmi5` had, so a simulated LMS can stand in for it, and three
   things about that shape matter: `sendXapiStatement` sends what it is given, so
   `allowedStatement` builds allowed statements — the launch actor, the registration, the

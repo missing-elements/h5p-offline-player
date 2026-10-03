@@ -388,6 +388,22 @@ describe('startCmi5', () => {
     expect(assigned).toEqual(['https://lms.example/back'])
   })
 
+  it('does not try to close a framed page that has no returnURL', async () => {
+    const { client, calls } = fakeClient({})
+    const session = await startCmi5(new FakePlayer(), { client, storage: null, src: false })
+    let closed = 0
+    const saved = { top: globalThis.top, self: globalThis.self, close: globalThis.close }
+    // In a frame, `top` is the LMS page's window and `self` this one.
+    Object.assign(globalThis, { top: {}, self: globalThis, close: () => closed++ })
+    try {
+      await session.exit()
+    } finally {
+      Object.assign(globalThis, saved)
+    }
+    expect(calls.at(-1)).toEqual({ call: 'terminate' })
+    expect(closed).toBe(0)
+  })
+
   it('drops a returnURL that is not a web address, and says so', async () => {
     const { client } = fakeClient({ returnURL: 'javascript:alert(1)' })
     const events: Cmi5Event[] = []

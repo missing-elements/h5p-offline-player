@@ -17,6 +17,9 @@ const player = document.querySelector('h5p-player')
 const status = document.querySelector('#status')
 const log = document.querySelector('#log')
 const exitButton = document.querySelector('#exit')
+// What a learner does after Exit when the launch named no return URL: an LMS that framed the
+// page is still around it, and a window of its own is theirs to close.
+const leave = window.top === window ? 'You can close this window.' : 'You can go back to the course.'
 const instructions = document.querySelector('#instructions')
 
 const say = (text) => {
@@ -72,7 +75,7 @@ async function start(client, simulated) {
         break
       case 'recorded':
         if (!simulated) note(`sent  ${[event.outcome, event.completed && 'completed'].filter(Boolean).join(', ')}`)
-        say(`Recorded. ${simulated ? 'Exit sends terminated.' : returnURL ? 'Exit returns to the course.' : 'You can close this window.'}`)
+        say(`Recorded. ${simulated ? 'Exit sends terminated.' : returnURL ? 'Exit returns to the course.' : leave}`)
         break
       case 'skipped':
         note(`finished: ${event.reason}`)
@@ -109,7 +112,7 @@ async function start(client, simulated) {
     }
     await session.exit()
     // Still here: no return URL, and a window the page did not open will not close.
-    say('Terminated. You can close this window.')
+    say(`Terminated. ${leave}`)
   })
 }
 

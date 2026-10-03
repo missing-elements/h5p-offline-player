@@ -76,8 +76,7 @@ The course structure you import into the LMS, zipped as `cmi5.xml`:
     <title><langstring lang="en-US">Quiz</langstring></title>
     <description><langstring lang="en-US">A question set</langstring></description>
   </course>
-  <au id="https://your-site.example/courses/quiz/au" moveOn="CompletedAndPassed" masteryScore="0.8"
-      launchMethod="OwnWindow">
+  <au id="https://your-site.example/courses/quiz/au" moveOn="CompletedAndPassed" masteryScore="0.8">
     <title><langstring lang="en-US">Quiz</langstring></title>
     <description><langstring lang="en-US">A question set</langstring></description>
     <url>https://your-site.example/au.html?src=https://your-site.example/quiz.h5p</url>
@@ -85,9 +84,16 @@ The course structure you import into the LMS, zipped as `cmi5.xml`:
 </courseStructure>
 ```
 
-Keep `launchMethod="OwnWindow"`. It makes the LMS open your page top level. A framed page works
-too, in Safari and on iOS 26 as well, but it loses its Service Worker inside a plain-`http` LMS
-page, keeps its storage per LMS site, and has not been tried on iOS before 26. The package URL must send CORS headers, as for any use of the player.
+With no `launchMethod` the LMS decides where the page opens, and most frame it in the course
+page; the player runs there, in Safari and on iOS 26 too. Add `launchMethod="OwnWindow"` to
+have the page opened top level when a frame would not do: an LMS on plain `http` (a frame
+inside it gets no Service Worker), content that needs fullscreen in an LMS iframe without
+`allow="fullscreen"`, or learners on iOS before 26, which has not been tried framed. The package
+URL must send CORS headers, as for any use of the player.
+
+`exit()` goes to the launch's `returnURL`. With none, it closes the window when the page is top
+level; a framed page stays, since it cannot close the LMS page around it, so tell the learner
+to go back to the course.
 
 ## Options
 

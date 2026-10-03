@@ -72,8 +72,10 @@
           LMS wants it, and import it into an LMS that supports cmi5 &mdash; SCORM Cloud does, with a
           free tier &mdash; then open the course. It holds the structure below, naming this page
           and the quiz. The LMS appends its five launch parameters to the address.
-          <code>launchMethod="OwnWindow"</code> makes it open the page in a window of its own, top
-          level, which is what lets the player run on every browser, Safari and iOS included.
+          <code>launchMethod="OwnWindow"</code> asks for the page in a window of its own, top level.
+          The player runs in an LMS&rsquo;s frame too, Safari and iOS 26 included, so a course of
+          your own can leave it out and let the LMS choose; keep it for an LMS on plain
+          <code>http</code>, or for learners on an older iOS.
         </p>
         <pre class="code">&lt;?xml version="1.0" encoding="utf-8"?&gt;
 &lt;courseStructure xmlns="https://w3id.org/xapi/profiles/cmi5/v1/CourseStructure.xsd"&gt;

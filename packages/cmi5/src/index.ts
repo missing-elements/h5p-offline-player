@@ -170,7 +170,10 @@ export interface Cmi5Session {
   terminate(): Promise<void>
   /** Retries a completion outcome that the LRS did not accept. */
   retry(): Promise<void>
-  /** `terminate()`, then the return URL, or closes the window when there is none. */
+  /**
+   * `terminate()`, then the return URL. With none, it closes the window, if the page is top level;
+   * a frame cannot close the LMS page around it, so a framed page stays where it is.
+   */
   exit(): Promise<void>
   /** Stops listening to the element, without terminating. */
   stop(): void
@@ -474,7 +477,7 @@ export async function startCmi5(player: PlayerLike, options: Cmi5Options = {}): 
       async exit() {
         await terminate()
         if (returnURL) globalThis.location?.assign(returnURL)
-        else globalThis.close?.()
+        else if (globalThis.top === globalThis.self) globalThis.close?.()
       },
       stop
     }
