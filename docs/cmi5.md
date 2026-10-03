@@ -4,13 +4,13 @@ cmi5 is xAPI with a launch contract: the LMS opens content by URL, hands it a on
 and an LRS to talk to, and the content sends its statements there. It is the integration that
 fits this player, for four reasons. The package stays on a static host, since the LMS imports
 only a small course structure. The assignable unit can demand its own window, which keeps the
-player out of a cross-origin iframe, where Safari and every browser on iOS give it no Service
-Worker. No LRS credentials sit in page code; the token is per launch. And every statement keeps
+player out of the LMS's iframe and so off the conditions a framed player depends on (see *The
+launch*). No LRS credentials sit in page code; the token is per launch. And every statement keeps
 `context.revision`, so the LRS knows which build each completion came from.
 
 The alternatives each break one of those. SCORM is the one nearly every LMS supports, but a
 SCORM package has to contain the player and the `.h5p` and be hosted inside the LMS, which often
-serves it from a content domain in an iframe, bringing the iOS gap back; and its data model has
+serves it from a content domain in an iframe, bringing those conditions back; and its data model has
 no field for the build. LTI 1.3 is how Moodle, Canvas and Blackboard embed external tools, with
 grade passback, but it is an OpenID Connect exchange that needs a server holding keys, which a
 static host does not have, and it embeds in an iframe by default. Plain xAPI works already, through
@@ -74,9 +74,13 @@ cmi5.xml` rebuilds it after an edit. The LMS appends `endpoint`, `fetch`, `actor
 package; `<launchParameters>` in the AU is the alternative, and the page reads it from the LMS
 when the URL carries no `src`. The package URL needs CORS headers, as in every setup.
 
-`launchMethod="OwnWindow"` is not decoration. It obliges the LMS to open the page top level,
-and a top-level page gets a Service Worker in every browser. Without it, an LMS may frame the
-page, and on iOS the player then shows nothing.
+`launchMethod="OwnWindow"` is still worth keeping, though a framed player works: in October
+2026 a cross-origin frame registered its own Service Worker in desktop Safari 26.6.2, on iOS
+26.6.1 and in Chrome. It obliges the LMS to open the page top level, which removes what a frame
+depends on. A framed page is an insecure context, with no Service Worker, whenever the LMS
+page around it is plain `http`. Its storage is partitioned by the LMS's site, so what it
+extracted is kept for that LMS only. Safari may clear script-written storage of a site the
+learner never opens on its own. And iOS before 26 has not been tried.
 
 ## What the page sends
 

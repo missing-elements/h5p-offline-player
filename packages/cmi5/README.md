@@ -85,9 +85,9 @@ The course structure you import into the LMS, zipped as `cmi5.xml`:
 </courseStructure>
 ```
 
-Keep `launchMethod="OwnWindow"`. It makes the LMS open your page top level. Framed on another
-origin, Safari and every browser on iOS give the page no Service Worker, and the player cannot
-run without one. The package URL must send CORS headers, as for any use of the player.
+Keep `launchMethod="OwnWindow"`. It makes the LMS open your page top level. A framed page works
+too, in Safari and on iOS 26 as well, but it loses its Service Worker inside a plain-`http` LMS
+page, keeps its storage per LMS site, and has not been tried on iOS before 26. The package URL must send CORS headers, as for any use of the player.
 
 ## Options
 
