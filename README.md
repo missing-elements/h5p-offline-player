@@ -67,6 +67,11 @@ is left alone.
 `/embed?src=<package url>`. It sizes itself through H5P's own resizer protocol and relays xAPI
 statements to your page on request. See Setup C in the setup guide.
 
+```html
+<iframe src="https://h5p-offline-player.vercel.app/embed?src=https://h5p-offline-player.vercel.app/demo/content/quiz.h5p&xapi=https://your-site.example"
+        allow="fullscreen" style="width: 100%; border: 0"></iframe>
+```
+
 Requirements: the page is on `https://` or `localhost`, and the package's host sends CORS
 headers. `Range` support on the host is optional; without it the archive is downloaded once and
 played from the browser's cache.
