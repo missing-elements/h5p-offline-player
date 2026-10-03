@@ -51,7 +51,7 @@
       <iframe id="embed" title="H5P player" class="embed-frame" allow="fullscreen"></iframe>
 
       <h2>Markup</h2>
-      <pre class="code">&lt;iframe src="https://player.example/embed?src=https://host.example/course.h5p&amp;xapi=https://your-site.example"
+      <pre class="code">&lt;iframe src="%SITE_URL%/embed?src=%SITE_URL%/demo/content/quiz.h5p&amp;xapi=https://your-site.example"
         allow="fullscreen" style="width: 100%; border: 0"&gt;&lt;/iframe&gt;
 
 &lt;!-- Sizing: the page speaks H5P's resizer protocol upward, so the script
@@ -62,7 +62,7 @@
 &lt;script&gt;
   const frame = document.querySelector('iframe')
   addEventListener('message', ({ source, origin, data }) =&gt; {
-    if (source !== frame.contentWindow || origin !== 'https://player.example') return
+    if (source !== frame.contentWindow || origin !== '%SITE_URL%') return
     if (data.context === 'h5p' &amp;&amp; data.action === 'hello') source.postMessage({ context: 'h5p', action: 'hello' }, origin)
     if (data.context === 'h5p' &amp;&amp; data.action === 'resize') frame.style.height = data.scrollHeight + 'px'
     if (data.context === 'h5p-offline-player' &amp;&amp; data.action === 'xapi') console.log(data.verb, data.statement)
@@ -73,8 +73,10 @@
       <pre class="log" id="log"></pre>
 
       <p class="message hint">
-        Safari does not give a cross-origin iframe a Service Worker, and the player cannot run
-        without one. There the embedded page shows a link that opens the player on its own.
+        The embedding page must be served over https. The frame then registers its own Service
+        Worker, in Safari and on iOS too (tried on Safari 26.6.2 and iOS 26.6.1; older iOS is
+        untested). Where a browser still refuses, the embedded page shows a link that opens the
+        player on its own.
       </p>
 
       <footer>

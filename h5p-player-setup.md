@@ -55,10 +55,10 @@ Under a Content-Security-Policy that does not allow `blob:` workers, download `d
 
 ## Setup C — iframe embed (nothing on the host)
 
-For sites that cannot host even one file, embed the player page:
+For sites that cannot host even one file, embed the player page. [Live example](https://h5p-offline-player.vercel.app/demo/embed.html):
 
 ```html
-<iframe src="https://player.example/embed?src=https://host.example/course.h5p&xapi=https://your-site.example"
+<iframe src="https://h5p-offline-player.vercel.app/embed?src=https://h5p-offline-player.vercel.app/demo/content/quiz.h5p&xapi=https://your-site.example"
         allow="fullscreen" style="width: 100%; border: 0"></iframe>
 ```
 

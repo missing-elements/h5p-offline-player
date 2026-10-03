@@ -65,7 +65,7 @@ console warns when the two differ.
 **C · iframe, nothing on the site**
 
 ```html
-<iframe src="https://h5p-offline-player.vercel.app/embed?src=https://host.example/course.h5p"
+<iframe src="https://h5p-offline-player.vercel.app/embed?src=https://h5p-offline-player.vercel.app/demo/content/quiz.h5p"
         allow="fullscreen" style="width: 100%; border: 0"></iframe>
 ```
 
