@@ -25,17 +25,18 @@ export default async function handler(request, response) {
     return
   }
 
-  const protocol = String(request.headers['x-forwarded-proto'] ?? 'https').split(',')[0]
-  const host = String(request.headers['x-forwarded-host'] ?? request.headers.host).split(',')[0]
+  const origin = deploymentOrigin(request)
   /** @type {Record<string, string>} */
   const headers = {}
   // A preview deployment behind Vercel's deployment protection answers an anonymous fetch with
-  // its login page; the bypass secret, when the project has one, gets the file instead.
-  if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
-    headers['x-vercel-protection-bypass'] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+  // its login page; the bypass secret, when the project has one, gets the file instead. Only
+  // ever to Vercel's own deployment hosts, whatever the origin turned out to be.
+  const secret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+  if (secret && new URL(origin).hostname.endsWith('.vercel.app')) {
+    headers['x-vercel-protection-bypass'] = secret
   }
 
-  const upstream = await fetch(`${protocol}://${host}/demo/content/${name}`, { headers })
+  const upstream = await fetch(`${origin}/demo/content/${name}`, { headers })
   if (!upstream.ok || !upstream.body) {
     response.statusCode = 404
     response.end('no such fixture')
@@ -51,4 +52,18 @@ export default async function handler(request, response) {
   if (length && !upstream.headers.get('content-encoding')) response.setHeader('content-length', length)
 
   Readable.fromWeb(/** @type {any} */ (upstream.body)).pipe(response)
+}
+
+/**
+ * Where this deployment's static files are, from Vercel's environment rather than from the
+ * request: the production domain for production, the deployment's own URL for a preview. The
+ * request's `Host` is the fallback for `vercel dev`, which sets neither and runs on localhost.
+ *
+ * @param {import('node:http').IncomingMessage} request
+ */
+function deploymentOrigin(request) {
+  const { VERCEL_ENV, VERCEL_PROJECT_PRODUCTION_URL, VERCEL_URL } = process.env
+  if (VERCEL_ENV === 'production' && VERCEL_PROJECT_PRODUCTION_URL) return `https://${VERCEL_PROJECT_PRODUCTION_URL}`
+  if (VERCEL_URL) return `https://${VERCEL_URL}`
+  return `http://${String(request.headers.host ?? 'localhost')}`
 }

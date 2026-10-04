@@ -125,7 +125,8 @@ meanwhile: anything the content emits before `initialized` has gone out waits, a
 after it. The `fetch` URL answers once. Reload recovery is therefore an explicit trusted-host
 choice: pass `storage` to `startCmi5()` only when both the package and origin are trusted.
 H5P library scripts run in a same-origin frame and can read browser storage, so the default
-keeps no LRS token; with it, a reload must be launched again by the LMS. Every relayed statement
+keeps no LRS token; with it, a reload must be launched again by the LMS. A kept session is
+reused only for the endpoint, registration and activity it was made under. Every relayed statement
 carries a UUID id, as cmi5 requires: its own if it has one, a new one if not. A score
 on `passed`, `failed` or `completed` carries `min` and `max` beside `raw`, as cmi5 requires;
 H5P gives `raw` and `max`, and its minimum is 0. `returnURL` is read from the launch data, where

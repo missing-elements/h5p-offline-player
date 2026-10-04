@@ -111,6 +111,14 @@
         <button type="button" id="use-hub">h5p.org</button>
       </p>
 
+      <!-- A link's ?src= on another site waits for a click: see foreignHost in demo/player-page.js. -->
+      <p class="message warning offer" id="confirm-src" hidden>
+        <span>This link opens a package from <strong class="host"></strong>. A package runs its own
+        scripts on this site, and they can read what other packages saved in this browser. Open it
+        only if you trust that site.</span>
+        <button type="button" id="confirm-open">Open the package</button>
+      </p>
+
       <h5p-player preload="auto"></h5p-player>
 
       <h2>Events</h2>

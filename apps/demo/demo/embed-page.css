@@ -36,6 +36,17 @@ h5p-player {
   font-weight: 600;
 }
 
+.notice button {
+  margin-left: 0.5rem;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
 /* The element draws nothing until it is ready, and the first seconds go to registering the worker
    and probing the package. The loader is in the HTML, so it shows before any script has run. */
 .loader {

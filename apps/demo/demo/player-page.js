@@ -17,6 +17,7 @@ const log = document.querySelector('#log')
 const offer = document.querySelector('#offer')
 const useBundle = document.querySelector('#use-bundle')
 const useHub = document.querySelector('#use-hub')
+const confirmBox = document.querySelector('#confirm-src')
 
 const write = (line) => {
   const stamp = new Date().toLocaleTimeString([], { hour12: false })
@@ -188,6 +189,7 @@ let reload = null
 
 const loadUrl = (url) => {
   log.textContent = ''
+  confirmBox.hidden = true
   offer.hidden = true
   reload = () => loadUrl(url)
   applyLibrarySource()
@@ -200,6 +202,7 @@ const loadUrl = (url) => {
 
 const loadFile = (file) => {
   log.textContent = ''
+  confirmBox.hidden = true
   offer.hidden = true
   reload = () => loadFile(file)
   applyLibrarySource()
@@ -236,9 +239,41 @@ for (const button of document.querySelectorAll('.samples button')) {
   })
 }
 
+/**
+ * The host of a package on another site, or `null` for this site's own and for what is not a URL
+ * (which `loadUrl` then reports). A package's libraries are JavaScript and the frame is
+ * same-origin by design, so a package runs with this origin's storage: the app's saved states,
+ * the chunk store, the list of what was played. Typed into the field is the visitor's choice; a
+ * link's `?src=` is whoever wrote the link's, so it waits for a click that names the host.
+ */
+const foreignHost = (src) => {
+  try {
+    const url = new URL(src, location.href)
+    // A `data:` URL has no host and an opaque origin: name its scheme, so it still waits.
+    return url.origin === location.origin ? null : url.host || url.protocol
+  } catch {
+    return null
+  }
+}
+
+/** What the pending link would load; any other load (`loadUrl`, `loadFile`) hides the question. */
+let pendingOpen = null
+const askBeforeOpening = (host, go) => {
+  confirmBox.querySelector('.host').textContent = host
+  confirmBox.hidden = false
+  pendingOpen = go
+}
+document.querySelector('#confirm-open').addEventListener('click', () => {
+  confirmBox.hidden = true
+  pendingOpen?.()
+  pendingOpen = null
+})
+
 // `?src=` makes the page linkable, which is also what the iframe embed in demo/embed.html uses.
 const initial = new URLSearchParams(location.search).get('src')
 if (initial) {
   urlInput.value = initial
-  loadUrl(initial)
+  const host = foreignHost(initial)
+  if (host) askBeforeOpening(host, () => loadUrl(initial))
+  else loadUrl(initial)
 }

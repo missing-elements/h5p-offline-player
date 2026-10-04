@@ -241,7 +241,18 @@ const verbOf = (statement: Statement | undefined): string => {
 
 /* ------------------------------------------------------------------ the session kept across a reload */
 
-interface KeptSession {
+/**
+ * What the record was made for. The storage key is the `fetch` URL alone, so a record is also held
+ * to the launch it was made under: the token goes to the LRS in `endpoint`, and a record that
+ * names another endpoint, registration or activity is ignored rather than handing its token on.
+ */
+interface KeptLaunch {
+  endpoint: string
+  registration: string
+  activityId: string
+}
+
+interface KeptSession extends KeptLaunch {
   authToken: string
   initializedDate: Date
   movedOn: boolean
@@ -253,14 +264,21 @@ interface Outcome {
   success?: boolean
 }
 
-function readKept(storage: SessionStorage | null, key: string): KeptSession | null {
+function readKept(storage: SessionStorage | null, key: string, launch: KeptLaunch): KeptSession | null {
   if (!storage) return null
   try {
     const raw = storage.getItem(key)
     if (!raw) return null
-    const { authToken, initializedDate, movedOn, pendingOutcome } = JSON.parse(raw)
+    const { authToken, initializedDate, movedOn, pendingOutcome, endpoint, registration, activityId } = JSON.parse(raw)
     if (!authToken || !initializedDate) return null
-    return { authToken, initializedDate: new Date(initializedDate), movedOn: Boolean(movedOn), ...(pendingOutcome ? { pendingOutcome } : {}) }
+    if (endpoint !== launch.endpoint || registration !== launch.registration || activityId !== launch.activityId) return null
+    return {
+      ...launch,
+      authToken,
+      initializedDate: new Date(initializedDate),
+      movedOn: Boolean(movedOn),
+      ...(pendingOutcome ? { pendingOutcome } : {})
+    }
   } catch {
     return null
   }
@@ -410,11 +428,12 @@ export async function startCmi5(player: PlayerLike, options: Cmi5Options = {}): 
     client = options.client ?? createCmi5Client({ url })
     launch = client.getLaunchParameters()
     key = `h5p-cmi5:${launch.fetch}`
-    const saved = readKept(storage, key)
+    const bound: KeptLaunch = { endpoint: launch.endpoint, registration: launch.registration, activityId: launch.activityId }
+    const saved = readKept(storage, key, bound)
     movedOn = Boolean(saved?.movedOn)
     await client.initialize(saved ? { authToken: saved.authToken, initializedDate: saved.initializedDate } : undefined)
     data = client.getLaunchData()
-    kept = saved ?? { authToken: client.getAuthToken(), initializedDate: client.getInitializedDate(), movedOn: false }
+    kept = saved ?? { ...bound, authToken: client.getAuthToken(), initializedDate: client.getInitializedDate(), movedOn: false }
     pendingOutcome = saved?.pendingOutcome ?? pendingOutcome
     if (!saved) writeKept(storage, key, kept)
 

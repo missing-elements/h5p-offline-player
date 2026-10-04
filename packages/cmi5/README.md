@@ -100,7 +100,7 @@ to go back to the course.
 | Option | Default | What it is for |
 |---|---|---|
 | `onEvent(event)` | none | Told about each step: `initialized`, `sent`, `rejected` with the LMS's reason, `recorded` with what went out now, `skipped` in Browse and Review mode or when an earlier session recorded the result, `registration-unread`, `terminated`, `unsafe-return-url` |
-| `src` | the address's `src`, then `launchParameters` | The package to play; `false` leaves the element's `src` to you |
+| `src` | the address's `src`, then `launchParameters` | The package to play; `false` leaves the element's `src` to you. Both defaults are whatever the launch named: on a page anyone can link to, pass `false` and check the package's origin yourself before setting `src`, as the demo page does |
 | `storage` | `null` | Where the session is kept across a reload; pass it only for a trusted package and origin |
 | `client` | `createCmi5Client()` on this page's launch | A client of your own: a simulated LMS, a test double |
 
@@ -117,7 +117,9 @@ address.
 - **Reload recovery is opt-in.** The launch's token works once, so passing `storage` keeps it
   with the start time and whether the result went out. Do that only when both the package and
   origin are trusted: H5P library scripts run in a same-origin frame and can read browser
-  storage. With the default `null`, a reload must be launched again by the LMS.
+  storage. With the default `null`, a reload must be launched again by the LMS. A kept session
+  is reused only for the same endpoint, registration and activity it was made under, so its
+  token never goes to another LRS.
 - **Nothing is sent as the page unloads.** A page cannot tell a reload from a closed tab, and a
   `terminated` sent on a reload ends the session the page goes on using. A learner who closes
   the tab without Exit leaves the session for the LMS to record as `abandoned`, which is what
