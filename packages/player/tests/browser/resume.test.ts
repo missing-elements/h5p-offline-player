@@ -3,7 +3,7 @@ import '../../src/h5p-offline-player'
 import type { H5PPlayerElement, UserDataDetail } from '../../src/h5p-offline-player'
 import { USER_DATA_DB_NAME } from '../../src/shared/constants'
 import { readUserData, writeUserData } from '../../src/user-data-store'
-import { FIXTURES, createPlayer, frameDocument, frameWindow, play, waitFor, waitForEvent, waitForSettled } from './utils'
+import { FIXTURES, clearPackageCaches, createPlayer, frameDocument, frameWindow, play, waitFor, waitForEvent, waitForSettled } from './utils'
 
 /**
  * Save and resume: the runtime asks the content for its state and the element keeps it — on this
@@ -171,5 +171,27 @@ describe('resume', () => {
 
     const again = await play(FIXTURES.noRangeBasic, { resume: '' })
     expect(count(again)).toBe('1')
+  })
+
+  it('finishes the load under the mode it started with, when the host switches resume off midway', async () => {
+    // 20 MB at 2 MB/s: the frame boots from the forward index within the first second, a save
+    // made three seconds later lands before the central directory, and the index answers at
+    // about ten. A query of its own, so the package is cold whatever ran before.
+    await clearPackageCaches()
+    const player = createPlayer({ resume: '' })
+    const settled = waitForSettled(player, 60_000)
+    player.setAttribute('src', `${FIXTURES.noRangeLargeStored}?throttle=2000000&case=resume-mode`)
+    expect(await settled).toEqual({ ok: true })
+    expect(player.revision).toBeNull()
+
+    const saved = await completeAndSave(player)
+    expect(saved.revision).toBeNull()
+    expect((await readUserData(player.pkgId!))[0]?.revision).toBeNull()
+
+    // `resume` takes effect on the next load. This load began with it on, so stamping the early
+    // save with the build, once the index names it, is still this load's to do.
+    player.resume = 'off'
+    await waitFor(() => player.revision !== null, 60_000)
+    await waitFor(async () => (await readUserData(player.pkgId!))[0]?.revision === player.revision)
   })
 })

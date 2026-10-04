@@ -459,7 +459,11 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   stamped with the build's `revision`; on a host without `Range` the frame boots before the
   index can say, so such a row is written with `null` and stamped once the index answers
   (`adoptRevision`), and while the build is unknown a saved state is handed over unchecked — the
-  package id already separates builds on any host that sends a validator. `resume.test.ts`
+  package id already separates builds on any host that sends a validator. The mode is read
+  once per load (`loadResumeMode`) and again latched with the frame's save session
+  (`userDataMode`, PR #1, 2026-10-04): `resume` takes effect on the next load, and reading it
+  live let a host that switched it mid-lesson drop the running frame's next save, or leave an
+  early save on a host without `Range` unstamped. `resume.test.ts`
   drives all of it through the fixture content type, which counts presses of Complete.
 - **A library bundle is downloaded, never range-read.** It is read exhaustively — every library's
   JSON, scripts and styles — so the element registers it as `chunked` even when the host honours
