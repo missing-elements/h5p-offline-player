@@ -13,6 +13,7 @@
 const params = new URLSearchParams(location.search)
 const player = document.querySelector('h5p-player')
 const notice = document.querySelector('#notice')
+const loader = document.querySelector('#loader')
 const framed = window.parent !== window
 
 /* ------------------------------------------------------------------ notices */
@@ -115,13 +116,18 @@ player.addEventListener('error', (event) => {
 })
 
 player.addEventListener('statechange', (event) => {
-  if (event.detail.state !== 'error') say('')
+  const { state } = event.detail
+  if (state !== 'error') say('')
+  // Shown from the HTML on, until the content is up or the load has failed.
+  loader.hidden = state === 'ready' || state === 'error' || state === 'idle'
+  requestAnimationFrame(announce)
 })
 
 /* ------------------------------------------------------------------ load */
 
 const src = params.get('src')?.trim()
 if (!src) {
+  loader.hidden = true
   say('No package given. Add ?src=<url of a .h5p file> to the address.', 'error')
 } else {
   const libraries = params.get('libraries')?.trim()
