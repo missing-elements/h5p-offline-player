@@ -217,7 +217,19 @@ export class H5PPlayerElement extends HTMLElement {
    * the host just cleared before the next load reads the store.
    */
   private userDataSession: string | null = null
-  /** Resume policy belonging to `userDataSession`; the public attribute changes on next load. */
+  /**
+   * The resume mode this load started with. `resume` takes effect on the next load, so a load
+   * reads it once and keeps the value for everything it decides later: the frame's URL, the
+   * state handed to the frame, and the stamping of saves made before the index answered. Read
+   * live, a host switching the attribute mid-load got a frame started under one mode and
+   * answered under another.
+   */
+  private loadResumeMode: ResumeMode = 'off'
+  /**
+   * The mode the frame holding `userDataSession` was answered under, which its saves follow.
+   * Kept apart from `loadResumeMode`: a straggler save from the previous document can arrive
+   * after the next load has begun and before its frame has asked for its state.
+   */
   private userDataMode: ResumeMode = 'off'
   private prefetching: string | null = null
 
@@ -454,6 +466,7 @@ export class H5PPlayerElement extends HTMLElement {
     this.iframe.title = FRAME_TITLE
     this.forgetPackage()
     this.revisionSettled = false
+    this.loadResumeMode = this.resume
 
     try {
       this.setState('probing')
@@ -478,7 +491,7 @@ export class H5PPlayerElement extends HTMLElement {
       // `?resume=1` tells the frame's boot script to ask for the saved state before the runtime
       // initialises. In the URL, not the frame document, so that a worker and an element of
       // different versions each do what they know: see `frame-boot.ts`.
-      const frameUrl = `${routes.frame}${pkgId}${this.resume === 'off' ? '' : '?resume=1'}`
+      const frameUrl = `${routes.frame}${pkgId}${this.loadResumeMode === 'off' ? '' : '?resume=1'}`
       let indexed: IndexResult
 
       if (descriptor.type === 'chunked') {
@@ -503,7 +516,7 @@ export class H5PPlayerElement extends HTMLElement {
       this.releaseStatements()
       // A state saved before this answer — by a frame booted early on a host without `Range` —
       // is stamped with the build now that it is known, so the next load can check it.
-      if (this.resume === 'device' && this.internalRevision) {
+      if (this.loadResumeMode === 'device' && this.internalRevision) {
         adoptRevision(pkgId, this.internalRevision).catch(() => {})
       }
 
@@ -1076,7 +1089,7 @@ export class H5PPlayerElement extends HTMLElement {
    * host that sends a validator.
    */
   private async answerUserData(pkgId: string): Promise<void> {
-    const mode = this.resume
+    const mode = this.loadResumeMode
     let entries: UserDataEntry[] = []
     if (mode === 'host') {
       entries = (this.hostUserData ?? []).map(({ dataType, subContentId, data }) => ({
