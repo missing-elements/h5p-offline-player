@@ -59,5 +59,10 @@ media are licensed, or the content is accessible; those are the user's to review
 not check library versions: a package built against newer library versions than the H5P hub
 carries (h5p-cli builds from GitHub `master`) plays here and is refused by h5p.com and by the
 offline app's library pack; if the destination is one of those, build against the hub's versions.
+A pass is not a trust decision either: the package's scripts ran in a headless browser on this
+machine, with its network, and a package that behaves at start-up can still read and send what
+other packages saved on a site that plays it. Run the tool only on packages you would open
+yourself.
+
 Give the user the `revision` from the report with the file — it is the build identifier every
 xAPI statement from this package will carry.

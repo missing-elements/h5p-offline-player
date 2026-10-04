@@ -125,13 +125,61 @@ player.addEventListener('statechange', (event) => {
 
 /* ------------------------------------------------------------------ load */
 
-const src = params.get('src')?.trim()
-if (!src) {
-  loader.hidden = true
-  say('No package given. Add ?src=<url of a .h5p file> to the address.', 'error')
-} else {
+/**
+ * The host of a package on another site, or `null` for this site's own and for what is not a URL.
+ * A package's scripts run with the storage of the origin it plays on. In another site's frame
+ * that storage is partitioned by the embedding site, so a page can only ever reach what was played
+ * under its own embed; opened on its own, or framed by a page of this site, `/embed` shares this
+ * origin's storage with the player page and the app, and a link to it waits for a click, as
+ * theirs do.
+ */
+const foreignHost = (value) => {
+  try {
+    const url = new URL(value, location.href)
+    // A `data:` URL has no host and an opaque origin: name its scheme, so it still waits.
+    return url.origin === location.origin ? null : url.host || url.protocol
+  } catch {
+    return null
+  }
+}
+
+const start = (value) => {
   const libraries = params.get('libraries')?.trim()
   if (libraries) player.setAttribute('libraries', libraries)
   if (params.get('preload') === 'auto') player.setAttribute('preload', 'auto')
-  player.setAttribute('src', src)
+  player.setAttribute('src', value)
+}
+
+/** Whether this document's storage is the demo origin's own: top level, or framed by this origin. */
+const sharesOriginStorage = () => {
+  if (!framed) return true
+  try {
+    return window.parent.location.origin === location.origin
+  } catch {
+    return false // Another origin's frame: reading its location throws, and the storage is partitioned.
+  }
+}
+
+const src = params.get('src')?.trim()
+const host = src && sharesOriginStorage() ? foreignHost(src) : null
+if (!src) {
+  loader.hidden = true
+  say('No package given. Add ?src=<url of a .h5p file> to the address.', 'error')
+} else if (host) {
+  loader.hidden = true
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.textContent = 'Open the package'
+  button.addEventListener('click', () => {
+    say('')
+    loader.hidden = false
+    start(src)
+  })
+  say(
+    `This link opens a package from ${host}. A package runs its own scripts on this site, and they ` +
+      'can read what other packages saved in this browser. Open it only if you trust that site.'
+  )
+  notice.append(' ', button)
+} else {
+  start(src)
 }

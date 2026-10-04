@@ -18,6 +18,7 @@ const fileName = document.querySelector('#file-name')
 const message = document.querySelector('#message')
 const offer = document.querySelector('#offer')
 const update = document.querySelector('#update')
+const confirmBox = document.querySelector('#confirm-src')
 
 const show = (text, kind = 'hint') => {
   message.textContent = text
@@ -125,6 +126,8 @@ const opening = (label, again) => {
 
 async function open(file, libraries = PACK) {
   lastUrl = null
+  // A file the learner chose answers a pending link's question: they went with the file.
+  confirmBox.hidden = true
   opening(`${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB`, (source) => open(file, source))
   document.title = `${file.name} — H5P Offline Player`
   await ready
@@ -156,6 +159,38 @@ async function openUrl(src, libraries = PACK) {
   player.setAttribute('src', url.href)
 }
 
+/**
+ * The host of a package on another site, or `null` for this site's own and for what is not a URL
+ * (which `openUrl` then reports). A package's libraries are JavaScript and the frame is
+ * same-origin by design, so a package runs with this origin's storage — with `resume` on, the
+ * saved state of every file opened here, answers included, and the chunk store and the list of
+ * what was played. A file the learner picked is their choice; a link is whoever wrote it, so a
+ * link to another site waits for a click that names the host.
+ */
+const foreignHost = (src) => {
+  try {
+    const url = new URL(src, location.href)
+    // A `data:` URL has no host and an opaque origin: name its scheme, so it still waits.
+    return url.origin === location.origin ? null : url.host || url.protocol
+  } catch {
+    return null
+  }
+}
+
+let confirmed = null
+const openLink = (src) => {
+  confirmBox.hidden = true
+  const host = foreignHost(src)
+  if (!host) return void openUrl(src)
+  confirmBox.querySelector('.host').textContent = host
+  confirmBox.hidden = false
+  confirmed = () => openUrl(src)
+}
+document.querySelector('#confirm-open').addEventListener('click', () => {
+  confirmBox.hidden = true
+  void confirmed?.()
+})
+
 const srcOf = (href) => {
   try {
     return new URL(href).searchParams.get('src')
@@ -174,7 +209,7 @@ fileInput.addEventListener('change', () => {
 // The page's own address first: `/app/?src=…` opened in a tab, or the link that launched the
 // app. A launch with a file opens at the manifest's action, `/app/`, which has no `src`.
 const initial = srcOf(location.href)
-if (initial) void openUrl(initial)
+if (initial) openLink(initial)
 
 // How an installed app is handed what it was launched with. A `.h5p` opened from the file
 // manager arrives as a file handle (the manifest's `file_handlers`); a link to `/app/?src=…`
@@ -189,7 +224,7 @@ if ('launchQueue' in window) {
       return
     }
     const src = params.targetURL ? srcOf(params.targetURL) : null
-    if (src && new URL(src, location.href).href !== lastUrl) void openUrl(src)
+    if (src && new URL(src, location.href).href !== lastUrl) openLink(src)
   })
 }
 

@@ -25,7 +25,12 @@ never handed to another: the content shows H5P's own "This content has changed s
 used it. You'll be starting over.", and the old state is dropped.
 
 It is off by default because a browser is not a learner: on a shared machine, the state one
-person leaves is what the next one finds. A site that knows its users keeps the state itself
+person leaves is what the next one finds. And the storage is the site's, not the package's. A
+package's libraries are JavaScript running on the site's origin, so any package played on that
+site can read what every other package saved there, answers included, and send it wherever
+the content can send an image. Play only packages you trust on a site with `resume` on, and do
+not open a package from a link's `?src=` without asking first; the demo pages ask before opening
+a package from another site. A site that knows its users keeps the state itself
 with `resume="host"`, which stores nothing on the device. The element fires `userdata` on every
 save; the host keeps the latest `data` per `dataType` and `subContentId`, under its own user and
 package, and before the next load of that package sets `userData` to those entries,

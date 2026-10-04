@@ -53,6 +53,13 @@
       </p>
 
       <p class="message" id="status" role="status" aria-live="polite"></p>
+      <!-- A package on another site waits for a click, whoever named it: see foreignHost in cmi5-page.js. -->
+      <p class="message warning offer" id="confirm-src" hidden>
+        <span>This link opens a package from <strong class="host"></strong>. A package runs its own
+        scripts on this site, and they can read what other packages saved in this browser. Open it
+        only if you trust that site.</span>
+        <button type="button" id="confirm-open">Open the package</button>
+      </p>
 
       <h5p-player></h5p-player>
 

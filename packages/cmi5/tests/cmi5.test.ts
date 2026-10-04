@@ -253,6 +253,29 @@ describe('startCmi5', () => {
     expect(storage.map.size).toBe(0)
   })
 
+  // The record is found by the fetch URL alone, and its token is sent to the endpoint the launch
+  // names: a record made for another endpoint must not hand its token over.
+  it('ignores a kept session made for another endpoint, registration or activity', async () => {
+    const storage = memoryStorage()
+    const first = fakeClient()
+    await startCmi5(new FakePlayer(), { client: first.client, storage, src: false })
+    const [[key, raw]] = [...storage.map.entries()]
+
+    for (const field of ['endpoint', 'registration', 'activityId'] as const) {
+      storage.map.set(key, JSON.stringify({ ...JSON.parse(raw), [field]: 'https://elsewhere.example/' }))
+      const next = fakeClient()
+      const session = await startCmi5(new FakePlayer(), { client: next.client, storage, src: false })
+      expect(session.resumed).toBe(false)
+      expect(next.calls[0]).toEqual({ call: 'initialize', arg: undefined })
+    }
+
+    // A record from before the binding names none of the three, and starts over the same way.
+    const { endpoint, registration, activityId, ...unbound } = JSON.parse(raw)
+    storage.map.set(key, JSON.stringify(unbound))
+    const old = fakeClient()
+    expect((await startCmi5(new FakePlayer(), { client: old.client, storage, src: false })).resumed).toBe(false)
+  })
+
   it('retains a rejected outcome for retrying in the page or after a trusted-storage reload', async () => {
     const storage = memoryStorage()
     const failed = fakeClient()

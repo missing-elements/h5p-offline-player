@@ -1126,7 +1126,9 @@ SPA-fallback trap described above cannot happen there.
   had already made the page do: relayed statements get an `id`, which the player checks for;
   and the `fetch` URL answers once, so the default keeps its token only in memory. The
   `storage` option is for a trusted AU on a trusted origin only: H5P content scripts share the
-  origin and can read browser storage. The page shows the LMS's stated reason for a refused
+  origin and can read browser storage. A kept record is found by the `fetch` URL and names the
+  `endpoint`, `registration` and `activityId` it was made under; one that names others is
+  ignored, so a token is never sent to an endpoint other than its own (2026-10-04). The page shows the LMS's stated reason for a refused
   statement, not only the
   status. The deployed page was launched from the local player once (`--au`), on 2026-10-01,
   under a `connect-src` widened to `http://localhost:*` for the run and narrowed again after:
@@ -1226,7 +1228,22 @@ SPA-fallback trap described above cannot happen there.
 - **What a public demo means.** The frame is same-origin by design, and a package's libraries
   are JavaScript, so `/?src=<any url>` runs a stranger's code on the demo's origin. That is the
   architecture — a host chooses what it plays — not a flaw in it, and it is why the demo origin
-  must hold nothing: no cookies, no accounts, no storage worth reading.
+  holds no cookies and no accounts. It does hold storage worth reading, and the rule once said
+  it must not: the app sets `resume`, so `h5p-player-userdata` has the saved state of every
+  package opened there, answers included; the chunk store has every package's extracted files;
+  and the `packages` table lists every URL and file name played. Any package on the origin can
+  read all three and send them out through the frame's `img-src *`, and `connect-src 'self'`
+  does not stop it. Found by the security review of 2026-10-04: a link to
+  `/app/?src=<hostile package>` opened at once, in the installed app too. So the player page,
+  the app, the cmi5 page and `/embed` ask before opening a package from another origin, naming
+  the host, and open their own origin's packages and what the visitor typed or picked as before.
+  The cmi5 page gates both places a launch names the package, `?src=` and `launchParameters`,
+  since a link can carry cmi5 parameters pointing at an LMS of the link-writer's own; it passes
+  `src: false` and sets `src` itself on `initialized`. `/embed` in another origin's frame does
+  not ask: its storage is partitioned by the embedding site, so a page only reaches what was
+  played under its own embed; framed by this origin it asks like the rest. Every check fails
+  closed: a `data:` URL, with no host, waits too. The rule is now: any package played on an
+  origin can read every other package's data there.
 - **Caching.** Hashed files under `/assets/` are immutable; `h5p-sw.js` is `no-cache`;
   `frame-assets/` and `fixtures/` revalidate hourly. Fixtures also carry permissive CORS with
   `Range` allowed and `Content-Range` exposed, so another player instance can be pointed at them.

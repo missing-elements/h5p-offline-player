@@ -88,6 +88,13 @@
       <p class="message hint" id="offer" hidden>
         <button type="button" id="fetch-libraries">Fetch them from h5p.org and retry</button>
       </p>
+      <!-- A link's ?src= on another site waits for a click: see foreignHost in app.js. -->
+      <p class="message warning" id="confirm-src" hidden>
+        <span>This link opens a package from <strong class="host"></strong>. A package runs its own
+        scripts on this site, and they can read what other packages saved in this browser. Open it
+        only if you trust that site.</span>
+        <button type="button" id="confirm-open">Open the package</button>
+      </p>
       <p class="message hint" id="update" hidden>
         A new version of the app is ready.
         <button type="button" id="reload">Reload</button>
@@ -130,7 +137,7 @@
 
         <h3>What it keeps on this device, and what it does not</h3>
         <ul class="list">
-          <li>Where you were. When a file is open, the content saves its own state — the slide or chapter reached, the answers given so far, the position in a video, whatever that content type keeps — in this browser's storage, on this device only. Open the same file again (same name, size and date) and it picks up there; <strong>Start over</strong> forgets it. On a shared device, the next person to open the file finds where the last one left it, so press Start over first. Nothing is sent anywhere.</li>
+          <li>Where you were. When a file is open, the content saves its own state — the slide or chapter reached, the answers given so far, the position in a video, whatever that content type keeps — in this browser's storage, on this device only. Open the same file again (same name, size and date) and it picks up there; <strong>Start over</strong> forgets it. On a shared device, the next person to open the file finds where the last one left it, so press Start over first. The app sends none of it anywhere. A package's own scripts can read it, though, including what other packages saved here, so the app asks before opening a package from another site's link; open only packages you trust.</li>
           <li>Not results. The scores and completions the content reports as xAPI statements are neither stored on this device nor sent anywhere, so nothing here is a record that a course was completed.</li>
           <li>For results that are recorded — a class, a course, a compliance record — use the <a href="/demo/setup.html">player component</a> on a site that sends its xAPI statements to an LRS or an LMS.</li>
         </ul>
