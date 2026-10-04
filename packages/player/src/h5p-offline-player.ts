@@ -217,6 +217,8 @@ export class H5PPlayerElement extends HTMLElement {
    * the host just cleared before the next load reads the store.
    */
   private userDataSession: string | null = null
+  /** Resume policy belonging to `userDataSession`; the public attribute changes on next load. */
+  private userDataMode: ResumeMode = 'off'
   private prefetching: string | null = null
 
   constructor() {
@@ -290,6 +292,7 @@ export class H5PPlayerElement extends HTMLElement {
   async clearUserData(): Promise<void> {
     const pkgId = this.internalPkgId ?? this.previousStamp?.pkgId
     this.userDataSession = null
+    this.userDataMode = 'off'
     if (pkgId) await clearUserData(pkgId)
   }
 
@@ -1098,6 +1101,7 @@ export class H5PPlayerElement extends HTMLElement {
     }
 
     const session = createNonce()
+    this.userDataMode = mode
     this.userDataSession = session
     const preload: UserDataPreload = {
       channel: 'h5p-player',
@@ -1121,7 +1125,7 @@ export class H5PPlayerElement extends HTMLElement {
           ? previous.revision
           : null
 
-    if (this.resume === 'device') {
+    if (this.userDataMode === 'device') {
       const write =
         data === null
           ? removeUserData(pkgId, dataType, subContentId)

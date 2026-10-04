@@ -133,6 +133,21 @@ describe('resume', () => {
     expect(await readUserData(again.pkgId!)).toEqual([])
   })
 
+  it('keeps the active resume mode until the next load', async () => {
+    const player = await play(FIXTURES.basic, { resume: '' })
+    await completeAndSave(player)
+    expect((await readUserData(player.pkgId!))[0]?.data).toBe('{"clicks":1}')
+
+    // The property is documented as taking effect on the next load. The running frame is still
+    // the device-resume frame, so its next save must not be dropped when the host changes mode.
+    player.resume = 'off'
+    await completeAndSave(player)
+    expect((await readUserData(player.pkgId!))[0]?.data).toBe('{"clicks":2}')
+
+    const again = await play(FIXTURES.basic)
+    expect(count(again)).toBe('0')
+  })
+
   it('lets the host keep the state itself', async () => {
     const player = createPlayer({ resume: 'host' })
     player.userData = [{ dataType: 'state', subContentId: '0', data: '{"clicks":5}' }]
