@@ -509,6 +509,28 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
 - **The element waits for *its own* registration to reach `activated`**, not for
   `navigator.serviceWorker.ready` — that tracks the page's controller and may never resolve for a
   nested scope.
+- **The first load after an upgrade is brought to the element's version before the frame
+  boots.** Registering again with an unchanged script URL returns the existing registration
+  without fetching the script — measured in Chromium on 2026-10-04 — so that load booted against
+  the old worker, and the frame's navigation, being in scope, made the browser fetch the new one
+  and swap it in about a second into the boot, under a frame document the old version wrote:
+  errors or an empty frame until a reload. `ensureCurrentWorker` asks the worker's version over
+  the control channel, and on a difference calls `registration.update()` and waits for the new
+  worker, all bounded by `WORKER_UPDATE_TIMEOUT_MS`; offline or past it, the load goes ahead with
+  the worker it has. Same bytes after the update is a host's stale `h5p-sw.js`, still a warning.
+  `activated()` waits for the newest worker — installing, then waiting, then active — since a
+  changed script URL (a bundler's hash) installs a new worker beside the old active one; that
+  wait is bounded by the same timeout whenever an activated worker can serve, because a host's
+  own worker that does not skip waiting sits in `waiting` until the old one's last client has
+  closed, and a newest worker that turns redundant falls back to the one running. The version is
+  asked again after the update rather than read off `installing`: with `skipWaiting` the new
+  worker can be active before `update()` resolves. A later navigation in scope
+  can still swap the worker under a frame mid-lesson; that is a restart within one version, which
+  the stateless worker already survives. `tests/browser/worker-update.test.ts` serves the real
+  worker at `/versioned/h5p-sw.js` with the version the dev server is told, so an update is one
+  URL with new bytes, and fails on the element from before. The app at `/app/` mounts the
+  handlers in its own worker, which deletes the old precache as it activates while the page still
+  runs the old shell, so `app.js` offers a reload on a `controllerchange` once controlled.
 - **Job requests are deduplicated for two seconds, not for the whole wait.** A job can die with
   the tab that owned it; a long window would leave the entry unserved until it expired. The real
   deduplication is the Jobs worker's in-flight map plus a Web Lock. `waitForWatermark` re-asks

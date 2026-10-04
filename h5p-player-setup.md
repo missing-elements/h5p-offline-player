@@ -188,5 +188,6 @@ Routes then live under the host's scope as `<hostScope>h5p/virtual/…` and `<ho
 ## Versioning
 
 - Cache names include the package major version. Minor and patch updates reuse cached packages.
-- The worker updates itself on the next visit (`skipWaiting`); cached packages are never invalidated by a worker update.
+- The element brings its own worker up to date before the first load after an upgrade: when the worker reports a different version, the element asks the browser to fetch `h5p-sw.js` again and waits for the new worker, for up to three seconds, before the content boots. Offline, or past that, the load goes ahead with the worker already running. Cached packages are never invalidated by a worker update.
+- A host that mounts the handlers in its own worker (the single-worker setup) updates that worker itself. A page inside that worker's scope gets the new worker about a second after it loads, under a page still running the old code; offer a reload on `controllerchange`, as the demo's app does.
 - Setup B only: re-download `h5p-sw.js` after upgrading so it matches the element. The element logs a warning when versions differ.

@@ -1,5 +1,5 @@
 /** Version of the element/worker pair. Kept in sync with package.json by scripts/sync-h5p-assets.mjs. */
-export const VERSION = '0.3.1'
+export const VERSION = '0.3.2'
 
 /** Major version. Cache names carry it, so a major bump discards every cached package. */
 export const MAJOR_VERSION = 0
@@ -162,3 +162,10 @@ export const USER_DATA_STORE = 'states'
  * from the last save.
  */
 export const SAVE_INTERVAL_S = 10
+
+/**
+ * How long the first load after an update may spend bringing the Service Worker to the element's
+ * version: one fetch of the script and an install. Past it, the load goes ahead with the worker
+ * that is running, as it did before the check existed.
+ */
+export const WORKER_UPDATE_TIMEOUT_MS = 3_000

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { readFile, stat } from 'node:fs/promises'
 import type { ServerResponse } from 'node:http'
 import { resolve } from 'node:path'
@@ -100,18 +101,35 @@ export function jobsWorkerPlugin(): Plugin {
  * points at `/src/h5p-sw.js`, which is this.
  */
 export function devServiceWorkerPlugin(): Plugin {
+  // `/versioned/h5p-sw.js` is the worker as an older release would answer: the same script with
+  // the version it reports replaced by the last `/versioned/__version?v=`, unset meaning the
+  // real one. One URL with changing bytes is what a player update looks like to the browser,
+  // which is what `tests/browser/worker-update.test.ts` needs.
+  let versionedAs: string | null = null
+  // The worker's `VERSION` constant, which a release keeps equal to the package's own.
+  const { version } = JSON.parse(readFileSync(resolve(rootDir, 'package.json'), 'utf8')) as { version: string }
+
   return {
     name: 'h5p-dev-service-worker',
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         const url = req.url?.split('?')[0]
+        if (url === '/versioned/__version') {
+          versionedAs = new URL(req.url ?? '', 'http://dev').searchParams.get('v') || null
+          res.setHeader('cache-control', 'no-store')
+          res.end(versionedAs ?? '')
+          return
+        }
         // The Jobs worker as a file, which the element falls back to under a policy that
         // refuses its `blob:` URL; served the same way so that fallback works in dev too.
         const entry = url?.endsWith('/h5p-sw.js') ? SW_ENTRY : url?.endsWith('/h5p-jobs.js') ? JOBS_ENTRY : null
         if (!entry) return next()
 
+        const as = url === '/versioned/h5p-sw.js' ? versionedAs : null
         void bundleWorker(entry, false).then(
-          (source) => {
+          (bundled) => {
+            // By value, not by name: esbuild renames the constant (`VERSION2`) when names collide.
+            const source = as ? bundled.replaceAll(JSON.stringify(version), JSON.stringify(as)) : bundled
             res.setHeader('content-type', 'text/javascript; charset=utf-8')
             // The registration already asks for an `h5p/` sub-scope under this file's directory,
             // which needs no extra permission, but the header costs nothing and helps a host that

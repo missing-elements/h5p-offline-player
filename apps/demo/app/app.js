@@ -17,6 +17,7 @@ const stateBadge = document.querySelector('#state')
 const fileName = document.querySelector('#file-name')
 const message = document.querySelector('#message')
 const offer = document.querySelector('#offer')
+const update = document.querySelector('#update')
 
 const show = (text, kind = 'hint') => {
   message.textContent = text
@@ -71,8 +72,10 @@ function activated(registration) {
 
 const ready = controlled().then(
   (isControlled) => {
-    if (isControlled) setOffline('ready', 'Works offline')
-    else setOffline('online-only', 'Online only — reload to enable offline use')
+    if (isControlled) {
+      setOffline('ready', 'Works offline')
+      offerNewVersion()
+    } else setOffline('online-only', 'Online only — reload to enable offline use')
     return isControlled
   },
   (error) => {
@@ -81,6 +84,21 @@ const ready = controlled().then(
     return false
   }
 )
+
+/**
+ * A new app worker took over this page. Loading the page checked for one, and `mountH5P` skips
+ * waiting, so a deploy reaches an open page about a second after it loads: the new worker deletes
+ * the old precache as it activates, while this page still runs the old shell, whose hashed files
+ * are then gone for good offline. Offered rather than done, since a reload in the middle of a
+ * lesson is the learner's call; with `resume` the content comes back where it was. Listened for
+ * only once the page is controlled, because the first visit's claim fires the same event.
+ */
+function offerNewVersion() {
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    update.hidden = false
+  })
+  document.querySelector('#reload').addEventListener('click', () => location.reload())
+}
 
 /* ---------------------------------------------------------------- opening a file */
 

@@ -2,7 +2,7 @@ import jobsWorkerSource from 'virtual:h5p-jobs-worker'
 import SHADOW_CSS from './shadow.css?inline'
 import { FRAME_FONTS } from './frame-fonts'
 import { JobsWorkerHandle, type JobsScript } from './jobs-worker-handle'
-import { SAVE_INTERVAL_S, VERSION, WARM_ENTRY } from './shared/constants'
+import { SAVE_INTERVAL_S, VERSION, WARM_ENTRY, WORKER_UPDATE_TIMEOUT_MS } from './shared/constants'
 import {
   HUB_CONTENT_TYPE_URL,
   PlayerError,
@@ -860,7 +860,7 @@ export class H5PPlayerElement extends HTMLElement {
 
     this.registration = registration
     this.routes = routesFor(registration.scope)
-    void this.warnOnVersionMismatch()
+    await this.ensureCurrentWorker(registration)
     return this.routes
   }
 
@@ -885,17 +885,38 @@ export class H5PPlayerElement extends HTMLElement {
   }
 
   /**
-   * Asks the worker its version over the control channel rather than over the `_ping` route. The
+   * Brings the worker up to the element's version before the frame boots. Registering again with
+   * an unchanged script URL returns the existing registration without fetching the script, so the
+   * first load after an update would boot against the old worker — and the frame's navigation,
+   * being in scope, would then make the browser fetch the new one and swap it in about a second
+   * into the boot, under a frame document the old version wrote. So a version that differs asks
+   * for the update itself and waits for it, bounded: offline, or on a slow host, the load goes
+   * ahead with the worker it has. A script that is still old after the update is the host's copy,
+   * which only the host can replace; that stays a warning.
+   */
+  private async ensureCurrentWorker(registration: ServiceWorkerRegistration): Promise<void> {
+    const before = await this.workerVersion()
+    if (before === null || before === VERSION) return
+
+    await withTimeout(updateWorker(registration), WORKER_UPDATE_TIMEOUT_MS, undefined)
+    // Asked again rather than trusting what the update reported: with `skipWaiting`, a new
+    // worker can be active before `update()` has resolved, leaving nothing in `installing`.
+    warnIfDifferent((await this.workerVersion()) ?? before)
+  }
+
+  /**
+   * The worker's version, over the control channel rather than over the `_ping` route. The
    * route only answers for a client the worker controls, and the host page deliberately is not
    * one — our scope is a sub-directory it does not sit under. `postMessage` to the registration's
-   * own worker has no such requirement.
+   * own worker has no such requirement. `null` when it cannot be learnt: a version check must not
+   * fail a load.
    */
-  private async warnOnVersionMismatch(): Promise<void> {
+  private async workerVersion(): Promise<string | null> {
     try {
-      const reply = await this.send({ type: 'ping' })
-      if (reply.ok && reply.type === 'pong') warnIfDifferent(reply.version)
+      const reply = await this.send({ type: 'ping' }, WORKER_UPDATE_TIMEOUT_MS)
+      return reply.ok && reply.type === 'pong' ? reply.version : null
     } catch {
-      // A version check is a diagnostic; failing it must not fail a load.
+      return null
     }
   }
 
@@ -1380,31 +1401,64 @@ async function stillRegistered(registration: ServiceWorkerRegistration): Promise
   }
 }
 
-/** Resolves when *this* registration has an activated worker. */
+/**
+ * Resolves when *this* registration's newest worker is activated. Newest first: a registration
+ * whose script changed has the new worker installing beside the old active one, and resolving on
+ * the old would boot the frame against the version about to be replaced. The wait for a newer
+ * worker is bounded while an older one can serve: a host's own worker that does not skip
+ * waiting sits in `waiting` until every client of the old one has closed, and the load must not
+ * wait with it. A newest worker that turns redundant falls back to the one running for the same
+ * reason.
+ */
 function activated(registration: ServiceWorkerRegistration): Promise<ServiceWorker> {
-  const worker = registration.active ?? registration.waiting ?? registration.installing
+  const running = registration.active?.state === 'activated' ? registration.active : null
+  const worker = registration.installing ?? registration.waiting ?? registration.active
   if (!worker) return Promise.reject(new PlayerError('no-worker', 'The registration has no worker'))
   if (worker.state === 'activated') return Promise.resolve(worker)
 
-  return new Promise((resolve, reject) => {
+  const settled = new Promise<ServiceWorker>((resolve, reject) => {
     const onChange = () => {
       if (worker.state === 'activated') {
         worker.removeEventListener('statechange', onChange)
         resolve(registration.active ?? worker)
       } else if (worker.state === 'redundant') {
         worker.removeEventListener('statechange', onChange)
-        reject(new PlayerError('no-worker', 'The Service Worker became redundant'))
+        if (running && running !== worker) resolve(running)
+        else reject(new PlayerError('no-worker', 'The Service Worker became redundant'))
       }
     }
     worker.addEventListener('statechange', onChange)
   })
+  return running && running !== worker ? withTimeout(settled, WORKER_UPDATE_TIMEOUT_MS, running) : settled
+}
+
+/**
+ * Fetches the registration's script and, when its bytes changed, waits for the new worker to
+ * take over (`mountH5P` skips waiting). Settles without a word when nothing new was installed:
+ * the network failed, or the script is the same bytes as before.
+ */
+async function updateWorker(registration: ServiceWorkerRegistration): Promise<void> {
+  try {
+    await registration.update()
+    if (registration.installing || registration.waiting) await activated(registration)
+  } catch {
+    // Offline, a refused script, a worker that failed to install: the running one serves.
+  }
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const late = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(fallback), ms)
+  })
+  return Promise.race([promise, late]).finally(() => clearTimeout(timer))
 }
 
 function warnIfDifferent(workerVersion: string | undefined): void {
   if (workerVersion && workerVersion !== VERSION) {
     console.warn(
       `[h5p-player] element is ${VERSION} but the Service Worker is ${workerVersion}. ` +
-        'Re-copy h5p-sw.js so the two match.'
+        'If this persists after a reload, re-copy h5p-sw.js so the two match.'
     )
   }
 }
