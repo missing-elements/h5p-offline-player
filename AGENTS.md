@@ -176,6 +176,12 @@ pnpm demo:libraries    # rebuild the app's library pack from the H5P hub; before
 pnpm preview:demo      # serves dist-demo/ with the production headers and the /no-range route
 ```
 
+`pnpm test` runs the packages one at a time (`--workspace-concurrency=1`). The demo's `test`
+runs the player's `prepare:dev` and the verifier's runs the player's `build`, and both of those
+begin with `sync:assets`, which deletes `public/frame-assets/` and writes it again. Run in
+parallel, as `pnpm -r` does once their shared dependency is done, one run deleted the directory
+while the other was writing into it. CI hit exactly that: ENOENT on `frame.bundle.js`.
+
 pnpm forwards extra arguments on its own: `pnpm preview:demo --port 4199`, not `-- --port`. A
 literal `--` reaches the script, which Vite then reads as the end of its options.
 
