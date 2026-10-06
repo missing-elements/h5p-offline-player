@@ -53,6 +53,9 @@ const json = (res: ServerResponse, status: number, value: unknown) => {
   res.end(JSON.stringify(value))
 }
 
+/** How long a `?slow` token endpoint takes to answer. */
+const SLOW_FETCH_MS = 1500
+
 /** The LMS: the token endpoint, the launch data, no learner preferences, and an LRS that keeps what it gets. */
 async function handle(req: IncomingMessage, res: ServerResponse) {
   cors(res)
@@ -62,8 +65,8 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     const launch = `${url.searchParams.get('reg') ?? ''}#${url.searchParams.get('launch') ?? '1'}`
     const calls = (fetches.get(launch) ?? 0) + 1
     fetches.set(launch, calls)
-    const delay = Number(url.searchParams.get('delay') ?? 0)
-    if (delay) await new Promise((r) => setTimeout(r, delay))
+    // A flag, not a duration: the URL says whether the endpoint is slow, the mock says how slow.
+    if (url.searchParams.has('slow')) await new Promise((r) => setTimeout(r, SLOW_FETCH_MS))
     if (calls > 1) return json(res, 200, { 'error-code': '1', 'error-text': 'Already in Use' })
     return json(res, 200, { 'auth-token': Buffer.from('user:pass').toString('base64') })
   }
@@ -133,11 +136,11 @@ const waitForVerb = async (verb: string, defined = false, registration = REGISTR
 }
 
 /** The address an LMS would open: the AU URL with the five launch parameters, the token endpoint told which launch it is for. */
-const launchUrl = (registration: string, { delay = 0, launch = 1 } = {}) =>
+const launchUrl = (registration: string, { slow = false, launch = 1 } = {}) =>
   `${playerOrigin}/demo/cmi5.html?${new URLSearchParams({
     src: `${playerOrigin}/demo/content/how-it-works.h5p`,
     endpoint: `${lmsOrigin}/lrs/`,
-    fetch: `${lmsOrigin}/fetch?reg=${registration}&launch=${launch}${delay ? `&delay=${delay}` : ''}`,
+    fetch: `${lmsOrigin}/fetch?reg=${registration}&launch=${launch}${slow ? '&slow=1' : ''}`,
     actor: JSON.stringify(ACTOR),
     registration,
     activityId: ACTIVITY
@@ -235,8 +238,8 @@ it('does not persist LRS credentials across a reload by default', async () => {
 it('holds what the content emits before the handshake, and sends it after initialized', async () => {
   const registration = crypto.randomUUID()
   const page = await browser.newPage()
-  // The token endpoint answers after 1.5 s; the statement goes out before it has.
-  await page.goto(launchUrl(registration, { delay: 1500 }))
+  // The token endpoint answers after SLOW_FETCH_MS; the statement goes out before it has.
+  await page.goto(launchUrl(registration, { slow: true }))
   await page.evaluate(() => {
     const statement = {
       actor: { name: 'H5P user' },
