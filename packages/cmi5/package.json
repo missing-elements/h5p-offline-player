@@ -55,9 +55,9 @@
   },
   "devDependencies": {
     "@cmi5/requirements": "^1.0.0",
-    "@types/node": "^22.13.0",
-    "typescript": "^5.7.3",
-    "vitest": "^5.0.1"
+    "@types/node": "^26.6.4",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
   },
   "engines": {
     "node": ">=20"
