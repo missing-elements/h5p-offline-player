@@ -106,7 +106,11 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             demo/cmi5.html with demo/cmi5-page.js is a cmi5 assignable unit around
                             the element, on @missing-elements/h5p-cmi5, and demo/cmi5-course.zip the
                             course structure for importing it into an LMS, naming the hosted page;
-                            demo/element.js is the one import of the element every page loads
+                            demo/element.js is the one import of the element every page loads;
+                            demo/theme.js the light/dark switch, a classic script every page
+                            loads in its head before the stylesheet, since the CSP allows no
+                            inline script and a pinned theme has to be on <html> before the
+                            first paint
   tests/                    cmi5.test.ts: the cmi5 page against a mock LMS and LRS on a second
                             origin, through the dev server and a real browser
   cmi5-catapult/            docker-compose.yml for ADL's CATAPULT player, MySQL and the SQL LRS;
@@ -1175,7 +1179,8 @@ SPA-fallback trap described above cannot happen there.
   fallback stays for those, and for an in-app browser.
 - **The pages carry their metadata, and the origin is filled in at build time.** Titles,
   descriptions, canonical links, Open Graph and Twitter tags, JSON-LD for the software on the
-  front page, `robots.txt` and `sitemap.xml`, and the GitHub link in every page's navigation. The
+  front page, `robots.txt` and `sitemap.xml`, and the GitHub link at the right of every page's
+  header, an icon beside the theme switch. The
   absolute URLs are written as `%SITE_URL%` in the HTML and replaced by `siteUrlPlugin`
   (`apps/demo/vite.config.ts`), which runs before Vite's own `%ENV%` pass so Vite does not warn about a
   name it does not know. `build-demo.mjs` decides the origin — `SITE_URL` if set, else Vercel's

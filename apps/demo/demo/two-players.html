@@ -22,6 +22,9 @@
     <meta name="twitter:description" content="H5P assumes it owns the page. Each player gets its own frame document, so two of them on one page do not collide." />
     <meta name="twitter:image" content="%SITE_URL%/demo/og-image.png" />
     <link rel="icon" type="image/svg+xml" href="/demo/favicon.svg" />
+    <!-- Ahead of the stylesheet, so a pinned theme is on <html> before anything is painted. A
+         classic script, which Vite leaves alone; the build copies it as it is. -->
+    <script src="/demo/theme.js" vite-ignore></script>
     <link rel="stylesheet" href="/demo/player-page.css" />
     <script type="module" src="/demo/element.js"></script>
     <script type="module" src="/demo/analytics.js"></script>
@@ -29,15 +32,25 @@
 
   <body>
     <header class="topbar">
-      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">H5</span>h5p-offline-player</a>
+      <a class="brand" href="/"><img class="brand-mark" src="/demo/favicon.svg" alt="" width="32" height="32" />h5p-offline-player</a>
       <nav aria-label="Site">
         <a href="/">Player</a>
         <a href="/app/">App</a>
         <a href="/demo/setup.html">Setup</a>
         <a href="/demo/normalize.html">Normalize</a>
         <a href="/demo/" aria-current="page">Examples</a>
-        <a href="https://github.com/missing-elements/h5p-offline-player" rel="noopener">GitHub</a>
       </nav>
+      <div class="topbar-actions">
+        <button type="button" class="icon-button theme-toggle" aria-label="Switch theme">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path class="icon-moon" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            <g class="icon-sun"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" /></g>
+          </svg>
+        </button>
+        <a class="icon-button" href="https://github.com/missing-elements/h5p-offline-player" rel="noopener" aria-label="GitHub repository" title="GitHub repository">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.9 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.7 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3" /></svg>
+        </a>
+      </div>
     </header>
 
     <main>

@@ -28,7 +28,7 @@ const html = `<!doctype html>
       .brand { display: flex; align-items: center; gap: 20px; font-size: 34px; font-weight: 700; }
       .mark {
         width: 64px; height: 64px; border-radius: 16px; background: #2f6df6; color: #fff;
-        display: grid; place-items: center; font-size: 26px; font-weight: 800;
+        display: grid; place-items: center; font: 700 22px / 1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: -0.02em;
       }
       h1 { margin: 0; font-size: 66px; line-height: 1.08; letter-spacing: -1.5px; max-width: 1000px; }
       p { margin: 26px 0 0; font-size: 30px; line-height: 1.4; color: #5b6370; max-width: 980px; }
@@ -37,7 +37,7 @@ const html = `<!doctype html>
     </style>
   </head>
   <body>
-    <div class="brand"><div class="mark">H5</div>h5p-offline-player</div>
+    <div class="brand"><div class="mark">H5P</div>h5p-offline-player</div>
     <div>
       <h1>Play H5P packages in the browser.<br />No server, no unpacking.</h1>
       <p>A web component that reads a <code>.h5p</code> in place and serves it to the H5P runtime with a Service Worker.</p>
