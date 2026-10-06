@@ -1,0 +1,61 @@
+name: Bug report
+description: Report a reproducible problem with the player, tools, or demo.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a problem.
+
+        Do not report security vulnerabilities here. Follow [SECURITY.md](../../SECURITY.md) instead.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected component
+      options:
+        - h5p-offline-player
+        - h5p-normalize
+        - h5p-verify
+        - h5p-cmi5
+        - Demo site or installable app
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: State the expected behavior and the actual behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: |
+        Give exact steps, a minimal repository, or a package that can be shared
+        publicly. Do not attach private learner data or proprietary H5P content.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include package version, browser and version, operating system, and host framework or build tool if relevant.
+      placeholder: |
+        Package version:
+        Browser and version:
+        Operating system:
+        Framework/build tool:
+  - type: textarea
+    id: logs
+    attributes:
+      label: Errors, logs, or screenshots
+      description: Include relevant console errors, network responses, and screenshots. Remove credentials, tokens, and private URLs.
+

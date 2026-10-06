@@ -1,0 +1,42 @@
+name: Feature request
+description: Suggest an improvement to the player, tools, or documentation.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: Thank you for sharing an idea.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Relevant component
+      options:
+        - h5p-offline-player
+        - h5p-normalize
+        - h5p-verify
+        - h5p-cmi5
+        - Demo site or installable app
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Describe the user need or limitation.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the behavior you would like and any alternatives you considered.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Include examples, mockups, H5P content-type constraints, or deployment requirements if helpful.
+
