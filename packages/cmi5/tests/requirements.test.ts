@@ -200,7 +200,8 @@ describe('the cmi5 requirements on the AU', () => {
   })
 
   it('are named next to their test when marked tested', () => {
-    const named = (id: string) => new RegExp(`(?<![\\d.])${id.replace(/\./g, '\\.')}(?![\\d-])`).test(testedText)
+    const escaped = (id: string) => id.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')
+    const named = (id: string) => new RegExp(`(?<![\\d.])${escaped(id)}(?![\\d-])`).test(testedText)
     expect(Object.keys(ANSWERS).filter((id) => ANSWERS[id] === 'tested' && !named(id))).toEqual([])
   })
 })

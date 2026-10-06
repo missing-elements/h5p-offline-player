@@ -62,8 +62,9 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     const launch = `${url.searchParams.get('reg') ?? ''}#${url.searchParams.get('launch') ?? '1'}`
     const calls = (fetches.get(launch) ?? 0) + 1
     fetches.set(launch, calls)
-    const delay = Number(url.searchParams.get('delay') ?? 0)
-    if (delay) await new Promise((r) => setTimeout(r, delay))
+    // Capped, so the mock answers within any test's timeout whatever a URL asks of it.
+    const delay = Math.min(Number(url.searchParams.get('delay')) || 0, 5000)
+    if (delay > 0) await new Promise((r) => setTimeout(r, delay))
     if (calls > 1) return json(res, 200, { 'error-code': '1', 'error-text': 'Already in Use' })
     return json(res, 200, { 'auth-token': Buffer.from('user:pass').toString('base64') })
   }
