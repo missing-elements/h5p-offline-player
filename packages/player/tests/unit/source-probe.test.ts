@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { insecureOnSecurePage, probeSource } from '../../src/shared/source'
+import { insecureOnSecurePage, probeSource, unfetchableScheme } from '../../src/shared/source'
 
 /**
  * What the probe can learn about an archive from the headers a browser lets it read. The fake
@@ -117,5 +117,37 @@ describe('an http: package on an https: page', () => {
     expect(insecureOnSecurePage('https://host.example/a.h5p', 'https://player.example/')).toBeNull()
     expect(insecureOnSecurePage('/fixtures/a.h5p', 'https://player.example/')).toBeNull()
     expect(insecureOnSecurePage('http://host.example/a.h5p', undefined)).toBeNull()
+  })
+})
+
+describe('a URL no package can be fetched from', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('is refused before any request, naming the scheme', async () => {
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    vi.stubGlobal('location', new URL('https://player.example/'))
+
+    // `fetch` would reject these with a TypeError that reads like a network failure.
+    for (const url of ['javascript:alert(1)', 'file:///home/learner/course.h5p', 'ftp://host.example/a.h5p']) {
+      const probe = probeSource(url)
+      await expect(probe).rejects.toMatchObject({ code: 'network' })
+      await expect(probe).rejects.toThrow(`${new URL(url).protocol} URLs cannot be played`)
+    }
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('lets http:, https:, blob:, data: and a relative URL through', () => {
+    const page = 'https://player.example/demo/'
+    for (const url of [
+      'http://host.example/a.h5p',
+      'https://host.example/a.h5p',
+      'blob:https://player.example/8d4a0c1e-0000-4000-8000-000000000000',
+      'data:application/zip;base64,UEsFBgAAAAAAAAAAAAAAAAAAAAAAAA==',
+      '/fixtures/a.h5p',
+      'course.h5p'
+    ]) {
+      expect(unfetchableScheme(url, page)).toBeNull()
+    }
   })
 })

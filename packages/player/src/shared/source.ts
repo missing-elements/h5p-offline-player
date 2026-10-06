@@ -63,6 +63,24 @@ function readValidator(response: Response): string | null {
  * neither, and is often blocked outright).
  */
 /**
+ * The schemes a package can be fetched from. Anything else — `javascript:`, `file:`, `ftp:`, a
+ * typo — `fetch` rejects with a `TypeError` that reads like a network failure, so the probe
+ * refuses it first and names the scheme.
+ */
+const FETCHABLE_SCHEMES = new Set(['http:', 'https:', 'blob:', 'data:'])
+
+/** The scheme of `url` when no package can be fetched from it, else `null`. */
+export function unfetchableScheme(url: string, pageUrl: string | undefined): string | null {
+  let target: URL
+  try {
+    target = new URL(url, pageUrl)
+  } catch {
+    return null
+  }
+  return FETCHABLE_SCHEMES.has(target.protocol) ? null : target.protocol
+}
+
+/**
  * The `https:` URL to suggest when `url` is `http:` on an `https:` page, else `null`. Browsers
  * refuse such a fetch as mixed content — and a page whose CSP names only `https:` refuses it
  * before that — and the rejection reads exactly like a host without CORS, so without this check
@@ -91,6 +109,10 @@ export async function probeSource(
   url: string,
   signal?: AbortSignal
 ): Promise<RemoteSourceDescriptor> {
+  const scheme = unfetchableScheme(url, globalThis.location?.href)
+  if (scheme) {
+    throw new PlayerError('network', `${scheme} URLs cannot be played. Use an http:, https:, blob: or data: URL.`)
+  }
   const secure = insecureOnSecurePage(url, globalThis.location?.href)
   if (secure) {
     throw new PlayerError(
