@@ -88,6 +88,11 @@ async function appPrecache() {
   return { version: hash.digest('hex').slice(0, 12), urls: ['/app/', ...[...files].sort().map((name) => `/${name}`)] }
 }
 
+// The theme switch's script runs before the first paint, so every page links it as a classic
+// script with `vite-ignore` — Vite bundles modules only — and it is copied as it is. Before the
+// precache is read: the app page links it too, and the list is hashed over the files it names.
+await cp(resolve(rootDir, 'demo', 'theme.js'), resolve(outDir, 'demo', 'theme.js'))
+
 const precache = await appPrecache()
 await writeFile(
   resolve(outDir, 'app', 'sw.js'),

@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { chromium } from 'playwright'
 
 /**
- * Renders the installable app's icons into `app/icons/`: the site's "H5" mark at 192 and 512,
+ * Renders the installable app's icons into `app/icons/`: the site's "H5P" mark at 192 and 512,
  * and a maskable 512 whose mark sits inside the safe zone, the centre 80%, since a launcher may
  * crop it to a circle. Rasterized in Chromium for the same reason as the social card — no image
  * tooling in the repository. The output is committed; run this when the mark changes.
@@ -20,10 +20,10 @@ const page = (size, { inset, radius }) => `<!doctype html>
     position: absolute; inset: ${inset * size}px;
     display: grid; place-items: center;
     border-radius: ${radius * size}px; background: #2f6df6; color: #fff;
-    font: 700 ${(1 - 2 * inset) * size * 0.42}px / 1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    font: 700 ${(1 - 2 * inset) * size * 0.38}px / 1 ui-monospace, SFMono-Regular, Menlo, monospace;
     letter-spacing: -0.02em;
   }
-</style></head><body><div class="tile">H5</div></body></html>`
+</style></head><body><div class="tile">H5P</div></body></html>`
 
 const icons = [
   { name: 'icon-192.png', size: 192, inset: 0, radius: 0.22 },
