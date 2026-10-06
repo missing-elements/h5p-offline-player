@@ -44,7 +44,7 @@
     "prepublishOnly": "pnpm typecheck && pnpm test"
   },
   "dependencies": {
-    "@zip.js/zip.js": "^2.17.0"
+    "@zip.js/zip.js": "^2.23.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
