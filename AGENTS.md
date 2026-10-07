@@ -1226,7 +1226,8 @@ SPA-fallback trap described above cannot happen there.
   `demo/embed-page.js`: it speaks H5P's resizer protocol *upward* — `hello`, then `resize` with
   `scrollHeight` — so a site that already includes h5p.org's `h5p-resizer.js` for its h5p.org
   embeds resizes this frame with no code of its own, and every other site gets `/resizer.js`
-  from this origin, the same protocol in twenty lines, which the snippets name (chosen on
+  from this origin, the same protocol in twenty lines, which the snippets named until Embed My
+  (next bullet) took them over (chosen on
   2026-10-07 over naming h5p.org's copy: every visitor's browser would otherwise call h5p.org,
   at a Drupal module path H5P Group can move, for a GPL file; the player page's embed dialog
   offers the same line under "advanced"); it relays xAPI only when `xapi=` names the
@@ -1254,6 +1255,28 @@ SPA-fallback trap described above cannot happen there.
   stays for those, and for an in-app browser. No document names a Safari or iOS version
   floor, decided on 2026-10-08: the player supports both, and a framed player that fails on an
   earlier release is a bug to fix, not a caveat to publish.
+- **Embed My is Setup C as a service, and the snippets here name it.** https://embed-my.org/
+  is the owner's separate project (github.com/embed-my: the site in `embed-my.github.io`, the
+  guides in `.github/docs/`), on this player since 2026-10-08: it turns a package link into an
+  iframe snippet with a live preview and the display options as checkboxes, and serves the
+  `/embed` page itself at `https://embed-my.github.io/h5p`, with `h5p-resizer.js` beside it —
+  the GitHub Pages address rather than embed-my.org on purpose, since the project keeps it for
+  as long as it is on GitHub, which forwards it to the domain. Its page is this player bundled
+  by Vite, so its worker lands under `/assets/` and takes scope `/assets/h5p/`; its preview
+  still frames this site's `/embed`. Measured on 2026-10-08 from a page on another origin
+  carrying the exact snippet the service writes: `ready` in 3.9 s, the quiz rendered, the
+  height applied, no console errors; opened on its own it asks before opening a package from
+  another origin, as `/embed` does. So the README, the setup guide, the skill, the demo's setup
+  page and the player page's embed dialog (`player-page.js`, `EMBED_ORIGIN`) name Embed My's
+  page and script, and `/embed` stays as the same page on this site: the demo's embed example
+  frames it, since `tests/embed.test.ts` drives that page through the dev server with no
+  network. Two things to keep in mind. `/embed`'s query parameters (`src`, the bare `frame`,
+  `copyright` and `export`, `xapi`) and its two message shapes — the resizer protocol upward
+  and the `h5p-offline-player` xAPI relay — are an interface another repository builds on
+  (`embed-my.github.io/src/snippet.ts` and its copy of the page), so a change to one means a
+  change there with it. And a listener on an embedding page sees the frame's messages from
+  `https://embed-my.org`, where the GitHub Pages address forwards, not from the address in the
+  snippet — the setup guide says so.
 - **The pages carry their metadata, and the origin is filled in at build time.** Titles,
   descriptions, canonical links, Open Graph and Twitter tags, JSON-LD for the software on the
   front page, `robots.txt` and `sitemap.xml`, and the GitHub link at the right of every page's

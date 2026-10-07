@@ -13,6 +13,8 @@ or from disk — no server-side extraction, no backend, nothing to unpack ahead 
 
 [Offline app (PWA)](https://h5p-offline-player.vercel.app/app/) — install it in Chrome or Edge and play `.h5p` files with no network
 
+[Embed My](https://embed-my.org/) — paste a link to a package and copy an iframe snippet for any site; a separate project built on this player
+
 ```html
 <script type="module" src="h5p-player.js"></script>
 <h5p-player src="https://host.example/course.h5p"></h5p-player>
@@ -63,15 +65,19 @@ Copy `dist/h5p-sw.js` from the same CDN path onto your site and point `sw` at it
 keep loading from the CDN. At the root its scope is `/h5p/`, not `/`, so an existing site worker
 is left alone.
 
-**C · An iframe, nothing on your site:** frame the hosted player page,
-`/embed?src=<package url>`. It sizes itself through H5P's own resizer protocol and relays xAPI
-statements to your page on request, and takes the display options below as query parameters
-(`&frame&copyright`, `&activity-id=…`). See Setup C in the setup guide. A third-party site embedding it from GitHub Pages: [alekswebnet.github.io/h5p](https://alekswebnet.github.io/h5p/).
+**C · An iframe, nothing on your site:** frame the embed page of
+[Embed My](https://embed-my.org/), a separate service built on this player. It sizes itself
+through H5P's own resizer protocol and relays xAPI statements to your page on request, and takes
+the display options below as query parameters (`&frame&copyright`, `&activity-id=…`). Embed My
+writes the snippet for you, with a live preview and the display options as checkboxes, and its
+[guides](https://github.com/embed-my/.github/tree/main/docs) cover hosting a package and testing
+the page. See Setup C in the setup guide. This site's `/embed` is the same page, and a
+third-party site frames it from GitHub Pages: [alekswebnet.github.io/h5p](https://alekswebnet.github.io/h5p/).
 
 ```html
-<iframe src="https://h5p-offline-player.vercel.app/embed?src=https://h5p-offline-player.vercel.app/demo/content/quiz.h5p&xapi=https://your-site.example"
+<iframe src="https://embed-my.github.io/h5p?src=https://h5p-offline-player.vercel.app/demo/content/quiz.h5p&xapi=https://your-site.example"
         allow="fullscreen" style="width: 100%; border: 0"></iframe>
-<script src="https://h5p-offline-player.vercel.app/resizer.js"></script>
+<script src="https://embed-my.github.io/h5p-resizer.js"></script>
 ```
 
 The script line sizes the iframe to the content; without it the frame keeps the height your CSS gives it.

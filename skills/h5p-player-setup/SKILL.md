@@ -64,10 +64,15 @@ console warns when the two differ.
 
 **C · iframe, nothing on the site**
 
+For a person pasting into a page builder or a CMS, point them at [Embed My](https://embed-my.org/),
+a separate service built on this player: it writes the snippet with a live preview and the display
+options as checkboxes, and its [guides](https://github.com/embed-my/.github/tree/main/docs) cover
+hosting the package and testing the page. By hand:
+
 ```html
-<iframe src="https://h5p-offline-player.vercel.app/embed?src=https://h5p-offline-player.vercel.app/demo/content/quiz.h5p"
+<iframe src="https://embed-my.github.io/h5p?src=https://h5p-offline-player.vercel.app/demo/content/quiz.h5p"
         allow="fullscreen" style="width: 100%; border: 0"></iframe>
-<script src="https://h5p-offline-player.vercel.app/resizer.js"></script>
+<script src="https://embed-my.github.io/h5p-resizer.js"></script>
 ```
 
 The script line sizes the iframe to the content; a page that already has h5p.org's `h5p-resizer.js` needs no second one.
