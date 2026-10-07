@@ -1,6 +1,6 @@
 {
   "name": "@missing-elements/h5p-normalize",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Rewrites an .h5p package so it streams: media stored, mp4 index first, libraries before content. The content is not changed.",
   "license": "MIT",
   "repository": {
