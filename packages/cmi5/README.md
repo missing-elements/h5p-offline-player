@@ -85,11 +85,10 @@ The course structure you import into the LMS, zipped as `cmi5.xml`:
 ```
 
 With no `launchMethod` the LMS decides where the page opens, and most frame it in the course
-page; the player runs there, in Safari and on iOS 26 too. Add `launchMethod="OwnWindow"` to
+page; the player runs there, in Safari and on iOS too. Add `launchMethod="OwnWindow"` to
 have the page opened top level when a frame would not do: an LMS on plain `http` (a frame
-inside it gets no Service Worker), content that needs fullscreen in an LMS iframe without
-`allow="fullscreen"`, or learners on iOS before 26, which has not been tried framed. The package
-URL must send CORS headers, as for any use of the player.
+inside it gets no Service Worker), or content that needs fullscreen in an LMS iframe without
+`allow="fullscreen"`. The package URL must send CORS headers, as for any use of the player.
 
 `exit()` goes to the launch's `returnURL`. With none, it closes the window when the page is top
 level; a framed page stays, since it cannot close the LMS page around it, so tell the learner

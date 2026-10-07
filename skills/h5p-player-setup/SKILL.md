@@ -74,9 +74,9 @@ The script line sizes the iframe to the content; a page that already has h5p.org
 
 Add `&xapi=<your page's origin>` to receive statements by `postMessage`, and the element's display
 attributes as parameters (`&frame&copyright&export`, `&activity-id=<IRI>`, `&custom-css=<URL>`). The embedding page must be
-https (or localhost); the frame then registers its own worker, in Safari and on iOS too (measured on
-Safari 26.6.2 and iOS 26.6.1). Only for a site that truly cannot host a file, and say so to the
-user: their content then runs on a third party's origin, and storage is per embedding site.
+https (or localhost); the frame then registers its own worker, in Safari and on iOS too. Only
+for a site that truly cannot host a file, and say so to the user: their content then runs on a
+third party's origin, and storage is per embedding site.
 
 **Sizing:** the element follows the content's own height by default. Set `auto-resize="off"`
 only when the page sizes it itself, from CSS or from the `resize` event, because the height the

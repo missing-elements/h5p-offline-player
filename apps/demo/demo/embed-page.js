@@ -101,7 +101,7 @@ player.addEventListener('error', (event) => {
   const { code, message } = event.detail
   if (code === 'no-worker' && framed) {
     // Detected, not sniffed: a browser, an in-app one or a page that is not https may give a frame
-    // no Service Worker, and the player cannot run without one. Safari does allow it, as of 26.
+    // no Service Worker, and the player cannot run without one. Safari does allow it.
     say("This browser does not run the player inside another site's page.", 'error', {
       href: location.href,
       text: 'Open it on its own'

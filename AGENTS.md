@@ -1150,8 +1150,8 @@ SPA-fallback trap described above cannot happen there.
   was believed to have; with framed players measured working on 2026-10-03, the examples
   dropped it on 2026-10-04 and the LMS chooses (`AnyWindow`, cmi5's default), as do
   `demo/cmi5-course.zip` and the CATAPULT course — SCORM Cloud launched the demo course framed
-  that day and recorded the quiz. It stays documented for an LMS on plain `http`, an LMS iframe
-  without `allow="fullscreen"` and iOS before 26.
+  that day and recorded the quiz. It stays documented for an LMS on plain `http` and an LMS
+  iframe without `allow="fullscreen"`.
   Exit in a frame follows 10.2.6.0-1, "the current browser window or frame", to `returnURL`;
   with none, `exit()` closes only a top-level window, and the demo page says to go back to the
   course.
@@ -1249,9 +1249,11 @@ SPA-fallback trap described above cannot happen there.
   own registration and chunk store, so a package is downloaded once per embedding site. The
   parent must be https or localhost: a plain-http LAN address makes the frame an insecure
   context with no `serviceWorker`, which is what a first iPhone test looked like. Not measured:
-  iOS before 26, Safari's seven-day limit on script-writable storage for a frame the learner
-  never opens on its own, and video and offline playback in a frame on iOS. The `target="_top"`
-  fallback stays for those, and for an in-app browser.
+  Safari's seven-day limit on script-writable storage for a frame the learner never opens on
+  its own, and video and offline playback in a frame on iOS. The `target="_top"` fallback
+  stays for those, and for an in-app browser. No document names a Safari or iOS version
+  floor, decided on 2026-10-08: the player supports both, and a framed player that fails on an
+  earlier release is a bug to fix, not a caveat to publish.
 - **The pages carry their metadata, and the origin is filled in at build time.** Titles,
   descriptions, canonical links, Open Graph and Twitter tags, JSON-LD for the software on the
   front page, `robots.txt` and `sitemap.xml`, and the GitHub link at the right of every page's

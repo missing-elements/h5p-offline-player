@@ -74,20 +74,18 @@ package; `<launchParameters>` in the AU is the alternative, and the page reads i
 when the URL carries no `src`. The package URL needs CORS headers, as in every setup.
 
 The structure names no `launchMethod`, so it is cmi5's default, `AnyWindow`: the LMS decides
-where the page opens, and most put it in a frame of the course page. The player runs there: in
-October 2026 a cross-origin frame registered its own Service Worker in desktop Safari 26.6.2, on
-iOS 26.6.1 and in Chrome. On Exit the page goes to the launch's `returnURL`, which cmi5 has the
-AU do in "the current browser window or frame"; with no `returnURL`, a framed page stays where
-it is, since it cannot close the LMS page around it, and the demo page tells the learner to go
-back to the course.
+where the page opens, and most put it in a frame of the course page. The player runs there: a
+cross-origin frame registers its own Service Worker, in Chrome, in Safari and on iOS alike. On
+Exit the page goes to the launch's `returnURL`, which cmi5 has the AU do in "the current
+browser window or frame"; with no `returnURL`, a framed page stays where it is, since it cannot
+close the LMS page around it, and the demo page tells the learner to go back to the course.
 
 `launchMethod="OwnWindow"` makes the LMS open the page top level instead, in a new window or in
 place of the course page. Ask for it when a frame would not do:
 
 - the LMS serves its pages over plain `http`, which makes a frame inside them an insecure
   context, with no Service Worker;
-- the content needs fullscreen, and the LMS's iframe has no `allow="fullscreen"`;
-- learners use iOS before 26, where a framed player has not been tried.
+- the content needs fullscreen, and the LMS's iframe has no `allow="fullscreen"`.
 
 A frame also keeps its storage per LMS site, and Safari may clear the storage of a site the
 learner never opens on its own; either costs a download again, not the session. The demo's
