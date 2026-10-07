@@ -1431,10 +1431,16 @@ changed its metadata. Three things follow:
   entry there.
 - The demo site serves the same directory, so the same files are on it, and `index.html`'s
   JSON-LD names both licences.
+- Our own shipped files carry a one-line notice too (`playerNotice` in
+  `scripts/lib/worker-bundle.mjs`, on the element, both Service Worker scripts and the Jobs
+  worker): MIT asks for its notice to accompany copies, and until 2026-10-07 none of them had one.
 
 Whether the copyleft reaches our own code is a legal question and is not settled here. The
 element and the workers exchange only messages and HTTP with the runtime; the frame boot script
-runs in the same document and calls its API.
+runs in the same document and calls its API. Moving our code to the GPL was considered on
+2026-10-07 and decided against: Setup A bundles the element into a host's own bundle, where a
+GPL dependency is what corporate policies and scanners refuse, while the runtime sits in an
+iframe, the weakest form of linking. MPL-2.0 is the middle ground if closed forks ever matter.
 
 ## Where this differs from the written design
 

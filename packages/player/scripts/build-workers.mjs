@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { transform } from 'esbuild'
-import { buildJobsWorker, buildMountModule, buildServiceWorker } from './lib/worker-bundle.mjs'
+import { buildJobsWorker, buildMountModule, buildServiceWorker, playerNotice } from './lib/worker-bundle.mjs'
 
 /**
  * Builds the artefacts Vite's library build cannot produce.
@@ -27,7 +27,8 @@ await buildJobsWorker(resolve(distDir, 'h5p-jobs.js'))
 const elementPath = resolve(distDir, 'h5p-player.js')
 const element = await readFile(elementPath, 'utf8')
 const minified = await transform(element, { minify: true, format: 'esm', target: 'es2022', legalComments: 'none' })
-await writeFile(elementPath, minified.code)
+// With the package's notice in front, as the workers have: see `playerNotice`.
+await writeFile(elementPath, `${await playerNotice()}\n${minified.code}`)
 
 const sizeOf = async (name) => {
   const contents = await readFile(resolve(distDir, name))

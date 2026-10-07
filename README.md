@@ -258,3 +258,5 @@ The player's own code — the element, the two workers, the scripts — is MIT, 
 - The two Service Worker scripts in `dist/`, `h5p-sw.js` and `h5p-sw-mount.js`, bundle [zip.js](https://github.com/gildas-lormeau/zip.js)
   (BSD-3-Clause). Both open with its licence in full, so the notice travels with them when a
   bundler emits them on their own, and [NOTICE.md](https://github.com/missing-elements/h5p-offline-player/blob/main/packages/player/NOTICE.md) reproduces it.
+  Each of the player's own files opens with a one-line notice of its own: MIT asks for its notice
+  to accompany copies, and a bundler emits each file alone.

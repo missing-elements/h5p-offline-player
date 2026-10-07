@@ -52,6 +52,16 @@ async function zipJsNotice() {
   return `/*! @missing-elements/h5p-offline-player Service Worker. Bundles zip.js ${version} (https://github.com/gildas-lormeau/zip.js):\n\n${licence}\n*/`
 }
 
+/**
+ * The package's own notice, on every file it ships: MIT asks for its copyright and permission
+ * notice to accompany copies, and a bundler emits each file on its own with nothing from the
+ * package root beside it. One line, naming the licence and where its text is.
+ */
+export async function playerNotice() {
+  const { version } = JSON.parse(await readFile(resolve(rootDir, 'package.json'), 'utf8'))
+  return `/*! @missing-elements/h5p-offline-player ${version}. Copyright (c) 2026 missing-elements. MIT (https://github.com/missing-elements/h5p-offline-player/blob/main/LICENSE). */`
+}
+
 async function shared() {
   return {
     bundle: true,
@@ -59,7 +69,7 @@ async function shared() {
     target: 'es2022',
     minify: true,
     legalComments: 'none',
-    banner: { js: await zipJsNotice() },
+    banner: { js: `${await playerNotice()}\n${await zipJsNotice()}` },
     define: { 'import.meta.env.DEV': 'false' },
     plugins: [frameBootEsbuildPlugin(true), noCodecImport]
   }
@@ -78,11 +88,11 @@ export async function buildMountModule(outfile) {
 /**
  * `h5p-jobs.js`: the Jobs worker the element carries as a string, as a file of its own for a page
  * whose policy refuses a `blob:` worker. It bundles nothing but our own code — no zip.js, which is
- * the Service Worker's — so it carries no notice.
+ * the Service Worker's — so it carries the package's notice alone.
  */
 export async function buildJobsWorker(outfile) {
   const { banner, plugins, ...options } = await shared()
-  return build({ ...options, plugins: [frameBootEsbuildPlugin(true)], entryPoints: [resolve(rootDir, 'src/jobs/jobs-worker.ts')], outfile, format: 'iife' })
+  return build({ ...options, banner: { js: await playerNotice() }, plugins: [frameBootEsbuildPlugin(true)], entryPoints: [resolve(rootDir, 'src/jobs/jobs-worker.ts')], outfile, format: 'iife' })
 }
 
 /**
