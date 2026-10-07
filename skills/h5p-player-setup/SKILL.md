@@ -67,7 +67,10 @@ console warns when the two differ.
 ```html
 <iframe src="https://h5p-offline-player.vercel.app/embed?src=https://h5p-offline-player.vercel.app/demo/content/quiz.h5p"
         allow="fullscreen" style="width: 100%; border: 0"></iframe>
+<script src="https://h5p-offline-player.vercel.app/resizer.js"></script>
 ```
+
+The script line sizes the iframe to the content; a page that already has h5p.org's `h5p-resizer.js` needs no second one.
 
 Add `&xapi=<your page's origin>` to receive statements by `postMessage`, and the element's display
 attributes as parameters (`&frame&copyright&export`, `&activity-id=<IRI>`, `&custom-css=<URL>`). The embedding page must be

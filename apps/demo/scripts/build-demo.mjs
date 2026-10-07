@@ -92,6 +92,9 @@ async function appPrecache() {
 // script with `vite-ignore` — Vite bundles modules only — and it is copied as it is. Before the
 // precache is read: the app page links it too, and the list is hashed over the files it names.
 await cp(resolve(rootDir, 'demo', 'theme.js'), resolve(outDir, 'demo', 'theme.js'))
+// The page-side half of the resizer protocol, for sites that frame /embed: a classic script at
+// the site root, named by the embed snippets, so an embedding page sends nothing to h5p.org.
+await cp(resolve(rootDir, 'resizer.js'), resolve(outDir, 'resizer.js'))
 
 const precache = await appPrecache()
 await writeFile(

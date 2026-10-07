@@ -71,7 +71,10 @@ statements to your page on request, and takes the display options below as query
 ```html
 <iframe src="https://h5p-offline-player.vercel.app/embed?src=https://h5p-offline-player.vercel.app/demo/content/quiz.h5p&xapi=https://your-site.example"
         allow="fullscreen" style="width: 100%; border: 0"></iframe>
+<script src="https://h5p-offline-player.vercel.app/resizer.js"></script>
 ```
+
+The script line sizes the iframe to the content; without it the frame keeps the height your CSS gives it.
 
 Requirements: the page is on `https://` or `localhost`, and the package's host sends CORS
 headers. `Range` support on the host is optional; without it the archive is downloaded once and

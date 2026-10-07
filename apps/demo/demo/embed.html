@@ -73,11 +73,12 @@
      &amp;frame&amp;copyright&amp;export&amp;icon  &amp;fullscreen=off  &amp;reporting
      &amp;activity-id=&lt;the IRI statements should name&gt;  &amp;custom-css=&lt;your stylesheet's URL&gt; --&gt;
 
-&lt;!-- Sizing: the page speaks H5P's resizer protocol upward, so the script
-     h5p.org's own embed code includes resizes this frame as it is&hellip; --&gt;
-&lt;script src="https://h5p.org/sites/all/modules/h5p/library/js/h5p-resizer.js"&gt;&lt;/script&gt;
+&lt;!-- Sizing: the frame reports its height in H5P's resizer protocol, and this one line
+     applies it. Served from this site, so your page sends nothing to a third party;
+     h5p.org's own h5p-resizer.js speaks the same protocol, if a page has it already. --&gt;
+&lt;script src="%SITE_URL%/resizer.js"&gt;&lt;/script&gt;
 
-&lt;!-- &hellip;or answer it yourself, and hear the statements: --&gt;
+&lt;!-- Or answer it yourself, and hear the statements: --&gt;
 &lt;script&gt;
   const frame = document.querySelector('iframe')
   addEventListener('message', ({ source, origin, data }) =&gt; {
@@ -106,6 +107,8 @@
       </footer>
     </main>
 
+    <!-- The sizing, as the snippet above has it; the module below only listens. -->
+    <script src="/resizer.js" vite-ignore></script>
     <script type="module">
       const frame = document.querySelector('#embed')
       const log = document.querySelector('#log')
@@ -119,14 +122,11 @@
 
       addEventListener('message', ({ source, origin, data }) => {
         if (source !== frame.contentWindow || origin !== location.origin || !data) return
-        if (data.context === 'h5p') {
-          if (data.action === 'hello') source.postMessage({ context: 'h5p', action: 'hello' }, origin)
-          if (data.action === 'resize') {
-            frame.style.height = `${data.scrollHeight}px`
-            // Content is up: the box around it goes, so its rounded corners stop clipping it (player-page.css).
-            frame.dataset.loaded = ''
-            write(`resize  ${data.scrollHeight}px`)
-          }
+        // /resizer.js answers the hello and sets the height; this only shows what went by.
+        if (data.context === 'h5p' && data.action === 'resize') {
+          // Content is up: the box around it goes, so its rounded corners stop clipping it (player-page.css).
+          frame.dataset.loaded = ''
+          write(`resize  ${data.scrollHeight}px`)
         }
         if (data.context === 'h5p-offline-player') {
           if (data.action === 'xapi') write(`xapi  ${data.verb ?? '(no verb)'}`)

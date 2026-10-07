@@ -8,7 +8,7 @@
  *
  * Upward it speaks H5P's own resizer protocol — the `hello` / `resize` exchange that h5p.org's
  * embed code and its `h5p-resizer.js` use — so a page that already resizes h5p.org iframes
- * resizes this one without a change. xAPI statements are relayed to the parent only when `xapi=`
+ * resizes this one without a change, and any other page gets `/resizer.js` from this origin. xAPI statements are relayed to the parent only when `xapi=`
  * names the parent's origin, and they are posted to that origin only.
  */
 

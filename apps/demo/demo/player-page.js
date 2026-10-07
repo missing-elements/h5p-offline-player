@@ -195,9 +195,10 @@ let reload = null
 const embedCodeFor = (url) =>
   `<iframe src="${location.origin}/embed?src=${encodeURIComponent(new URL(url, location.href).href)}" width=":w" height=":h" allow="fullscreen" style="border: 0"></iframe>`
 
-// The sizing script the embed dialog offers under "advanced": `/embed` speaks h5p.org's resizer
-// protocol upward, so h5p.org's own script sizes the frame on any page it is pasted into.
-player.setAttribute('resize-code', '<script src="https://h5p.org/sites/all/modules/h5p/library/js/h5p-resizer.js" charset="UTF-8"></script>')
+// The sizing script the embed dialog offers under "advanced": `/embed` speaks H5P's resizer
+// protocol upward, and `/resizer.js` on this origin is the page-side half, so the embedding page
+// sends nothing to h5p.org (whose `h5p-resizer.js` speaks the same protocol and would do too).
+player.setAttribute('resize-code', `<script src="${location.origin}/resizer.js"></script>`)
 
 const loadUrl = (url) => {
   log.textContent = ''

@@ -111,6 +111,9 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             loads in its head before the stylesheet, since the CSP allows no
                             inline script and a pinned theme has to be on <html> before the
                             first paint
+  resizer.js                the page-side half of H5P's resizer protocol, served at /resizer.js
+                            for sites that frame /embed: the one line the embed snippets name,
+                            so an embedding page sends nothing to h5p.org; tests/embed.test.ts
   tests/                    cmi5.test.ts: the cmi5 page against a mock LMS and LRS on a second
                             origin, through the dev server and a real browser
   cmi5-catapult/            docker-compose.yml for ADL's CATAPULT player, MySQL and the SQL LRS;
@@ -1222,7 +1225,11 @@ SPA-fallback trap described above cannot happen there.
   attribute names (see the h5p-standalone options invariant for which, and why not `custom-js`). Three decisions in
   `demo/embed-page.js`: it speaks H5P's resizer protocol *upward* — `hello`, then `resize` with
   `scrollHeight` — so a site that already includes h5p.org's `h5p-resizer.js` for its h5p.org
-  embeds resizes this frame with no code of its own; it relays xAPI only when `xapi=` names the
+  embeds resizes this frame with no code of its own, and every other site gets `/resizer.js`
+  from this origin, the same protocol in twenty lines, which the snippets name (chosen on
+  2026-10-07 over naming h5p.org's copy: every visitor's browser would otherwise call h5p.org,
+  at a Drupal module path H5P Group can move, for a GPL file; the player page's embed dialog
+  offers the same line under "advanced"); it relays xAPI only when `xapi=` names the
   parent's origin and posts to that origin only, which is the opt-in the frame-to-element channel
   cannot have; and, for a browser that really cannot register a worker in a frame, it detects
   that by the `no-worker` error rather than by sniffing the user agent, and answers with a
