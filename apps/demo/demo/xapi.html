@@ -61,9 +61,11 @@
         a question below and watch the statements arrive. Each one names the build it came from:
         <code>context.revision</code> is a fingerprint of the package's index, the same one
         <code>h5p-normalize</code> prints, and <code>context.platform</code> the player's version.
+        The actor is the learner this page named through the element's <code>user</code> property,
+        and the object is the package's URL, the same across re-uploads.
       </p>
 
-      <h5p-player src="/demo/content/quiz.h5p" auto-resize="off"></h5p-player>
+      <h5p-player auto-resize="off"></h5p-player>
 
       <h2>Statements</h2>
       <pre class="log" id="log"></pre>
@@ -92,6 +94,11 @@
       player.addEventListener('resize', (event) => {
         player.style.height = `${Math.max(event.detail.height, 240)}px`
       })
+
+      // The learner, as the actor of every statement; without one H5P's actor is anonymous. It is
+      // read with the load, so it goes on before `src` — which is why `src` is not in the markup.
+      player.user = { name: 'Demo learner', mail: 'learner@example.com' }
+      player.setAttribute('src', '/demo/content/quiz.h5p')
     </script>
   </body>
 </html>

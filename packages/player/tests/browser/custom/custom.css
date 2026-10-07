@@ -1,0 +1,2 @@
+/* Served to the browser suite as /tests/browser/custom/custom.css: proof that a custom-css URL reaches the frame. */
+body { --h5p-test-custom: applied; }

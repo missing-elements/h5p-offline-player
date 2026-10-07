@@ -132,7 +132,10 @@
         <button type="button" id="confirm-open">Open the package</button>
       </p>
 
-      <h5p-player preload="auto"></h5p-player>
+      <!-- H5P's own action bar under the content: Reuse downloads the package, Rights of use shows
+           the licences from its h5p.json and its media, Embed offers this site's /embed page around
+           it (the code is set per load in demo/player-page.js, since it names the package URL). -->
+      <h5p-player preload="auto" frame copyright export embed></h5p-player>
 
       <h2>Events</h2>
       <pre class="log" id="log"></pre>

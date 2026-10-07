@@ -62,7 +62,7 @@ For sites that cannot host even one file, embed the player page. [Live example](
         allow="fullscreen" style="width: 100%; border: 0"></iframe>
 ```
 
-Query parameters: `src` (required), `libraries` (`hub` or a URL, as the attribute), `preload=auto`, and `xapi`, your page's origin.
+Query parameters: `src` (required), `libraries` (`hub` or a URL, as the attribute), `preload=auto`, `xapi`, your page's origin, and the display options by their attribute names: `frame`, `copyright`, `export`, `icon`, `reporting` (bare), `fullscreen=off`, `activity-id=<IRI>` and `custom-css=<URL>`. Not `custom-js` or `user`: a script is a capability on the player's origin that a link should not hand out, and a learner's name has no place in a URL.
 
 **Sizing.** The page speaks H5P's resizer protocol upward — the `hello` / `resize` exchange h5p.org's embed code uses — so the `h5p-resizer.js` that code includes resizes this iframe as it is. Without it, answer the messages yourself: reply to `{ context: 'h5p', action: 'hello' }` with the same message, and on `{ context: 'h5p', action: 'resize', scrollHeight }` set the iframe's height.
 
@@ -97,10 +97,21 @@ The element does one thing: play a package.
                        load of the package (default: off, nothing is kept). `host` keeps nothing
                        on the device: the host page gets a `userdata` event on every save and
                        sets `userData` before the next load
+  frame copyright export icon embed
+                       H5P's action bar under the content and its buttons, as bare attributes
+                       (default: all off). The copyright dialog is built from the package's
+                       `h5p.json` and its media's notices; `export` offers `download-url` or the
+                       package URL; `embed` offers `embed-code`, `:w` and `:h` standing for the
+                       size, and `resize-code`, a sizing script, under "advanced"
+  fullscreen="off"     take the fullscreen button away (default: on)
+  custom-css="…"       stylesheets and scripts to load in the frame after the runtime's own,
+  custom-js="…"        space separated; their origins join the frame's CSP
+  reporting            the submit button, in content types that have one
+  activity-id="…"      the id statements name as their object (default: the package URL)
 ></h5p-player>
 ```
 
-Properties: `src`, `file` (a `File` from a picker; setting it loads), `pkgId`, `preload`, `resume` (`off | device | host`), `userData` (the entries a host hands in under `resume="host"`), `state` (`idle | probing | downloading | indexing | ready | error`), `scope` (read-only, the resolved worker scope), `revision` (read-only: the build playing, as its statements name it). `clearUserData()` forgets the state kept on the device for the package loaded now; set `src` again to start it over.
+Properties: `src`, `file` (a `File` from a picker; setting it loads), `user` (`{ name, mail }`, the actor of every statement; read with the load, so set it before `src`), `pkgId`, `preload`, `resume` (`off | device | host`), `userData` (the entries a host hands in under `resume="host"`), `state` (`idle | probing | downloading | indexing | ready | error`), `scope` (read-only, the resolved worker scope), `revision` (read-only: the build playing, as its statements name it). `clearUserData()` forgets the state kept on the device for the package loaded now; set `src` again to start it over.
 
 `resume` is off by default because a browser is not a learner: on a shared machine, the state one person leaves is what the next one finds. The state sits in the site's storage, which every package played on the site can read, since a package's libraries run on the site's origin: with `resume` on, play only packages you trust, and ask before opening one from a link. With it on, the saved state is keyed by the package and the build it was saved against (the `revision`), so a state from another version of the package is not handed over — the content shows H5P's own "content has changed, starting over" instead. Nothing is sent anywhere in either mode, and xAPI statements are never stored.
 
@@ -147,6 +158,35 @@ copy them too; with the CDN (Setup B) they are served from there. A site that se
 is distributing GPL code, so keep the notices reachable. The full account, including zip.js's
 BSD notice, is `NOTICE.md` in the package.
 
+## Coming from h5p-standalone
+
+The element runs h5p-standalone inside its frame, and takes its options by their own names where
+they still mean something here. What decided the layout of a content folder — `h5pJsonPath`,
+`librariesPath`, `contentJsonPath` — is decided by the `.h5p` itself; what posted results to a
+server — `ajax.*`, `postUserStatistics` — is replaced by the `xapi` and `finished` events; and the
+saved state (`contentUserData`, `saveFreq`) is `resume`.
+
+| h5p-standalone | Here | Note |
+|---|---|---|
+| `h5pJsonPath` | `src` or `file` | The package, not a folder |
+| `frameJs`, `frameCss` | `assets-base` | One directory for both, and the fonts |
+| `frame`, `copyright`, `export`, `icon`, `embed` | the same, as bare attributes | `frame` shows the action bar the buttons live in |
+| `fullScreen` | `fullscreen="off"` to turn off | On by default here |
+| `downloadUrl` | `download-url` | Defaults to the package URL |
+| `embedCode`, `resizeCode` | `embed-code`, `resize-code` | Same `:w` and `:h` placeholders; the sizing script the dialog offers beside it |
+| `customCss`, `customJs` | `custom-css`, `custom-js` | Space separated; their origins are allowed by the frame's CSP |
+| `reportingIsEnabled` | `reporting` | Reaches the content as `isReportingEnabled`, which this core does not pass on by itself |
+| `xAPIObjectIRI` | `activity-id` | Defaults to the package URL; h5p-standalone defaults to the page's |
+| `user` | the `user` property | `{ name, mail }`; never stored |
+| `metadata`, `title` | — | Read from the package's `h5p.json`: the copyright dialog and the statements' object name come from it. h5p-standalone defaults to "Undisclosed" |
+| `contentUserData`, `saveFreq` | `resume`, `userData` | See the guide on resume |
+| `ajax.setFinishedUrl`, `postUserStatistics` | the `finished` event | Nothing is posted anywhere |
+| `ajax.contentUserDataUrl` | `resume="host"` and the `userdata` event | |
+| `id`, `librariesPath`, `contentJsonPath`, `embedType`, `preventH5PInit` | — | Decided by the package and the frame |
+
+Formulas: there is no `customJs` recipe for MathJax here because it is not needed when the
+package carries `H5P.MathDisplay`, and it only half works when it does not — see Troubleshooting.
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
@@ -164,6 +204,8 @@ BSD notice, is `NOTICE.md` in the package.
 | `error: bad-archive`, "contains no libraries" | The export has `content/` but no library folders — h5p.com and h5p.org omit libraries the origin site already has | Set `libraries="hub"` to fetch them from h5p.org, point `libraries` at a `.h5p` that carries them — the repository's [`libraries.h5p`](https://github.com/missing-elements/h5p-offline-player/raw/main/apps/demo/app/libraries.h5p) has every hub content type's, to serve from your own site with its `libraries.txt` — or re-export with them included. `event.detail.missingLibraries` names them |
 | Console: 404 for `<Library>-<major>.<minor>/library.json` on load | Not a fault. h5p-standalone probes the versioned folder name to find out whether a package uses versioned folders; older packages do not, and the 404 is what tells it to fall back to the bare name | Ignore it. One such 404 per load is expected |
 | Console: "violates the following Content Security Policy directive" | The content loads a script, style or font from an origin the frame does not permit | Built in: MathJax CDNs, Google WebFont, YouTube, Vimeo, Panopto. Anything else goes in `allow-origins` |
+| No copyright button with `frame copyright` | The package's `h5p.json` names no licence, `U` (undisclosed), or one H5P has no name for, such as `MIT` from a CLI build; H5P hides the button for content with nothing to show | H5P's own rule, nothing in the player: give the package a licence H5P knows (CC BY, CC0 1.0, GNU GPL, PD, C, …) in `h5p.json`. The media's own notices show either way |
+| Formulas show as raw LaTeX, `\(…\)` or `$$…$$` | The package does not carry `H5P.MathDisplay`. On a site it is an addon the H5P plugin attaches to content that contains math, so an export from a site without it, or made before the math was added, lacks it. The player runs the package's own libraries and injects no script of its own — there is no `customJs` as in h5p-standalone — and a `libraries` bundle is attached only to a package that is missing libraries it declares, not to a complete one | Add `H5P.MathDisplay-1.0/` to the archive and `H5P.MathDisplay` to `preloadedDependencies` in `h5p.json`; it is on the H5P hub, MIT. MathDisplay then fetches MathJax from a CDN the frame's CSP already allows — so formulas need the network even in the installable app, and the app's library pack does not include MathDisplay |
 | Several videos in one package, and the first one takes long to start | Every video the content instantiates is asked for at boot, not only the one on screen; extractions now run one at a time with the first-requested first, so the others wait rather than share the link. What remains is the video itself: one whose mp4 index sits at the end plays nothing until its last byte | Normalize the package (`npx @missing-elements/h5p-normalize course.h5p`): stored, faststart video starts after its first bytes and the other chapters cost nothing until opened |
 | A video sits with its play icon on and never starts, and a reload plays it at once | The link went quiet or dropped while the video was being extracted. Earlier versions gave up on the response after thirty silent seconds, which a media element takes as a fatal error it never retries, while the extraction went on to finish in the background — hence the reload. The player now rides out a silent or dropped link: a request that stops is re-issued from the byte it reached, for about a minute of outright failures or four of hangs, before the entry is failed | Nothing on your side. A host that stays down that long fails the entry, the element reports it as an `error` event naming the entry, and a reload tries again |
 | A video shows nothing for minutes, then plays normally | Its mp4 is deflated in the zip *and* not faststart, so the index it needs is the last few kilobytes of a file that can only be read forward. The transfer is genuinely required | Set `preload="auto"` so it starts when the content loads rather than when the learner presses play. The durable fix is to rewrite the package once with `npx @missing-elements/h5p-normalize course.h5p`: it stores the media, moves the mp4 index to the front and leaves the content untouched |

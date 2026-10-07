@@ -9,6 +9,8 @@ import {
   type ErrorCode,
   type LibrarySource,
   type MissingLibraries,
+  type FrameOptions,
+  type FrameUser,
   type FrameAssets,
   type FromFrameMessage,
   type FromJobsMessage,
@@ -175,7 +177,12 @@ function adoptShadowStyles(root: ShadowRoot): void {
 
 export class H5PPlayerElement extends HTMLElement {
   static get observedAttributes(): string[] {
-    return ['src', 'sw', 'assets-base', 'auto-resize', 'libraries', 'allow-origins', 'preload', 'resume']
+    return [
+      'src', 'sw', 'assets-base', 'auto-resize', 'libraries', 'allow-origins', 'preload', 'resume',
+      // h5p-standalone's display and loading options, by its names; read when a package is registered.
+      'frame', 'copyright', 'export', 'icon', 'embed', 'fullscreen', 'download-url', 'embed-code', 'resize-code',
+      'custom-css', 'custom-js', 'reporting', 'activity-id'
+    ]
   }
 
   private iframe: HTMLIFrameElement
@@ -225,6 +232,8 @@ export class H5PPlayerElement extends HTMLElement {
    * answered under another.
    */
   private loadResumeMode: ResumeMode = 'off'
+  /** The learner the host named, for the statements' actor; handed to the frame as it boots. */
+  private userValue: FrameUser | null = null
   /**
    * The mode the frame holding `userDataSession` was answered under, which its saves follow.
    * Kept apart from `loadResumeMode`: a straggler save from the previous document can arrive
@@ -386,8 +395,9 @@ export class H5PPlayerElement extends HTMLElement {
       return
     }
 
-    // `sw` and `assets-base` only take effect on the next load; a running package keeps the
-    // worker and assets it was loaded with.
+    // `sw`, `assets-base` and the frame options (`frame`, `custom-css`, `activity-id`, …) only
+    // take effect on the next load; a running package keeps the worker, assets and frame it was
+    // loaded with.
     // Handing the height back to the host: the inline height this element wrote would otherwise
     // outlive the choice, since an inline style beats any rule in the host's stylesheet.
     if (name === 'auto-resize' && next === 'off') this.style.removeProperty('height')
@@ -491,7 +501,10 @@ export class H5PPlayerElement extends HTMLElement {
       // `?resume=1` tells the frame's boot script to ask for the saved state before the runtime
       // initialises. In the URL, not the frame document, so that a worker and an element of
       // different versions each do what they know: see `frame-boot.ts`.
-      const frameUrl = `${routes.frame}${pkgId}${this.loadResumeMode === 'off' ? '' : '?resume=1'}`
+      // `?user=1` the same way: the host named a learner, and the frame asks for it in the same
+      // reply, before the runtime reads its actor.
+      const flags = [this.loadResumeMode === 'off' ? '' : 'resume=1', this.userValue ? 'user=1' : ''].filter(Boolean)
+      const frameUrl = `${routes.frame}${pkgId}${flags.length ? `?${flags.join('&')}` : ''}`
       let indexed: IndexResult
 
       if (descriptor.type === 'chunked') {
@@ -714,10 +727,69 @@ export class H5PPlayerElement extends HTMLElement {
       source,
       frameAssets: this.frameAssets(),
       allowOrigins: this.allowOrigins(),
+      frameOptions: this.frameOptions(source),
       status: 'registered',
       lastPlayed: Date.now(),
       version: VERSION
     }
+  }
+
+  /**
+   * The learner, as the actor of every statement the content sends: `{ name, mail }`, what
+   * h5p-standalone calls `user`. Read by the load, so set it before `src`. Not stored anywhere:
+   * it goes to the frame in the reply it waits for before booting.
+   */
+  get user(): FrameUser | null {
+    return this.userValue
+  }
+
+  set user(value: FrameUser | null) {
+    this.userValue = value && typeof value.name === 'string' && typeof value.mail === 'string' ? { name: value.name, mail: value.mail } : null
+  }
+
+  /**
+   * The display and loading options, h5p-standalone's by name, read when the package is
+   * registered so they ride in its record and a restarted worker synthesizes the same frame. A
+   * bare attribute turns a thing on; `fullscreen="off"` turns off the one that is on by default.
+   * `export` needs a file to offer: `download-url`, or the package URL when there is one. The
+   * activity id defaults to the package URL for the same reason: the frame's own URL, which the
+   * runtime would use, carries the package hash and changes with every build.
+   */
+  private frameOptions(source: SourceDescriptor): FrameOptions | undefined {
+    const text = (name: string) => this.getAttribute(name)?.trim() || undefined
+    const flag = (name: string) => (this.hasAttribute(name) ? this.getAttribute(name)?.trim() !== 'off' : undefined)
+    const resolve = (value: string) => {
+      try {
+        return new URL(value, location.href).href
+      } catch {
+        return undefined
+      }
+    }
+    const urls = (name: string) => (text(name) ?? '').split(/\s+/).filter(Boolean).flatMap((value) => resolve(value) ?? [])
+    const sourceUrl = 'url' in source && typeof source.url === 'string' ? source.url : undefined
+
+    const options: FrameOptions = {}
+    const flags = { frame: 'frame', copyright: 'copyright', icon: 'icon', embed: 'embed', export: 'export', fullScreen: 'fullscreen', reportingIsEnabled: 'reporting' } as const
+    for (const [key, name] of Object.entries(flags) as Array<[keyof typeof flags, string]>) {
+      const value = flag(name)
+      if (value !== undefined) options[key] = value
+    }
+    const downloadUrl = text('download-url') ?? (options.export ? sourceUrl : undefined)
+    if (downloadUrl) {
+      const resolved = resolve(downloadUrl)
+      if (resolved) options.downloadUrl = resolved
+    }
+    const embedCode = text('embed-code')
+    if (embedCode) options.embedCode = embedCode
+    const resizeCode = text('resize-code')
+    if (resizeCode) options.resizeCode = resizeCode
+    const customCss = urls('custom-css')
+    if (customCss.length) options.customCss = customCss
+    const customJs = urls('custom-js')
+    if (customJs.length) options.customJs = customJs
+    const activityId = text('activity-id') ?? sourceUrl
+    if (activityId) options.activityId = activityId
+    return Object.keys(options).length ? options : undefined
   }
 
   private frameAssets(): FrameAssets {
@@ -1142,7 +1214,8 @@ export class H5PPlayerElement extends HTMLElement {
       type: 'user-data',
       session,
       saveInterval: SAVE_INTERVAL_S,
-      entries
+      entries,
+      ...(this.userValue ? { user: this.userValue } : {})
     }
     this.iframe.contentWindow?.postMessage(preload, location.origin)
   }
@@ -1150,6 +1223,9 @@ export class H5PPlayerElement extends HTMLElement {
   /** The runtime saved a value, or deleted one. Kept here, or handed to the host, and told either way. */
   private onUserData(message: Extract<FromFrameMessage, { type: 'user-data' }>): void {
     if (!this.userDataSession || message.session !== this.userDataSession) return
+    // A frame booted for a named learner carries the shim without `resume`, and a content type
+    // may save through it; with `resume` off the host asked for no `userdata` events.
+    if (this.userDataMode === 'off') return
     const { pkgId, dataType, subContentId, data } = message
     const previous = this.previousStamp
     const revision =

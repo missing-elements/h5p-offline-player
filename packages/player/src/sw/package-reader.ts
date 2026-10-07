@@ -16,6 +16,7 @@ import { SourceReader } from '../shared/source-reader'
 import type { ByteRange } from '../shared/range'
 import type { ForwardEntry, ForwardIndexSnapshot } from '../shared/forward-index'
 import { indexFingerprint, revisionOf } from '../shared/revision'
+import { contentMetadata, type ContentMetadata } from '../shared/metadata'
 
 /**
  * The package reader: a zip central directory turned into a name → entry index, plus the decision
@@ -120,6 +121,11 @@ export class PackageReader {
   get title(): string | undefined {
     const { title } = this.manifest as { title?: unknown }
     return typeof title === 'string' ? title : undefined
+  }
+
+  /** `h5p.json`'s licence, authors and the rest, as the runtime's copyright dialog reads them; the same caution. */
+  get metadata(): ContentMetadata | undefined {
+    return contentMetadata(this.manifest)
   }
 
   static async open(

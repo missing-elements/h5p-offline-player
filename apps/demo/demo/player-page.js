@@ -187,6 +187,18 @@ const applyLibrarySource = () => {
  */
 let reload = null
 
+/**
+ * What the H5P embed button offers: Setup C, this site's `/embed` page around the package, with
+ * H5P's own `:w` and `:h` standing for the size the dialog lets the visitor pick. Set per load,
+ * since it names the package; a picked file has no URL to embed, and the button stays off.
+ */
+const embedCodeFor = (url) =>
+  `<iframe src="${location.origin}/embed?src=${encodeURIComponent(new URL(url, location.href).href)}" width=":w" height=":h" allow="fullscreen" style="border: 0"></iframe>`
+
+// The sizing script the embed dialog offers under "advanced": `/embed` speaks h5p.org's resizer
+// protocol upward, so h5p.org's own script sizes the frame on any page it is pasted into.
+player.setAttribute('resize-code', '<script src="https://h5p.org/sites/all/modules/h5p/library/js/h5p-resizer.js" charset="UTF-8"></script>')
+
 const loadUrl = (url) => {
   log.textContent = ''
   confirmBox.hidden = true
@@ -195,6 +207,8 @@ const loadUrl = (url) => {
   applyLibrarySource()
   write(`loading  ${url}`)
   startClock()
+  // The embed code is read with the load, like `libraries`, so it goes on before `src`.
+  player.setAttribute('embed-code', embedCodeFor(url))
   // Removed first so re-setting the same URL still counts as a change.
   player.removeAttribute('src')
   player.setAttribute('src', url)
@@ -209,6 +223,7 @@ const loadFile = (file) => {
   write(`loading  ${file.name} (${(file.size / 1024).toFixed(0)} kB, from disk)`)
   startClock()
   urlInput.value = ''
+  player.removeAttribute('embed-code')
   player.file = file
 }
 

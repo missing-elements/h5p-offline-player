@@ -251,7 +251,9 @@ class VirtualServer {
       assets: record.frameAssets,
       nonce,
       title: record.title,
-      allowOrigins: record.allowOrigins
+      metadata: record.metadata,
+      allowOrigins: record.allowOrigins,
+      frameOptions: record.frameOptions
     })
 
     return new Response(body, {
@@ -651,6 +653,7 @@ class VirtualServer {
         const partialHandle = await openSource(pkgId, record.source, file, { partial: true })
         const partial = await PackageReader.fromForwardIndex(pkgId, partialHandle, snapshot)
         if (record.libraryPkgId) partial.use(await this.reader(record.libraryPkgId))
+        await this.rememberManifest(record, partial)
         return partial
       }
     }
@@ -667,10 +670,22 @@ class VirtualServer {
       reader.assertLibrariesPresent()
     }
 
-    const { title } = reader
-    if (title && title !== record.title) await db.updatePackage(pkgId, { title })
-
+    await this.rememberManifest(record, reader)
     return reader
+  }
+
+  /**
+   * What the frame document shows of the manifest — the title, and the metadata behind the
+   * copyright dialog and the statements' object name — kept on the record, because the frame
+   * route reads the record and never opens a reader. A partial reader's manifest counts too,
+   * once `h5p.json` has arrived, so a host without `Range` gets it on the first boot.
+   */
+  private async rememberManifest(record: PackageRecord, reader: PackageReader): Promise<void> {
+    const patch: Partial<PackageRecord> = {}
+    const { title, metadata } = reader
+    if (title && title !== record.title) patch.title = title
+    if (metadata && JSON.stringify(metadata) !== JSON.stringify(record.metadata)) patch.metadata = metadata
+    if (Object.keys(patch).length) await db.updatePackage(record.pkgId, patch)
   }
 
   /**

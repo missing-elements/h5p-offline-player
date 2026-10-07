@@ -69,7 +69,8 @@ console warns when the two differ.
         allow="fullscreen" style="width: 100%; border: 0"></iframe>
 ```
 
-Add `&xapi=<your page's origin>` to receive statements by `postMessage`. The embedding page must be
+Add `&xapi=<your page's origin>` to receive statements by `postMessage`, and the element's display
+attributes as parameters (`&frame&copyright&export`, `&activity-id=<IRI>`, `&custom-css=<URL>`). The embedding page must be
 https (or localhost); the frame then registers its own worker, in Safari and on iOS too (measured on
 Safari 26.6.2 and iOS 26.6.1). Only for a site that truly cannot host a file, and say so to the
 user: their content then runs on a third party's origin, and storage is per embedding site.
@@ -78,6 +79,12 @@ user: their content then runs on a third party's origin, and storage is per embe
 only when the page sizes it itself, from CSS or from the `resize` event, because the height the
 element writes is an inline style and would beat the page's rule. Any CSS goes on the
 `h5p-player` tag itself; the inside is shadow DOM.
+
+**Coming from h5p-standalone:** its options carry over by name as attributes — `frame`,
+`copyright`, `export`, `icon`, `embed` (bare = on), `fullscreen="off"`, `download-url`,
+`embed-code`, `custom-css`, `custom-js`, `reporting`, `activity-id` — and `user` as a property.
+The guide's "Coming from h5p-standalone" table maps every option, including the ones the `.h5p`
+or the events replace. Formulas need `H5P.MathDisplay` in the package, not a `customJs` recipe.
 
 **Resume, only when asked for.** By default a reload starts the content over and nothing is
 stored. `resume` keeps the content's own saved state — the slide reached, the answers so far, the

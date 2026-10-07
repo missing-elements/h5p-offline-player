@@ -3,7 +3,9 @@
   "language": "en",
   "mainLibrary": "H5P.OfflineTest",
   "embedTypes": ["div"],
-  "license": "MIT",
+  "license": "CC BY",
+  "licenseVersion": "4.0",
+  "authors": [{ "name": "missing-elements", "role": "Author" }],
   "preloadedDependencies": [
     { "machineName": "H5P.OfflineTest", "majorVersion": 1, "minorVersion": 0 }
   ]

@@ -3,6 +3,8 @@
  * site that cannot host a file of its own and puts this page in an iframe.
  *
  *   /embed?src=<package url>[&libraries=hub|<url>][&preload=auto][&xapi=<parent origin>]
+ *         [&frame][&copyright][&export][&icon][&reporting][&fullscreen=off]
+ *         [&activity-id=<IRI>][&custom-css=<stylesheet url>]
  *
  * Upward it speaks H5P's own resizer protocol — the `hello` / `resize` exchange that h5p.org's
  * embed code and its `h5p-resizer.js` use — so a page that already resizes h5p.org iframes
@@ -143,10 +145,30 @@ const foreignHost = (value) => {
   }
 }
 
+/**
+ * The element's display options, by their attribute names, for the embedding page to ask for:
+ * `&frame&copyright&export` shows H5P's action bar with those buttons, `&fullscreen=off` takes
+ * that one away, `&activity-id=` names the statements' object and `&custom-css=` restyles the
+ * content to the embedding site's taste. Not `custom-js`, `embed-code` or `user`: a script is a
+ * capability on this origin that a link should not hand out, the embed is the embed, and a
+ * learner's name has no place in a URL.
+ */
+const applyOptions = () => {
+  for (const name of ['frame', 'copyright', 'export', 'icon', 'reporting']) {
+    if (params.has(name) && params.get(name) !== 'off') player.setAttribute(name, '')
+  }
+  if (params.get('fullscreen') === 'off') player.setAttribute('fullscreen', 'off')
+  for (const name of ['activity-id', 'custom-css']) {
+    const value = params.get(name)?.trim()
+    if (value) player.setAttribute(name, value)
+  }
+}
+
 const start = (value) => {
   const libraries = params.get('libraries')?.trim()
   if (libraries) player.setAttribute('libraries', libraries)
   if (params.get('preload') === 'auto') player.setAttribute('preload', 'auto')
+  applyOptions()
   player.setAttribute('src', value)
 }
 

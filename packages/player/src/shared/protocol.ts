@@ -1,3 +1,5 @@
+import type { ContentMetadata } from './metadata'
+
 /**
  * The shapes crossing the three contexts: the page (element), the Service Worker and the Jobs
  * worker. Everything here is structured-cloneable.
@@ -41,6 +43,12 @@ export type PackageStatus = 'registered' | 'indexed'
 export type LibrarySource = 'hub' | { url: string }
 
 /** The official H5P content-type server. It answers with CORS and honours `Range`. */
+// Deliberately the old host. H5P Group moved the hub to hub-api.h5p.org in 2026, and the demo's
+// build scripts fetch from there, but this URL is fetched from the browser: checked on
+// 2026-10-07, the new host (S3 behind CloudFront) sends no Access-Control-Allow-Origin header at
+// all, while this one answers `*` on every request, so a `libraries="hub"` load against the new
+// host fails as `no-cors` before a byte arrives. Move it when the new host answers CORS; until
+// then this one still serves the bundles, from an older catalogue.
 export const HUB_CONTENT_TYPE_URL = 'https://api.h5p.org/v1/content-types/'
 
 /** What an archive declared but does not contain. */
@@ -54,6 +62,44 @@ export interface MissingLibraries {
 }
 
 /** One row of the IndexedDB `packages` table. */
+/**
+ * What the host asked the frame to show and load, by h5p-standalone's own option names, so a
+ * reader of its documentation finds the same words here. `activityId` is its `xAPIObjectIRI`.
+ * Written into the package's record, so a restarted worker synthesizes the same frame.
+ */
+export interface FrameOptions {
+  /** The H5P action bar under the content, which the three buttons below live in. */
+  frame?: boolean
+  copyright?: boolean
+  /** The download button; shown only with `downloadUrl`. */
+  export?: boolean
+  icon?: boolean
+  /** The embed button; shown only with `embedCode`. */
+  embed?: boolean
+  fullScreen?: boolean
+  downloadUrl?: string
+  /** The code the embed button offers, `:w` and `:h` standing for the size. */
+  embedCode?: string
+  /** The script the embed dialog offers under "advanced", for sizing the embed; h5p-standalone's `resizeCode`. */
+  resizeCode?: string
+  /** Absolute URLs of stylesheets and scripts the frame loads after the runtime's own. */
+  customCss?: string[]
+  customJs?: string[]
+  /**
+   * The submit button, in content types that have one. The frame hands it to the top-level
+   * instance as `extras.isReportingEnabled`, since this core never does (see frame-boot).
+   */
+  reportingIsEnabled?: boolean
+  /** The id statements carry as their object. Default: the package URL, or the frame's own for a file. */
+  activityId?: string
+}
+
+/** The learner, as H5P names the xAPI actor; h5p-standalone's `user`. */
+export interface FrameUser {
+  name: string
+  mail: string
+}
+
 export interface PackageRecord {
   pkgId: string
   source: SourceDescriptor
@@ -71,8 +117,12 @@ export interface PackageRecord {
   frameAssets: FrameAssets
   /** Extra CSP host-sources the host page vouches for. See the `allow-origins` attribute. */
   allowOrigins?: string[]
+  /** The display and loading options the host set; absent from a record an older element wrote. */
+  frameOptions?: FrameOptions
   status: PackageStatus
   title?: string
+  /** `h5p.json`'s licence, authors and the rest, for the frame's copyright dialog; absent from an older row. */
+  metadata?: ContentMetadata
   lastPlayed: number
   /** The element version that wrote the row. Read by nothing today; a future migration keys on it. */
   version: string
@@ -317,4 +367,10 @@ export interface UserDataPreload {
   /** Seconds between saves; what H5P core calls `saveFreq`. */
   saveInterval: number
   entries: UserDataEntry[]
+  /**
+   * The learner the host named, for the statements' actor. It travels here, in a message to the
+   * frame, rather than in the package's record: a name and an address are not for the worker's
+   * database, and this reply is already the one thing the frame waits for before it boots.
+   */
+  user?: FrameUser
 }

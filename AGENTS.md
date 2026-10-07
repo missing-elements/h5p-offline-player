@@ -475,11 +475,78 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   live let a host that switched it mid-lesson drop the running frame's next save, or leave an
   early save on a host without `Range` unstamped. `resume.test.ts`
   drives all of it through the fixture content type, which counts presses of Complete.
+- **The hub has two hosts, and the element is on the old one on purpose.** H5P Group moved the
+  hub from `api.h5p.org` to `hub-api.h5p.org` in 2026, with a newer catalogue behind it (S3 and
+  CloudFront; `content-types/<name>` is a plain `GET` with no parameters, and `POST` to it is
+  gone). The demo's build scripts fetch from the new host, since Node needs no CORS. The
+  element's `HUB_CONTENT_TYPE_URL` does not, checked on 2026-10-07: the new host sends no
+  `Access-Control-Allow-Origin` header on any request, the old one answers `*` on every one, and
+  a browser fetch of the new host therefore fails as `no-cors` before a byte arrives. Do not
+  "update" that constant until `curl -sI -H 'Origin: https://example.com'
+  https://hub-api.h5p.org/v1/content-types/H5P.Accordion` shows the header. When it moves, a
+  learner's offline fallback bundle (keyed by URL) is downloaded once more under the new URL.
 - **A library bundle is downloaded, never range-read.** It is read exhaustively — every library's
   JSON, scripts and styles — so the element registers it as `chunked` even when the host honours
   `Range`. Against the real H5P hub this was the difference between 76 and 7 seconds.
 - **A 404 from the virtual server is load-bearing.** h5p-standalone probes `library.json` under
   both the versioned and unversioned folder names and picks whichever answers.
+- **h5p-standalone's options are attributes by the same names, and ride in the package record.**
+  Added on 2026-10-07 after the question "do we support `customJs` and `customCss`": `frame`,
+  `copyright`, `export`, `icon`, `embed`, `fullscreen`, `download-url`, `embed-code`, `resize-code`,
+  `custom-css`, `custom-js`, `reporting` and `activity-id` are read by `frameOptions()` when the
+  package is registered, stored as `PackageRecord.frameOptions`, and written by
+  `frame-document.ts` into the boot config after `sanitizeFrameOptions` has checked every type
+  and URL — a record is read back from IndexedDB, so it is held to a shape like the fonts are.
+  `frame-boot.ts` lays them over its defaults and keeps a button off when its target is missing:
+  export without a `downloadUrl`, embed without an `embedCode`. Two of them are more than
+  passthroughs. `activity-id` defaults to the package URL, because what the runtime would use
+  without it is the frame's own URL, which carries the package hash and so changed with every
+  re-upload — every statement's object id was unstable until then; a picked file keeps the frame
+  URL, having no other. And `user` is a property, not an attribute, and travels in the
+  `need-user-data` reply (the frame asks with `?user=1` as it does with `?resume=1`) rather than
+  in the record: a learner's name and address are not for the worker's database. A user set
+  makes H5P core take itself to be on a site: every user-data call then goes to
+  `H5PIntegration.ajax.contentUserData.replace(…)`, which does not exist here, and the first
+  boot with a user died on it — so the frame installs the `resume` shim whenever the element
+  answered, holding nothing without `resume`, and the element ignores a save that arrives with
+  `resume` off rather than raising a `userdata` event nobody asked for. The custom
+  stylesheets' and scripts' origins join the frame's `style-src` and `script-src` the way the
+  frame assets' do, since they are the host's choice like `assets-base`. `customJs` is there for
+  completeness, not for MathJax: formulas need `H5P.MathDisplay` in the package (see the setup
+  guide's Troubleshooting), and a host-side analytics script has the `xapi` events instead.
+  `tests/browser/options.test.ts` pins each against `H5PIntegration` and the statements the
+  fixture sends; `frame-document.test.ts` pins the sanitising and the CSP.
+  Two of them were found not to do what they said, the same day, by asking what each option
+  gives a host. **`copyright` showed every package as "Undisclosed"**: h5p-standalone takes the
+  content's metadata as an option and, given none, invents `{ title, license: 'U' }` whatever
+  `h5p.json` says — and the core then hides the copyright button for content with nothing to
+  show, so the demo's Big Buck Bunny video, CC BY in its manifest and its media, had no button.
+  The worker now reads the manifest's metadata (`shared/metadata.ts`, `PackageReader.metadata`),
+  keeps it on the record beside the title (`rememberManifest`, for the partial reader too) and
+  the frame hands it to h5p-standalone with the title; the core also puts the title into every
+  statement's `object.definition.name`, which was empty before. Two things that fix uncovered:
+  the frame called `H5P.init()` as soon as h5p-standalone resolved, but the core builds
+  `H5P.copyrightLicenses` in its own document-ready handler, which jQuery 1.x defers to `load`
+  when the document is still `interactive` — the frame's own scripts and styles delay `load` —
+  so a licensed package died on `copyrightLicenses['CC BY']`; the init is now queued on
+  `H5P.jQuery(document).ready`, behind that handler. And the core reads its licence table by the
+  manifest's string with no check, so a licence it has no name for (`MIT`, which h5p-cli writes)
+  dies on `.hasOwnProperty`; `KNOWN_LICENSES` in `metadata.ts` is the core's table, and any
+  other licence is left out of the metadata, which reads as "none given". **`reporting` set a
+  flag nothing read**: `H5PIntegration.reportingIsEnabled` is h5p.com's, whose core passes it to
+  the content as `extras.isReportingEnabled`; this core (and upstream h5p-php-library) calls
+  `newRunnable` with `{ standalone: true }` alone. Measured over the app's library pack on
+  2026-10-07: Question Set, Interactive Video, Course Presentation, Game Map and Question read
+  the extras only, Interactive Book and Documentation Tool read both. So with `reporting` the
+  frame wraps `H5P.newRunnable` before `init` and sets `isReportingEnabled` on the `standalone`
+  instance. The fixture content type keeps its `extras` so the test can read them. The demo
+  uses them: the player page sets `frame copyright export embed`, with the Setup C `/embed`
+  snippet for the loaded URL as the embed code (per load, since it names the package; off for a
+  picked file), the embed example asks for `&frame&copyright&export`, and the xAPI example sets
+  `user`. `/embed` passes `frame`, `copyright`, `export`, `icon`, `reporting`, `fullscreen=off`,
+  `activity-id` and `custom-css` through from its query string, and not `custom-js`,
+  `embed-code` or `user`: a script is a capability on this origin a link should not hand out,
+  and a learner's name has no place in a URL.
 - **The frame uses `embedType: 'div'`.** With the default `iframe` type, H5P core creates an inner
   `about:blank` frame, and whether that child inherits the Service Worker controller differs
   between browsers.
@@ -1151,7 +1218,8 @@ SPA-fallback trap described above cannot happen there.
   (`isInitialized`), not the snake case of its tables; `--open` once waited on the snake-case
   names and never returned.
 - **`/embed` is Setup C, and it is a page of its own.** The element alone, `auto-resize`, and
-  the query string for `src`, `libraries`, `preload` and `xapi`. Three decisions in
+  the query string for `src`, `libraries`, `preload`, `xapi` and the display options by their
+  attribute names (see the h5p-standalone options invariant for which, and why not `custom-js`). Three decisions in
   `demo/embed-page.js`: it speaks H5P's resizer protocol *upward* — `hello`, then `resize` with
   `scrollHeight` — so a site that already includes h5p.org's `h5p-resizer.js` for its h5p.org
   embeds resizes this frame with no code of its own; it relays xAPI only when `xapi=` names the

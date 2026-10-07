@@ -59,6 +59,8 @@
         archive reaches the player&rsquo;s data and not the embedding site&rsquo;s, and storage is
         partitioned per embedding site. The embedding page hears what it asks for: the frame&rsquo;s
         height always, and the xAPI statements when the address names the page&rsquo;s own origin.
+        The address also takes the element&rsquo;s display options: this example asks for H5P&rsquo;s
+        action bar with the download and rights-of-use buttons.
       </p>
 
       <iframe id="embed" title="H5P player" class="embed-frame" allow="fullscreen"></iframe>
@@ -66,6 +68,10 @@
       <h2>Markup</h2>
       <pre class="code">&lt;iframe src="%SITE_URL%/embed?src=%SITE_URL%/demo/content/quiz.h5p&amp;xapi=https://your-site.example"
         allow="fullscreen" style="width: 100%; border: 0"&gt;&lt;/iframe&gt;
+
+&lt;!-- Optional, as the element's attributes: &amp;libraries=hub  &amp;preload=auto
+     &amp;frame&amp;copyright&amp;export&amp;icon  &amp;fullscreen=off  &amp;reporting
+     &amp;activity-id=&lt;the IRI statements should name&gt;  &amp;custom-css=&lt;your stylesheet's URL&gt; --&gt;
 
 &lt;!-- Sizing: the page speaks H5P's resizer protocol upward, so the script
      h5p.org's own embed code includes resizes this frame as it is&hellip; --&gt;
@@ -109,7 +115,7 @@
       }
 
       // The embedding site names itself, so the relay goes to this origin and to no other.
-      frame.src = `/embed?src=${encodeURIComponent('/demo/content/quiz.h5p')}&xapi=${encodeURIComponent(location.origin)}`
+      frame.src = `/embed?src=${encodeURIComponent('/demo/content/quiz.h5p')}&xapi=${encodeURIComponent(location.origin)}&frame&copyright&export`
 
       addEventListener('message', ({ source, origin, data }) => {
         if (source !== frame.contentWindow || origin !== location.origin || !data) return

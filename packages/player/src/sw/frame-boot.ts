@@ -14,6 +14,27 @@ interface BootConfig {
   h5pJsonPath: string
   frameJs: string
   frameCss: string
+  /** `h5p.json`'s title, and its licence, authors and the rest, in the shape `H5P.buildMetadataCopyrights` reads. */
+  title?: string
+  metadata?: Record<string, unknown>
+  /** What the host asked for; the same shape as `FrameOptions` in shared/protocol.ts. */
+  options?: FrameOptions
+}
+
+interface FrameOptions {
+  frame?: boolean
+  copyright?: boolean
+  export?: boolean
+  icon?: boolean
+  embed?: boolean
+  fullScreen?: boolean
+  downloadUrl?: string
+  embedCode?: string
+  resizeCode?: string
+  customCss?: string[]
+  customJs?: string[]
+  reportingIsEnabled?: boolean
+  activityId?: string
 }
 
 interface UserDataEntry {
@@ -28,6 +49,7 @@ interface UserDataPreload {
   session: string
   saveInterval: number
   entries: UserDataEntry[]
+  user?: { name: string; mail: string }
 }
 
 type UserDataDone = (error?: unknown, data?: unknown) => void
@@ -39,6 +61,8 @@ declare global {
       externalDispatcher?: { on(name: string, handler: (event: { data?: { statement?: XapiStatement } }) => void): void }
       init?: () => void
       preventInit?: boolean
+      jQuery?: (target: Document) => { ready(handler: () => void): void }
+      newRunnable?: (library: unknown, contentId: unknown, attachTo?: unknown, skipResize?: boolean, extras?: RunnableExtras) => unknown
       getUserData?: (contentId: unknown, dataType: string, done: UserDataDone, subContentId?: unknown) => void
       setUserData?: (contentId: unknown, dataType: string, data: unknown, options?: { subContentId?: unknown; errorCallback?: (error: unknown) => void }) => void
       deleteUserData?: (contentId: unknown, dataType: string, subContentId?: unknown) => void
@@ -49,6 +73,12 @@ declare global {
 
 interface XapiStatement {
   verb?: { id?: string }
+}
+
+/** What `H5P.newRunnable` hands a content type's constructor as its third argument. */
+interface RunnableExtras {
+  standalone?: boolean
+  isReportingEnabled?: boolean
 }
 
 const config = JSON.parse(document.getElementById('h5p-boot-config')!.textContent!) as BootConfig
@@ -74,7 +104,7 @@ if (navigator.serviceWorker) {
 
 var root = document.getElementById('h5p-root')!;
 
-var options = {
+var options: Record<string, unknown> = {
   h5pJsonPath: config.h5pJsonPath,
   frameJs: config.frameJs,
   frameCss: config.frameCss,
@@ -99,12 +129,42 @@ var options = {
   preventH5PInit: false
 };
 
+// What the host asked for, by h5p-standalone's names; the defaults above stand where it said
+// nothing. A button whose target is missing stays off: an export button with no file to download
+// and an embed button with no code to offer would both be broken buttons.
+var custom: FrameOptions = config.options || {};
+var flags = ['frame', 'copyright', 'icon', 'fullScreen', 'reportingIsEnabled'] as const;
+for (var f = 0; f < flags.length; f++) {
+  if (typeof custom[flags[f]] === 'boolean') options[flags[f]] = custom[flags[f]];
+}
+if (custom.downloadUrl) {
+  options.downloadUrl = custom.downloadUrl;
+  if (typeof custom.export === 'boolean') options.export = custom.export;
+}
+if (custom.embedCode) {
+  options.embedCode = custom.embedCode;
+  if (custom.resizeCode) options.resizeCode = custom.resizeCode;
+  if (typeof custom.embed === 'boolean') options.embed = custom.embed;
+}
+if (custom.customCss && custom.customCss.length) options.customCss = custom.customCss;
+if (custom.customJs && custom.customJs.length) options.customJs = custom.customJs;
+if (custom.activityId) options.xAPIObjectIRI = custom.activityId;
+
+// The package's own account of itself. h5p-standalone takes `metadata` as an option and, given
+// none, makes one up — `{ title, license: 'U' }`, "Undisclosed" — for every package, whatever
+// its manifest says; the runtime then hides the copyright button, and names no activity in the
+// statements' object. The worker read it off `h5p.json`.
+if (config.title) options.title = config.title;
+if (config.metadata) options.metadata = config.metadata;
+
 /**
  * Whether the element opened this frame with `resume`. In the URL rather than in the boot
  * configuration so that an element older than the worker, which never sets it, boots as before,
  * and a worker older than the element, whose boot script does not know it, ignores it.
  */
 var resume = /[?&]resume=1(?:&|$)/.test(location.search);
+/** Whether the element has a learner to name; the same reply carries it, so the frame asks for it the same way. */
+var wantsUser = /[?&]user=1(?:&|$)/.test(location.search);
 
 /**
  * The saved state lives with the element, which either keeps it on this device or takes it from
@@ -153,7 +213,7 @@ var installUserData = function (preload: UserDataPreload) {
 
 /** Asks the element for the saved state and waits for it; nothing to wait for without `resume`. */
 var askForUserData = function (): Promise<UserDataPreload | null> {
-  if (!resume) return Promise.resolve(null);
+  if (!resume && !wantsUser) return Promise.resolve(null);
   return new Promise(function (resolve) {
     var onMessage = function (event: MessageEvent) {
       var data = event.data as UserDataPreload | undefined;
@@ -169,14 +229,45 @@ var askForUserData = function (): Promise<UserDataPreload | null> {
 
 askForUserData()
   .then(function (preload) {
-    if (preload) options.saveFreq = preload.saveInterval;
+    if (preload && preload.user) options.user = preload.user;
+    if (preload && resume) options.saveFreq = preload.saveInterval;
     return new window.H5PStandalone.H5P(root, options).then(function () {
+      // Whenever the element answered, not only under `resume`: with a user set, the runtime
+      // takes itself to be on a site and sends every user-data call to an AJAX URL that does not
+      // exist here, and the boot died on it. Without `resume` the shim holds nothing and saves
+      // reach an element that keeps none; the actor is what the user was for.
       if (preload) installUserData(preload);
+    });
+  })
+  .then(function (): Promise<void> {
+    // Behind the runtime's own ready handler, not merely after its scripts have loaded. The core
+    // registers that handler as it loads and the frame's document is often still `interactive`
+    // then — its own scripts and styles delay `load` — so jQuery runs it at `load`, which can
+    // fall after h5p-standalone resolves. The handler builds `H5P.copyrightLicenses`, which
+    // `H5P.init` reads for the copyright button of any package whose licence is not
+    // "Undisclosed"; initialised before it, such a package died on `copyrightLicenses['MIT']`.
+    // Queued behind it, the init below runs once it has; preventInit keeps it from initialising.
+    var H5P = window.H5P!;
+    return new Promise(function (resolve) {
+      if (H5P.jQuery) H5P.jQuery(document).ready(function () { resolve(); });
+      else resolve();
     });
   })
   .then(function () {
     // What h5p-standalone would have done itself but for `preventH5PInit`.
     var H5P = window.H5P!;
+    // `reportingIsEnabled` reaches a content type as `extras.isReportingEnabled` on h5p.com,
+    // whose core sets it; this core never does, and of the hub's content types only Interactive
+    // Book and Documentation Tool read the integration flag themselves. Question Set, Interactive
+    // Video, Course Presentation and Game Map read the extras, so the top-level instance — the
+    // one `H5P.init` creates, marked `standalone` — gets it here.
+    if (options.reportingIsEnabled && typeof H5P.newRunnable === 'function') {
+      var newRunnable = H5P.newRunnable;
+      H5P.newRunnable = function (library, contentId, attachTo, skipResize, extras) {
+        if (extras && extras.standalone) extras.isReportingEnabled = true;
+        return newRunnable.call(H5P, library, contentId, attachTo, skipResize, extras);
+      };
+    }
     if (typeof H5P.init === 'function') H5P.init();
     H5P.preventInit = false;
 

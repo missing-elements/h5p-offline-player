@@ -24,7 +24,10 @@ import { formatBytes, normalizeArchive } from '@missing-elements/h5p-normalize'
 
 configure({ useWebWorkers: false })
 
-const HUB = 'https://api.h5p.org/v1/content-types/'
+// The hub moved to this host in 2026 (the old one still answers for now, with an older catalogue).
+// The element's own `HUB_CONTENT_TYPE_URL` stays on the old host until this one sends CORS
+// headers, which it did not on 2026-10-07; a Node fetch needs none, so the build can move first.
+const HUB = 'https://hub-api.h5p.org/v1/content-types/'
 
 const rootDir = resolve(import.meta.dirname, '..')
 const sourceRoot = resolve(rootDir, 'demo', 'content', 'src')

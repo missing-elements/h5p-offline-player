@@ -1,5 +1,6 @@
 import bootSource from 'virtual:h5p-frame-boot'
-import type { FrameAssets, FrameFont } from '../shared/protocol'
+import type { FrameAssets, FrameFont, FrameOptions } from '../shared/protocol'
+import { contentMetadata, type ContentMetadata } from '../shared/metadata'
 
 /**
  * The frame document, generated per request. H5P core assumes it owns the page — it plants
@@ -66,11 +67,15 @@ export interface FrameDocumentOptions {
   assets: FrameAssets
   nonce: string
   title?: string
+  /** The manifest's metadata, for the runtime's copyright dialog and the statements' object name. */
+  metadata?: ContentMetadata
   /**
    * Extra origins the host vouches for, for content that reaches somewhere this package cannot
    * know about — a tenant's own Panopto or Echo360 host, an in-house CDN.
    */
   allowOrigins?: string[]
+  /** What the host asked the frame to show and load; see `FrameOptions`. */
+  frameOptions?: FrameOptions
 }
 
 function escapeHtml(value: string): string {
@@ -127,9 +132,57 @@ export function fontFaceRules(fonts: readonly FrameFont[] | undefined): string {
     .join('\n')
 }
 
+/**
+ * The host's own stylesheets and scripts, held to the shape the element writes: absolute http(s)
+ * URLs. They arrive through IndexedDB like the fonts, so anything else is dropped here rather than
+ * written into the document.
+ */
+function customUrls(urls: readonly string[] | undefined): string[] {
+  return (urls ?? []).flatMap((url) => {
+    try {
+      const parsed = new URL(url)
+      return parsed.protocol === 'https:' || parsed.protocol === 'http:' ? [parsed.href] : []
+    } catch {
+      return []
+    }
+  })
+}
+
+/** The origins of those URLs that are not the frame's own, for the directive each kind loads under. */
+function customOrigins(urls: readonly string[], base: string): string[] {
+  const own = new URL(base).origin
+  return [...new Set(urls.map((url) => new URL(url).origin).filter((origin) => origin !== own))]
+}
+
+/**
+ * The options as the boot script may see them: each value checked for its type, the URLs for
+ * their shape, so a record from an older or a tampered store cannot hand the runtime a surprise.
+ */
+function sanitizeFrameOptions(options: FrameOptions | undefined): FrameOptions | undefined {
+  if (!options) return undefined
+  const out: FrameOptions = {}
+  for (const flag of ['frame', 'copyright', 'export', 'icon', 'embed', 'fullScreen', 'reportingIsEnabled'] as const) {
+    if (typeof options[flag] === 'boolean') out[flag] = options[flag]
+  }
+  for (const text of ['embedCode', 'resizeCode', 'activityId'] as const) {
+    if (typeof options[text] === 'string' && options[text]) out[text] = options[text]
+  }
+  const [downloadUrl] = customUrls(options.downloadUrl ? [options.downloadUrl] : [])
+  if (downloadUrl) out.downloadUrl = downloadUrl
+  const customCss = customUrls(options.customCss)
+  if (customCss.length) out.customCss = customCss
+  const customJs = customUrls(options.customJs)
+  if (customJs.length) out.customJs = customJs
+  return Object.keys(out).length ? out : undefined
+}
+
 export function buildContentSecurityPolicy(options: FrameDocumentOptions): string {
   const origins = assetOrigins(options.assets, options.virtualRoot)
   const extra = sanitizeOrigins(options.allowOrigins)
+  // The host's own stylesheets and scripts are the host's choice, like `assets-base`: their
+  // origins join the directive they load under without an `allow-origins` entry.
+  const customCss = customOrigins(customUrls(options.frameOptions?.customCss), options.virtualRoot)
+  const customJs = customOrigins(customUrls(options.frameOptions?.customJs), options.virtualRoot)
   const directive = (name: string, ...sources: string[]) =>
     `${name} ${sources.filter(Boolean).join(' ')}`
 
@@ -139,6 +192,7 @@ export function buildContentSecurityPolicy(options: FrameDocumentOptions): strin
       'script-src',
       "'self'",
       ...origins,
+      ...customJs,
       ...RUNTIME_ALLOWLIST.script,
       ...extra,
       `'nonce-${options.nonce}'`,
@@ -158,6 +212,7 @@ export function buildContentSecurityPolicy(options: FrameDocumentOptions): strin
       'style-src',
       "'self'",
       ...origins,
+      ...customCss,
       ...RUNTIME_ALLOWLIST.style,
       ...extra,
       "'unsafe-inline'"
@@ -190,7 +245,11 @@ export function buildFrameDocument(options: FrameDocumentOptions): string {
     pkgId,
     h5pJsonPath: virtualRoot,
     frameJs: assets.frameJs,
-    frameCss: assets.frameCss
+    frameCss: assets.frameCss,
+    title: options.title,
+    // Checked again on the way out, as the options are: the record came back from IndexedDB.
+    metadata: contentMetadata(options.metadata),
+    options: sanitizeFrameOptions(options.frameOptions)
   }).replaceAll('<', '\\u003c')
 
   const fontFaces = fontFaceRules(assets.fonts)

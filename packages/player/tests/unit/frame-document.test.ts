@@ -275,3 +275,73 @@ describe('the boot script', () => {
     expect(html).toMatch(/parent\.postMessage\([^;]*location\.origin\)/)
   })
 })
+
+describe('the host’s frame options', () => {
+  const withOptions = (frameOptions: object) => buildFrameDocument({ ...options, frameOptions } as typeof options & { frameOptions: object })
+
+  it('ride into the boot config by h5p-standalone’s names', () => {
+    const html = withOptions({ frame: true, copyright: true, reportingIsEnabled: true, activityId: 'https://lms.example/a/1' })
+    expect(html).toContain('"options":{"frame":true,"copyright":true,"reportingIsEnabled":true,"activityId":"https://lms.example/a/1"}')
+  })
+
+  it('are left out entirely when the host set none, so an old frame boots as before', () => {
+    expect(buildFrameDocument(options)).not.toContain('"options"')
+  })
+
+  it('keep only values of the right type and URLs of the right shape', () => {
+    const html = withOptions({
+      frame: 'yes',
+      customCss: ['https://cdn.example/a.css', 'javascript:alert(1)', 'not a url'],
+      customJs: ['data:text/javascript,1', 'https://cdn.example/b.js'],
+      downloadUrl: 'ftp://host/file.h5p'
+    })
+    expect(html).toContain('"options":{"customCss":["https://cdn.example/a.css"],"customJs":["https://cdn.example/b.js"]}')
+    expect(html).not.toContain('frame":"yes')
+    // The boot script's own source names the key; the JSON block must not.
+    expect(html).not.toContain('"downloadUrl"')
+  })
+
+  it('let the custom stylesheets and scripts load from their own origins, as the frame assets do', () => {
+    const csp = buildContentSecurityPolicy({
+      ...options,
+      frameOptions: { customCss: ['https://styles.example/a.css'], customJs: ['https://scripts.example/b.js'] }
+    })
+    const [scriptSrc] = csp.split('; ').filter((part) => part.startsWith('script-src'))
+    const [styleSrc] = csp.split('; ').filter((part) => part.startsWith('style-src'))
+    expect(scriptSrc).toContain('https://scripts.example')
+    expect(scriptSrc).not.toContain('https://styles.example')
+    expect(styleSrc).toContain('https://styles.example')
+    expect(styleSrc).not.toContain('https://scripts.example')
+  })
+
+  it('cannot end the JSON block early through an embed code', () => {
+    const html = withOptions({ embed: true, embedCode: '</script><script>alert(1)</script>' })
+    expect(html).not.toContain('</script><script>alert(1)')
+    expect(html).toContain('\\u003c/script>')
+  })
+})
+
+describe('the package’s metadata', () => {
+  it('rides into the boot config with the title, for the copyright dialog and the statements’ object name', () => {
+    const html = buildFrameDocument({
+      ...options,
+      metadata: { title: 'A course', license: 'CC BY', licenseVersion: '4.0', authors: [{ name: 'Ada', role: 'Author' }] }
+    })
+    expect(html).toContain('"title":"A course"')
+    expect(html).toContain('"metadata":{"title":"A course","license":"CC BY","licenseVersion":"4.0","authors":[{"name":"Ada","role":"Author"}]}')
+  })
+
+  it('is held to its shape on the way out, since the record came back from storage', () => {
+    const html = buildFrameDocument({
+      ...options,
+      metadata: { license: 42, authors: ['Ada', { role: 'Author' }, { name: 'Bob' }], changes: [{ log: 'Fixed', date: 3 }] } as never
+    })
+    expect(html).toContain('"metadata":{"authors":[{"name":"Bob"}],"changes":[{"log":"Fixed"}]}')
+  })
+
+  it('is left out when the manifest said nothing, and so is a missing title', () => {
+    const html = buildFrameDocument({ ...options, title: undefined })
+    expect(html).not.toContain('"metadata"')
+    expect(html).not.toContain('"title"')
+  })
+})

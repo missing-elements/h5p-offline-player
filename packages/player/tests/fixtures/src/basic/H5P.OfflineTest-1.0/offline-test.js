@@ -14,6 +14,8 @@ H5P.OfflineTest = (function ($) {
     this.contentId = contentId;
     var previous = extras && extras.previousState;
     this.clicks = previous && typeof previous.clicks === 'number' ? previous.clicks : 0;
+    // Kept so a test can read what the runtime handed over, `isReportingEnabled` among it.
+    this.extras = extras || {};
   }
 
   OfflineTest.prototype = Object.create(H5P.EventDispatcher.prototype);

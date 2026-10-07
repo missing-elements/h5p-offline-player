@@ -65,7 +65,8 @@ is left alone.
 
 **C · An iframe, nothing on your site:** frame the hosted player page,
 `/embed?src=<package url>`. It sizes itself through H5P's own resizer protocol and relays xAPI
-statements to your page on request. See Setup C in the setup guide. A third-party site embedding it from GitHub Pages: [alekswebnet.github.io/h5p](https://alekswebnet.github.io/h5p/).
+statements to your page on request, and takes the display options below as query parameters
+(`&frame&copyright`, `&activity-id=…`). See Setup C in the setup guide. A third-party site embedding it from GitHub Pages: [alekswebnet.github.io/h5p](https://alekswebnet.github.io/h5p/).
 
 ```html
 <iframe src="https://h5p-offline-player.vercel.app/embed?src=https://h5p-offline-player.vercel.app/demo/content/quiz.h5p&xapi=https://your-site.example"
@@ -119,6 +120,15 @@ so the page can offer a file picker instead.
 | `assets-base` | attribute | The directory of the frame assets. Default: `frame-assets/` next to the element; may be a CDN |
 | `libraries` | attribute | `hub`, or the URL of a `.h5p` that carries library folders, for packages that ship without their own. Default: unset, and such packages are refused (see Guides) |
 | `allow-origins` | attribute | Extra origins the frame's CSP should permit, space separated (see Guides) |
+| `frame`, `copyright`, `export`, `icon`, `embed` | attribute | h5p-standalone's display options, by name: the bare attribute shows the H5P action bar, and the copyright, download, H5P-icon and embed buttons in it. The copyright dialog is built from the package's `h5p.json` and its media's own notices; `export` needs `download-url` or a package URL; `embed` needs `embed-code`. Default: all off |
+| `fullscreen` | attribute | `off` removes the fullscreen button. Default: on |
+| `download-url` | attribute | What the download button offers. Default: the package URL |
+| `embed-code` | attribute | What the embed button offers; `:w` and `:h` stand for the size |
+| `resize-code` | attribute | The sizing script the embed dialog offers under "advanced" with that code; h5p-standalone's `resizeCode` |
+| `custom-css`, `custom-js` | attribute | Stylesheets and scripts to load in the frame after the runtime's own, space separated; h5p-standalone's `customCss` and `customJs`. Their origins are allowed by the frame's CSP without `allow-origins` |
+| `reporting` | attribute | The bare attribute enables the submit button in content types that have one: Question Set, Interactive Video, Course Presentation, Interactive Book; h5p-standalone's `reportingIsEnabled` |
+| `activity-id` | attribute | The id statements carry as their object; h5p-standalone's `xAPIObjectIRI`. Default: the package URL, or the frame's own URL for a file |
+| `user` | property | The learner, `{ name, mail }`, as the actor of every statement; h5p-standalone's `user`. Read by the load, so set it before `src`. Default: H5P's anonymous actor |
 | `auto-resize` | attribute | `off` to size the element yourself, from CSS or the `resize` event. By default it follows the content's own height |
 | `preload` | attribute, property | `auto` pulls large deflated media before the content asks (see Guides). Default: `none` |
 | `resume` | attribute, property | `device` (or the bare attribute) keeps the content's saved state on this device and resumes from it; `host` hands it to the host page instead (see Guides). Default: `off` |

@@ -27,7 +27,9 @@ import { formatBytes } from '@missing-elements/h5p-normalize'
 
 configure({ useWebWorkers: false })
 
-const HUB = 'https://api.h5p.org/v1/content-types/'
+// The hub moved to this host in 2026; see the same constant in build-demo-content.mjs for why
+// the element itself has not followed yet.
+const HUB = 'https://hub-api.h5p.org/v1/content-types/'
 
 /** Every content type the hub serves, as of 2026-09-29. One that is gone is reported and skipped. */
 const CONTENT_TYPES = [
@@ -170,7 +172,8 @@ async function hubBundle(machineName) {
   const url = `${HUB}${encodeURIComponent(machineName)}`
   console.log(`[app-libraries] fetching ${url}`)
   const response = await fetch(url)
-  if (response.status === 404) return null
+  // Not a content type. The old host said 404; S3 behind the new one says 403 for a missing key.
+  if (response.status === 404 || response.status === 403) return null
   if (!response.ok || !response.body) throw new Error(`${url} returned ${response.status}`)
   await pipeline(Readable.fromWeb(/** @type {any} */ (response.body)), createWriteStream(path))
   return path

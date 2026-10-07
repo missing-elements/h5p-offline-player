@@ -24,7 +24,8 @@ the line to put in your version record at release.
 *When* a build was the current one is not something a statement or a package can say — a package
 cannot know it will be replaced. That is your version record: your LMS or LRS, or the document
 control you already run. An audit compares each statement's `revision` and timestamp against it.
-For a major change, publish at a new URL, which also gives the content a new xAPI activity id.
+For a major change, publish at a new URL, which also gives the content a new xAPI activity id — the
+package URL is the activity by default, unless the element's `activity-id` names one.
 
 On a host without `Range` the content can start before the download has finished, when the
 index is not known yet; statements sent in that window are held and released, in order, with
