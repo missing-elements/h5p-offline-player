@@ -3,16 +3,17 @@ import { cp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { relative, resolve, sep } from 'node:path'
 import { build as viteBuild } from 'vite'
 import { buildJobsWorker, buildServiceWorker, bundleHostWorker } from '../../../packages/player/scripts/lib/worker-bundle.mjs'
+import { DIST_DIR as RUNTIME_DIST } from '../../../packages/runtime/scripts/build.mjs'
 
 /**
  * Builds the hosted demo into `dist-demo/`: the pages through `vite.config.ts`, then the Service
- * Worker, the frame assets and the demo content placed where the pages and the element expect
- * them. The player's `sync:assets` has to have run first — `pnpm build:demo` runs it — so that
- * the vendored runtime exists in `packages/player/public/`.
+ * Worker, the runtime and the demo content placed where the pages and the element expect them.
+ * The player's `sync:assets` has to have run first — `pnpm build:demo` runs it — so that the
+ * runtime package is built: its `dist/` is copied to `frame-assets/` at the site root, beside
+ * `h5p-player.js`, which is where the element looks when told nothing.
  */
 
 const rootDir = resolve(import.meta.dirname, '..')
-const publicDir = resolve(rootDir, '..', '..', 'packages', 'player', 'public')
 const outDir = resolve(rootDir, 'dist-demo')
 
 // The origin the pages' absolute URLs use: given, or Vercel's production URL, or the preview.
@@ -28,7 +29,7 @@ await buildServiceWorker(resolve(outDir, 'h5p-sw.js'))
 await buildJobsWorker(resolve(outDir, 'h5p-jobs.js'))
 
 await rm(resolve(outDir, 'frame-assets'), { recursive: true, force: true })
-await cp(resolve(publicDir, 'frame-assets'), resolve(outDir, 'frame-assets'), { recursive: true })
+await cp(RUNTIME_DIST, resolve(outDir, 'frame-assets'), { recursive: true })
 
 // The demo content, and nothing from the player's `public/fixtures/`: those are the test suite's stub
 // archives, and they are not what a visitor should see.
@@ -43,11 +44,9 @@ for (const name of packages) {
 // manifest with `vite-ignore`, and the manifest names its icons relative to itself.
 await cp(resolve(rootDir, 'app', 'manifest.webmanifest'), resolve(outDir, 'app', 'manifest.webmanifest'))
 await cp(resolve(rootDir, 'app', 'icons'), resolve(outDir, 'app', 'icons'), { recursive: true })
-// The library pack the app attaches to packages without their own, and its licence notice;
-// both precached below with the rest of `app/`. Built by `pnpm demo:libraries`.
-for (const name of ['libraries.h5p', 'libraries.txt']) {
-  await cp(resolve(rootDir, 'app', name), resolve(outDir, 'app', name))
-}
+// The library pack the app attaches to packages without their own is not copied here: the page
+// imports it from `@missing-elements/h5p-libraries` as a URL, so Vite emits it under `assets/`
+// and the precache below picks it up from the manifest with everything else the page pulls in.
 
 /**
  * What the app needs to start with no network: the page, everything it pulls in — read from

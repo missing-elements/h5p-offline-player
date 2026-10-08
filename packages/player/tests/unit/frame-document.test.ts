@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   buildContentSecurityPolicy,
@@ -14,7 +16,8 @@ const options = {
   assets: {
     mainJs: 'https://site.example/frame-assets/main.bundle.js',
     frameJs: 'https://site.example/frame-assets/frame.bundle.js',
-    frameCss: 'https://site.example/frame-assets/h5p.css'
+    frameCss: 'https://site.example/frame-assets/h5p.css',
+    bootJs: 'https://site.example/frame-assets/frame-boot.js'
   },
   nonce: 'deadbeef',
   title: 'A course'
@@ -110,15 +113,6 @@ describe('buildFrameDocument', () => {
     expect(html).toContain(`"h5pJsonPath":"${options.virtualRoot}"`)
   })
 
-  it('uses div embedding, so there is no inner about:blank frame to inherit a controller', () => {
-    expect(html).toMatch(/embedType:\s*["']div["']/)
-  })
-
-  it('turns off every result endpoint, because there is no server to post to', () => {
-    expect(html).toMatch(/postUserStatistics:\s*(?:false|!1)/)
-    expect(html).toMatch(/saveFreq:\s*(?:false|!1)/)
-  })
-
   it('marks the document element the way H5P core styles expect', () => {
     // Seven rules in the core stylesheet are keyed on `html.h5p-iframe` — the base font, the
     // content's 16px/1.5 type, full width, the fullscreen heights. Div embedding puts that
@@ -137,17 +131,6 @@ describe('buildFrameDocument', () => {
     expect(hostile).toContain('&lt;script&gt;')
   })
 
-  it('reports a runtime script or stylesheet that fails to load, in the capture phase', () => {
-    // A failed resource fires 'error' on its own element and never bubbles, and the runtime's
-    // loader waits on 'load' alone: without a capturing listener a library the server could not
-    // deliver leaves the boot hanging with nothing reported anywhere.
-    expect(html).toMatch(/addEventListener\(["']error["'],\s*function\s*\([^)]*\)\s*\{[\s\S]*?\},\s*(?:true|!0)\)/)
-    expect(html).toContain('Could not load ')
-    // Only the tags the runtime injected itself, which it marks data-h5p: a content image that
-    // 404s is the content's business.
-    expect(html).toMatch(/\.dataset\.h5p\b/)
-  })
-
   it('pins a YouTube iframe over its box, which H5P.Video up to 1.6.66 fails to do itself', () => {
     // Its handler sets the style through a minified private field of the YouTube API object,
     // `player.g`, which YouTube renamed; the line throws and the iframe lands below its 16:9 box,
@@ -155,24 +138,22 @@ describe('buildFrameDocument', () => {
     expect(html).toMatch(/\.h5p-video\.h5p-youtube iframe \{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; \}/)
   })
 
-  it('ships the boot script minified, its configuration as a JSON block beside it', () => {
-    const script = /<script nonce="deadbeef">([\s\S]*?)<\/script>/.exec(html)![1]
-    // What every frame document carries: no comments, no indentation, one line.
-    expect(script).not.toMatch(/\/\/ |\/\* /)
-    expect(script.split('\n').length).toBeLessThan(4)
+  it('names the boot script beside the runtime, under the nonce, its configuration as a JSON block beside it', () => {
+    // The script is a file of the runtime package, not a string inlined here: it runs in the
+    // H5P document and calls the core's API, so it ships with the core under the core's licence,
+    // and this worker only names it.
+    expect(html).toContain('<script nonce="deadbeef" src="https://site.example/frame-assets/frame-boot.js"></script>')
+    expect(html).not.toMatch(/<script nonce="deadbeef">/)
     expect(html).toContain('<script type="application/json" id="h5p-boot-config">')
-    // A `<` in a value could otherwise end the JSON block early.
+    // A record written before the file existed names no `bootJs`; it is looked for beside `main.bundle.js`.
+    const older = buildFrameDocument({ ...options, assets: { ...options.assets, bootJs: undefined } })
+    expect(older).toContain('src="https://site.example/frame-assets/frame-boot.js"')
+    const explicit = buildFrameDocument({ ...options, assets: { ...options.assets, bootJs: 'https://cdn.example/x/boot-abc.js' } })
+    expect(explicit).toContain('src="https://cdn.example/x/boot-abc.js"')
+    expect(buildContentSecurityPolicy({ ...options, assets: { ...options.assets, bootJs: 'https://cdn.example/x/boot-abc.js' } })).toMatch(/script-src[^;]*https:\/\/cdn\.example/)
     expect(buildFrameDocument({ ...options, virtualRoot: 'https://site.example/</script>' })).not.toContain('</script>"')
   })
 
-  it('forwards xAPI to the parent, the only channel results have', () => {
-    expect(html).toMatch(/\.on\(["']xAPI["']/)
-    expect(html).toContain('parent.postMessage')
-  })
-
-  it('relays the worker job requests the Service Worker cannot run itself', () => {
-    expect(html).toMatch(/\.type\s*===?\s*["']need-job["']/)
-  })
 })
 
 describe('allow-origins', () => {
@@ -266,13 +247,49 @@ describe('createNonce', () => {
 })
 
 describe('the boot script', () => {
+  // Its source is in the runtime package (`packages/runtime/src/frame-boot.ts`), which has no
+  // test runner of its own; the invariant is pinned here, on the source text.
+  const source = readFileSync(resolve(import.meta.dirname, '../../../runtime/src/frame-boot.ts'), 'utf8')
+
   it('posts to its own origin, never to whatever page happens to frame the document', () => {
-    const html = buildFrameDocument(options)
-    expect(html).toContain('parent.postMessage(')
+    expect(source).toContain('parent.postMessage(')
     // Package ids are derived from the URL, so frame URLs are guessable; a wildcard here would
     // hand every xAPI statement to any third-party page that framed one.
-    expect(html).not.toMatch(/parent\.postMessage\([^;]*["']\*["']\)/)
-    expect(html).toMatch(/parent\.postMessage\([^;]*location\.origin\)/)
+    expect(source).not.toMatch(/parent\.postMessage\([^;]*["']\*["']\)/)
+    expect(source).toMatch(/parent\.postMessage\([^;]*location\.origin\)/)
+  })
+
+  it('reads its configuration from the JSON block the frame document writes', () => {
+    expect(source).toContain("document.getElementById('h5p-boot-config')")
+  })
+
+  it('uses div embedding, so there is no inner about:blank frame to inherit a controller', () => {
+    expect(source).toMatch(/embedType:\s*["']div["']/)
+  })
+
+  it('turns off every result endpoint, because there is no server to post to', () => {
+    expect(source).toMatch(/postUserStatistics:\s*false/)
+    expect(source).toMatch(/saveFreq:\s*false/)
+  })
+
+  it('reports a runtime script or stylesheet that fails to load, in the capture phase', () => {
+    // A failed resource fires 'error' on its own element and never bubbles, and the runtime's
+    // loader waits on 'load' alone: without a capturing listener a library the server could not
+    // deliver leaves the boot hanging with nothing reported anywhere.
+    expect(source).toMatch(/addEventListener\(["']error["'],\s*function\s*\([^)]*\)\s*\{[\s\S]*?\},\s*true\)/)
+    expect(source).toContain('Could not load ')
+    // Only the tags the runtime injected itself, which it marks data-h5p: a content image that
+    // 404s is the content's business.
+    expect(source).toMatch(/\.dataset\.h5p\b/)
+  })
+
+  it('forwards xAPI to the parent, the only channel results have', () => {
+    expect(source).toMatch(/\.on\(["']xAPI["']/)
+    expect(source).toContain('parent.postMessage')
+  })
+
+  it('relays the worker job requests the Service Worker cannot run itself', () => {
+    expect(source).toMatch(/\.type\s*===?\s*["']need-job["']/)
   })
 })
 

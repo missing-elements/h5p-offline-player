@@ -43,6 +43,34 @@ describe('supplying missing libraries', () => {
     )
   })
 
+  it('takes several sources in order, asking the next only for what the one before left absent', async () => {
+    // The first "bundle" is a content-only export, which supplies nothing; the second has the
+    // libraries. This is the shape the docs recommend — a bundle the site controls, then `hub` —
+    // with a fixture standing in for a bundle that lacks what the package needs.
+    const player = await playWithLibraries(FIXTURES.needsLibraries, `${FIXTURES.contentOnly} ${FIXTURES.libraries}`)
+
+    expect(player.state).toBe('ready')
+    expect(frameDocument(player).querySelector('.h5p-offline-test-message')?.textContent).toBe(
+      'Libraries came from somewhere else.'
+    )
+  })
+
+  it('passes over a source it cannot reach while another remains', async () => {
+    // The first source answers 404 and nothing was downloaded from it before; the second has the
+    // libraries. The point of naming a second source is to have it when the first is not there.
+    const player = await playWithLibraries(FIXTURES.needsLibraries, `${FIXTURES.missing} ${FIXTURES.libraries}`)
+    expect(player.state).toBe('ready')
+  })
+
+  it('reports the last source when none of them could supply the libraries', async () => {
+    const player = createPlayer({ libraries: `${FIXTURES.missing} ${FIXTURES.contentOnly}` })
+    const settled = waitForSettled(player)
+    player.setAttribute('src', FIXTURES.needsLibraries)
+
+    const result = await settled
+    expect(result).toMatchObject({ ok: false, detail: { code: 'bad-archive' } })
+  })
+
   it('still refuses it without a libraries attribute', async () => {
     const player = createPlayer()
     const settled = waitForSettled(player)

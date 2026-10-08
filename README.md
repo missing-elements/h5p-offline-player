@@ -25,45 +25,53 @@ Setting `src` loads, the way it does on `<video>`.
 ## Getting started
 
 The player is three things: the element (`h5p-player.js`, an ES module), a Service Worker script
-(`h5p-sw.js`) and a folder of H5P runtime files (`frame-assets/`). The worker is the one file that
-has to be served from **your own origin**, because browsers refuse to register a worker from
-anywhere else. The other two can come from your bundle or from a CDN.
+(`h5p-sw.js`) and the H5P runtime the frame loads, which is a package of its own,
+[`@missing-elements/h5p-runtime`](https://www.npmjs.com/package/@missing-elements/h5p-runtime),
+because it is GPL-3.0 while the player is MIT. The worker is the one file that has to be served
+from **your own origin**, because browsers refuse to register a worker from anywhere else. The
+other two can come from your bundle or from a CDN.
 
 **A · With a bundler** (Vite, webpack 5, Rollup):
 
 ```bash
 # With npm
-npm install @missing-elements/h5p-offline-player
+npm install @missing-elements/h5p-offline-player @missing-elements/h5p-runtime
 # With pnpm
-pnpm add @missing-elements/h5p-offline-player
+pnpm add @missing-elements/h5p-offline-player @missing-elements/h5p-runtime
 ```
 
 ```js
 import '@missing-elements/h5p-offline-player'
+import { runtime } from '@missing-elements/h5p-runtime'
+
+document.querySelector('h5p-player').runtime = runtime
 ```
 
 ```html
 <h5p-player src="https://host.example/course.h5p"></h5p-player>
 ```
 
-That is all: nothing to copy, nothing to configure. The element names every file it needs —
-the worker, the two runtime scripts, the stylesheet, each font — with its own
-`new URL('./file', import.meta.url)`, and each file stands alone, so these bundlers emit them as
-hashed assets and rewrite the URLs themselves, in the dev server as in the build. A bundler that
-does not follow that pattern, esbuild among them, leaves the files behind: then serve the
-package's `dist/` folder from a static path and set `sw` and `assets-base` to it.
+Nothing to copy: both packages name every file they need — the worker, the two runtime scripts,
+the boot script, the stylesheet, each font — with a static `new URL('./file', import.meta.url)`,
+and each file stands alone, so these bundlers emit them as hashed assets and rewrite the URLs
+themselves, in the dev server as in the build. The runtime is handed to the element as a
+property because it is a separate package: installing it is your choice, and the player's own
+package carries none of it. A bundler that does not follow that pattern, esbuild among them,
+leaves the files behind: then serve the player's `dist/` and the runtime's `dist/` from static
+paths and set `sw` and `assets-base` to them.
 
 **B · No build step:**
 
 ```html
 <script type="module"
   src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player/dist/h5p-player.js"></script>
-<h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js"></h5p-player>
+<h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js"
+            assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-runtime/dist/"></h5p-player>
 ```
 
-Copy `dist/h5p-sw.js` from the same CDN path onto your site and point `sw` at it. The frame assets
-keep loading from the CDN. At the root its scope is `/h5p/`, not `/`, so an existing site worker
-is left alone.
+Copy `dist/h5p-sw.js` from the same CDN path onto your site and point `sw` at it. The runtime
+loads from the CDN, from its own package. At the root the worker's scope is `/h5p/`, not `/`, so
+an existing site worker is left alone.
 
 **C · An iframe, nothing on your site:** frame the embed page of
 [Embed My](https://embed-my.org/), a separate service built on this player. It sizes itself
@@ -126,8 +134,9 @@ so the page can offer a file picker instead.
 | `file` | property | A `File` from a picker. Setting it loads with no network and wins over `src`; `null` empties the player |
 | `sw` | attribute | The worker's URL. Default: `h5p-sw.js` next to the element. Must be same-origin |
 | `jobs` | attribute | The background worker's URL, for a page whose CSP has no `blob:` in `worker-src`. Default: a `blob:` URL, then `h5p-jobs.js` next to the element. Must be same-origin |
-| `assets-base` | attribute | The directory of the frame assets. Default: `frame-assets/` next to the element; may be a CDN |
-| `libraries` | attribute | `hub`, or the URL of a `.h5p` that carries library folders, for packages that ship without their own. Default: unset, and such packages are refused (see Guides) |
+| `runtime` | property | The runtime's files, the `runtime` export of `@missing-elements/h5p-runtime`, for a bundler to emit. Set before `src`; wins over `assets-base` |
+| `assets-base` | attribute | The directory the runtime's `dist/` is served from. Default: `frame-assets/` next to the element; may be a CDN |
+| `libraries` | attribute | Where a package that ships without its libraries gets them: the URL of a `.h5p` that carries library folders, `hub` for the H5P hub, or several separated by spaces, tried in order — `libraries="/h5p/libraries.h5p hub"`. Default: unset, and such packages are refused (see Guides) |
 | `allow-origins` | attribute | Extra origins the frame's CSP should permit, space separated (see Guides) |
 | `frame`, `copyright`, `export`, `icon`, `embed` | attribute | h5p-standalone's display options, by name: the bare attribute shows the H5P action bar, and the copyright, download, H5P-icon and embed buttons in it. The copyright dialog is built from the package's `h5p.json` and its media's own notices; `export` needs `download-url` or a package URL; `embed` needs `embed-code`. Default: all off |
 | `fullscreen` | attribute | `off` removes the fullscreen button. Default: on |
@@ -182,8 +191,8 @@ is a working example of one.
 
 - [Video that cannot stream](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/streaming-video.md) — why a deflated, non-faststart mp4
   waits for its last byte, what `preload="auto"` changes, and the normalizer that fixes the package.
-- [Packages without libraries](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/libraries.md) — `libraries="hub"`, or a bundle you host;
-  a ready-made one with every hub content type is in the repository.
+- [Packages without libraries](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/libraries.md) — `@missing-elements/h5p-libraries`,
+  every hub content type's libraries in one bundle, with the hub as the fallback.
 - [What the frame is allowed to reach](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/frame-csp.md) — the generated CSP,
   `allow-origins`, and why `'unsafe-eval'` is in it.
 - [Which build a learner completed](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/revision.md) — the `revision` every statement
@@ -242,31 +251,37 @@ npx skills add missing-elements/h5p-offline-player --skill h5p-verify    # one
 
 ## Development
 
-A pnpm workspace: the player in `packages/player`, the normalizer in `packages/normalize`, the
-verifier in `packages/verify`, the cmi5 wiring in `packages/cmi5`, the demo site in `apps/demo`. The commands, the demo site and the
+A pnpm workspace: the player in `packages/player`, the H5P runtime it loads in
+`packages/runtime`, the library bundle in `packages/libraries`, the normalizer in
+`packages/normalize`, the verifier in `packages/verify`, the cmi5 wiring in `packages/cmi5`, the
+demo site in `apps/demo`. The commands, the demo site and the
 installable app are in [docs/development.md](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/development.md); working on the code
 starts with [AGENTS.md](https://github.com/missing-elements/h5p-offline-player/blob/main/AGENTS.md).
 
 ## Licence
 
-The player's own code — the element, the two workers, the scripts — is MIT, see
-[LICENSE](https://github.com/missing-elements/h5p-offline-player/blob/main/LICENSE). The package as published is not MIT alone, and its `license` field says so:
-`(MIT AND GPL-3.0-only)`.
+The player — the element, the workers, the scripts, everything in
+`@missing-elements/h5p-offline-player` — is MIT, see
+[LICENSE](https://github.com/missing-elements/h5p-offline-player/blob/main/LICENSE). Each of its
+files opens with a one-line notice, since MIT asks for its notice to accompany copies and a
+bundler emits each file alone. The two Service Worker scripts bundle
+[zip.js](https://github.com/gildas-lormeau/zip.js) (BSD-3-Clause) and open with its licence in
+full; [NOTICE.md](https://github.com/missing-elements/h5p-offline-player/blob/main/packages/player/NOTICE.md)
+reproduces it.
 
-- `dist/frame-assets/` is the H5P core runtime from
-  [h5p-standalone](https://github.com/tunapanda/h5p-standalone): the scripts' code unmodified, the
-  stylesheet rebuilt so that it stands alone. h5p-standalone's own code is
-  MIT, but its `frame.bundle.js`, stylesheet and icon fonts come from
-  [h5p-php-library](https://github.com/h5p/h5p-php-library), which is **GPL-3.0**; upstream
-  confirms it in [issue #188](https://github.com/tunapanda/h5p-standalone/issues/188) while
-  its npm metadata still says MIT. The directory carries its own `LICENSE.txt` and `NOTICE.txt`.
-  Keep them with it when you copy or serve it: a site serving these files is distributing GPL
-  code. A bundler emits the runtime files without the text files beside them, so
-  `frame.bundle.js`, `main.bundle.js` and `h5p.css` each open with a notice comment naming
-  their licences and the corresponding source. Whether the copyleft reaches the page around the player is a legal question, not one
-  this README answers.
-- The two Service Worker scripts in `dist/`, `h5p-sw.js` and `h5p-sw-mount.js`, bundle [zip.js](https://github.com/gildas-lormeau/zip.js)
-  (BSD-3-Clause). Both open with its licence in full, so the notice travels with them when a
-  bundler emits them on their own, and [NOTICE.md](https://github.com/missing-elements/h5p-offline-player/blob/main/packages/player/NOTICE.md) reproduces it.
-  Each of the player's own files opens with a one-line notice of its own: MIT asks for its notice
-  to accompany copies, and a bundler emits each file alone.
+The H5P runtime the frame loads is not MIT and is not in that package. It comes from
+[h5p-php-library](https://github.com/h5p/h5p-php-library) by way of
+[h5p-standalone](https://github.com/tunapanda/h5p-standalone), and it is **GPL-3.0** — upstream
+confirms it in [issue #188](https://github.com/tunapanda/h5p-standalone/issues/188) while its npm
+metadata still says MIT. So it is published on its own, as
+[`@missing-elements/h5p-runtime`](https://www.npmjs.com/package/@missing-elements/h5p-runtime)
+under the GPL, together with the small script that boots it inside the frame, which is the one
+piece of this project's code that runs in the H5P document and calls the core's API. A site
+installs that package, serves it from a CDN or copies its `dist/` next to the element; the
+element names its files and exchanges HTTP and `postMessage` with the document they run in, and
+nothing else. What serving the runtime entails under the GPL — keeping the notices, the
+corresponding source — is in that package's
+[NOTICE.md](https://github.com/missing-elements/h5p-offline-player/blob/main/packages/runtime/NOTICE.md).
+Whether the copyleft reaches the page around the player is a legal question this README does
+not answer; the split is what makes the answer defensible, since the player links against
+nothing of the runtime's.

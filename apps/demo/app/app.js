@@ -7,7 +7,12 @@
  * looked before then would register its own worker at `/h5p/`, which plays online and not off.
  */
 
+import librariesPack from '@missing-elements/h5p-libraries/libraries.h5p?url'
+import librariesNotice from '@missing-elements/h5p-libraries/libraries.txt?url'
+
 const player = document.querySelector('h5p-player')
+// The pack's licence list, emitted beside it: the page links it, so a reader finds the notices of what the app carries.
+document.querySelector('#libraries-notice').href = librariesNotice
 const fileInput = document.querySelector('#file')
 const installButton = document.querySelector('#install')
 const startOver = document.querySelector('#start-over')
@@ -105,11 +110,12 @@ function offerNewVersion() {
 
 /**
  * Where a package missing its own libraries gets them: the pack the app carries — every content
- * type's runtime libraries from the H5P hub, precached with the app — so a stripped export plays
- * offline. The hub itself only for what the pack lacks: a newer minor than it was built with, or
- * a content type added since, and only with the viewer's consent.
+ * type's runtime libraries from the H5P hub, `@missing-elements/h5p-libraries`, emitted by Vite
+ * under `assets/` and precached with the app — so a stripped export plays offline. The hub
+ * itself only for what the pack lacks: a newer minor than it was built with, or a content type
+ * added since, and only with the viewer's consent.
  */
-const PACK = '/app/libraries.h5p'
+const PACK = librariesPack
 
 /** Replays the last open with a library source, for the retry against the hub. */
 let reopen = null

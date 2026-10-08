@@ -1,8 +1,8 @@
 {
   "name": "@missing-elements/h5p-offline-player",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Browser-only H5P player web component. Plays arbitrary .h5p archives from a URL or a local file, with no server-side extraction.",
-  "license": "(MIT AND GPL-3.0-only)",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/missing-elements/h5p-offline-player.git",
@@ -33,8 +33,7 @@
   "files": [
     "dist",
     "types",
-    "NOTICE.md",
-    "licenses"
+    "NOTICE.md"
   ],
   "keywords": [
     "h5p",
@@ -52,7 +51,7 @@
     "sync:assets": "node scripts/sync-h5p-assets.mjs",
     "fixtures": "node scripts/build-fixtures.mjs",
     "prepare:dev": "pnpm sync:assets && pnpm fixtures",
-    "build": "pnpm sync:assets && node -e \"for (const p of ['types', 'tsconfig.tsbuildinfo', 'node_modules/.tsc-node']) require('node:fs').rmSync(p, { recursive: true, force: true })\" && tsc -b && vite build && node scripts/build-workers.mjs && node scripts/copy-frame-assets.mjs",
+    "build": "pnpm sync:assets && node -e \"for (const p of ['types', 'tsconfig.tsbuildinfo', 'node_modules/.tsc-node']) require('node:fs').rmSync(p, { recursive: true, force: true })\" && tsc -b && vite build && node scripts/build-workers.mjs",
     "test": "pnpm prepare:dev && vitest run",
     "test:unit": "vitest run --project unit",
     "test:browser": "pnpm prepare:dev && vitest run --project browser --project browser-emulated",
@@ -62,10 +61,18 @@
     "prepublishOnly": "pnpm typecheck && pnpm test:unit && pnpm build"
   },
   "dependencies": {
-    "@zip.js/zip.js": "^2.23.0",
-    "h5p-standalone": "^3.8.2"
+    "@zip.js/zip.js": "^2.23.0"
+  },
+  "peerDependencies": {
+    "@missing-elements/h5p-runtime": "^0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@missing-elements/h5p-runtime": {
+      "optional": true
+    }
   },
   "devDependencies": {
+    "@missing-elements/h5p-runtime": "workspace:*",
     "@types/node": "^26.6.4",
     "@vitest/browser": "^5.0.3",
     "@vitest/browser-playwright": "^5.0.3",

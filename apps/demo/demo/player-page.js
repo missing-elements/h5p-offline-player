@@ -4,6 +4,8 @@
  * no URL field, no file picker, no progress bar and no "open in another browser" banner.
  */
 
+import librariesPack from '@missing-elements/h5p-libraries/libraries.h5p?url'
+
 const player = document.querySelector('h5p-player')
 const form = document.querySelector('#load-form')
 const urlInput = document.querySelector('#url')
@@ -166,11 +168,12 @@ player.addEventListener('resize', (event) => {
 })
 
 /**
- * The same bundle the installable app carries: every H5P hub content type's runtime libraries.
- * Fetched only once a visitor picks it for a package that lacks its own — the player page stays
- * light, and nothing is downloaded for packages that carry their libraries.
+ * The same bundle the installable app carries: every H5P hub content type's runtime libraries,
+ * `@missing-elements/h5p-libraries`, emitted by Vite as an asset. Fetched only once a visitor
+ * picks it for a package that lacks its own — the player page stays light, and nothing is
+ * downloaded for packages that carry their libraries.
  */
-const BUNDLE = '/app/libraries.h5p'
+const BUNDLE = librariesPack
 
 /** Where missing libraries come from: `null` until the visitor has chosen, then for every load. */
 let librarySource = null

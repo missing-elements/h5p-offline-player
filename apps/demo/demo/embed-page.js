@@ -2,7 +2,7 @@
  * The embeddable player page, `/embed`: the element alone, driven by the query string, for a
  * site that cannot host a file of its own and puts this page in an iframe.
  *
- *   /embed?src=<package url>[&libraries=hub|<url>][&preload=auto][&xapi=<parent origin>]
+ *   /embed?src=<package url>[&libraries=pack|hub|<url>][&preload=auto][&xapi=<parent origin>]
  *         [&frame][&copyright][&export][&icon][&reporting][&fullscreen=off]
  *         [&activity-id=<IRI>][&custom-css=<stylesheet url>]
  *
@@ -11,6 +11,8 @@
  * resizes this one without a change, and any other page gets `/resizer.js` from this origin. xAPI statements are relayed to the parent only when `xapi=`
  * names the parent's origin, and they are posted to that origin only.
  */
+
+import librariesPack from '@missing-elements/h5p-libraries/libraries.h5p?url'
 
 const params = new URLSearchParams(location.search)
 const player = document.querySelector('h5p-player')
@@ -165,8 +167,11 @@ const applyOptions = () => {
 }
 
 const start = (value) => {
+  // `pack` is this site's own copy of `@missing-elements/h5p-libraries`, every hub content type's
+  // libraries, with the hub as the fallback for what it lacks: an export without its libraries
+  // then plays with no request to h5p.org in the common case, and the snippet names no third party.
   const libraries = params.get('libraries')?.trim()
-  if (libraries) player.setAttribute('libraries', libraries)
+  if (libraries) player.setAttribute('libraries', libraries === 'pack' ? `${librariesPack} hub` : libraries)
   if (params.get('preload') === 'auto') player.setAttribute('preload', 'auto')
   applyOptions()
   player.setAttribute('src', value)

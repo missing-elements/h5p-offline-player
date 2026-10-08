@@ -11,7 +11,7 @@
     "demo:og": "node scripts/build-og-image.mjs",
     "demo:icons": "node scripts/build-app-icons.mjs",
     "typecheck": "tsc -p tsconfig.json",
-    "demo:libraries": "node scripts/build-app-libraries.mjs",
+    "libraries": "node scripts/build-libraries.mjs",
     "cmi5:catapult": "node scripts/cmi5-catapult.mjs"
   },
   "dependencies": {
@@ -19,6 +19,7 @@
     "@missing-elements/h5p-offline-player": "workspace:*"
   },
   "devDependencies": {
+    "@missing-elements/h5p-libraries": "workspace:*",
     "@missing-elements/h5p-normalize": "workspace:*",
     "@types/node": "^26.6.4",
     "@zip.js/zip.js": "^2.23.0",

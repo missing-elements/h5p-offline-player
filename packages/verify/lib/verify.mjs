@@ -200,23 +200,33 @@ function dedupe(messages) {
   return [...counts].map(([message, count]) => (count > 1 ? `${message} (×${count})` : message))
 }
 
-/** The player's `dist/`, from the installed package; the workspace needs it built first. */
+/**
+ * The player's `dist/` and the runtime's, from the installed packages; the workspace needs both
+ * built first. The runtime is a package of its own (`@missing-elements/h5p-runtime`, GPL) and is
+ * served at `/frame-assets/`, which is where the element looks beside its own script.
+ */
 async function playerDist() {
   const element = require.resolve('@missing-elements/h5p-offline-player')
   const dist = dirname(element)
-  if (!existsSync(join(dist, 'h5p-sw.js')) || !existsSync(join(dist, 'frame-assets', 'h5p.css'))) {
+  if (!existsSync(join(dist, 'h5p-sw.js'))) {
     throw new VerifyError(`The player is not built at ${dist} — run \`pnpm build\` in the workspace, or reinstall the package`)
   }
-  return dist
+  const runtime = join(dirname(require.resolve('@missing-elements/h5p-runtime/package.json')), 'dist')
+  if (!existsSync(join(runtime, 'h5p.css')) || !existsSync(join(runtime, 'frame-boot.js'))) {
+    throw new VerifyError(`The H5P runtime is not built at ${runtime} — run \`pnpm build\` in the workspace, or reinstall @missing-elements/h5p-runtime`)
+  }
+  return { dist, runtime }
 }
 
-/** A static server for the player and the test page, on a free localhost port. */
-function serve(dist) {
+/** A static server for the player, the runtime and the test page, on a free localhost port. */
+function serve({ dist, runtime }) {
   const page = join(here, 'page.html')
+  const ASSETS = '/frame-assets/'
   const server = createServer(async (request, response) => {
     const path = decodeURIComponent(new URL(request.url ?? '/', 'http://localhost').pathname)
-    const target = path === '/' ? page : join(dist, normalize(path).replace(/^(\.\.[/\\])+/, ''))
-    if (target !== page && !target.startsWith(dist)) {
+    const safe = (root, rest) => join(root, normalize(rest).replace(/^(\.\.[/\\])+/, ''))
+    const target = path === '/' ? page : path.startsWith(ASSETS) ? safe(runtime, path.slice(ASSETS.length)) : safe(dist, path)
+    if (target !== page && !target.startsWith(dist) && !target.startsWith(runtime)) {
       response.writeHead(403).end()
       return
     }

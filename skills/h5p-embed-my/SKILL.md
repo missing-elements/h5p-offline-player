@@ -33,7 +33,9 @@ the user controls the headers.
 
 An export from h5p.com or h5p.org usually contains only `content/` and no libraries. Such a
 package needs a library source: add `&libraries=hub` to the address for the H5P hub, or
-`&libraries=<url>` for a bundle the user hosts.
+`&libraries=<url>` for a bundle — `@missing-elements/h5p-libraries` on jsDelivr
+(`https://cdn.jsdelivr.net/npm/@missing-elements/h5p-libraries@0/libraries.h5p`, every hub
+content type's libraries, encoded as a value) or one the user hosts.
 
 ## 2. Write the snippet
 

@@ -1,0 +1,58 @@
+{
+  "name": "@missing-elements/h5p-runtime",
+  "version": "0.1.0",
+  "description": "The H5P core runtime and the frame boot script that @missing-elements/h5p-offline-player loads inside its frame. GPL-3.0, kept apart from the MIT player on purpose.",
+  "license": "GPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/missing-elements/h5p-offline-player.git",
+    "directory": "packages/runtime"
+  },
+  "homepage": "https://github.com/missing-elements/h5p-offline-player/tree/main/packages/runtime#readme",
+  "bugs": {
+    "url": "https://github.com/missing-elements/h5p-offline-player/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "index.js",
+    "index.d.ts",
+    "NOTICE.md"
+  ],
+  "keywords": [
+    "h5p",
+    "h5p-standalone",
+    "h5p-offline-player",
+    "runtime"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "pnpm typecheck",
+    "test:unit": "pnpm typecheck",
+    "prepublishOnly": "pnpm typecheck && pnpm build"
+  },
+  "dependencies": {
+    "h5p-standalone": "^3.8.2"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

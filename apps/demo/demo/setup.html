@@ -78,9 +78,9 @@
             <td>Browsers refuse to register a worker from another origin. It is the one file that cannot come from a CDN.</td>
           </tr>
           <tr>
-            <td><code>frame-assets/</code><br /><span>the H5P runtime</span></td>
-            <td>Next to the element by default, or a CDN via <code>assets-base</code></td>
-            <td>Plain static files, loaded into the frame the worker generates.</td>
+            <td><code>@missing-elements/h5p-runtime</code><br /><span>the H5P runtime</span></td>
+            <td>Your bundle (the <code>runtime</code> property), a CDN via <code>assets-base</code>, or <code>frame-assets/</code> next to the element</td>
+            <td>Plain static files, loaded into the frame the worker generates. A package of its own because it is GPL-3.0; the player is MIT.</td>
           </tr>
         </tbody>
       </table>
@@ -92,23 +92,26 @@
 
       <h2>A · With a bundler</h2>
       <p>Vite, webpack 5 and Rollup. Install it, import it once, use the element.</p>
-      <pre class="code">npm i @missing-elements/h5p-offline-player</pre>
-      <pre class="code">import '@missing-elements/h5p-offline-player'</pre>
+      <pre class="code">npm i @missing-elements/h5p-offline-player @missing-elements/h5p-runtime</pre>
+      <pre class="code">import '@missing-elements/h5p-offline-player'
+import { runtime } from '@missing-elements/h5p-runtime'
+
+document.querySelector('h5p-player').runtime = runtime</pre>
       <pre class="code">&lt;h5p-player src="https://host.example/course.h5p"&gt;&lt;/h5p-player&gt;</pre>
       <p>
-        That is the whole setup. The element finds its worker and its runtime files with
-        <code>new URL('./h5p-sw.js', import.meta.url)</code>, which these bundlers recognise: they
-        copy the files into the build and rewrite the URLs. Already have a Service Worker on the
-        site? Nothing changes. Each registration has its own scope, and the two never see each
-        other's requests.
+        That is the whole setup. Both packages name their files with
+        <code>new URL('./file', import.meta.url)</code>, which these bundlers recognise: they copy
+        the files into the build and rewrite the URLs, and the runtime's export hands the element
+        the addresses it ended up with. Already have a Service Worker on the site? Nothing changes.
+        Each registration has its own scope, and the two never see each other's requests.
       </p>
       <p>
         A bundler that does not follow that pattern, esbuild among them, leaves the files behind.
-        Then serve the package's <code>dist/</code> folder from a static path and say where it is:
+        Then serve both packages' <code>dist/</code> folders from static paths and say where they are:
       </p>
       <pre class="code">&lt;h5p-player src="…"
             sw="/vendor/h5p-player/h5p-sw.js"
-            assets-base="/vendor/h5p-player/frame-assets/"&gt;&lt;/h5p-player&gt;</pre>
+            assets-base="/vendor/h5p-runtime/"&gt;&lt;/h5p-player&gt;</pre>
 
       <h2>B · No build step</h2>
       <p>
@@ -117,10 +120,12 @@
       <pre class="code">&lt;script type="module"
   src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player/dist/h5p-player.js"&gt;&lt;/script&gt;
 
-&lt;h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js"&gt;&lt;/h5p-player&gt;</pre>
+&lt;h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js"
+            assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-runtime/dist/"&gt;&lt;/h5p-player&gt;</pre>
       <p>
         Download <code>dist/h5p-sw.js</code> from the same CDN path, place it on your site, and point
-        <code>sw</code> at it. The frame assets keep loading from the CDN. Putting the worker at the
+        <code>sw</code> at it. The runtime loads from the CDN, from its own package, which
+        <code>assets-base</code> names. Putting the worker at the
         root is safe: its scope becomes <code>/h5p/</code>, not <code>/</code>. The element warns in
         the console when the worker and the element are different versions, so update both together.
       </p>
@@ -149,7 +154,7 @@
         <li><code>h5p-sw.js</code> is on the page's own origin. With a bundler that is automatic.</li>
         <li>The package's host sends CORS headers, or no browser can read the file. Without them the element reports <code>error: no-cors</code>, and your page can offer a file picker instead.</li>
         <li><code>Range</code> support on the host is optional. With it a 300 MB package starts after a few kilobytes; without it the archive is downloaded once and played from the browser's cache, booting as soon as its libraries have arrived.</li>
-        <li>Licences: the player's code is MIT. <code>frame-assets/</code> is the H5P core runtime, which is GPL-3.0, and carries its own <code>LICENSE.txt</code> and <code>NOTICE.txt</code>; keep them with it when you copy or serve it. The package's <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/packages/player/NOTICE.md" rel="noopener">NOTICE.md</a> has the full account.</li>
+        <li>Licences: the player is MIT. The H5P core runtime it loads is GPL-3.0, which is why it is a package of its own, <code>@missing-elements/h5p-runtime</code>, whose <code>dist/</code> carries its <code>LICENSE.txt</code> and <code>NOTICE.txt</code>; keep them with it when you copy or serve it. The runtime's <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/packages/runtime/NOTICE.md" rel="noopener">NOTICE.md</a> has the full account.</li>
       </ul>
 
       <h2>Listening to it</h2>
@@ -178,8 +183,9 @@ input.addEventListener('change', () =&gt; { player.file = input.files[0] })</pre
           <tr><td><code>src</code></td><td>The package URL. Setting it loads; setting it again aborts and reloads.</td></tr>
           <tr><td><code>auto-resize</code></td><td>The element follows the content's own height by default. <code>off</code> leaves the height to you, from CSS or the <code>resize</code> event; the height the element writes is an inline style, which would beat your rule.</td></tr>
           <tr><td><code>sw</code></td><td>Where the worker script is. Default: <code>h5p-sw.js</code> next to the element. Must be same-origin.</td></tr>
-          <tr><td><code>assets-base</code></td><td>The folder of the frame assets. Default: <code>frame-assets/</code> next to the element. May be a CDN.</td></tr>
-          <tr><td><code>libraries</code></td><td><code>hub</code>, or the URL of a <code>.h5p</code> that carries library folders, for exports that ship without their own. Downloaded once and cached; when the URL cannot be reached later, the earlier copy is used. A ready-made bundle of every hub content type's libraries is <a href="https://github.com/missing-elements/h5p-offline-player/raw/main/apps/demo/app/libraries.h5p" rel="noopener"><code>libraries.h5p</code></a> in the repository, ~10 MB, with their licences in <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/apps/demo/app/libraries.txt" rel="noopener"><code>libraries.txt</code></a>; serve both from your own site. Default: such packages are refused, with the missing libraries named.</td></tr>
+          <tr><td><code>runtime</code></td><td>A property: the <code>runtime</code> export of <code>@missing-elements/h5p-runtime</code>, for a bundler to emit the files. Set it before <code>src</code>; it wins over <code>assets-base</code>.</td></tr>
+          <tr><td><code>assets-base</code></td><td>The folder the runtime's <code>dist/</code> is served from. Default: <code>frame-assets/</code> next to the element. May be a CDN.</td></tr>
+          <tr><td><code>libraries</code></td><td>Where an export that ships without its libraries gets them: the URL of a <code>.h5p</code> that carries library folders, <code>hub</code> for the H5P hub, or several separated by spaces, tried in order. <a href="https://www.npmjs.com/package/@missing-elements/h5p-libraries" rel="noopener"><code>@missing-elements/h5p-libraries</code></a> is every hub content type's libraries in one bundle, ~10 MB, with their licences in its <code>libraries.txt</code>: <code>libraries="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-libraries@0/libraries.h5p hub"</code> asks the hub only for what it lacks. Downloaded once and cached; when a URL cannot be reached later, the earlier copy is used. Default: such packages are refused, with the missing libraries named.</td></tr>
           <tr><td><code>preload</code></td><td><code>auto</code> pulls large compressed media once the content is up, instead of when the learner presses play.</td></tr>
           <tr><td><code>allow-origins</code></td><td>Extra origins the frame's Content Security Policy should permit, space separated: a tenant's video host, an in-house CDN.</td></tr>
           <tr><td><code>resume</code></td><td>Keep the content's own saved state &mdash; the slide reached, the answers so far, the position in a video &mdash; in the browser's storage on that device, and pick up there on the next load of the package. <code>host</code> keeps nothing on the device: the page gets a <code>userdata</code> event on every save and hands the state back through <code>userData</code> before the next load. Default: off, nothing is kept. Nothing is sent in either case.</td></tr>

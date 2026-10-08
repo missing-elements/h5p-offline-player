@@ -128,6 +128,12 @@ export interface PackageRecord {
   version: string
 }
 
+/**
+ * Where the runtime's files are: `@missing-elements/h5p-runtime`'s `dist/`, resolved by the host
+ * (its `runtime` export, under a bundler), by the element against an `assets-base`, or against
+ * the default `frame-assets/` beside the element. The runtime is a package of its own because it
+ * is GPL-3.0 and the player is MIT; the player carries none of these files and only names them.
+ */
 export interface FrameAssets {
   /** h5p-standalone `main.bundle.js` — the loader that walks dependencies and boots the runtime. */
   mainJs: string
@@ -135,6 +141,12 @@ export interface FrameAssets {
   frameJs: string
   /** h5p-standalone `styles/h5p.css`, rebuilt to stand alone: icon fonts and images inlined. */
   frameCss: string
+  /**
+   * The frame's boot script, `frame-boot.js`, which the worker names in the frame document.
+   * Absent from a record an element before 0.5 wrote, when the script was inlined; the worker
+   * then looks for it beside `mainJs`.
+   */
+  bootJs?: string
   /**
    * The text faces taken out of that sheet, which the frame document declares itself. Absent
    * from a record an older element wrote, whose `frameCss` still declares them.

@@ -1,7 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { build } from 'esbuild'
-import { frameBootEsbuildPlugin } from './frame-boot-plugin.mjs'
 
 /**
  * The worker artefacts, built the same way for the package (`build-workers.mjs`) and for the
@@ -71,7 +70,7 @@ async function shared() {
     legalComments: 'none',
     banner: { js: `${await playerNotice()}\n${await zipJsNotice()}` },
     define: { 'import.meta.env.DEV': 'false' },
-    plugins: [frameBootEsbuildPlugin(true), noCodecImport]
+    plugins: [noCodecImport]
   }
 }
 
@@ -92,7 +91,7 @@ export async function buildMountModule(outfile) {
  */
 export async function buildJobsWorker(outfile) {
   const { banner, plugins, ...options } = await shared()
-  return build({ ...options, banner: { js: await playerNotice() }, plugins: [frameBootEsbuildPlugin(true)], entryPoints: [resolve(rootDir, 'src/jobs/jobs-worker.ts')], outfile, format: 'iife' })
+  return build({ ...options, banner: { js: await playerNotice() }, plugins: [], entryPoints: [resolve(rootDir, 'src/jobs/jobs-worker.ts')], outfile, format: 'iife' })
 }
 
 /**

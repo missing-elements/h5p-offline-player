@@ -8,9 +8,10 @@ license: MIT
 
 `@missing-elements/h5p-offline-player` is one custom element, `<h5p-player>`. It plays a `.h5p`
 package from a URL or a picked file: the archive is read in place and a Service Worker serves
-its files to the H5P runtime. Three files matter: the element (`h5p-player.js`), the worker
-(`h5p-sw.js`) and the runtime folder (`frame-assets/`). Only the worker has to be served from
-the site's own origin; browsers refuse a cross-origin Service Worker.
+its files to the H5P runtime. Three things matter: the element (`h5p-player.js`), the worker
+(`h5p-sw.js`) and the runtime, which is a second package, `@missing-elements/h5p-runtime`,
+because it is GPL-3.0 while the player is MIT. Only the worker has to be served from the site's
+own origin; browsers refuse a cross-origin Service Worker.
 
 ## 1. Pick the setup
 
@@ -28,35 +29,42 @@ site's own origin; where do the packages come from.
 **A · with a bundler**
 
 ```bash
-npm i @missing-elements/h5p-offline-player
+npm i @missing-elements/h5p-offline-player @missing-elements/h5p-runtime
 ```
 
 ```js
 import '@missing-elements/h5p-offline-player'
+import { runtime } from '@missing-elements/h5p-runtime'
+
+document.querySelector('h5p-player').runtime = runtime
 ```
 
 ```html
 <h5p-player src="https://host.example/course.h5p"></h5p-player>
 ```
 
-Nothing else: the element names its files with `new URL('./file', import.meta.url)`, which
-these bundlers emit and rewrite. Only one thing needs care: **the import must run in the
-browser.** In a framework that renders on the server, import it from a client-only place (a
-`useEffect`, a `<script>` in Astro, `onMount`, `client-only` in Nuxt), and mark the tag as a
-custom element if the framework demands it (Vue: `compilerOptions.isCustomElement`).
-esbuild alone (no Vite) does not rewrite `new URL`; then serve the package's `dist/` from a
-static path and set `sw="/that/path/h5p-sw.js" assets-base="/that/path/frame-assets/"`.
+Nothing else: both packages name their files with `new URL('./file', import.meta.url)`, which
+these bundlers emit and rewrite, and the runtime's `runtime` export is the list of its files'
+URLs, handed to the element as a property before `src` is set. Only one thing needs care: **the
+imports must run in the browser.** In a framework that renders on the server, import them from
+a client-only place (a `useEffect`, a `<script>` in Astro, `onMount`, `client-only` in Nuxt),
+and mark the tag as a custom element if the framework demands it (Vue:
+`compilerOptions.isCustomElement`). esbuild alone (no Vite) does not rewrite `new URL`; then
+serve both packages' `dist/` from static paths and set `sw="/that/path/h5p-sw.js"
+assets-base="/the/runtime's/dist/"`.
 
 **B · no build step**
 
 ```html
 <script type="module"
   src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@<version>/dist/h5p-player.js"></script>
-<h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js"></h5p-player>
+<h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js"
+            assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-runtime@<version>/dist/"></h5p-player>
 ```
 
 Download `https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@<version>/dist/h5p-sw.js`
-and place it on the site; `sw` points at it. The root is fine: its scope becomes `/h5p/`, not
+and place it on the site; `sw` points at it. `assets-base` names the runtime package's `dist/`
+on the CDN, since the player's own package does not carry the runtime. The root is fine: its scope becomes `/h5p/`, not
 `/`, so an existing site worker is untouched. Use one explicit version (`npm view
 @missing-elements/h5p-offline-player version` for the latest) in both URLs — unpinned, the CDN
 moves and the copied worker does not — and re-download `h5p-sw.js` on every upgrade; the
@@ -123,20 +131,22 @@ takes `host`, a kiosk or a classroom device takes neither, and a learner's own d
 | `error: no-worker` | page on `http://` or `file://`; or `sw` points at another origin | serve over https; keep the worker same-origin |
 | `error: network`, "is an http: URL and this page is served over https:" | mixed content: an `http://` package or bundle on an `https://` page | use the `https://` URL; `http://localhost` is exempt |
 | `error: no-cors` | the package host sends no CORS headers | host the package where you control headers (GitHub Pages works as it comes), or offer a file picker: `player.file = input.files[0]` |
-| `error: bad-archive`, "contains no libraries" | an h5p.com / h5p.org export: `content/` only | set `libraries="hub"` to fetch them from h5p.org, or `libraries="/path/libraries.h5p"` pointing at a bundle you host (the repository ships one with every hub content type's libraries, plus its `libraries.txt` of licences) |
-| worker or `frame-assets/` 404 after a build | the bundler did not rewrite `new URL` (esbuild) | serve `dist/` statically and set `sw` and `assets-base` |
+| `error: bad-archive`, "contains no libraries" | an h5p.com / h5p.org export: `content/` only | set `libraries` to a bundle, with the hub behind it: `libraries="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-libraries@0/libraries.h5p hub"` — `@missing-elements/h5p-libraries` carries every hub content type's libraries (serve it yourself with its `libraries.txt` of licences if the site must not reach a CDN), and `hub` is asked only for what it lacks; `libraries="hub"` alone fetches from h5p.org every time |
+| worker or runtime files 404 after a build | the bundler did not rewrite `new URL` (esbuild); or Setup A without `player.runtime`, so the element looked for `frame-assets/` beside a hashed bundle | set `runtime` from `@missing-elements/h5p-runtime`; or serve both packages' `dist/` statically and set `sw` and `assets-base` |
 | the frame renders the host page inside itself | an SPA fallback answered a virtual route with `index.html`: the worker is not registered | check the registration; after "clear site data" reload once |
 | content collapsed to 150 px | `auto-resize="off"` with no height from CSS; or the host's CSP has `style-src 'self'` and the browser lacks `adoptedStyleSheets`, so the fallback `<style>` is blocked | remove `auto-resize="off"`, or give the `h5p-player` tag a height; update the browser |
 | `error: runtime` after `ready` | a content type threw a non-fatal exception, common on resize | log it; do not hide the player |
-| Vite dev only: worker or assets 404 | the package is hoisted somewhere Vite does not serve (a monorepo); the element's own fallback for `.vite/deps/` covers the normal layout | add the package to `optimizeDeps.exclude`, or set `sw` and `assets-base` |
+| Vite dev only: worker or assets 404 | the packages are hoisted somewhere Vite does not serve (a monorepo); their own fallback for `.vite/deps/` covers the normal layout | add both packages to `optimizeDeps.exclude`, or set `sw` and `assets-base` |
 | a video takes minutes to start, then plays | the package, not the player: the video is compressed inside the zip and its index is at the end | the `h5p-normalize` skill; `preload="auto"` only moves the wait earlier |
 | the content starts over on every reload | `resume` is not set, which is the default | set `resume` (or `resume="host"`) if the user wants that, see section 2 |
 | "This content has changed since you last used it. You'll be starting over." | the package at that URL was replaced since the state was saved; the state is keyed by the build | expected, H5P's own dialog; OK drops the old state and the content saves afresh under the new build |
 
 ## 5. Hand over
 
-Tell the user three things. The runtime under `frame-assets/` is the H5P core, GPL-3.0, and its
-`LICENSE.txt` and `NOTICE.txt` must stay with it; the player's own code is MIT. Results arrive
+Tell the user three things. The player is MIT; the H5P core runtime it loads is GPL-3.0, which
+is why it is the separate package `@missing-elements/h5p-runtime`, whose `LICENSE.txt` and
+`NOTICE.txt` must stay with any copy of its `dist/` — the player links against none of it and
+only names its files. Results arrive
 only as `xapi` and `finished` events on the element, stored nowhere, so an LRS or their own
 backend has to listen; a learner's place in the content is kept only with the `resume`
 attribute, in the browser's storage on that device (or handed to the host with

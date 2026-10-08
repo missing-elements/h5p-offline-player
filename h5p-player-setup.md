@@ -18,26 +18,29 @@ npm i @missing-elements/h5p-offline-player
 
 ```js
 import '@missing-elements/h5p-offline-player';
+import { runtime } from '@missing-elements/h5p-runtime';
+
+document.querySelector('h5p-player').runtime = runtime;
 ```
 
 ```html
 <h5p-player src="https://host.example/course.h5p"></h5p-player>
 ```
 
-That's all — setting `src` loads and plays. Nothing is copied and nothing is configured. The element names every file it needs with its own `new URL('./file', import.meta.url)`: the worker, `frame-assets/main.bundle.js`, `frame-assets/frame.bundle.js`, `frame-assets/h5p.css` and each of the twelve text fonts under `frame-assets/fonts/`. Each file stands alone — the stylesheet carries its icon fonts and images inlined, and the frame declares the text fonts against the URLs the element resolved — so Vite (build and dev), Rollup and webpack 5 emit them as hashed assets wherever they like and rewrite the URLs. The same pattern is used in production by `pdfjs-viewer-element`. Verified against a fresh Vite 6 app (dev server and build) and a fresh webpack 5 app with no configuration beyond the entry.
+Setting `src` loads and plays. Nothing is copied. Two packages, because the H5P runtime is GPL-3.0 and the player is MIT: `@missing-elements/h5p-runtime` is the core runtime, its stylesheet and fonts, and the script that boots it inside the frame, and its `runtime` export is the list of those files' URLs, which the element takes as a property (set it before `src`). Both packages name every file with a static `new URL('./file', import.meta.url)` — the element its worker, the runtime its `main.bundle.js`, `frame.bundle.js`, `frame-boot.js`, `h5p.css` and each of the twelve text fonts — and each file stands alone, so Vite (build and dev), Rollup and webpack 5 emit them as hashed assets wherever they like and rewrite the URLs. The same pattern is used in production by `pdfjs-viewer-element`. Verified against a fresh Vite 6 app (dev server and build) and a fresh webpack 5 app with no configuration beyond the entry.
 
-The Vite dev server needs one thing done on its behalf: it pre-bundles dependencies into `node_modules/.vite/deps/`, which rewrites those URLs to files that were never put there. The element recognises that directory and falls back to the package's own copy under `node_modules/@missing-elements/h5p-offline-player/dist/`, which Vite serves. If your layout puts the package somewhere Vite does not serve — a monorepo that hoists it above the app's root — add it to `optimizeDeps.exclude`, or set `sw` and `assets-base` as below.
+The Vite dev server needs one thing done on its behalf: it pre-bundles dependencies into `node_modules/.vite/deps/`, which rewrites those URLs to files that were never put there. Both packages recognise that directory and fall back to their own copies under `node_modules/@missing-elements/…/dist/`, which Vite serves. If your layout puts them somewhere Vite does not serve — a monorepo that hoists them above the app's root — add both to `optimizeDeps.exclude`, or set `sw` and `assets-base` as below.
 
 With webpack, a `module.rules` entry that matches `.css` or `.js` everywhere also matches these files, which webpack loads as `new URL` assets; give such rules `dependency: { not: ['url'] }` so they leave the assets alone.
 
-Bundlers that do not analyse `new URL(…, import.meta.url)` — esbuild among them — leave the files behind and the worker 404s. Serve the package `dist` folder from a static path (or use the CDN) and point the element at it:
+Bundlers that do not analyse `new URL(…, import.meta.url)` — esbuild among them — leave the files behind and the worker 404s. Serve the player's `dist` folder from a static path, and the runtime's from one (or the CDN), and point the element at them:
 
 ```html
 <h5p-player src="…" sw="/vendor/h5p-player/h5p-sw.js"
-            assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player/dist/"></h5p-player>
+            assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-runtime/dist/"></h5p-player>
 ```
 
-`sw` must stay same-origin; `assets-base` (frame bundle, CSS, fonts) may be a CDN.
+`sw` must stay same-origin; `assets-base` (the runtime's `dist/`: the bundles, the boot script, the CSS, the fonts) may be a CDN. With neither `runtime` nor `assets-base` the element looks in `frame-assets/` beside its own script, which is the layout you get by copying the runtime's `dist/` there.
 
 **Already have a Service Worker?** Nothing changes. Browsers allow several registrations per origin with different scopes, and a document is controlled by the longest matching scope. The host's worker at `/` keeps controlling the host page; ours, registered under the bundler's asset path, controls only the frame it synthesizes. The two never see each other's requests. Merging into a single worker is possible but rarely needed — see *Single-worker hosts* at the end.
 
@@ -46,10 +49,11 @@ Bundlers that do not analyse `new URL(…, import.meta.url)` — esbuild among t
 ```html
 <script type="module"
   src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player/dist/h5p-player.js"></script>
-<h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js"></h5p-player>
+<h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js"
+            assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-runtime/dist/"></h5p-player>
 ```
 
-Download `https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player/dist/h5p-sw.js` once, place it on the site, point `sw` at it. This is the only file that cannot come from the CDN: browsers reject cross-origin Service Worker registration. Frame assets load from the CDN. Placing it at the root is safe: the registration scope becomes `/h5p/`, not `/`, so an existing site worker is left alone.
+Download `https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player/dist/h5p-sw.js` once, place it on the site, point `sw` at it. This is the only file that cannot come from the CDN: browsers reject cross-origin Service Worker registration. The runtime loads from the CDN, from its own package, `@missing-elements/h5p-runtime`, which `assets-base` names; or copy that package's `dist/` to `frame-assets/` beside a copy of the element, where the element looks by default. Placing the worker at the root is safe: the registration scope becomes `/h5p/`, not `/`, so an existing site worker is left alone.
 
 Under a Content-Security-Policy that does not allow `blob:` workers, download `dist/h5p-jobs.js` as well, place it on the site and point `jobs` at it. The element otherwise starts its background worker — downloads and media extraction — from a `blob:` URL. A worker cannot come from the CDN either.
 
@@ -80,11 +84,15 @@ The element does one thing: play a package.
   sw="…"               worker URL (default: h5p-sw.js next to the element, same-origin)
   jobs="…"             background worker URL, for a CSP without `blob:` in `worker-src`
                        (default: a blob: URL, then h5p-jobs.js next to the element, same-origin)
-  assets-base="…"      directory of frame assets (default: folder of the element)
-  libraries="…"        `hub`, or the URL of a `.h5p` carrying library folders, for packages
-                       exported without their own (default: unset — such packages are refused).
-                       Downloaded once and cached; when the URL cannot be reached later, the
-                       copy downloaded before is used, so it also plays offline after that
+  assets-base="…"      the directory the runtime's dist/ is served from (default: frame-assets/
+                       beside the element); the `runtime` property, set from the runtime
+                       package's export, wins over it
+  libraries="…"        where a package exported without its libraries gets them: the URL of a
+                       `.h5p` carrying library folders, `hub` for the H5P hub, or several
+                       separated by spaces, tried in order — "/h5p/libraries.h5p hub" asks the
+                       hub only for what the bundle lacks (default: unset — such packages are
+                       refused). Downloaded once and cached; when a URL cannot be reached
+                       later, the copy downloaded before is used, so it also plays offline
   allow-origins="…"    extra origins for the frame's CSP, space separated — for a tenant's own
                        video host or an in-house CDN
   auto-resize="off"    size the element yourself, from CSS or the `resize` event. By default it
@@ -148,15 +156,17 @@ input.onchange = () => (p.file = input.files[0]);
 
 ## Licences
 
-The player's code is MIT. `dist/frame-assets/` is not: it is the H5P core runtime, which is
-GPL-3.0, and the package's `license` field reads `(MIT AND GPL-3.0-only)` for that reason. The
-directory carries a `LICENSE.txt` and a `NOTICE.txt` naming what is in it and where it came from.
-With a bundler (Setup A) the runtime files are emitted without them, so `frame.bundle.js`,
-`main.bundle.js` and `h5p.css` each open with a comment naming their licences, the corresponding
-source and the package's `NOTICE.md`; when you copy `dist/` by hand,
-copy them too; with the CDN (Setup B) they are served from there. A site that serves the runtime to browsers
-is distributing GPL code, so keep the notices reachable. The full account, including zip.js's
-BSD notice, is `NOTICE.md` in the package.
+The player, `@missing-elements/h5p-offline-player`, is MIT. The H5P core runtime it loads is
+GPL-3.0, which is why it is a package of its own, `@missing-elements/h5p-runtime`, together with
+the script that boots it inside the frame; the player's package carries none of it, and the two
+exchange HTTP and `postMessage` only. The runtime's `dist/` carries a `LICENSE.txt` and a
+`NOTICE.txt` naming what is in it and where it came from. With a bundler (Setup A) its files are
+emitted without them, so `frame.bundle.js`, `main.bundle.js`, `frame-boot.js` and `h5p.css` each
+open with a comment naming their licences, the corresponding source and the package's
+`NOTICE.md`; when you copy `dist/` by hand, copy them too; with the CDN (Setup B) they are served
+from there. A site that serves the runtime to browsers is distributing GPL code, so keep the
+notices reachable. The full account is `NOTICE.md` in each package: the runtime's for the GPL,
+the player's for zip.js's BSD notice.
 
 ## Coming from h5p-standalone
 
@@ -169,7 +179,7 @@ saved state (`contentUserData`, `saveFreq`) is `resume`.
 | h5p-standalone | Here | Note |
 |---|---|---|
 | `h5pJsonPath` | `src` or `file` | The package, not a folder |
-| `frameJs`, `frameCss` | `assets-base` | One directory for both, and the fonts |
+| `frameJs`, `frameCss` | `runtime` or `assets-base` | The runtime package's export, or one directory for both, the boot script and the fonts |
 | `frame`, `copyright`, `export`, `icon`, `embed` | the same, as bare attributes | `frame` shows the action bar the buttons live in |
 | `fullScreen` | `fullscreen="off"` to turn off | On by default here |
 | `downloadUrl` | `download-url` | Defaults to the package URL |
@@ -194,14 +204,14 @@ package carries `H5P.MathDisplay`, and it only half works when it does not — s
 | `error: no-cors` | Package host sends no CORS headers | Cannot be fetched from a browser. Ask the user to download the file and use `file` |
 | `error: network`, "is an http: URL and this page is served over https:" | `src` or `libraries` is `http://` on an `https://` page. Browsers block that as mixed content (and a CSP naming only `https:` blocks it first); up to 0.1.5 it was reported as `no-cors` | Use the `https://` URL the message names; most hosts, GitHub Pages included, serve both. `http://localhost` is exempt and works as is |
 | `error: no-worker` | Page on `http://`, in-app browser without Service Worker support, or `sw` points cross-origin | Use `https://`; show "Open in Safari / Chrome"; serve `h5p-sw.js` from your origin |
-| Worker or frame assets 404 after build | Bundler does not analyse `new URL(…, import.meta.url)` (esbuild) | Serve `dist/` statically and set `sw` + `assets-base` |
+| Worker or runtime files 404 after build | Bundler does not analyse `new URL(…, import.meta.url)` (esbuild); or Setup A without the `runtime` property, so the element looked for `frame-assets/` beside a hashed bundle | Set `player.runtime` from `@missing-elements/h5p-runtime`; or serve both packages' `dist/` statically and set `sw` + `assets-base` |
 | Worker blocked by CSP | `script-src` excludes the worker's origin | Keep the default same-origin worker; don't point `sw` at a CDN |
 | Console: creating a worker from `blob:` violates `worker-src` | The page's policy refuses `blob:` workers. Not a fault on its own: the element falls back to `h5p-jobs.js` beside it | Set `jobs` to that file, which skips the attempt and the violation report. If `error: no-worker` says the background worker could not start, `h5p-jobs.js` is missing or not same-origin (Setup B: copy it next to `h5p-sw.js`) |
 | Video won't play in Safari, other browsers fine | Worker older than the element (Setup B) | Re-download `h5p-sw.js`; the console warns on version mismatch |
 | Console: `503` from the worker for a media file, after about 30 s | Nothing of the entry arrived for two 15 s stretches — neither inflated bytes nor network input. The job that extracts it is gone (its tab closed) or the host stopped answering. A slow host on its own no longer does this: while bytes arrive, the player waits | Reload. If it repeats, check that the host answers `Range` requests for the archive at all promptly; the browser's network panel shows them |
 | `error: quota` | The package needs more storage than the browser gives the site, after everything idle has been evicted. On a host that honours `Range`, or from disk, storage is not required — the player serves around a full store — so this comes from a host without `Range`, where the whole archive has to land, or from one large deflated entry | Show `event.detail.message`: it names the size needed and the site's usage against its quota. For the `Range` case, normalize the package (`npx @missing-elements/h5p-normalize course.h5p`) or move it to a host that supports ranges |
 | `error: bad-archive`, "Could not read the archive index" | The bytes at the URL are not a zip, or not the whole of one: a login page in place of the file, a truncated upload, or — up to 0.1.1 — a host that compresses the archive (GitHub Pages), which those versions measured at the compressed length | Check with `curl -sI -H 'Range: bytes=0-0' <url>`: a `206` whose body starts with `PK`, and `unzip -t` on a download of it. Update the element for the compressing-host case |
-| `error: bad-archive`, "contains no libraries" | The export has `content/` but no library folders — h5p.com and h5p.org omit libraries the origin site already has | Set `libraries="hub"` to fetch them from h5p.org, point `libraries` at a `.h5p` that carries them — the repository's [`libraries.h5p`](https://github.com/missing-elements/h5p-offline-player/raw/main/apps/demo/app/libraries.h5p) has every hub content type's, to serve from your own site with its `libraries.txt` — or re-export with them included. `event.detail.missingLibraries` names them |
+| `error: bad-archive`, "contains no libraries" | The export has `content/` but no library folders — h5p.com and h5p.org omit libraries the origin site already has | Point `libraries` at a `.h5p` that carries them: `@missing-elements/h5p-libraries` has every hub content type's, from the CDN (`https://cdn.jsdelivr.net/npm/@missing-elements/h5p-libraries@0/libraries.h5p`) or served from your own site with its `libraries.txt`; add ` hub` after it for what the bundle lacks, or use `libraries="hub"` alone to fetch from h5p.org; or re-export with them included. `event.detail.missingLibraries` names them |
 | Console: 404 for `<Library>-<major>.<minor>/library.json` on load | Not a fault. h5p-standalone probes the versioned folder name to find out whether a package uses versioned folders; older packages do not, and the 404 is what tells it to fall back to the bare name | Ignore it. One such 404 per load is expected |
 | Console: "violates the following Content Security Policy directive" | The content loads a script, style or font from an origin the frame does not permit | Built in: MathJax CDNs, Google WebFont, YouTube, Vimeo, Panopto. Anything else goes in `allow-origins` |
 | No copyright button with `frame copyright` | The package's `h5p.json` names no licence, `U` (undisclosed), or one H5P has no name for, such as `MIT` from a CLI build; H5P hides the button for content with nothing to show | H5P's own rule, nothing in the player: give the package a licence H5P knows (CC BY, CC0 1.0, GNU GPL, PD, C, …) in `h5p.json`. The media's own notices show either way |

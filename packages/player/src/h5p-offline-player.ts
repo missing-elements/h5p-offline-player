@@ -46,18 +46,25 @@ import { adoptRevision, clearUserData, readUserData, removeUserData, writeUserDa
 /** In dev the runtime is served from `public/frame-assets/`, the same flat layout as `dist/`. */
 const DEV_ASSETS_BASE = '/frame-assets/'
 
-/** File names inside `frame-assets/`, relative to the assets base. */
+/** File names inside the runtime's directory, relative to the assets base. */
 const ASSET_FILES = {
   mainJs: 'main.bundle.js',
   frameJs: 'frame.bundle.js',
-  frameCss: 'h5p.css'
+  frameCss: 'h5p.css',
+  bootJs: 'frame-boot.js'
 } as const
 
-// Every file the element needs is named here, one static `new URL('./file', import.meta.url)`
-// each, so that Vite, Rollup and webpack 5 in a consuming app emit it as an asset and rewrite the
-// URL — nothing for the host to copy. A directory cannot be emitted that way, which is why the
-// runtime is not addressed as `./frame-assets/` plus a name, and why each file stands alone:
-// `h5p.css` carries its fonts and images inlined (see `sync-h5p-assets.mjs`).
+// The two files this package ships beside the element are named here, one static
+// `new URL('./file', import.meta.url)` each, so that Vite, Rollup and webpack 5 in a consuming
+// app emit it as an asset and rewrite the URL — nothing for the host to copy.
+//
+// The runtime is not: it is `@missing-elements/h5p-runtime`, a package of its own because it is
+// GPL-3.0 and this one is MIT, and a static `new URL` here would have a bundler emit files this
+// package does not carry. A bundled host imports that package and hands its `runtime` export to
+// the element; a host serving files sets `assets-base`; and with neither, the element looks in
+// `frame-assets/` beside its own script — the layout of a served `dist/` with the runtime copied
+// in, which is what the demo site and the verifier serve. That default is built from a variable,
+// not a literal, so no bundler tries to resolve it.
 //
 // `@vite-ignore` matters in dev and in a consuming app alike: in dev the worker is served by the
 // plugin in `vite.plugins.ts` and Vite must not try to resolve the file at transform time. The
@@ -95,24 +102,23 @@ const BLOB_JOBS_SCRIPT: JobsScript = {
   release: (url) => URL.revokeObjectURL(url)
 }
 
-/** The runtime inside a directory: the dev server's, or the one an `assets-base` names. */
+/** The runtime inside a directory: the dev server's, the default beside the element, or an `assets-base`. */
 function assetsIn(base: string): FrameAssets {
   return {
     mainJs: new URL(ASSET_FILES.mainJs, base).href,
     frameJs: new URL(ASSET_FILES.frameJs, base).href,
     frameCss: new URL(ASSET_FILES.frameCss, base).href,
+    bootJs: new URL(ASSET_FILES.bootJs, base).href,
     fonts: FRAME_FONTS.map(({ family, style, weight, file }) => ({ family, style, weight, url: new URL(`fonts/${file}`, base).href }))
   }
 }
 
+/** See the note above `unbundled`: a variable, so that no bundler resolves the directory. */
+const DEFAULT_ASSETS_DIR = 'frame-assets/'
+
 const DEFAULT_ASSETS: FrameAssets = import.meta.env.DEV
   ? assetsIn(new URL(DEV_ASSETS_BASE, location.href).href)
-  : {
-      mainJs: unbundled(new URL(/* @vite-ignore */ './frame-assets/main.bundle.js', import.meta.url).href),
-      frameJs: unbundled(new URL(/* @vite-ignore */ './frame-assets/frame.bundle.js', import.meta.url).href),
-      frameCss: unbundled(new URL(/* @vite-ignore */ './frame-assets/h5p.css', import.meta.url).href),
-      fonts: FRAME_FONTS.map(({ family, style, weight, packaged }) => ({ family, style, weight, url: unbundled(packaged) }))
-    }
+  : assetsIn(unbundled(new URL(DEFAULT_ASSETS_DIR, import.meta.url).href))
 
 export type PlayerState = 'idle' | 'probing' | 'downloading' | 'indexing' | 'ready' | 'error'
 
@@ -234,6 +240,7 @@ export class H5PPlayerElement extends HTMLElement {
   private loadResumeMode: ResumeMode = 'off'
   /** The learner the host named, for the statements' actor; handed to the frame as it boots. */
   private userValue: FrameUser | null = null
+  private runtimeValue: FrameAssets | null = null
   /**
    * The mode the frame holding `userDataSession` was answered under, which its saves follow.
    * Kept apart from `loadResumeMode`: a straggler save from the previous document can arrive
@@ -591,24 +598,38 @@ export class H5PPlayerElement extends HTMLElement {
 
   /**
    * Indexes the package, and if it turns out to declare libraries it does not carry, fetches them
-   * from the configured source and indexes again.
+   * from the configured sources, in order, indexing again after each.
    *
    * Without a `libraries` attribute this is one call that either works or reports exactly what is
    * missing. Reaching out to a third party is never something the element decides on its own.
+   * With a list — `libraries="/h5p/libraries.h5p hub"` — the first source that covers the package
+   * wins, and the next is tried only for what the one before still left absent: a bundle a site
+   * hosts answers the common case with no request to the hub, and the hub answers a content type
+   * the bundle has not got. A source that cannot be reached at all — the bundle's host down, and
+   * no copy of it downloaded before — is passed over the same way while another remains, since
+   * the point of naming a second one is to have it when the first is not there; only the last
+   * source's failure is the load's. The last source attached stays attached: the worker keeps
+   * one bundle per package, and a hub bundle carries its content type's whole set.
    */
   private async index(pkgId: string, signal: AbortSignal): Promise<IndexResult> {
-    try {
-      return indexResultOf(await this.send({ type: 'index', pkgId }))
-    } catch (error) {
-      const missing = error instanceof PlayerError ? error.missingLibraries : undefined
-      const source = this.librarySource()
-      if (!missing || !source) throw error
+    const sources = this.librarySources()
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return indexResultOf(await this.send({ type: 'index', pkgId }))
+      } catch (error) {
+        const missing = error instanceof PlayerError ? error.missingLibraries : undefined
+        const source = sources[attempt]
+        if (!missing || !source) throw error
 
-      await this.supplyLibraries(pkgId, missing, source, signal)
-      if (signal.aborted) return nothingIndexed()
-
-      // Either it is complete now, or this throws naming what is still absent.
-      return indexResultOf(await this.send({ type: 'index', pkgId }))
+        try {
+          await this.supplyLibraries(pkgId, missing, source, signal)
+        } catch (failure) {
+          if (signal.aborted || attempt + 1 >= sources.length) throw failure
+        }
+        if (signal.aborted) return nothingIndexed()
+        // Round again: either it is complete now, or the index names what is still absent and
+        // the next source, if there is one, is asked for that.
+      }
     }
   }
 
@@ -693,10 +714,11 @@ export class H5PPlayerElement extends HTMLElement {
     return value ? value.split(/\s+/) : []
   }
 
-  private librarySource(): LibrarySource | null {
+  /** The `libraries` attribute: `hub` or a URL, or several separated by whitespace, in order. */
+  private librarySources(): LibrarySource[] {
     const value = this.getAttribute('libraries')?.trim()
-    if (!value) return null
-    return value === 'hub' ? 'hub' : { url: value }
+    if (!value) return []
+    return value.split(/\s+/).map((word) => (word === 'hub' ? 'hub' : { url: word }))
   }
 
   private async resolveSource(
@@ -792,7 +814,33 @@ export class H5PPlayerElement extends HTMLElement {
     return Object.keys(options).length ? options : undefined
   }
 
+  /**
+   * The runtime's files, resolved by the host: the `runtime` export of
+   * `@missing-elements/h5p-runtime`, which a bundler emits beside the host's own code. Read by the
+   * load, so set it before `src`; it takes precedence over `assets-base`. A value missing any of
+   * the four files is refused, since a frame without one of them is a frame that never boots.
+   */
+  get runtime(): FrameAssets | null {
+    return this.runtimeValue
+  }
+
+  set runtime(value: FrameAssets | null) {
+    this.runtimeValue = value && [value.mainJs, value.frameJs, value.frameCss, value.bootJs].every((url) => typeof url === 'string' && url)
+      ? {
+          mainJs: value.mainJs,
+          frameJs: value.frameJs,
+          frameCss: value.frameCss,
+          bootJs: value.bootJs,
+          fonts: Array.isArray(value.fonts)
+            ? value.fonts.filter((font) => font && typeof font === 'object').map(({ family, style, weight, url }) => ({ family, style, weight, url }))
+            : []
+        }
+      : null
+  }
+
+  /** The `runtime` property, else an `assets-base`, else `frame-assets/` beside the element. */
   private frameAssets(): FrameAssets {
+    if (this.runtimeValue) return this.runtimeValue
     const raw = this.getAttribute('assets-base')?.trim()
     if (!raw) return DEFAULT_ASSETS
     return assetsIn(new URL(raw.endsWith('/') ? raw : `${raw}/`, location.href).href)

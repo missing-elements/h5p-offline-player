@@ -51,9 +51,9 @@ Worker and Jobs worker. Run it for changes to playback, storage, worker,
 network, or browser-facing behavior. Run the smallest relevant check first,
 then expand coverage when the change affects more than one package.
 
-Do not commit generated `dist`, `public/frame-assets`, or fixture output unless
-the repository's existing release or asset-generation workflow explicitly
-requires it.
+Do not commit generated `dist`, `public/frame-assets`, the runtime's `index.js`,
+or fixture output unless the repository's existing release or asset-generation
+workflow explicitly requires it.
 
 ## Pull requests
 

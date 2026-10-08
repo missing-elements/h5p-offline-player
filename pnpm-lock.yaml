@@ -17,6 +17,9 @@ importers:
         specifier: workspace:*
         version: link:../../packages/player
     devDependencies:
+      '@missing-elements/h5p-libraries':
+        specifier: workspace:*
+        version: link:../../packages/libraries
       '@missing-elements/h5p-normalize':
         specifier: workspace:*
         version: link:../../packages/normalize
@@ -58,6 +61,8 @@ importers:
         specifier: ^5.0.3
         version: 5.0.3(@types/node@26.6.4)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.28.2))
 
+  packages/libraries: {}
+
   packages/normalize:
     dependencies:
       '@zip.js/zip.js':
@@ -79,10 +84,10 @@ importers:
       '@zip.js/zip.js':
         specifier: ^2.23.0
         version: 2.23.0
-      h5p-standalone:
-        specifier: ^3.8.2
-        version: 3.8.2
     devDependencies:
+      '@missing-elements/h5p-runtime':
+        specifier: workspace:*
+        version: link:../runtime
       '@types/node':
         specifier: ^26.6.4
         version: 26.6.4
@@ -108,11 +113,27 @@ importers:
         specifier: ^5.0.3
         version: 5.0.3(@types/node@26.6.4)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.28.2))
 
+  packages/runtime:
+    dependencies:
+      h5p-standalone:
+        specifier: ^3.8.2
+        version: 3.8.2
+    devDependencies:
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
   packages/verify:
     dependencies:
       '@missing-elements/h5p-offline-player':
         specifier: workspace:^
         version: link:../player
+      '@missing-elements/h5p-runtime':
+        specifier: workspace:^
+        version: link:../runtime
       playwright-core:
         specifier: ^1.50.0
         version: 1.63.0

@@ -1,0 +1,41 @@
+{
+  "name": "@missing-elements/h5p-libraries",
+  "version": "0.1.0",
+  "description": "The H5P hub's runtime libraries for every content type it serves, as one .h5p bundle for <h5p-player>'s `libraries` attribute, so an export without its own libraries plays without asking the hub.",
+  "license": "SEE LICENSE IN libraries.txt",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/missing-elements/h5p-offline-player.git",
+    "directory": "packages/libraries"
+  },
+  "homepage": "https://github.com/missing-elements/h5p-offline-player/tree/main/packages/libraries#readme",
+  "bugs": {
+    "url": "https://github.com/missing-elements/h5p-offline-player/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "exports": {
+    "./libraries.h5p": "./libraries.h5p",
+    "./libraries.txt": "./libraries.txt",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "libraries.h5p",
+    "libraries.txt"
+  ],
+  "keywords": [
+    "h5p",
+    "h5p-libraries",
+    "h5p-hub",
+    "h5p-offline-player"
+  ],
+  "scripts": {
+    "build": "node ../../apps/demo/scripts/build-libraries.mjs",
+    "test": "node -e \"const { statSync } = require('node:fs'); if (statSync('libraries.h5p').size < 1e6) throw new Error('libraries.h5p is missing or empty')\""
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

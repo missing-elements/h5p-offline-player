@@ -45,6 +45,7 @@
   },
   "dependencies": {
     "@missing-elements/h5p-offline-player": "workspace:^",
+    "@missing-elements/h5p-runtime": "workspace:^",
     "playwright-core": "^1.50.0"
   },
   "devDependencies": {

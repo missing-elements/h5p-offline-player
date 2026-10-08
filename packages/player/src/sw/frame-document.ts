@@ -1,4 +1,3 @@
-import bootSource from 'virtual:h5p-frame-boot'
 import type { FrameAssets, FrameFont, FrameOptions } from '../shared/protocol'
 import { contentMetadata, type ContentMetadata } from '../shared/metadata'
 
@@ -87,10 +86,26 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;')
 }
 
+/**
+ * The frame's boot script. It is a file of the runtime package rather than a string inlined here
+ * — it runs in the H5P document and calls the core's API, so it ships with the core, under the
+ * core's licence, and this worker only names it. A record written by an element before 0.5
+ * carries no `bootJs`; the file sits beside `main.bundle.js` in every layout the runtime is
+ * served in, so that is where it is looked for then.
+ */
+export function bootScriptUrl(assets: FrameAssets): string {
+  if (assets.bootJs) return assets.bootJs
+  try {
+    return new URL('frame-boot.js', assets.mainJs).href
+  } catch {
+    return 'frame-boot.js'
+  }
+}
+
 /** Origins that appear in a CSP directive, deduplicated. `'self'` covers same-origin assets. */
 function assetOrigins(assets: FrameAssets, base: string): string[] {
   const origins = new Set<string>()
-  const urls = [assets.mainJs, assets.frameJs, assets.frameCss, ...(assets.fonts ?? []).map((font) => font.url)]
+  const urls = [assets.mainJs, assets.frameJs, assets.frameCss, bootScriptUrl(assets), ...(assets.fonts ?? []).map((font) => font.url)]
   for (const url of urls) {
     try {
       const origin = new URL(url, base).origin
@@ -239,8 +254,9 @@ export function buildFrameDocument(options: FrameDocumentOptions): string {
   const { pkgId, virtualRoot, assets, nonce } = options
   const csp = buildContentSecurityPolicy(options)
 
-  // A JSON block, not a script: it is data, so it needs no nonce, and the boot script proper is
-  // then the same bytes for every package. `<` is escaped so no value can end the block early.
+  // A JSON block, not a script: it is data, so it needs no nonce, and the boot script proper —
+  // `frame-boot.js` from the runtime package, loaded by URL under the nonce — is the same bytes
+  // for every package. `<` is escaped so no value can end the block early.
   const bootConfig = JSON.stringify({
     pkgId,
     h5pJsonPath: virtualRoot,
@@ -278,7 +294,7 @@ ${fontFaces}
 <div id="h5p-root"></div>
 <script nonce="${nonce}" src="${escapeHtml(assets.mainJs)}" charset="UTF-8"></script>
 <script type="application/json" id="h5p-boot-config">${bootConfig}</script>
-<script nonce="${nonce}">${bootSource}</script>
+<script nonce="${nonce}" src="${escapeHtml(bootScriptUrl(assets))}"></script>
 </body>
 </html>`
 }
