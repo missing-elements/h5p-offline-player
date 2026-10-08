@@ -1,6 +1,6 @@
 {
   "name": "@missing-elements/h5p-verify",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Plays an .h5p package in a headless browser through h5p-offline-player and reports whether it works: start-up, errors, missing libraries, a screenshot. The last check before a generated package is handed to anyone.",
   "license": "MIT",
   "repository": {
