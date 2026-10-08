@@ -138,7 +138,8 @@ docs/                     the README's longer sections, one file each: streaming
 skills/                   agent skills, one directory per skill, at the root because that is where
                           `npx skills add <owner/repo>` looks: h5p-verify (when to run the verifier and how
                           to read its report), h5p-player-setup (putting the player on a site), h5p-normalize (when
-                          a package needs rewriting to stream, and how to read the dry run)
+                          a package needs rewriting to stream, and how to read the dry run), h5p-embed-my (Setup C
+                          through the Embed My service: the snippet, the checks, the relay, what it is not)
 
 api/no-range.js           the Vercel function that stands in for a host without Range on the demo
 vercel.json               the deployment: build command, the /no-range rewrite, caching and security headers

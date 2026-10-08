@@ -225,17 +225,18 @@ run over seven content types found.
 
 ## Agent skills
 
-The repository ships three [agent skills](https://agentskills.io) under `skills/`, for Claude
+The repository ships four [agent skills](https://agentskills.io) under `skills/`, for Claude
 Code, Cursor, Copilot, Codex and the rest:
 
 ```bash
-npx skills add missing-elements/h5p-offline-player                       # all three
+npx skills add missing-elements/h5p-offline-player                       # all four
 npx skills add missing-elements/h5p-offline-player --skill h5p-verify    # one
 ```
 
 | Skill | For an agent that |
 |---|---|
 | `h5p-player-setup` | is asked to put H5P content on a website: which setup, the exact lines, how to check it, what goes wrong |
+| `h5p-embed-my` | is asked to embed an H5P package on a page with nothing installed, through [Embed My](https://embed-my.org/): the package URL to check, the snippet, where to paste it, the xAPI relay, what the service is not |
 | `h5p-normalize` | hears that a package's video takes minutes to start, or publishes packages to a static host: diagnose with a dry run, rewrite once, keep the revision |
 | `h5p-verify` | generates or rewrites `.h5p` packages: run `h5p-verify` before claiming one works, and read what it reports |
 
