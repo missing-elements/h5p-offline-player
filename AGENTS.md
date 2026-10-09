@@ -6,7 +6,9 @@ the guide written for people integrating the package.
 
 ## What this is
 
-A browser-only H5P player, shipped as one web component. It plays an arbitrary `.h5p` archive
+Self-hosted H5P without an H5P server: a browser-only player, shipped as one web component,
+that a host puts on infrastructure it controls. That is the product's main benefit, and the
+documents lead with it. It plays an arbitrary `.h5p` archive
 fetched from a URL or picked from disk, with no server-side code and no extraction step: the zip
 is read in place and a Service Worker serves its entries to the H5P runtime over a virtual file
 server.
@@ -154,8 +156,7 @@ docs/                     the README's longer sections, one file each: streaming
 skills/                   agent skills, one directory per skill, at the root because that is where
                           `npx skills add <owner/repo>` looks: h5p-verify (when to run the verifier and how
                           to read its report), h5p-player-setup (putting the player on a site), h5p-normalize (when
-                          a package needs rewriting to stream, and how to read the dry run), h5p-embed-my (Setup C
-                          through the Embed My service: the snippet, the checks, the relay, what it is not)
+                          a package needs rewriting to stream, and how to read the dry run)
 
 api/no-range.js           the Vercel function that stands in for a host without Range on the demo
 vercel.json               the deployment: build command, the /no-range rewrite, caching and security headers
@@ -1276,8 +1277,8 @@ SPA-fallback trap described above cannot happen there.
   `demo/embed-page.js`: it speaks H5P's resizer protocol *upward* — `hello`, then `resize` with
   `scrollHeight` — so a site that already includes h5p.org's `h5p-resizer.js` for its h5p.org
   embeds resizes this frame with no code of its own, and every other site gets `/resizer.js`
-  from this origin, the same protocol in twenty lines, which the snippets named until Embed My
-  (next bullet) took them over (chosen on
+  from the player page's own origin, the same protocol in twenty lines, which the snippets name
+  (chosen on
   2026-10-07 over naming h5p.org's copy: every visitor's browser would otherwise call h5p.org,
   at a Drupal module path H5P Group can move, for a GPL file; the player page's embed dialog
   offers the same line under "advanced"); it relays xAPI only when `xapi=` names the
@@ -1305,28 +1306,24 @@ SPA-fallback trap described above cannot happen there.
   stays for those, and for an in-app browser. No document names a Safari or iOS version
   floor, decided on 2026-10-08: the player supports both, and a framed player that fails on an
   earlier release is a bug to fix, not a caveat to publish.
-- **Embed My is Setup C as a service, and the snippets here name it.** https://embed-my.org/
+- **Embed My is a test tool, and nothing here sends learners to it.** https://embed-my.org/
   is the owner's separate project (github.com/embed-my: the site in `embed-my.github.io`, the
-  guides in `.github/docs/`), on this player since 2026-10-08: it turns a package link into an
-  iframe snippet with a live preview and the display options as checkboxes, and serves the
-  `/embed` page itself at `https://embed-my.github.io/h5p`, with `h5p-resizer.js` beside it —
-  the GitHub Pages address rather than embed-my.org on purpose, since the project keeps it for
-  as long as it is on GitHub, which forwards it to the domain. Its page is this player bundled
-  by Vite, so its worker lands under `/assets/` and takes scope `/assets/h5p/`; its preview
-  still frames this site's `/embed`. Measured on 2026-10-08 from a page on another origin
-  carrying the exact snippet the service writes: `ready` in 3.9 s, the quiz rendered, the
-  height applied, no console errors; opened on its own it asks before opening a package from
-  another origin, as `/embed` does. So the README, the setup guide, the skill, the demo's setup
-  page and the player page's embed dialog (`player-page.js`, `EMBED_ORIGIN`) name Embed My's
-  page and script, and `/embed` stays as the same page on this site: the demo's embed example
-  frames it, since `tests/embed.test.ts` drives that page through the dev server with no
-  network. Two things to keep in mind. `/embed`'s query parameters (`src`, the bare `frame`,
-  `copyright` and `export`, `xapi`) and its two message shapes — the resizer protocol upward
-  and the `h5p-offline-player` xAPI relay — are an interface another repository builds on
+  guides in `.github/docs/`): paste a package link, get a live preview, a package check and a
+  snippet. From 2026-10-08 the README, the setup guide, the skills, the demo's setup page and the
+  player page's embed dialog named its page as *the* Embed setup, and an `h5p-embed-my` skill
+  walked an agent through pasting its snippet into a live page. Repositioned on 2026-10-09 by the
+  owner: a public service cannot pass a GDPR, security or vendor review — every learner's browser
+  connects to an origin the host has no data processing agreement with, the package URL passes
+  through it, and that origin plays whatever anyone points it at. So the Embed setup is now the
+  `/embed` page served from a player domain the host runs (a separate registrable domain holding
+  nothing else); the docs use `https://h5p-player.example.net/embed` and `/resizer.js` in their
+  snippets and mention Embed My only for trying a package first; the player page's embed dialog
+  (`EMBED_ORIGIN` in `player-page.js`) names this site's own `/embed`; the nav keeps a plain link;
+  the skill is deleted. Still true: `/embed`'s query parameters (`src`, the bare `frame`,
+  `copyright` and `export`, `xapi`) and its two message shapes — the resizer protocol upward and
+  the `h5p-offline-player` xAPI relay — are an interface Embed My builds on
   (`embed-my.github.io/src/snippet.ts` and its copy of the page), so a change to one means a
-  change there with it. And a listener on an embedding page sees the frame's messages from
-  `https://embed-my.org`, where the GitHub Pages address forwards, not from the address in the
-  snippet — the setup guide says so.
+  change there with it. `tests/embed.test.ts` drives this site's `/embed` through the dev server.
 - **The pages carry their metadata, and the origin is filled in at build time.** Titles,
   descriptions, canonical links, Open Graph and Twitter tags, JSON-LD for the software on the
   front page, `robots.txt` and `sitemap.xml`, and the GitHub link at the right of every page's
@@ -1538,15 +1535,20 @@ libraries.txt` and that file lists every one. Moving our code to the GPL was con
 GPL dependency is what corporate policies and scanners refuse. MPL-2.0 remains the middle ground
 if closed forks ever matter.
 
-**The setups are named, and Embed comes first.** Decided on 2026-10-09: the guide, the README,
-the demo's setup page and the `h5p-player-setup` skill open with a *Which setup* table that
-chooses by what is on the site's origin — signed-in users, or packages the site did not make,
-mean **Embed**; the element's API with trusted packages means **Install** (with a bundler, or
-without a build step). The reason is the one *What a public demo means* gives: a package is
-JavaScript, and installed, it runs as the host site. Embed My made the safe setup the easy one
-as well, so it no longer belongs last, as the fallback for sites that cannot host a file. The
-letters are gone from the user docs, which say "formerly Setup C" under each heading; this
-file and Embed My's guides still say Setup A (bundler), B (no build step) and C (Embed).
+**The setups are named, both are self-hosting, and Install comes first.** Decided on
+2026-10-09, after Embed My was repositioned as a test tool: the player's main benefit is that a
+host runs H5P on its own infrastructure — no H5P server, no backend, no third-party service in
+the learner's path — and the README, the setup guide, the demo's setup page ("Host it
+yourself"), the front page, the social card and the `h5p-player-setup` skill lead with that.
+Earlier the same day Embed had been put first, on the ground that Embed My made the safe setup
+the easy one; with Embed My out of production that ground is gone, so the documents present
+**Install** (with a bundler, or without a build step) first and **Embed** — the `/embed` page on
+a separate player domain the host runs — second. The *Which setup* table still chooses by what
+is on the site's origin, and its safety rows still win: signed-in users, or packages the site
+did not make, mean Embed, for the reason *What a public demo means* gives — a package is
+JavaScript, and installed, it runs as the host site. The letters are gone from the user docs,
+which say "formerly Setup A/B/C" under each heading; this file and Embed My's guides still say
+Setup A (bundler), B (no build step) and C (Embed).
 
 ## Where this differs from the written design
 

@@ -4,8 +4,11 @@
 [![licence](https://img.shields.io/npm/l/%40missing-elements%2Fh5p-offline-player)](https://github.com/missing-elements/h5p-offline-player/blob/main/LICENSE)
 [![skills.sh](https://skills.sh/b/missing-elements/h5p-offline-player)](https://skills.sh/missing-elements/h5p-offline-player)
 
-A browser-only H5P player, as one web component, self-hostable and builds fully offline PWA. It plays an arbitrary `.h5p` archive from a URL
-or from disk — no server-side extraction, no backend, nothing to unpack ahead of time.
+Self-hosted H5P without an H5P server. One web component that you put on your own site —
+static hosting is enough — to play `.h5p` packages from your own URLs or from disk: no Moodle,
+WordPress or Lumi, no backend, no extraction step, and no third-party service between your
+learners and your content. The archive is read in place in the browser, and the same component
+builds a fully offline app (PWA).
 
 **Try it:** 
 
@@ -13,7 +16,7 @@ or from disk — no server-side extraction, no backend, nothing to unpack ahead 
 
 [Offline app (PWA)](https://h5p-offline-player.vercel.app/app/) — install it in Chrome or Edge and play `.h5p` files with no network
 
-[Embed My](https://embed-my.org/) — paste a link to a package and copy an iframe snippet for any site; a separate project built on this player
+[Embed My](https://embed-my.org/) — a test tool, not for production: paste a link to a package and see whether it plays; a separate project built on this player
 
 ```html
 <script type="module" src="h5p-player.js"></script>
@@ -24,42 +27,23 @@ Setting `src` loads, the way it does on `<video>`.
 
 ## Getting started
 
-An H5P package is JavaScript, and the player runs it on the origin that serves the frame. So
-the first question is not your tooling but what lives on your site's origin:
+Everything runs on infrastructure you control: your site, your package host, your storage. There
+are two ways to self-host it, and which one fits depends on what lives on your site's origin,
+because an H5P package is JavaScript and the player runs it on the origin that serves the frame:
 
 | Your site | Setup |
 |---|---|
-| Has signed-in users, or plays packages you did not make | **Embed** |
-| Cannot host a file: a page builder, a hosted CMS, an LMS page | **Embed** with Embed My |
-| Needs the element's API — results with the learner's identity to your own backend, `resume="host"`, cmi5, a file picker — and plays only packages you made | **Install** |
-| A static site with no sessions, playing your own packages | Either |
+| Needs the element's API — results with the learner's identity to your own backend, `resume="host"`, cmi5, a file picker — and plays only packages you made | **Install** it on the site |
+| A static site with no sessions, playing your own packages | **Install**, or embed if you would rather keep packages off it |
+| Has signed-in users, or plays packages you did not make | **Embed**: the player page on a separate domain you run |
+| Cannot host a file: a page builder, a hosted CMS, an LMS page | **Embed**, from a player domain your organisation runs |
 
 When a site has signed-in users *and* needs the API, the safety rows win: embed a player page you
 host on a domain of its own, or install only on an origin that holds no session.
 
-Embedded, a package runs on the frame's origin and never sees your cookies, storage or page; you
-get results as relayed xAPI and nothing else. Installed, you get the element's whole API, and
-every package runs as your site. The setup guide's *Which setup* has the full table and the costs.
-
-### Embed
-
-The player in an iframe, on another origin: frame the embed page of
-[Embed My](https://embed-my.org/), a separate service built on this player. It sizes itself
-through H5P's own resizer protocol and relays xAPI statements to your page on request, and takes
-the display options below as query parameters (`&frame&copyright`, `&activity-id=…`). Embed My
-writes the snippet for you, with a live preview and the display options as checkboxes, and its
-[guides](https://github.com/embed-my/.github/tree/main/docs) cover hosting a package and testing
-the page. To keep a third party out of the path, serve the same page from a domain of your own;
-see *Embed* in the setup guide. This site's `/embed` is the same page, and a
-third-party site frames it from GitHub Pages: [alekswebnet.github.io/h5p](https://alekswebnet.github.io/h5p/).
-
-```html
-<iframe src="https://embed-my.github.io/h5p?src=https://h5p-offline-player.vercel.app/demo/content/quiz.h5p&xapi=https://your-site.example"
-        allow="fullscreen" style="width: 100%; border: 0"></iframe>
-<script src="https://embed-my.github.io/h5p-resizer.js"></script>
-```
-
-The script line sizes the iframe to the content; without it the frame keeps the height your CSS gives it.
+Installed, you get the element's whole API, and every package runs as your site. Embedded, a
+package runs on the player domain and never sees your cookies, storage or page; you get results
+as relayed xAPI and nothing else. The setup guide's *Which setup* has the full table and the costs.
 
 ### Install with a bundler
 
@@ -114,7 +98,31 @@ Copy `dist/h5p-sw.js` from the same CDN path onto your site and point `sw` at it
 loads from the CDN, from its own package. At the root the worker's scope is `/h5p/`, not `/`, so
 an existing site worker is left alone.
 
-Requirements, for every setup: the page is on `https://` or `localhost`, and the package's host sends CORS
+### Embed
+
+The player in an iframe, on a player domain of your own: serve the embed page — this
+repository's `/embed`, `apps/demo/embed.html` with `demo/embed-page.js` — from a domain that
+holds nothing else, and frame it. It sizes itself through H5P's own resizer protocol, relays xAPI statements to
+your page on request, and takes the display options below as query parameters
+(`&frame&copyright`, `&activity-id=…`). Use a separate registrable domain, not a subdomain of
+your site, which would receive its cookies; see *Embed* in the setup guide. A third-party site
+frames this site's `/embed` from GitHub Pages: [alekswebnet.github.io/h5p](https://alekswebnet.github.io/h5p/).
+
+```html
+<iframe src="https://h5p-player.example.net/embed?src=https://h5p-offline-player.vercel.app/demo/content/quiz.h5p&xapi=https://your-site.example"
+        allow="fullscreen" style="width: 100%; border: 0"></iframe>
+<script src="https://h5p-player.example.net/resizer.js"></script>
+```
+
+The script line sizes the iframe to the content; without it the frame keeps the height your CSS gives it.
+
+[Embed My](https://embed-my.org/) runs the same page as a public service, for trying a package
+before you embed it: whether its URL can be fetched, whether it carries its libraries, what the
+display options look like. It is a test tool, not somewhere to send learners: their browsers
+would connect to a service you have no agreement with, which a GDPR, security or vendor review
+will not pass.
+
+Requirements, for both setups: the page is on `https://` or `localhost`, and the package's host sends CORS
 headers. `Range` support on the host is optional; without it the archive is downloaded once and
 played from the browser's cache.
 
@@ -261,18 +269,17 @@ run over seven content types found.
 
 ## Agent skills
 
-The repository ships four [agent skills](https://agentskills.io) under `skills/`, for Claude
+The repository ships three [agent skills](https://agentskills.io) under `skills/`, for Claude
 Code, Cursor, Copilot, Codex and the rest:
 
 ```bash
-npx skills add missing-elements/h5p-offline-player                       # all four
+npx skills add missing-elements/h5p-offline-player                       # all three
 npx skills add missing-elements/h5p-offline-player --skill h5p-verify    # one
 ```
 
 | Skill | For an agent that |
 |---|---|
 | `h5p-player-setup` | is asked to put H5P content on a website: which setup, the exact lines, how to check it, what goes wrong |
-| `h5p-embed-my` | is asked to embed an H5P package on a page with nothing installed, through [Embed My](https://embed-my.org/): the package URL to check, the snippet, where to paste it, the xAPI relay, what the service is not |
 | `h5p-normalize` | hears that a package's video takes minutes to start, or publishes packages to a static host: diagnose with a dry run, rewrite once, keep the revision |
 | `h5p-verify` | generates or rewrites `.h5p` packages: run `h5p-verify` before claiming one works, and read what it reports |
 

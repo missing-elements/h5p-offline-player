@@ -145,7 +145,6 @@ p code, li code, .lede code { padding: 0.1em 0.35em; border-radius: 4px; backgro
 .topbar nav { display: flex; flex-wrap: wrap; gap: 0.25rem; min-width: 0; margin-left: auto; }
 
 .topbar nav a {
-  position: relative; /* the box a .nav-tag floats over */
   padding: 0.375rem 0.7rem;
   border-radius: 999px;
   color: var(--muted);
@@ -156,26 +155,6 @@ p code, li code, .lede code { padding: 0.1em 0.35em; border-radius: 4px; backgro
 
 .topbar nav a:hover { background: var(--surface-2); color: var(--fg); }
 .topbar nav a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
-
-/* A small "new" pill floating over a nav entry's top-right corner, for the Embed My link: the
-   link is the positioning box, and the tag sits out of the flow so the text keeps its place. The
-   accent as the fill and the page background as the text, so it reads in both themes (the dark
-   accent is a light blue). */
-.topbar nav .nav-tag {
-  position: absolute;
-  top: -0.2rem;
-  right: -0.25rem;
-  padding: 0.05rem 0.3rem;
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--bg);
-  font-size: 0.48rem;
-  font-weight: 600;
-  line-height: 1.2;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  pointer-events: none;
-}
 
 /* The right-hand end: the theme switch and the repository, as icons, after the nav. */
 .topbar-actions { display: flex; align-items: center; gap: 0.25rem; }

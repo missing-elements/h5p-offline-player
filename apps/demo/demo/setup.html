@@ -4,22 +4,22 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Setting it up — h5p-offline-player</title>
-    <meta name="description" content="How to put the H5P player on a page, and which way suits your site: embedded in an iframe on another origin, or installed with or without a bundler. What has to live where, and the events to listen for." />
+    <meta name="description" content="How to self-host the H5P player: install it on your own site, with or without a bundler, or serve its player page from a domain of your own and frame it. What has to live where, and which way suits your site." />
     <link rel="canonical" href="%SITE_URL%/demo/setup.html" />
     <meta name="theme-color" content="#2f6df6" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="h5p-offline-player" />
     <meta property="og:locale" content="en_US" />
     <meta property="og:title" content="Setting it up — h5p-offline-player" />
-    <meta property="og:description" content="How to put the H5P player on a page, and which way suits your site: embedded in an iframe on another origin, or installed with or without a bundler. What has to live where, and the events to listen for." />
+    <meta property="og:description" content="How to self-host the H5P player: install it on your own site, with or without a bundler, or serve its player page from a domain of your own and frame it. What has to live where, and which way suits your site." />
     <meta property="og:url" content="%SITE_URL%/demo/setup.html" />
     <meta property="og:image" content="%SITE_URL%/demo/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="h5p-offline-player: play H5P packages in the browser, with no server" />
+    <meta property="og:image:alt" content="h5p-offline-player: self-hosted H5P, with no H5P server" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Setting it up — h5p-offline-player" />
-    <meta name="twitter:description" content="How to put the H5P player on a page, and which way suits your site: embedded in an iframe on another origin, or installed with or without a bundler. What has to live where, and the events to listen for." />
+    <meta name="twitter:description" content="How to self-host the H5P player: install it on your own site, with or without a bundler, or serve its player page from a domain of your own and frame it. What has to live where, and which way suits your site." />
     <meta name="twitter:image" content="%SITE_URL%/demo/og-image.png" />
     <link rel="icon" type="image/svg+xml" href="/demo/favicon.svg" />
     <!-- Ahead of the stylesheet, so a pinned theme is on <html> before anything is painted. A
@@ -37,7 +37,7 @@
         <a href="/demo/setup.html" aria-current="page">Setup</a>
         <a href="/demo/normalize.html">Normalize</a>
         <a href="/demo/">Examples</a>
-        <a href="https://embed-my.org/" rel="noopener">Embed My<span class="nav-tag">new</span></a>
+        <a href="https://embed-my.org/" rel="noopener">Embed My</a>
       </nav>
       <div class="topbar-actions">
         <button type="button" class="icon-button theme-toggle" aria-label="Switch theme">
@@ -54,11 +54,13 @@
 
     <main>
       <p class="eyebrow">Setup</p>
-      <h1>Three ways to put it on a page</h1>
+      <h1>Host it yourself</h1>
       <p class="lede">
-        Embed it in an iframe, or install it on your site with or without a bundler. Which one
-        depends less on your tooling than on what lives on your site: an H5P package is
-        JavaScript, and the player runs it on the origin that serves the frame.
+        Everything runs on infrastructure you control: no H5P server, no backend, no third-party
+        service between your learners and your content. Install it on your site, with or without a
+        bundler, or serve its player page from a domain of your own and frame it. Which one depends
+        less on your tooling than on what lives on your site: an H5P package is JavaScript, and the
+        player runs it on the origin that serves the frame.
       </p>
 
       <h2>Which setup</h2>
@@ -67,11 +69,11 @@
           <tr><th>Your site</th><th>Setup</th></tr>
         </thead>
         <tbody>
-          <tr><td>Has signed-in users: an LMS, a school or company portal, anything with accounts or an admin area</td><td><a href="#embed"><strong>Embed</strong></a></td></tr>
-          <tr><td>Plays packages you did not make: uploads, links from users or teachers, a marketplace</td><td><a href="#embed"><strong>Embed</strong></a></td></tr>
-          <tr><td>Cannot host a file: a page builder, a hosted CMS, an LMS page you only edit</td><td><a href="#embed"><strong>Embed</strong></a> with Embed My</td></tr>
           <tr><td>Needs the element's API — results with the learner's identity to your own backend, <code>resume="host"</code>, cmi5, a file picker — and plays only packages your team made</td><td><a href="#bundler"><strong>Install</strong></a>, with a bundler or <a href="#no-build">without one</a></td></tr>
-          <tr><td>A static site with no sessions, playing your own packages</td><td>Either: Embed is less to maintain, Install keeps every request on your domain</td></tr>
+          <tr><td>A static site with no sessions, playing your own packages</td><td><a href="#bundler"><strong>Install</strong></a>: every request stays on your domain. Embed works too, at the cost of a second domain</td></tr>
+          <tr><td>Has signed-in users: an LMS, a school or company portal, anything with accounts or an admin area</td><td><a href="#embed"><strong>Embed</strong></a>, from a player domain you run</td></tr>
+          <tr><td>Plays packages you did not make: uploads, links from users or teachers, a marketplace</td><td><a href="#embed"><strong>Embed</strong></a>, from a player domain you run</td></tr>
+          <tr><td>Cannot host a file: a page builder, a hosted CMS, an LMS page you only edit</td><td><a href="#embed"><strong>Embed</strong></a>, from a player domain your organisation runs</td></tr>
         </tbody>
       </table>
       <p>
@@ -80,36 +82,13 @@
         the player only on an origin that holds no session.
       </p>
       <p>
-        Embedded, a package runs on the frame's origin and never sees your page, cookies, storage
-        or APIs; results reach you as relayed xAPI, and storage is kept per embedding site.
         Installed, you get the element's whole API and every event on your page, and every package
         runs as your site: play only packages you trust as your own code, and ask before opening
-        one from a link. In every setup the package is named by <code>src</code> — the element's
+        one from a link. Embedded, a package runs on the player domain and never sees your page,
+        cookies, storage or APIs; results reach you as relayed xAPI, and storage is kept per
+        embedding site. In every setup the package is named by <code>src</code> — the element's
         attribute, or <code>?src=</code> on the embed page — and naming it loads and plays, the way
         it does on <code>&lt;video&gt;</code>.
-      </p>
-
-      <h2 id="embed">Embed</h2>
-      <p>
-        Frame the player page; it runs on its own origin, never on yours.
-        <a href="https://embed-my.org/" rel="noopener">Embed My</a>, a separate service built on
-        this player, serves it and writes the snippet for you: paste the package's link, preview
-        it, tick the display options and copy. The page sizes itself through
-        H5P's own resizer protocol and relays xAPI statements to your page on request. The address
-        also takes <code>libraries</code>, <code>preload=auto</code> and the element's display options
-        by their attribute names: <code>frame</code>, <code>copyright</code>, <code>export</code>,
-        <code>icon</code>, <code>fullscreen=off</code>, <code>reporting</code>, <code>activity-id</code>
-        and <code>custom-css</code>.
-        <a href="/demo/embed.html">The embed example</a> frames this site's own copy of the page,
-        <code>/embed</code>, and shows the two listeners.
-      </p>
-      <pre class="code">&lt;iframe src="https://embed-my.github.io/h5p?src=%SITE_URL%/demo/content/quiz.h5p&amp;xapi=https://your-site.example"
-        allow="fullscreen" style="width: 100%; border: 0"&gt;&lt;/iframe&gt;
-&lt;script src="https://embed-my.github.io/h5p-resizer.js"&gt;&lt;/script&gt;</pre>
-      <p>
-        To keep a third party out of the path, serve the same page from a domain of your own. Use a
-        separate registrable domain — <code>h5p-player.example.net</code>, not a subdomain of your
-        site, which would receive its cookies — and keep nothing else on it.
       </p>
 
       <h2>What has to be where, when installed</h2>
@@ -179,6 +158,30 @@ document.querySelector('h5p-player').runtime = runtime</pre>
         <code>assets-base</code> names. Putting the worker at the
         root is safe: its scope becomes <code>/h5p/</code>, not <code>/</code>. The element warns in
         the console when the worker and the element are different versions, so update both together.
+      </p>
+
+      <h2 id="embed">Embed</h2>
+      <p>
+        Serve the player page, this site's <code>/embed</code>, from a domain of your own and frame
+        it; the player runs on that origin, never on yours. Use a separate registrable domain —
+        <code>h5p-player.example.net</code>, not a subdomain of your site, which would receive its
+        cookies — and keep nothing else on it. The page sizes itself through
+        H5P's own resizer protocol and relays xAPI statements to your page on request. The address
+        also takes <code>libraries</code>, <code>preload=auto</code> and the element's display options
+        by their attribute names: <code>frame</code>, <code>copyright</code>, <code>export</code>,
+        <code>icon</code>, <code>fullscreen=off</code>, <code>reporting</code>, <code>activity-id</code>
+        and <code>custom-css</code>.
+        <a href="/demo/embed.html">The embed example</a> frames this site's own copy of the page,
+        <code>/embed</code>, and shows the two listeners.
+      </p>
+      <pre class="code">&lt;iframe src="https://h5p-player.example.net/embed?src=%SITE_URL%/demo/content/quiz.h5p&amp;xapi=https://your-site.example"
+        allow="fullscreen" style="width: 100%; border: 0"&gt;&lt;/iframe&gt;
+&lt;script src="https://h5p-player.example.net/resizer.js"&gt;&lt;/script&gt;</pre>
+      <p>
+        To try a package before you embed it, <a href="https://embed-my.org/" rel="noopener">Embed My</a>
+        runs the same page as a public test tool: it shows whether the package can be fetched and
+        carries its libraries. Do not embed from it in production: learners&rsquo; browsers would
+        connect to a service you have no data processing agreement with.
       </p>
 
       <h2>Requirements</h2>

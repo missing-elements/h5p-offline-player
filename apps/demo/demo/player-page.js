@@ -191,26 +191,25 @@ const applyLibrarySource = () => {
 let reload = null
 
 /**
- * Where the embed snippets point: Embed My, the embedding service built on this player, which
- * serves the same page as this site's `/embed` at `/h5p` and the sizing script beside it. Its
- * GitHub Pages address rather than embed-my.org, as its own snippets have it: the project keeps
- * that address for as long as it is on GitHub, which forwards it to the domain.
+ * Where the embed snippets point: this site's own `/embed` and `/resizer.js`, the page a host
+ * serves from a player domain of its own. Not Embed My, which runs the same page as a test tool:
+ * a snippet offered here gets pasted into live pages, and those should not send learners to a
+ * third-party service.
  */
-const EMBED_ORIGIN = 'https://embed-my.github.io'
+const EMBED_ORIGIN = location.origin
 
 /**
- * What the H5P embed button offers: the Embed setup, Embed My's page around the package, with H5P's own
+ * What the H5P embed button offers: the Embed setup, this site's page around the package, with H5P's own
  * `:w` and `:h` standing for the size the dialog lets the visitor pick. Set per load, since it
  * names the package; a picked file has no URL to embed, and the button stays off.
  */
 const embedCodeFor = (url) =>
-  `<iframe src="${EMBED_ORIGIN}/h5p?src=${encodeURIComponent(new URL(url, location.href).href)}" width=":w" height=":h" allow="fullscreen" style="border: 0"></iframe>`
+  `<iframe src="${EMBED_ORIGIN}/embed?src=${encodeURIComponent(new URL(url, location.href).href)}" width=":w" height=":h" allow="fullscreen" style="border: 0"></iframe>`
 
 // The sizing script the embed dialog offers under "advanced": the page speaks H5P's resizer
-// protocol upward, and `h5p-resizer.js` beside it is the page-side half (`/resizer.js` here is
-// the same script), so the embedding page sends nothing to h5p.org, whose own `h5p-resizer.js`
-// speaks the same protocol and would do too.
-player.setAttribute('resize-code', `<script src="${EMBED_ORIGIN}/h5p-resizer.js"></script>`)
+// protocol upward, and `/resizer.js` is the page-side half, so the embedding page sends nothing
+// to h5p.org, whose own `h5p-resizer.js` speaks the same protocol and would do too.
+player.setAttribute('resize-code', `<script src="${EMBED_ORIGIN}/resizer.js"></script>`)
 
 const loadUrl = (url) => {
   log.textContent = ''

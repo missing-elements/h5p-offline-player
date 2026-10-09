@@ -39,7 +39,7 @@ const html = `<!doctype html>
   <body>
     <div class="brand"><div class="mark">H5P</div>h5p-offline-player</div>
     <div>
-      <h1>Play H5P packages in the browser.<br />No server, no unpacking.</h1>
+      <h1>Self-hosted H5P.<br />No H5P server, no unpacking.</h1>
       <p>A web component that reads a <code>.h5p</code> in place and serves it to the H5P runtime with a Service Worker.</p>
     </div>
     <div class="foot"><span>github.com/missing-elements/h5p-offline-player</span><span>MIT</span></div>

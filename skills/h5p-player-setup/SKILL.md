@@ -1,15 +1,16 @@
 ---
 name: h5p-player-setup
-description: Put an H5P player on a website with no server. Use when asked to play, embed or self-host H5P content or .h5p files on a static site, in an app (Vite, webpack, Next, Astro, plain HTML) or in a CMS, or for H5P without Moodle, WordPress or Lumi. Picks between embedding (an iframe on another origin, the safe default) and installing h5p-offline-player on the site (for the element's API), by what is on the site's origin.
+description: Self-host H5P on a website with no H5P server. Use when asked to play, embed or self-host H5P content or .h5p files on a static site, in an app (Vite, webpack, Next, Astro, plain HTML) or in a CMS, or for H5P without Moodle, WordPress, Lumi or a third-party service. Picks between installing h5p-offline-player on the site (the element's API) and serving its player page from a separate domain the user runs and framing it (for sites with sessions or packages they did not make), by what is on the site's origin.
 license: MIT
 ---
 
-# Put the H5P player on a site
+# Self-host the H5P player
 
 `@missing-elements/h5p-offline-player` is one custom element, `<h5p-player>`. It plays a `.h5p`
 package from a URL or a picked file: the archive is read in place and a Service Worker serves
-its files to the H5P runtime. A site either embeds it — an iframe of a player page on another
-origin, Embed My's or one of its own — or installs it. Installed, three things matter: the
+its files to the H5P runtime. Everything runs on infrastructure the user controls: no H5P
+server, no backend, no third-party service. A site either installs it, or embeds it — an
+iframe of a player page on a separate domain the site's organisation runs. Installed, three things matter: the
 element (`h5p-player.js`), the worker (`h5p-sw.js`) and the runtime, which is a second package,
 `@missing-elements/h5p-runtime`, because it is GPL-3.0 while the player is MIT. Only the worker
 has to be served from the site's own origin; browsers refuse a cross-origin Service Worker.
@@ -25,11 +26,11 @@ picker; can it host a file at all.
 
 | The site | Setup |
 |---|---|
-| Has signed-in users: an LMS, a portal, anything with accounts or an admin area | **Embed** |
-| Plays packages it did not make: uploads, links from users or teachers, a marketplace | **Embed** |
-| Cannot host a file: a page builder, a hosted CMS, an LMS page the user only edits | **Embed**, with Embed My — use the `h5p-embed-my` skill |
 | Needs the element's API (above) and plays only packages its own team made | **Install**: with a bundler if it has one (Vite, webpack 5, Rollup, Next, Nuxt, Astro, SvelteKit), else without a build step |
-| Static, no sessions, its own packages | Either; offer **Embed** as less to maintain, **Install** to keep every request on its own domain |
+| Static, no sessions, its own packages | **Install**, keeping every request on its own domain; **Embed** works too, at the cost of a second domain |
+| Has signed-in users: an LMS, a portal, anything with accounts or an admin area | **Embed**, from a player domain the organisation runs |
+| Plays packages it did not make: uploads, links from users or teachers, a marketplace | **Embed**, from a player domain the organisation runs |
+| Cannot host a file: a page builder, a hosted CMS, an LMS page the user only edits | **Embed**, from a player domain the organisation runs; the page itself only takes the snippet |
 
 When the site has sessions *and* needs the API, the safety rows win, and say why: installed,
 every package runs as the site. Offer the two ways out — embed a player page hosted on a
@@ -38,25 +39,6 @@ that holds no session (a separate origin for the course pages) — and install o
 origin only if the user confirms every package is their own team's.
 
 ## 2. Do it
-
-**Embed**
-
-For a person pasting into a page builder or a CMS, the `h5p-embed-my` skill has the whole of
-it: the package URL to check, the snippet, where it goes, results. In short:
-
-```html
-<iframe src="https://embed-my.github.io/h5p?src=https://h5p-offline-player.vercel.app/demo/content/quiz.h5p"
-        allow="fullscreen" style="width: 100%; border: 0"></iframe>
-<script src="https://embed-my.github.io/h5p-resizer.js"></script>
-```
-
-The script line sizes the iframe to the content; a page that already has h5p.org's `h5p-resizer.js` needs no second one.
-Add `&xapi=<your page's origin>` to receive statements by `postMessage`, and the element's
-display attributes as parameters (`&frame&copyright&export`, `&activity-id=<IRI>`,
-`&custom-css=<URL>`). The embedding page must be https (or localhost); the frame registers its
-own worker there, in Safari and on iOS too. For no third party in the path, the same page can
-be served from a domain of the site's own — a separate registrable domain, not a subdomain, and
-one that holds nothing else (the setup guide's *Embed* section).
 
 **Install with a bundler**
 
@@ -122,6 +104,52 @@ shared machine the state one person leaves is what the next one finds, so a site
 takes `host`, a kiosk or a classroom device takes neither, and a learner's own device takes
 `resume`. Either way nothing is sent anywhere, and xAPI statements are still not stored.
 
+**Embed**
+
+The player page is h5p-offline-player's `/embed` (`apps/demo/embed.html` with
+`demo/embed-page.js` in the repository, built with its `vite.config.ts`), served from a domain
+of the organisation's own: a separate registrable domain (`h5p-player.example.net`, not a
+subdomain of the site, which would receive its cookies) that holds nothing else — no accounts,
+no cookies. The site's page then carries:
+
+```html
+<iframe src="https://h5p-player.example.net/embed?src=https://host.example/activities/week-1-quiz.h5p&frame&copyright&export"
+        title="Week 1 knowledge check" loading="lazy" allow="fullscreen"
+        style="width: 100%; min-height: 540px; border: 0"></iframe>
+<script src="https://h5p-player.example.net/resizer.js"></script>
+```
+
+The script line sizes the iframe to the content; a page that already has h5p.org's
+`h5p-resizer.js` needs no second one. `title` is what screen readers announce, so name the
+activity; `min-height` is for a platform that strips the script. Encode `&`, `#`, `+`, `%` and
+spaces inside `src`. Parameters, by the element's attribute names: `libraries=hub` or
+`libraries=<url>` for a package without libraries, `preload=auto`, `frame`, `copyright`,
+`export`, `icon`, `reporting`, `fullscreen=off`, `activity-id=<IRI>`, `custom-css=<URL>`, and
+`xapi=<the page's origin>` to receive statements by `postMessage`. Not `custom-js` or `user`.
+
+Paste it into the platform's HTML block (Custom HTML in WordPress, Embed in Squarespace, Wix or
+Google Sites, HTML view in Moodle). The embedding page must be https (or localhost); the frame
+registers its own worker there, in Safari and on iOS too. A CSP on the site needs `frame-src
+https://h5p-player.example.net`. With `xapi=`, listen for the relay and check where it came from:
+
+```js
+const frame = document.querySelector('iframe')
+addEventListener('message', ({ source, origin, data }) => {
+  if (source !== frame.contentWindow || origin !== 'https://h5p-player.example.net') return
+  if (data?.context !== 'h5p-offline-player') return
+  if (data.action === 'xapi') send(data.statement)      // every statement
+  if (data.action === 'finished') send(data.statement)  // the final one, with result.score
+})
+```
+
+Those checks prove the sender, not the score: any package can post any statement, so relayed
+results are the learner's report, not proof for a grade.
+
+Do not embed from Embed My (embed-my.org) or from the demo site in production: Embed My is a
+test tool — every learner's browser would connect to a service the organisation has no data
+processing agreement with, which a GDPR or security review will not pass. It is fine for trying
+whether a package embeds before the domain is set up.
+
 ## 3. Check it
 
 1. The page is served over `https://` or `localhost`, never `file://`.
@@ -154,7 +182,7 @@ takes `host`, a kiosk or a classroom device takes neither, and a learner's own d
 
 ## 5. Hand over
 
-For an embed, hand over as the `h5p-embed-my` skill says. For an install, tell the user three
+For an embed, tell the user the player page's domain is theirs to keep running and must hold nothing else, that results are the page's to collect through the relay or there are none, and that a package runs its own scripts on that domain. For an install, tell the user three
 things. The player is MIT; the H5P core runtime it loads is GPL-3.0, which
 is why it is the separate package `@missing-elements/h5p-runtime`, whose `LICENSE.txt` and
 `NOTICE.txt` must stay with any copy of its `dist/` — the player links against none of it and

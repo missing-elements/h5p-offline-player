@@ -4,22 +4,22 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Embedding the player page — h5p-offline-player</title>
-    <meta name="description" content="For a site that cannot host a file: frame the player page, size it with H5P's own resizer protocol, and receive xAPI statements on request." />
+    <meta name="description" content="The player page on a domain of your own, framed by your site: sized with H5P's own resizer protocol, with xAPI statements relayed on request." />
     <link rel="canonical" href="%SITE_URL%/demo/embed.html" />
     <meta name="theme-color" content="#2f6df6" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="h5p-offline-player" />
     <meta property="og:locale" content="en_US" />
     <meta property="og:title" content="Embedding the player page — h5p-offline-player" />
-    <meta property="og:description" content="For a site that cannot host a file: frame the player page, size it with H5P's own resizer protocol, and receive xAPI statements on request." />
+    <meta property="og:description" content="The player page on a domain of your own, framed by your site: sized with H5P's own resizer protocol, with xAPI statements relayed on request." />
     <meta property="og:url" content="%SITE_URL%/demo/embed.html" />
     <meta property="og:image" content="%SITE_URL%/demo/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="h5p-offline-player: play H5P packages in the browser, with no server" />
+    <meta property="og:image:alt" content="h5p-offline-player: self-hosted H5P, with no H5P server" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Embedding the player page — h5p-offline-player" />
-    <meta name="twitter:description" content="For a site that cannot host a file: frame the player page, size it with H5P's own resizer protocol, and receive xAPI statements on request." />
+    <meta name="twitter:description" content="The player page on a domain of your own, framed by your site: sized with H5P's own resizer protocol, with xAPI statements relayed on request." />
     <meta name="twitter:image" content="%SITE_URL%/demo/og-image.png" />
     <link rel="icon" type="image/svg+xml" href="/demo/favicon.svg" />
     <!-- Ahead of the stylesheet, so a pinned theme is on <html> before anything is painted. A
@@ -37,7 +37,7 @@
         <a href="/demo/setup.html">Setup</a>
         <a href="/demo/normalize.html">Normalize</a>
         <a href="/demo/" aria-current="page">Examples</a>
-        <a href="https://embed-my.org/" rel="noopener">Embed My<span class="nav-tag">new</span></a>
+        <a href="https://embed-my.org/" rel="noopener">Embed My</a>
       </nav>
       <div class="topbar-actions">
         <button type="button" class="icon-button theme-toggle" aria-label="Switch theme">
@@ -55,22 +55,21 @@
     <main>
       <h1>Embedding the player page</h1>
       <p class="lede">
-        For a site that cannot host even one file. The player runs on its own origin, so a hostile
+        The player page served from a domain of its own and framed by your site. The player runs on its own origin, so a hostile
         archive reaches the player&rsquo;s data and not the embedding site&rsquo;s, and storage is
         partitioned per embedding site. The embedding page hears what it asks for: the frame&rsquo;s
         height always, and the xAPI statements when the address names the page&rsquo;s own origin.
         The address also takes the element&rsquo;s display options: this example asks for H5P&rsquo;s
         action bar with the download and rights-of-use buttons.
-        <a href="https://embed-my.org/" rel="noopener">Embed My</a> serves this page at an address
-        of its own and writes the snippet: paste a package link, preview it, tick the options and
-        copy. This example frames this site&rsquo;s own copy.
+        In production, serve this page from a domain your organisation runs;
+        <a href="https://embed-my.org/" rel="noopener">Embed My</a> runs it as a test tool, for
+        trying a package before you embed it, not for learners.
       </p>
 
       <iframe id="embed" title="H5P player" class="embed-frame" frameBorder="0" allow="fullscreen"></iframe>
 
       <h2>Markup</h2>
-      <pre class="code">&lt;!-- Embed My serves the same page at https://embed-my.github.io/h5p, with h5p-resizer.js
-     beside it, which is what its snippets and the setup guide name. This site's copy: --&gt;
+      <pre class="code">&lt;!-- This site's copy of the page; in production, your own player domain's. --&gt;
 &lt;iframe src="%SITE_URL%/embed?src=%SITE_URL%/demo/content/quiz.h5p&amp;xapi=https://your-site.example"
         allow="fullscreen" style="width: 100%; border: 0"&gt;&lt;/iframe&gt;
 

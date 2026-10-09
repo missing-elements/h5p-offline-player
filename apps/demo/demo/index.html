@@ -4,22 +4,22 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Examples — h5p-offline-player</title>
-    <meta name="description" content="The whole integration in two lines, and the other ways to embed a browser-only H5P player: xAPI, cmi5, a file from disk, an iframe, two players on one page." />
+    <meta name="description" content="The whole integration in two lines, and the other ways to self-host a browser-only H5P player: xAPI, cmi5, a file from disk, a player domain of your own, two players on one page." />
     <link rel="canonical" href="%SITE_URL%/demo/" />
     <meta name="theme-color" content="#2f6df6" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="h5p-offline-player" />
     <meta property="og:locale" content="en_US" />
     <meta property="og:title" content="Examples — h5p-offline-player" />
-    <meta property="og:description" content="The whole integration in two lines, and the other ways to embed a browser-only H5P player: xAPI, cmi5, a file from disk, an iframe, two players on one page." />
+    <meta property="og:description" content="The whole integration in two lines, and the other ways to self-host a browser-only H5P player: xAPI, cmi5, a file from disk, a player domain of your own, two players on one page." />
     <meta property="og:url" content="%SITE_URL%/demo/" />
     <meta property="og:image" content="%SITE_URL%/demo/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="h5p-offline-player: play H5P packages in the browser, with no server" />
+    <meta property="og:image:alt" content="h5p-offline-player: self-hosted H5P, with no H5P server" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Examples — h5p-offline-player" />
-    <meta name="twitter:description" content="The whole integration in two lines, and the other ways to embed a browser-only H5P player: xAPI, cmi5, a file from disk, an iframe, two players on one page." />
+    <meta name="twitter:description" content="The whole integration in two lines, and the other ways to self-host a browser-only H5P player: xAPI, cmi5, a file from disk, a player domain of your own, two players on one page." />
     <meta name="twitter:image" content="%SITE_URL%/demo/og-image.png" />
     <link rel="icon" type="image/svg+xml" href="/demo/favicon.svg" />
     <!-- Ahead of the stylesheet, so a pinned theme is on <html> before anything is painted. A
@@ -38,7 +38,7 @@
         <a href="/demo/setup.html">Setup</a>
         <a href="/demo/normalize.html">Normalize</a>
         <a href="/demo/" aria-current="page">Examples</a>
-        <a href="https://embed-my.org/" rel="noopener">Embed My<span class="nav-tag">new</span></a>
+        <a href="https://embed-my.org/" rel="noopener">Embed My</a>
       </nav>
       <div class="topbar-actions">
         <button type="button" class="icon-button theme-toggle" aria-label="Switch theme">
@@ -59,7 +59,7 @@
       <p class="lede">
         The Service Worker registers itself, and setting <code>src</code> loads the way it does on
         <code>&lt;video&gt;</code>. Nothing is unpacked on a server: the archive is read in place
-        and its files are served to the H5P runtime from inside the browser.
+        and its files are served to the H5P runtime from inside the browser, on a site you host.
       </p>
 
       <h5p-player src="/demo/content/how-it-works.h5p"></h5p-player>
@@ -72,15 +72,15 @@
         <code>@missing-elements/h5p-runtime</code>, as <code>frame-assets/</code> next to
         <code>h5p-player.js</code>, where the element looks by default. With a bundler, hand the
         element the runtime package's export instead; from a CDN, point <code>assets-base</code> at
-        it. <a href="/demo/setup.html">The setup page</a> has both, and when to embed instead.
+        it. <a href="/demo/setup.html">The setup page</a> has both, and when to frame it from a domain of your own instead.
       </p>
 
-      <h2>More ways to embed it</h2>
+      <h2>More ways to host it</h2>
       <ul class="grid">
         <li>
           <a class="card" href="/demo/setup.html">
             <strong>Setting it up</strong>
-            <span>Which setup is for your site — embedded in an iframe, or installed with or without a bundler — what has to live where, and the events to listen for.</span>
+            <span>Which setup is for your site — installed with or without a bundler, or framed from a player domain of your own — what has to live where, and the events to listen for.</span>
           </a>
         </li>
         <li>
@@ -122,7 +122,7 @@
         <li>
           <a class="card" href="/demo/embed.html">
             <strong>iframe embed</strong>
-            <span>For a site that cannot host even one file. The player runs on its own origin; Embed My writes the snippet.</span>
+            <span>The player page on an origin of its own, framed by your site, with the height and the xAPI statements relayed.</span>
           </a>
         </li>
         <li>
