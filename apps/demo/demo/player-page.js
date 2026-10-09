@@ -199,7 +199,7 @@ let reload = null
 const EMBED_ORIGIN = 'https://embed-my.github.io'
 
 /**
- * What the H5P embed button offers: Setup C, Embed My's page around the package, with H5P's own
+ * What the H5P embed button offers: the Embed setup, Embed My's page around the package, with H5P's own
  * `:w` and `:h` standing for the size the dialog lets the visitor pick. Set per load, since it
  * names the package; a picked file has no URL to embed, and the button stays off.
  */

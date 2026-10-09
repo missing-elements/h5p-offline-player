@@ -24,14 +24,53 @@ Setting `src` loads, the way it does on `<video>`.
 
 ## Getting started
 
-The player is three things: the element (`h5p-player.js`, an ES module), a Service Worker script
-(`h5p-sw.js`) and the H5P runtime the frame loads, which is a package of its own,
-[`@missing-elements/h5p-runtime`](https://www.npmjs.com/package/@missing-elements/h5p-runtime),
+An H5P package is JavaScript, and the player runs it on the origin that serves the frame. So
+the first question is not your tooling but what lives on your site's origin:
+
+| Your site | Setup |
+|---|---|
+| Has signed-in users, or plays packages you did not make | **Embed** |
+| Cannot host a file: a page builder, a hosted CMS, an LMS page | **Embed** with Embed My |
+| Needs the element's API — results with the learner's identity to your own backend, `resume="host"`, cmi5, a file picker — and plays only packages you made | **Install** |
+| A static site with no sessions, playing your own packages | Either |
+
+When a site has signed-in users *and* needs the API, the safety rows win: embed a player page you
+host on a domain of its own, or install only on an origin that holds no session.
+
+Embedded, a package runs on the frame's origin and never sees your cookies, storage or page; you
+get results as relayed xAPI and nothing else. Installed, you get the element's whole API, and
+every package runs as your site. The setup guide's *Which setup* has the full table and the costs.
+
+### Embed
+
+The player in an iframe, on another origin: frame the embed page of
+[Embed My](https://embed-my.org/), a separate service built on this player. It sizes itself
+through H5P's own resizer protocol and relays xAPI statements to your page on request, and takes
+the display options below as query parameters (`&frame&copyright`, `&activity-id=…`). Embed My
+writes the snippet for you, with a live preview and the display options as checkboxes, and its
+[guides](https://github.com/embed-my/.github/tree/main/docs) cover hosting a package and testing
+the page. To keep a third party out of the path, serve the same page from a domain of your own;
+see *Embed* in the setup guide. This site's `/embed` is the same page, and a
+third-party site frames it from GitHub Pages: [alekswebnet.github.io/h5p](https://alekswebnet.github.io/h5p/).
+
+```html
+<iframe src="https://embed-my.github.io/h5p?src=https://h5p-offline-player.vercel.app/demo/content/quiz.h5p&xapi=https://your-site.example"
+        allow="fullscreen" style="width: 100%; border: 0"></iframe>
+<script src="https://embed-my.github.io/h5p-resizer.js"></script>
+```
+
+The script line sizes the iframe to the content; without it the frame keeps the height your CSS gives it.
+
+### Install with a bundler
+
+Installed, the player is three things: the element (`h5p-player.js`, an ES module), a
+Service Worker script (`h5p-sw.js`) and the H5P runtime the frame loads, which is a package of
+its own, [`@missing-elements/h5p-runtime`](https://www.npmjs.com/package/@missing-elements/h5p-runtime),
 because it is GPL-3.0 while the player is MIT. The worker is the one file that has to be served
 from **your own origin**, because browsers refuse to register a worker from anywhere else. The
 other two can come from your bundle or from a CDN.
 
-**A · With a bundler** (Vite, webpack 5, Rollup):
+Vite, webpack 5, Rollup. For a site that needs the element's API, playing packages you trust:
 
 ```bash
 # With npm
@@ -60,7 +99,9 @@ package carries none of it. A bundler that does not follow that pattern, esbuild
 leaves the files behind: then serve the player's `dist/` and the runtime's `dist/` from static
 paths and set `sw` and `assets-base` to them.
 
-**B · No build step:**
+### Install without a build step
+
+The same, for plain HTML or a CMS theme you control:
 
 ```html
 <script type="module"
@@ -73,24 +114,7 @@ Copy `dist/h5p-sw.js` from the same CDN path onto your site and point `sw` at it
 loads from the CDN, from its own package. At the root the worker's scope is `/h5p/`, not `/`, so
 an existing site worker is left alone.
 
-**C · An iframe, nothing on your site:** frame the embed page of
-[Embed My](https://embed-my.org/), a separate service built on this player. It sizes itself
-through H5P's own resizer protocol and relays xAPI statements to your page on request, and takes
-the display options below as query parameters (`&frame&copyright`, `&activity-id=…`). Embed My
-writes the snippet for you, with a live preview and the display options as checkboxes, and its
-[guides](https://github.com/embed-my/.github/tree/main/docs) cover hosting a package and testing
-the page. See Setup C in the setup guide. This site's `/embed` is the same page, and a
-third-party site frames it from GitHub Pages: [alekswebnet.github.io/h5p](https://alekswebnet.github.io/h5p/).
-
-```html
-<iframe src="https://embed-my.github.io/h5p?src=https://h5p-offline-player.vercel.app/demo/content/quiz.h5p&xapi=https://your-site.example"
-        allow="fullscreen" style="width: 100%; border: 0"></iframe>
-<script src="https://embed-my.github.io/h5p-resizer.js"></script>
-```
-
-The script line sizes the iframe to the content; without it the frame keeps the height your CSS gives it.
-
-Requirements: the page is on `https://` or `localhost`, and the package's host sends CORS
+Requirements, for every setup: the page is on `https://` or `localhost`, and the package's host sends CORS
 headers. `Range` support on the host is optional; without it the archive is downloaded once and
 played from the browser's cache.
 

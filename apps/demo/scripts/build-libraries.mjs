@@ -8,8 +8,8 @@ import { BlobReader, BlobWriter, TextReader, Uint8ArrayReader, Uint8ArrayWriter,
 import { formatBytes } from '@missing-elements/h5p-normalize'
 
 /**
- * Builds the installable app's library pack, `packages/libraries/libraries.h5p`, and its licence notice,
- * `app/libraries.txt`. Exports from h5p.com and h5p.org carry no libraries, and an offline app
+ * Builds the library pack, `packages/libraries/libraries.h5p` (`@missing-elements/h5p-libraries`,
+ * which the installable app carries), and its licence notice, `packages/libraries/libraries.txt`. Exports from h5p.com and h5p.org carry no libraries, and an offline app
  * that has to fetch them from the hub first is not offline, so the app carries the hub's runtime
  * libraries for every content type and attaches them to any package missing its own.
  *

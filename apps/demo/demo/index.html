@@ -55,7 +55,7 @@
 
     <main>
       <p class="eyebrow">The whole integration</p>
-      <h1>Import the element, set <code>src</code>, done.</h1>
+      <h1>Set <code>src</code>, and it plays.</h1>
       <p class="lede">
         The Service Worker registers itself, and setting <code>src</code> loads the way it does on
         <code>&lt;video&gt;</code>. Nothing is unpacked on a server: the archive is read in place
@@ -67,13 +67,20 @@
       <h2>Markup</h2>
       <pre class="code">&lt;script type="module" src="h5p-player.js"&gt;&lt;/script&gt;
 &lt;h5p-player src="/demo/content/how-it-works.h5p"&gt;&lt;/h5p-player&gt;</pre>
+      <p>
+        That is all this page needs because this site serves the H5P runtime,
+        <code>@missing-elements/h5p-runtime</code>, as <code>frame-assets/</code> next to
+        <code>h5p-player.js</code>, where the element looks by default. With a bundler, hand the
+        element the runtime package's export instead; from a CDN, point <code>assets-base</code> at
+        it. <a href="/demo/setup.html">The setup page</a> has both, and when to embed instead.
+      </p>
 
       <h2>More ways to embed it</h2>
       <ul class="grid">
         <li>
           <a class="card" href="/demo/setup.html">
             <strong>Setting it up</strong>
-            <span>With a bundler or without a build step: what has to live on your origin, what can come from a CDN, and the events to listen for.</span>
+            <span>Which setup is for your site — embedded in an iframe, or installed with or without a bundler — what has to live where, and the events to listen for.</span>
           </a>
         </li>
         <li>

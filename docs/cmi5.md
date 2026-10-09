@@ -31,10 +31,14 @@ one-time token. This is the secure default for arbitrary H5P content.
 
 ```js
 import '@missing-elements/h5p-offline-player'
+import { runtime } from '@missing-elements/h5p-runtime'
 import { isCmi5Launch, startCmi5 } from '@missing-elements/h5p-cmi5'
 
+const player = document.querySelector('h5p-player')
+player.runtime = runtime
+
 if (isCmi5Launch()) {
-  startCmi5(document.querySelector('h5p-player')).then((session) => {
+  startCmi5(player).then((session) => {
     document.querySelector('#exit').onclick = () => session.exit()
   })
 }

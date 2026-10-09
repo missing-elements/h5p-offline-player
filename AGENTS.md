@@ -1538,6 +1538,16 @@ libraries.txt` and that file lists every one. Moving our code to the GPL was con
 GPL dependency is what corporate policies and scanners refuse. MPL-2.0 remains the middle ground
 if closed forks ever matter.
 
+**The setups are named, and Embed comes first.** Decided on 2026-10-09: the guide, the README,
+the demo's setup page and the `h5p-player-setup` skill open with a *Which setup* table that
+chooses by what is on the site's origin — signed-in users, or packages the site did not make,
+mean **Embed**; the element's API with trusted packages means **Install** (with a bundler, or
+without a build step). The reason is the one *What a public demo means* gives: a package is
+JavaScript, and installed, it runs as the host site. Embed My made the safe setup the easy one
+as well, so it no longer belongs last, as the fallback for sites that cannot host a file. The
+letters are gone from the user docs, which say "formerly Setup C" under each heading; this
+file and Embed My's guides still say Setup A (bundler), B (no build step) and C (Embed).
+
 ## Where this differs from the written design
 
 The architecture and setup documents predate the code. These are deliberate additions, not drift:

@@ -37,7 +37,7 @@ token. This is the secure default for arbitrary H5P content.
 ## Usage
 
 ```bash
-npm i @missing-elements/h5p-offline-player @missing-elements/h5p-cmi5
+npm i @missing-elements/h5p-offline-player @missing-elements/h5p-runtime @missing-elements/h5p-cmi5
 ```
 
 ```html
@@ -48,9 +48,12 @@ npm i @missing-elements/h5p-offline-player @missing-elements/h5p-cmi5
 
 ```js
 import '@missing-elements/h5p-offline-player'
+import { runtime } from '@missing-elements/h5p-runtime'
 import { isCmi5Launch, startCmi5 } from '@missing-elements/h5p-cmi5'
 
 const player = document.querySelector('h5p-player')
+// The H5P runtime the frame loads, a package of its own since the player's 0.5 (see its README).
+player.runtime = runtime
 
 if (isCmi5Launch()) {
   startCmi5(player)

@@ -1,7 +1,7 @@
 H5P Offline Player library pack: the H5P hub runtime libraries the installable app carries,
 so that a package exported without its own libraries plays offline. Each library is used here
 under the licence below; its source is the library folder itself, as shipped by the hub
-(https://api.h5p.org/v1/content-types/<content type>). Built by apps/demo/scripts/build-app-libraries.mjs.
+(https://api.h5p.org/v1/content-types/<content type>). Built by apps/demo/scripts/build-libraries.mjs.
 
 flowplayer-1.0  1.0.5  GPL-3.0 (header of scripts/flowplayer-3.2.12.min.js)
 FontAwesome-4.5  4.5.4  MIT (library.json)  — Dave Gandy

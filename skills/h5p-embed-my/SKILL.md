@@ -1,6 +1,6 @@
 ---
 name: h5p-embed-my
-description: Embed an H5P activity (.h5p) on any web page with nothing installed, through Embed My (embed-my.org), a free service built on h5p-offline-player. Use when asked to put H5P content on a blog, a page builder, a CMS, a documentation site, an LMS page or a portfolio that cannot host files, or for an iframe snippet for an H5P package. Covers the package URL to check, the snippet, where to paste it, the xAPI relay and what the service is not.
+description: Embed an H5P activity (.h5p) on any web page with nothing installed, through Embed My (embed-my.org), a free service built on h5p-offline-player. Use when asked to put H5P content on a blog, a page builder, a CMS, a documentation site, an LMS page or a portfolio, on any site with signed-in users or packages it did not make, or for an iframe snippet for an H5P package. Covers the package URL to check, the snippet, where to paste it, the xAPI relay and what the service is not.
 license: MIT
 ---
 
@@ -8,9 +8,12 @@ license: MIT
 
 [Embed My](https://embed-my.org/) turns a link to a `.h5p` file into an iframe snippet. The
 activity runs on Embed My's origin in h5p-offline-player, with no server, no account and no
-file on the user's site: the page carries an `<iframe>` and one script line that sizes it. Use
-it when the site cannot host a file of its own; when it can, the `h5p-player-setup` skill puts
-the player on the site itself, which keeps the content and its storage on the user's origin.
+file on the user's site: the page carries an `<iframe>` and one script line that sizes it. It is
+the safe default: a package is JavaScript, and embedded it runs on Embed My's origin, where it
+cannot reach the site's page, cookies, storage or APIs. Use the `h5p-player-setup` skill to
+install the player on the site instead only when the site needs the element's own API —
+results with the learner's identity to its backend, `resume="host"`, cmi5, a file picker — and
+plays only packages its own team made, or when it must keep every request on its own domain.
 
 ## 1. Check the package URL
 
@@ -135,6 +138,10 @@ addEventListener('message', ({ source, origin, data }) => {
   if (data.action === 'finished') send(data.statement)  // the final one, with result.score
 })
 ```
+
+The origin and source checks prove where a message came from, not what it says: the content
+produces each statement, and a package can post any score. Treat relayed results as the
+learner's report, which is what xAPI from a browser always is, not as proof for a grade.
 
 Each statement carries `context.revision`, a fingerprint of the package build, and
 `context.platform`, the player's version, so a completion can be tied to the build the learner

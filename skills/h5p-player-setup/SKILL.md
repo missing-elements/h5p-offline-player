@@ -1,6 +1,6 @@
 ---
 name: h5p-player-setup
-description: Put an H5P player on a website with no server. Use when asked to play, embed or self-host H5P content or .h5p files on a static site, in an app (Vite, webpack, Next, Astro, plain HTML) or in a CMS, or for H5P without Moodle, WordPress or Lumi. Uses h5p-offline-player, one web component plus a Service Worker; nothing is unpacked on a server.
+description: Put an H5P player on a website with no server. Use when asked to play, embed or self-host H5P content or .h5p files on a static site, in an app (Vite, webpack, Next, Astro, plain HTML) or in a CMS, or for H5P without Moodle, WordPress or Lumi. Picks between embedding (an iframe on another origin, the safe default) and installing h5p-offline-player on the site (for the element's API), by what is on the site's origin.
 license: MIT
 ---
 
@@ -8,25 +8,57 @@ license: MIT
 
 `@missing-elements/h5p-offline-player` is one custom element, `<h5p-player>`. It plays a `.h5p`
 package from a URL or a picked file: the archive is read in place and a Service Worker serves
-its files to the H5P runtime. Three things matter: the element (`h5p-player.js`), the worker
-(`h5p-sw.js`) and the runtime, which is a second package, `@missing-elements/h5p-runtime`,
-because it is GPL-3.0 while the player is MIT. Only the worker has to be served from the site's
-own origin; browsers refuse a cross-origin Service Worker.
+its files to the H5P runtime. A site either embeds it — an iframe of a player page on another
+origin, Embed My's or one of its own — or installs it. Installed, three things matter: the
+element (`h5p-player.js`), the worker (`h5p-sw.js`) and the runtime, which is a second package,
+`@missing-elements/h5p-runtime`, because it is GPL-3.0 while the player is MIT. Only the worker
+has to be served from the site's own origin; browsers refuse a cross-origin Service Worker.
 
 ## 1. Pick the setup
 
-Ask, or read from the project, three things: is there a bundler; can a file be placed on the
-site's own origin; where do the packages come from.
+Decide by what is on the site's origin, not by its tooling. An H5P package is JavaScript and
+the player runs it on the origin that serves the frame: installed on the site, a package can
+read the page, its non-`HttpOnly` cookies and storage, and call the site's APIs as the signed-in
+user. Ask, or read from the project: does the site have signed-in users; who makes the
+packages; does it need results with the learner's identity, `resume="host"`, cmi5 or a file
+picker; can it host a file at all.
 
 | The site | Setup |
 |---|---|
-| Has a bundler: Vite, webpack 5, Rollup, or a framework on one (Next, Nuxt, Astro, SvelteKit) | **A** |
-| Plain HTML, a CMS theme, a static site with no build | **B** |
-| Cannot host even one file: a page builder, a locked-down CMS | **C** |
+| Has signed-in users: an LMS, a portal, anything with accounts or an admin area | **Embed** |
+| Plays packages it did not make: uploads, links from users or teachers, a marketplace | **Embed** |
+| Cannot host a file: a page builder, a hosted CMS, an LMS page the user only edits | **Embed**, with Embed My — use the `h5p-embed-my` skill |
+| Needs the element's API (above) and plays only packages its own team made | **Install**: with a bundler if it has one (Vite, webpack 5, Rollup, Next, Nuxt, Astro, SvelteKit), else without a build step |
+| Static, no sessions, its own packages | Either; offer **Embed** as less to maintain, **Install** to keep every request on its own domain |
+
+When the site has sessions *and* needs the API, the safety rows win, and say why: installed,
+every package runs as the site. Offer the two ways out — embed a player page hosted on a
+separate domain and take results by the xAPI relay, or install the player only on an origin
+that holds no session (a separate origin for the course pages) — and install on the session
+origin only if the user confirms every package is their own team's.
 
 ## 2. Do it
 
-**A · with a bundler**
+**Embed**
+
+For a person pasting into a page builder or a CMS, the `h5p-embed-my` skill has the whole of
+it: the package URL to check, the snippet, where it goes, results. In short:
+
+```html
+<iframe src="https://embed-my.github.io/h5p?src=https://h5p-offline-player.vercel.app/demo/content/quiz.h5p"
+        allow="fullscreen" style="width: 100%; border: 0"></iframe>
+<script src="https://embed-my.github.io/h5p-resizer.js"></script>
+```
+
+The script line sizes the iframe to the content; a page that already has h5p.org's `h5p-resizer.js` needs no second one.
+Add `&xapi=<your page's origin>` to receive statements by `postMessage`, and the element's
+display attributes as parameters (`&frame&copyright&export`, `&activity-id=<IRI>`,
+`&custom-css=<URL>`). The embedding page must be https (or localhost); the frame registers its
+own worker there, in Safari and on iOS too. For no third party in the path, the same page can
+be served from a domain of the site's own — a separate registrable domain, not a subdomain, and
+one that holds nothing else (the setup guide's *Embed* section).
+
+**Install with a bundler**
 
 ```bash
 npm i @missing-elements/h5p-offline-player @missing-elements/h5p-runtime
@@ -53,7 +85,7 @@ and mark the tag as a custom element if the framework demands it (Vue:
 serve both packages' `dist/` from static paths and set `sw="/that/path/h5p-sw.js"
 assets-base="/the/runtime's/dist/"`.
 
-**B · no build step**
+**Install without a build step**
 
 ```html
 <script type="module"
@@ -69,27 +101,6 @@ on the CDN, since the player's own package does not carry the runtime. The root 
 @missing-elements/h5p-offline-player version` for the latest) in both URLs — unpinned, the CDN
 moves and the copied worker does not — and re-download `h5p-sw.js` on every upgrade; the
 console warns when the two differ.
-
-**C · iframe, nothing on the site**
-
-For a person pasting into a page builder or a CMS, point them at [Embed My](https://embed-my.org/),
-a separate service built on this player: it writes the snippet with a live preview and the display
-options as checkboxes, and its [guides](https://github.com/embed-my/.github/tree/main/docs) cover
-hosting the package and testing the page. By hand:
-
-```html
-<iframe src="https://embed-my.github.io/h5p?src=https://h5p-offline-player.vercel.app/demo/content/quiz.h5p"
-        allow="fullscreen" style="width: 100%; border: 0"></iframe>
-<script src="https://embed-my.github.io/h5p-resizer.js"></script>
-```
-
-The script line sizes the iframe to the content; a page that already has h5p.org's `h5p-resizer.js` needs no second one.
-
-Add `&xapi=<your page's origin>` to receive statements by `postMessage`, and the element's display
-attributes as parameters (`&frame&copyright&export`, `&activity-id=<IRI>`, `&custom-css=<URL>`). The embedding page must be
-https (or localhost); the frame then registers its own worker, in Safari and on iOS too. Only
-for a site that truly cannot host a file, and say so to the user: their content then runs on a
-third party's origin, and storage is per embedding site.
 
 **Sizing:** the element follows the content's own height by default. Set `auto-resize="off"`
 only when the page sizes it itself, from CSS or from the `resize` event, because the height the
@@ -132,7 +143,7 @@ takes `host`, a kiosk or a classroom device takes neither, and a learner's own d
 | `error: network`, "is an http: URL and this page is served over https:" | mixed content: an `http://` package or bundle on an `https://` page | use the `https://` URL; `http://localhost` is exempt |
 | `error: no-cors` | the package host sends no CORS headers | host the package where you control headers (GitHub Pages works as it comes), or offer a file picker: `player.file = input.files[0]` |
 | `error: bad-archive`, "contains no libraries" | an h5p.com / h5p.org export: `content/` only | set `libraries` to a bundle, with the hub behind it: `libraries="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-libraries@0/libraries.h5p hub"` — `@missing-elements/h5p-libraries` carries every hub content type's libraries (serve it yourself with its `libraries.txt` of licences if the site must not reach a CDN), and `hub` is asked only for what it lacks; `libraries="hub"` alone fetches from h5p.org every time |
-| worker or runtime files 404 after a build | the bundler did not rewrite `new URL` (esbuild); or Setup A without `player.runtime`, so the element looked for `frame-assets/` beside a hashed bundle | set `runtime` from `@missing-elements/h5p-runtime`; or serve both packages' `dist/` statically and set `sw` and `assets-base` |
+| worker or runtime files 404 after a build | the bundler did not rewrite `new URL` (esbuild); or an install with a bundler but without `player.runtime`, so the element looked for `frame-assets/` beside a hashed bundle | set `runtime` from `@missing-elements/h5p-runtime`; or serve both packages' `dist/` statically and set `sw` and `assets-base` |
 | the frame renders the host page inside itself | an SPA fallback answered a virtual route with `index.html`: the worker is not registered | check the registration; after "clear site data" reload once |
 | content collapsed to 150 px | `auto-resize="off"` with no height from CSS; or the host's CSP has `style-src 'self'` and the browser lacks `adoptedStyleSheets`, so the fallback `<style>` is blocked | remove `auto-resize="off"`, or give the `h5p-player` tag a height; update the browser |
 | `error: runtime` after `ready` | a content type threw a non-fatal exception, common on resize | log it; do not hide the player |
@@ -143,7 +154,8 @@ takes `host`, a kiosk or a classroom device takes neither, and a learner's own d
 
 ## 5. Hand over
 
-Tell the user three things. The player is MIT; the H5P core runtime it loads is GPL-3.0, which
+For an embed, hand over as the `h5p-embed-my` skill says. For an install, tell the user three
+things. The player is MIT; the H5P core runtime it loads is GPL-3.0, which
 is why it is the separate package `@missing-elements/h5p-runtime`, whose `LICENSE.txt` and
 `NOTICE.txt` must stay with any copy of its `dist/` — the player links against none of it and
 only names its files. Results arrive

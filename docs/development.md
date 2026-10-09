@@ -2,8 +2,10 @@
 
 The repository, its commands, and what the demo site is.
 
-A pnpm workspace: the player in `packages/player`, the normalizer in `packages/normalize`, the
-verifier in `packages/verify`, the cmi5 wiring in `packages/cmi5`, the demo site in `apps/demo`.
+A pnpm workspace: the player in `packages/player`, the H5P runtime it loads in
+`packages/runtime`, the library bundle in `packages/libraries`, the normalizer in
+`packages/normalize`, the verifier in `packages/verify`, the cmi5 wiring in `packages/cmi5`, the
+demo site in `apps/demo`.
 
 ```bash
 pnpm install
@@ -11,13 +13,14 @@ pnpm --filter @missing-elements/h5p-offline-player exec playwright install chrom
 
 pnpm dev          # the demo player page on http://localhost:5173
 pnpm test         # every package's tests, the player's browser suite included
-pnpm build        # the player package
+pnpm build        # the player package, building the runtime package on the way
 pnpm normalize course.h5p   # rewrite a package so it streams (docs/streaming-video.md)
 pnpm verify course.h5p      # play a package headless and report whether it works
 pnpm build:demo             # the hosted demo, as Vercel builds it, into apps/demo/dist-demo/
 pnpm preview:demo           # serve it locally with the production headers
 pnpm demo:content           # rebuild the demo's content packages from their sources
 pnpm demo:icons             # re-render the installable app's icons
+pnpm libraries              # rebuild packages/libraries from the H5P hub
 ```
 
 `pnpm dev` serves the player page with real content — a quiz, an interactive video, an
