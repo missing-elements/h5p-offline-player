@@ -69,7 +69,8 @@ export function parseDefaultLibraries(value, { packages = null, libraries = true
     if (tokens.length > 1) throw new EmbedError('--default-libraries none stands alone.')
     return null
   }
-  const hubAllowed = !packages || packages.includes('https://api.h5p.org')
+  // An exact match on a parsed origin, not a substring of a URL.
+  const hubAllowed = !packages || packages.some((origin) => origin === 'https://api.h5p.org')
   for (const token of tokens) {
     if (token === 'hub') {
       if (!hubAllowed) throw new EmbedError('--default-libraries names hub, but --packages does not list https://api.h5p.org.')
