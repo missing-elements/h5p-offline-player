@@ -5,6 +5,8 @@ import { build as viteBuild } from 'vite'
 import { buildJobsWorker, buildServiceWorker, bundleHostWorker } from '../../../packages/player/scripts/lib/worker-bundle.mjs'
 import { DIST_DIR as RUNTIME_DIST } from '../../../packages/runtime/scripts/build.mjs'
 
+const RESIZER = resolve(import.meta.dirname, '../../../packages/embed/site/resizer.js')
+
 /**
  * Builds the hosted demo into `dist-demo/`: the pages through `vite.config.ts`, then the Service
  * Worker, the runtime and the demo content placed where the pages and the element expect them.
@@ -92,8 +94,9 @@ async function appPrecache() {
 // precache is read: the app page links it too, and the list is hashed over the files it names.
 await cp(resolve(rootDir, 'demo', 'theme.js'), resolve(outDir, 'demo', 'theme.js'))
 // The page-side half of the resizer protocol, for sites that frame /embed: a classic script at
-// the site root, named by the embed snippets, so an embedding page sends nothing to h5p.org.
-await cp(resolve(rootDir, 'resizer.js'), resolve(outDir, 'resizer.js'))
+// the site root, named by the embed snippets, so an embedding page sends nothing to h5p.org. The
+// embed package's copy, the one a host's own player domain serves.
+await cp(RESIZER, resolve(outDir, 'resizer.js'))
 
 const precache = await appPrecache()
 await writeFile(
@@ -105,7 +108,7 @@ await writeFile(
 await cp(resolve(rootDir, 'demo', 'og-image.png'), resolve(outDir, 'demo', 'og-image.png'))
 // The course structure the cmi5 page offers for importing into an LMS, zipped as LMSs want it.
 await cp(resolve(rootDir, 'demo', 'cmi5-course.zip'), resolve(outDir, 'demo', 'cmi5-course.zip'))
-const pages = ['/', '/app/', '/demo/', '/demo/setup.html', '/demo/normalize.html', '/demo/xapi.html', '/demo/cmi5.html', '/demo/local-file.html', '/demo/two-players.html', '/demo/embed.html']
+const pages = ['/', '/app/', '/demo/', '/demo/setup.html', '/demo/compare.html', '/demo/normalize.html', '/demo/xapi.html', '/demo/cmi5.html', '/demo/local-file.html', '/demo/two-players.html', '/demo/embed.html']
 const today = new Date().toISOString().slice(0, 10)
 await writeFile(
   resolve(outDir, 'sitemap.xml'),

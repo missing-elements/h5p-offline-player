@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@missing-elements/h5p-cmi5": "workspace:*",
+    "@missing-elements/h5p-embed": "workspace:*",
     "@missing-elements/h5p-offline-player": "workspace:*"
   },
   "devDependencies": {

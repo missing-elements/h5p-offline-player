@@ -35,6 +35,7 @@
         <a href="/">Player</a>
         <a href="/app/">App</a>
         <a href="/demo/setup.html">Setup</a>
+        <a href="/demo/compare.html">Compare</a>
         <a href="/demo/normalize.html">Normalize</a>
         <a href="/demo/" aria-current="page">Examples</a>
         <a href="https://embed-my.org/" rel="noopener">Embed My</a>
@@ -61,7 +62,8 @@
         height always, and the xAPI statements when the address names the page&rsquo;s own origin.
         The address also takes the element&rsquo;s display options: this example asks for H5P&rsquo;s
         action bar with the download and rights-of-use buttons.
-        In production, serve this page from a domain your organisation runs;
+        In production, <code>npx @missing-elements/h5p-embed</code> writes this page as a static
+        site for a domain your organisation runs;
         <a href="https://embed-my.org/" rel="noopener">Embed My</a> runs it as a test tool, for
         trying a package before you embed it, not for learners.
       </p>
@@ -69,7 +71,8 @@
       <iframe id="embed" title="H5P player" class="embed-frame" frameBorder="0" allow="fullscreen"></iframe>
 
       <h2>Markup</h2>
-      <pre class="code">&lt;!-- This site's copy of the page; in production, your own player domain's. --&gt;
+      <pre class="code">&lt;!-- This site's copy of the page. Your own player domain, from npx @missing-elements/h5p-embed,
+     serves it at its root: https://h5p-player.example.net/?src=… --&gt;
 &lt;iframe src="%SITE_URL%/embed?src=%SITE_URL%/demo/content/quiz.h5p&amp;xapi=https://your-site.example"
         allow="fullscreen" style="width: 100%; border: 0"&gt;&lt;/iframe&gt;
 

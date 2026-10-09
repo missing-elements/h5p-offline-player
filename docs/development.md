@@ -4,7 +4,7 @@ The repository, its commands, and what the demo site is.
 
 A pnpm workspace: the player in `packages/player`, the H5P runtime it loads in
 `packages/runtime`, the library bundle in `packages/libraries`, the normalizer in
-`packages/normalize`, the verifier in `packages/verify`, the cmi5 wiring in `packages/cmi5`, the
+`packages/normalize`, the verifier in `packages/verify`, the cmi5 wiring in `packages/cmi5`, the embed site writer in `packages/embed`, the
 demo site in `apps/demo`.
 
 ```bash

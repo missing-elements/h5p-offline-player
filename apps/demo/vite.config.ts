@@ -82,12 +82,33 @@ function appWorkerPlugin(): Plugin {
   }
 }
 
+/**
+ * Serves `/resizer.js` in dev from the embed package, where the script lives; the build copies the
+ * same file to the site root (`scripts/build-demo.mjs`).
+ */
+function resizerPlugin(): Plugin {
+  const file = resolve(repositoryRoot, 'packages', 'embed', 'site', 'resizer.js')
+  return {
+    name: 'h5p-resizer',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.url?.split('?')[0] !== '/resizer.js') return next()
+        res.setHeader('content-type', 'text/javascript; charset=utf-8')
+        // Read on every request and never cached, so an edit shows on the next reload.
+        res.setHeader('cache-control', 'no-store')
+        res.end(readFileSync(file))
+      })
+    }
+  }
+}
+
 export default defineConfig(({ command }) => ({
   // `SITE_URL` is set by `scripts/build-demo.mjs`; alone, this config builds for a local preview.
   plugins: [
     jobsWorkerPlugin(),
     devServiceWorkerPlugin(),
     appWorkerPlugin(),
+    resizerPlugin(),
     // The demo content first, then the player's fixtures: the pages use the former, and the
     // latter stay reachable for trying a fixture against the dev server.
     noRangeFixturesPlugin([resolve(rootDir, 'demo', 'content'), PLAYER_FIXTURES]),
@@ -121,6 +142,7 @@ export default defineConfig(({ command }) => ({
         embed: resolve(rootDir, 'embed.html'),
         demo: resolve(rootDir, 'demo/index.html'),
         setup: resolve(rootDir, 'demo/setup.html'),
+        compare: resolve(rootDir, 'demo/compare.html'),
         normalize: resolve(rootDir, 'demo/normalize.html'),
         xapi: resolve(rootDir, 'demo/xapi.html'),
         cmi5: resolve(rootDir, 'demo/cmi5.html'),

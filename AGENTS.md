@@ -26,7 +26,7 @@ The hard constraints that shape every file here:
 
 ## Layout
 
-A pnpm workspace of six parts. Paths elsewhere in this file are relative to the part they
+A pnpm workspace of seven parts. Paths elsewhere in this file are relative to the part they
 belong to — `src/…` and `scripts/…` mean the player's unless a section says otherwise.
 
 ```
@@ -112,13 +112,27 @@ packages/cmi5/            @missing-elements/h5p-cmi5 — cmi5 for the element, p
                             client and a fake element, and requirements.test.ts, which holds every
                             AU requirement in @cmi5/requirements to a test or a stated reason
 
+packages/embed/           @missing-elements/h5p-embed — the embed page as a static site for a player domain
+  site/                     the page: index.html (its CSP a placeholder the writer fills), main.js,
+                            embed.js (startEmbed, also what the demo's /embed runs), embed.css,
+                            resizer.js (the page-side half of the resizer protocol, served at the
+                            folder's root, and at /resizer.js on the demo)
+  lib/build.mjs             buildSite(): copies the page, the player's dist/, the runtime's dist/ as
+                            frame-assets/ and the library pack; writes config.js, the policy into the
+                            page, _headers, vercel.json and NOTICE.txt
+  bin/h5p-embed.mjs         the command
+  tests/                    build.test.ts, no browser; site.test.ts, a written site on 127.0.0.1
+                            framed by a page on localhost, as deployed
+
 apps/demo/                the demo app: the dev server for the whole repository, and the hosted site
   index.html                the hosted player page
   embed.html                the embeddable page, /embed: the element alone, driven by the query
-                            string (demo/embed-page.js; `libraries=pack` is the site's own copy of the
-                            library bundle with the hub behind it); demo/embed.html is the site that embeds it
+                            string (demo/embed-page.js, which runs the embed package's startEmbed;
+                            `libraries=pack` is the site's own copy of the library bundle with the hub
+                            behind it); demo/embed.html is the site that embeds it
   demo/                     demo/index.html is the examples index, demo/setup.html the setup page for
-                            integrators, demo/normalize.html why deflated media cannot stream and how
+                            integrators, demo/compare.html how it compares with h5p.com, the H5P
+                            plugins, Lumi and h5p-standalone, demo/normalize.html why deflated media cannot stream and how
                             the normalizer fixes it (prose and a CSS-only diagram, no script), the rest
                             the individual embedding demos, all sharing demo/player-page.css;
                             demo/cmi5.html with demo/cmi5-page.js is a cmi5 assignable unit around
@@ -129,9 +143,8 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             loads in its head before the stylesheet, since the CSP allows no
                             inline script and a pinned theme has to be on <html> before the
                             first paint
-  resizer.js                the page-side half of H5P's resizer protocol, served at /resizer.js
-                            for sites that frame /embed: the one line the embed snippets name,
-                            so an embedding page sends nothing to h5p.org; tests/embed.test.ts
+  tests/embed.test.ts       /resizer.js (the embed package's, served by a dev middleware and
+                            copied by the build) sizing the framed /embed
   tests/                    cmi5.test.ts: the cmi5 page against a mock LMS and LRS on a second
                             origin, through the dev server and a real browser
   cmi5-catapult/            docker-compose.yml for ADL's CATAPULT player, MySQL and the SQL LRS;
@@ -1273,8 +1286,9 @@ SPA-fallback trap described above cannot happen there.
   names and never returned.
 - **`/embed` is Setup C, and it is a page of its own.** The element alone, `auto-resize`, and
   the query string for `src`, `libraries`, `preload`, `xapi` and the display options by their
-  attribute names (see the h5p-standalone options invariant for which, and why not `custom-js`). Three decisions in
-  `demo/embed-page.js`: it speaks H5P's resizer protocol *upward* — `hello`, then `resize` with
+  attribute names (see the h5p-standalone options invariant for which, and why not `custom-js`). Its
+  script is `packages/embed/site/embed.js`, which the demo calls through `demo/embed-page.js`
+  and the embed package deploys, so the two cannot drift. Three decisions in it: it speaks H5P's resizer protocol *upward* — `hello`, then `resize` with
   `scrollHeight` — so a site that already includes h5p.org's `h5p-resizer.js` for its h5p.org
   embeds resizes this frame with no code of its own, and every other site gets `/resizer.js`
   from the player page's own origin, the same protocol in twenty lines, which the snippets name
@@ -1316,14 +1330,37 @@ SPA-fallback trap described above cannot happen there.
   connects to an origin the host has no data processing agreement with, the package URL passes
   through it, and that origin plays whatever anyone points it at. So the Embed setup is now the
   `/embed` page served from a player domain the host runs (a separate registrable domain holding
-  nothing else); the docs use `https://h5p-player.example.net/embed` and `/resizer.js` in their
-  snippets and mention Embed My only for trying a package first; the player page's embed dialog
+  nothing else), written by `@missing-elements/h5p-embed` (next bullet); the docs use
+  `https://h5p-player.example.net/?src=` and `/resizer.js` in their snippets and mention Embed My only for trying a package first; the player page's embed dialog
   (`EMBED_ORIGIN` in `player-page.js`) names this site's own `/embed`; the nav keeps a plain link;
   the skill is deleted. Still true: `/embed`'s query parameters (`src`, the bare `frame`,
   `copyright` and `export`, `xapi`) and its two message shapes — the resizer protocol upward and
   the `h5p-offline-player` xAPI relay — are an interface Embed My builds on
   (`embed-my.github.io/src/snippet.ts` and its copy of the page), so a change to one means a
   change there with it. `tests/embed.test.ts` drives this site's `/embed` through the dev server.
+- **`@missing-elements/h5p-embed` is the Embed setup as a deployable folder.** Built on
+  2026-10-09, the day Embed My stopped being the production path: until then a host that wanted
+  its own player domain had to build the demo app. `npx @missing-elements/h5p-embed <folder>`
+  copies the page, the player's `dist/`, the runtime as `frame-assets/` and the library pack from
+  the installed packages (so the versions are the ones published together, and nothing is
+  fetched), and writes the policy three ways: `_headers` for Netlify and Cloudflare Pages,
+  `vercel.json` for Vercel, and a `<meta>` in the page for every other host, GitHub Pages among
+  them — which cannot carry `frame-ancestors`, so `--ancestors` needs a header. `--packages`
+  turns the default `connect-src 'self' https:` into exactly the hosts given, and `config.js`
+  hands the same list to the page, which refuses an `src` or a library URL off it by name
+  before fetching anything, and `hub` unless `https://api.h5p.org` is listed (the hub serves
+  from there with no redirect, checked the same day). The page checks only the address it is
+  given; `connect-src` also applies to every redirect, so a listed host that redirects off the
+  list fails as a plain network error — the README says to list every host on the way. With a list, a listed host skips the
+  ask-first gate: the host vouched for it when it wrote the site. `pack` resolves to the folder's
+  `libraries.h5p` with `hub` behind it where allowed. The page is at the folder's root, not at
+  `/embed`, because a static host's mapping of `/embed` to `embed.html` differs (S3 does not),
+  and every URL in it is relative, so a project site under a path works. MIT: the folder carries
+  the GPL runtime and the libraries as separate works with their notices, and `NOTICE.txt` says
+  which file is what. `--force` replaces only the files it writes, never the folder, so a wrong
+  path costs nothing that was not its own. `tests/site.test.ts` serves a written site on
+  `127.0.0.1` and frames it from `localhost` — two sites, as deployed — with no headers, as
+  GitHub Pages would; `http://localhost` and `127.0.0.1` are accepted as origins for that reason.
 - **The pages carry their metadata, and the origin is filled in at build time.** Titles,
   descriptions, canonical links, Open Graph and Twitter tags, JSON-LD for the software on the
   front page, `robots.txt` and `sitemap.xml`, and the GitHub link at the right of every page's

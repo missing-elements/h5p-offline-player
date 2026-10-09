@@ -1,0 +1,65 @@
+{
+  "name": "@missing-elements/h5p-embed",
+  "version": "0.1.0",
+  "description": "Self-hosted H5P embeds: writes the H5P embed page as a static site for a player domain of your own, then any site frames it with an iframe and one script line. No H5P server, no third-party service; optional allowlists for package hosts and embedding sites.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/missing-elements/h5p-offline-player.git",
+    "directory": "packages/embed"
+  },
+  "homepage": "https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#readme",
+  "bugs": {
+    "url": "https://github.com/missing-elements/h5p-offline-player/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "bin": {
+    "h5p-embed": "./bin/h5p-embed.mjs"
+  },
+  "exports": {
+    ".": "./lib/build.mjs",
+    "./embed.js": "./site/embed.js",
+    "./embed.css": "./site/embed.css",
+    "./resizer.js": "./site/resizer.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "site"
+  ],
+  "keywords": [
+    "h5p",
+    "h5p-embed",
+    "h5p-self-hosted",
+    "h5p-player",
+    "iframe",
+    "embed",
+    "static-site",
+    "elearning",
+    "cli"
+  ],
+  "scripts": {
+    "test": "pnpm --filter @missing-elements/h5p-offline-player build && vitest run",
+    "typecheck": "tsc -p tsconfig.json",
+    "prepack": "node -e \"require('node:fs').copyFileSync('../../LICENSE', 'LICENSE')\"",
+    "prepublishOnly": "pnpm typecheck && pnpm test"
+  },
+  "dependencies": {
+    "@missing-elements/h5p-libraries": "workspace:^",
+    "@missing-elements/h5p-offline-player": "workspace:^",
+    "@missing-elements/h5p-runtime": "workspace:^"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "playwright": "^1.50.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

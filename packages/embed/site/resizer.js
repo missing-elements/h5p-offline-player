@@ -1,7 +1,8 @@
-/*! h5p-offline-player resizer. MIT. Sizes an <iframe> of the /embed page to its content. */
+/*! h5p-offline-player resizer. MIT. Sizes an <iframe> of the H5P embed page to its content. */
 /**
- * The page-side half of H5P's resizer protocol, for a page that frames `/embed`. The frame can
- * only report its height upward, by `postMessage`, and something on the page has to apply it:
+ * The page-side half of H5P's resizer protocol, for a page that frames the embed page
+ * (`@missing-elements/h5p-embed`). The frame can only report its height upward, by
+ * `postMessage`, and something on the page has to apply it:
  * this script, in one line, or h5p.org's own `h5p-resizer.js`, which speaks the same protocol.
  * This one is served from the player's origin, so an embedding page sends nothing to a third
  * party and does not depend on a path on h5p.org.

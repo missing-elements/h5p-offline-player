@@ -45,6 +45,9 @@ Installed, you get the element's whole API, and every package runs as your site.
 package runs on the player domain and never sees your cookies, storage or page; you get results
 as relayed xAPI and nothing else. The setup guide's *Which setup* has the full table and the costs.
 
+How it compares with h5p.com, the Moodle, WordPress and Drupal plugins, Lumi and h5p-standalone,
+and when one of those is the better choice: [the comparison](https://h5p-offline-player.vercel.app/demo/compare.html).
+
 ### Install with a bundler
 
 Installed, the player is three things: the element (`h5p-player.js`, an ES module), a
@@ -100,16 +103,23 @@ an existing site worker is left alone.
 
 ### Embed
 
-The player in an iframe, on a player domain of your own: serve the embed page — this
-repository's `/embed`, `apps/demo/embed.html` with `demo/embed-page.js` — from a domain that
-holds nothing else, and frame it. It sizes itself through H5P's own resizer protocol, relays xAPI statements to
-your page on request, and takes the display options below as query parameters
-(`&frame&copyright`, `&activity-id=…`). Use a separate registrable domain, not a subdomain of
-your site, which would receive its cookies; see *Embed* in the setup guide. A third-party site
-frames this site's `/embed` from GitHub Pages: [alekswebnet.github.io/h5p](https://alekswebnet.github.io/h5p/).
+The player in an iframe, on a player domain of your own.
+[`@missing-elements/h5p-embed`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#readme)
+writes the embed page as a static site — the page, the player, the H5P runtime and the library
+pack, with header files for Netlify, Cloudflare Pages and Vercel:
+
+```bash
+npx @missing-elements/h5p-embed h5p-player
+```
+
+Deploy the folder to a domain that holds nothing else — a separate registrable domain, not a
+subdomain of your site, which would receive its cookies — and frame it. `--packages` limits the
+hosts packages may come from, `--ancestors` the sites that may frame it. The page sizes itself
+through H5P's own resizer protocol, relays xAPI statements to your page on request, and takes
+the display options below as query parameters (`&frame&copyright`, `&activity-id=…`).
 
 ```html
-<iframe src="https://h5p-player.example.net/embed?src=https://h5p-offline-player.vercel.app/demo/content/quiz.h5p&xapi=https://your-site.example"
+<iframe src="https://h5p-player.example.net/?src=https://h5p-offline-player.vercel.app/demo/content/quiz.h5p&xapi=https://your-site.example"
         allow="fullscreen" style="width: 100%; border: 0"></iframe>
 <script src="https://h5p-player.example.net/resizer.js"></script>
 ```
@@ -288,7 +298,7 @@ npx skills add missing-elements/h5p-offline-player --skill h5p-verify    # one
 A pnpm workspace: the player in `packages/player`, the H5P runtime it loads in
 `packages/runtime`, the library bundle in `packages/libraries`, the normalizer in
 `packages/normalize`, the verifier in `packages/verify`, the cmi5 wiring in `packages/cmi5`, the
-demo site in `apps/demo`. The commands, the demo site and the
+embed site writer in `packages/embed`, the demo site in `apps/demo`. The commands, the demo site and the
 installable app are in [docs/development.md](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/development.md); working on the code
 starts with [AGENTS.md](https://github.com/missing-elements/h5p-offline-player/blob/main/AGENTS.md).
 

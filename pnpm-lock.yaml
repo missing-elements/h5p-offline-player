@@ -13,6 +13,9 @@ importers:
       '@missing-elements/h5p-cmi5':
         specifier: workspace:*
         version: link:../../packages/cmi5
+      '@missing-elements/h5p-embed':
+        specifier: workspace:*
+        version: link:../../packages/embed
       '@missing-elements/h5p-offline-player':
         specifier: workspace:*
         version: link:../../packages/player
@@ -54,6 +57,31 @@ importers:
       '@types/node':
         specifier: ^26.6.4
         version: 26.6.4
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@26.6.4)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.28.2))
+
+  packages/embed:
+    dependencies:
+      '@missing-elements/h5p-libraries':
+        specifier: workspace:^
+        version: link:../libraries
+      '@missing-elements/h5p-offline-player':
+        specifier: workspace:^
+        version: link:../player
+      '@missing-elements/h5p-runtime':
+        specifier: workspace:^
+        version: link:../runtime
+    devDependencies:
+      '@types/node':
+        specifier: ^26.6.4
+        version: 26.6.4
+      playwright:
+        specifier: ^1.50.0
+        version: 1.63.0
       typescript:
         specifier: ^7.0.2
         version: 7.0.2

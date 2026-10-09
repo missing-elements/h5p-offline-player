@@ -35,6 +35,7 @@
         <a href="/">Player</a>
         <a href="/app/">App</a>
         <a href="/demo/setup.html" aria-current="page">Setup</a>
+        <a href="/demo/compare.html">Compare</a>
         <a href="/demo/normalize.html">Normalize</a>
         <a href="/demo/">Examples</a>
         <a href="https://embed-my.org/" rel="noopener">Embed My</a>
@@ -89,6 +90,10 @@
         embedding site. In every setup the package is named by <code>src</code> — the element's
         attribute, or <code>?src=</code> on the embed page — and naming it loads and plays, the way
         it does on <code>&lt;video&gt;</code>.
+      </p>
+      <p>
+        <a href="/demo/compare.html">How it compares</a> with h5p.com, the H5P plugins, Lumi and
+        h5p-standalone, and when one of those is the better choice.
       </p>
 
       <h2>What has to be where, when installed</h2>
@@ -162,21 +167,31 @@ document.querySelector('h5p-player').runtime = runtime</pre>
 
       <h2 id="embed">Embed</h2>
       <p>
-        Serve the player page, this site's <code>/embed</code>, from a domain of your own and frame
-        it; the player runs on that origin, never on yours. Use a separate registrable domain —
+        Write the player page as a static site, deploy it to a domain of your own, and frame it;
+        the player runs on that origin, never on yours. Use a separate registrable domain —
         <code>h5p-player.example.net</code>, not a subdomain of your site, which would receive its
-        cookies — and keep nothing else on it. The page sizes itself through
-        H5P's own resizer protocol and relays xAPI statements to your page on request. The address
-        also takes <code>libraries</code>, <code>preload=auto</code> and the element's display options
-        by their attribute names: <code>frame</code>, <code>copyright</code>, <code>export</code>,
-        <code>icon</code>, <code>fullscreen=off</code>, <code>reporting</code>, <code>activity-id</code>
-        and <code>custom-css</code>.
-        <a href="/demo/embed.html">The embed example</a> frames this site's own copy of the page,
-        <code>/embed</code>, and shows the two listeners.
+        cookies — and keep nothing else on it.
       </p>
-      <pre class="code">&lt;iframe src="https://h5p-player.example.net/embed?src=%SITE_URL%/demo/content/quiz.h5p&amp;xapi=https://your-site.example"
+      <pre class="code">npx @missing-elements/h5p-embed h5p-player</pre>
+      <p>
+        The folder holds the page, the player, the H5P runtime and the library pack, with the
+        headers Netlify, Cloudflare Pages and Vercel read beside it. <code>--packages</code> limits
+        the hosts packages may come from, and <code>--ancestors</code> the sites that may frame it;
+        the <a href="https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#readme" rel="noopener">package's README</a>
+        has the rest. Then, on your site:
+      </p>
+      <pre class="code">&lt;iframe src="https://h5p-player.example.net/?src=%SITE_URL%/demo/content/quiz.h5p&amp;xapi=https://your-site.example"
         allow="fullscreen" style="width: 100%; border: 0"&gt;&lt;/iframe&gt;
 &lt;script src="https://h5p-player.example.net/resizer.js"&gt;&lt;/script&gt;</pre>
+      <p>
+        The page sizes itself through H5P's own resizer protocol and relays xAPI statements to
+        your page on request. The address also takes <code>libraries</code>,
+        <code>preload=auto</code> and the element's display options by their attribute names:
+        <code>frame</code>, <code>copyright</code>, <code>export</code>, <code>icon</code>,
+        <code>fullscreen=off</code>, <code>reporting</code>, <code>activity-id</code> and
+        <code>custom-css</code>. <a href="/demo/embed.html">The embed example</a> frames this site's
+        own copy of the page, <code>/embed</code>, and shows the two listeners.
+      </p>
       <p>
         To try a package before you embed it, <a href="https://embed-my.org/" rel="noopener">Embed My</a>
         runs the same page as a public test tool: it shows whether the package can be fetched and

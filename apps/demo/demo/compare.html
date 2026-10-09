@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>How it compares — h5p-offline-player</title>
+    <meta name="description" content="How h5p-offline-player compares with h5p.com, the Moodle, WordPress and Drupal plugins, Lumi and h5p-standalone: what each runs on, what it can do, and when to choose something else." />
+    <link rel="canonical" href="%SITE_URL%/demo/compare.html" />
+    <meta name="theme-color" content="#2f6df6" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="h5p-offline-player" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:title" content="How it compares — h5p-offline-player" />
+    <meta property="og:description" content="How h5p-offline-player compares with h5p.com, the Moodle, WordPress and Drupal plugins, Lumi and h5p-standalone: what each runs on, what it can do, and when to choose something else." />
+    <meta property="og:url" content="%SITE_URL%/demo/compare.html" />
+    <meta property="og:image" content="%SITE_URL%/demo/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="h5p-offline-player: self-hosted H5P, with no H5P server" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="How it compares — h5p-offline-player" />
+    <meta name="twitter:description" content="How h5p-offline-player compares with h5p.com, the Moodle, WordPress and Drupal plugins, Lumi and h5p-standalone: what each runs on, what it can do, and when to choose something else." />
+    <meta name="twitter:image" content="%SITE_URL%/demo/og-image.png" />
+    <link rel="icon" type="image/svg+xml" href="/demo/favicon.svg" />
+    <!-- Ahead of the stylesheet, so a pinned theme is on <html> before anything is painted. A
+         classic script, which Vite leaves alone; the build copies it as it is. -->
+    <script src="/demo/theme.js" vite-ignore></script>
+    <link rel="stylesheet" href="/demo/player-page.css" />
+</head>
+
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/"><img class="brand-mark" src="/demo/favicon.svg" alt="" width="32" height="32" />h5p-offline-player</a>
+      <nav aria-label="Site">
+        <a href="/">Player</a>
+        <a href="/app/">App</a>
+        <a href="/demo/setup.html">Setup</a>
+        <a href="/demo/compare.html" aria-current="page">Compare</a>
+        <a href="/demo/normalize.html">Normalize</a>
+        <a href="/demo/">Examples</a>
+        <a href="https://embed-my.org/" rel="noopener">Embed My</a>
+      </nav>
+      <div class="topbar-actions">
+        <button type="button" class="icon-button theme-toggle" aria-label="Switch theme">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path class="icon-moon" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            <g class="icon-sun"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" /></g>
+          </svg>
+        </button>
+        <a class="icon-button" href="https://github.com/missing-elements/h5p-offline-player" rel="noopener" aria-label="GitHub repository" title="GitHub repository">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.9 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.7 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3" /></svg>
+        </a>
+      </div>
+    </header>
+
+    <main>
+      <p class="eyebrow">Compare</p>
+      <h1>How it compares</h1>
+      <p class="lede">
+        H5P content has several homes. This one is a player you host yourself, on infrastructure
+        you control, with no H5P server. It does not edit content, and for some sites one of the
+        others is the better choice; this page says which.
+      </p>
+
+      <h2>At a glance</h2>
+      <table class="table">
+        <thead>
+          <tr><th>Option</th><th>What you run</th><th>Edits content</th><th>Plays a <code>.h5p</code> as it is</th><th>Offline</th><th>Where learners&rsquo; data goes</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>h5p-offline-player</strong></td>
+            <td data-label="What you run">Static files on your site, or on a player domain you run</td>
+            <td data-label="Edits content">No</td>
+            <td data-label="Plays a .h5p as it is">Yes, from a URL or a picked file, streamed</td>
+            <td data-label="Offline">Yes: an installable app, and a cache for repeat plays</td>
+            <td data-label="Where learners&rsquo; data goes">Nowhere, unless your page sends the xAPI events on</td>
+          </tr>
+          <tr>
+            <td><strong>h5p.com</strong></td>
+            <td data-label="What you run">Nothing: a hosted service by H5P Group, by subscription</td>
+            <td data-label="Edits content">Yes</td>
+            <td data-label="Plays a .h5p as it is">Uploaded into the service</td>
+            <td data-label="Offline">No</td>
+            <td data-label="Where learners&rsquo; data goes">H5P Group&rsquo;s service</td>
+          </tr>
+          <tr>
+            <td><strong>Moodle, WordPress or Drupal with H5P</strong></td>
+            <td data-label="What you run">A PHP site and its database; Moodle has H5P built in</td>
+            <td data-label="Edits content">Yes</td>
+            <td data-label="Plays a .h5p as it is">Uploaded, then unpacked by the server</td>
+            <td data-label="Offline">No</td>
+            <td data-label="Where learners&rsquo; data goes">Your site&rsquo;s database: basic scores per user</td>
+          </tr>
+          <tr>
+            <td><strong>Lumi</strong></td>
+            <td data-label="What you run">A desktop app on each author&rsquo;s computer</td>
+            <td data-label="Edits content">Yes</td>
+            <td data-label="Plays a .h5p as it is">Yes, in the app</td>
+            <td data-label="Offline">Yes, in the app</td>
+            <td data-label="Where learners&rsquo; data goes">Wherever its exports are hosted</td>
+          </tr>
+          <tr>
+            <td><strong>h5p-standalone</strong></td>
+            <td data-label="What you run">Static files on your site</td>
+            <td data-label="Edits content">No</td>
+            <td data-label="Plays a .h5p as it is">No: each package is unzipped into a folder first</td>
+            <td data-label="Offline">Not built in</td>
+            <td data-label="Where learners&rsquo; data goes">Nowhere, unless your page sends the xAPI events on</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>What only this player does</h2>
+      <ul class="list">
+        <li><strong>A <code>.h5p</code> plays as it is.</strong> No unzipping, no upload step, no folder per package: a URL to the file, or a file picked from disk. A 300 MB package starts after a few kilobytes on a host that honours <code>Range</code>, and on one that does not it starts as soon as its libraries have arrived.</li>
+        <li><strong>Offline, as an app.</strong> <a href="/app/">The installable app</a> opens <code>.h5p</code> files from the computer and plays them with no network, the libraries included.</li>
+        <li><strong>Every statement names its build.</strong> Each xAPI statement carries <code>context.revision</code>, a fingerprint of the package it came from, so a completion record says which version the learner finished. <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/docs/revision.md" rel="noopener">How</a>.</li>
+        <li><strong>cmi5, without an H5P server.</strong> The package stays on a static host and an LMS launches it as an assignable unit, checked against ADL&rsquo;s CATAPULT. <a href="/demo/cmi5.html">The cmi5 example</a>.</li>
+        <li><strong>Tools for packages made by machine.</strong> <code>h5p-verify</code> plays a package headless and says whether it works; <code>h5p-normalize</code> rewrites one so its video streams. Both are commands, both have agent skills.</li>
+        <li><strong>MIT, with the GPL kept apart.</strong> The H5P core runtime is GPL-3.0; it is a package of its own, so the element in your bundle is MIT alone.</li>
+      </ul>
+
+      <h2>When to choose something else</h2>
+      <ul class="list">
+        <li><strong>You need to edit content.</strong> This is a player. Author in Lumi, on h5p.com or in a site with the H5P plugin, export the <code>.h5p</code>, and play it here &mdash; the two work together.</li>
+        <li><strong>Your site already runs Moodle.</strong> Its built-in H5P plays and edits content and records scores in the gradebook. Use it.</li>
+        <li><strong>You want it managed for you.</strong> h5p.com hosts, edits, reports and integrates with LMSs, with support, for a subscription. This player needs someone to deploy and update it.</li>
+        <li><strong>You want scores stored per learner with no code.</strong> The H5P plugins for WordPress, Drupal and Moodle keep basic results per user out of the box. Here results are events: your page, an LRS or cmi5 decides where they go.</li>
+        <li><strong>You have a few packages and are happy to unzip them.</strong> h5p-standalone is smaller and has been around longer; served from static files, media streams from the host directly.</li>
+      </ul>
+
+      <h2>Data and trust</h2>
+      <p>
+        Installed, the player and every package run on your site; embedded, on a player domain you
+        run. In both cases the learner&rsquo;s browser talks to your hosts and nothing else, unless a
+        package or your configuration names another: the H5P hub, for an export without its
+        libraries, is the one the player itself may reach, and only when told to. Nothing is
+        stored except the content&rsquo;s own saved state when <code>resume</code> is set, in the
+        browser on that device. Statements are not stored at all.
+      </p>
+      <p>
+        A package is JavaScript, here as everywhere H5P runs, and it runs with the rights of the
+        origin that serves it. That is why <a href="/demo/setup.html">the setup page</a> asks what
+        lives on your site before it recommends a setup.
+      </p>
+
+      <p>
+        Facts about the other options are from their documentation as of October 2026 and may have
+        changed; corrections are welcome as
+        <a href="https://github.com/missing-elements/h5p-offline-player/issues" rel="noopener">issues</a>.
+      </p>
+
+      <footer>
+        <nav class="footer-links" aria-label="More on this site">
+          <a href="/">Player page</a>
+          <a href="/demo/setup.html">Setup</a>
+          <a href="/demo/">All examples</a>
+          <a href="https://www.npmjs.com/package/@missing-elements/h5p-offline-player" rel="noopener">On npm</a>
+          <a href="https://github.com/missing-elements/h5p-offline-player" rel="noopener">Source and README</a>
+        </nav>
+      </footer>
+    </main>
+  </body>
+</html>

@@ -106,14 +106,22 @@ takes `host`, a kiosk or a classroom device takes neither, and a learner's own d
 
 **Embed**
 
-The player page is h5p-offline-player's `/embed` (`apps/demo/embed.html` with
-`demo/embed-page.js` in the repository, built with its `vite.config.ts`), served from a domain
-of the organisation's own: a separate registrable domain (`h5p-player.example.net`, not a
-subdomain of the site, which would receive its cookies) that holds nothing else — no accounts,
-no cookies. The site's page then carries:
+The player page is a static site that `@missing-elements/h5p-embed` writes:
+
+```bash
+npx @missing-elements/h5p-embed h5p-player --packages https://host.example
+```
+
+`--packages` limits the hosts packages may come from (add `https://api.h5p.org` for
+`libraries=hub`), `--ancestors` the sites that may frame the page; leave both out to allow any.
+Deploy the folder to a domain of the organisation's own: a separate registrable domain
+(`h5p-player.example.net`, not a subdomain of the site, which would receive its cookies) that
+holds nothing else — no accounts, no cookies. Netlify and Cloudflare Pages read the `_headers`
+it writes and Vercel its `vercel.json`; elsewhere the page carries the policy in a `<meta>` tag,
+without `--ancestors`. The site's page then carries:
 
 ```html
-<iframe src="https://h5p-player.example.net/embed?src=https://host.example/activities/week-1-quiz.h5p&frame&copyright&export"
+<iframe src="https://h5p-player.example.net/?src=https://host.example/activities/week-1-quiz.h5p&frame&copyright&export"
         title="Week 1 knowledge check" loading="lazy" allow="fullscreen"
         style="width: 100%; min-height: 540px; border: 0"></iframe>
 <script src="https://h5p-player.example.net/resizer.js"></script>
@@ -122,7 +130,7 @@ no cookies. The site's page then carries:
 The script line sizes the iframe to the content; a page that already has h5p.org's
 `h5p-resizer.js` needs no second one. `title` is what screen readers announce, so name the
 activity; `min-height` is for a platform that strips the script. Encode `&`, `#`, `+`, `%` and
-spaces inside `src`. Parameters, by the element's attribute names: `libraries=hub` or
+spaces inside `src`. Parameters, by the element's attribute names: `libraries=pack`, `hub` or
 `libraries=<url>` for a package without libraries, `preload=auto`, `frame`, `copyright`,
 `export`, `icon`, `reporting`, `fullscreen=off`, `activity-id=<IRI>`, `custom-css=<URL>`, and
 `xapi=<the page's origin>` to receive statements by `postMessage`. Not `custom-js` or `user`.
