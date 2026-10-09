@@ -148,7 +148,8 @@ apps/demo/                the demo app: the dev server for the whole repository,
 
 docs/                     the README's longer sections, one file each: streaming video, libraries, the
                           frame's CSP, the revision on statements, resume, the verifier, cmi5, development; the README links
-                          them by absolute URL because npm renders the same file
+                          them by absolute URL because npm renders the same file; docs/releases/<version>.md
+                          the release notes, one file per release, the GitHub release body
 
 skills/                   agent skills, one directory per skill, at the root because that is where
                           `npx skills add <owner/repo>` looks: h5p-verify (when to run the verifier and how
@@ -518,7 +519,16 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   per package, so a later source *replaces* the earlier bundle rather than stacking on it, which
   is right for the hub (its bundle carries the content type's whole set) and is the reason the
   list is "bundle, then hub" and not a merge. `/embed` has `libraries=pack` for the site's own
-  copy with `hub` behind it, and the docs recommend the CDN URL plus `hub`.
+  copy with `hub` behind it, and the docs recommend the CDN URL plus `hub`. A source that fails
+  outright is passed over while another remains; only the last one's failure is the load's.
+- **The element says what it is playing: `source`, `metadata`, `libraryBundle`.** Added on
+  2026-10-09 for Embed My's "package check" under its preview: the probe's classification and
+  size (`currentSource`, exposed as a copy), the manifest's metadata plus `mainLibrary` (new on
+  the `indexed` reply, read off the reader), and which bundle supplied missing libraries with
+  `fromCache` for the earlier-download fallback — the privacy line "nothing left this origin".
+  All three ride on `ready`'s detail with `pkgId` and `revision`, and all are `null` again
+  after `forgetPackage`. Deliberately not exposed: the index summary (deflated media, whether
+  a video can stream), which the Service Worker alone has and would be a bigger change.
 - **A 404 from the virtual server is load-bearing.** h5p-standalone probes `library.json` under
   both the versioned and unversioned folder names and picks whichever answers.
 - **h5p-standalone's options are attributes by the same names, and ride in the package record.**

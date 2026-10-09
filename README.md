@@ -154,6 +154,9 @@ so the page can offer a file picker instead.
 | `state` | property, read-only | `idle`, `probing`, `downloading`, `indexing`, `ready` or `error` |
 | `pkgId` | property, read-only | The id of the package loaded now; `null` before one is |
 | `revision` | property, read-only | The build's fingerprint, the same value the statements carry (see Guides); `null` until the package is indexed |
+| `source` | property, read-only | Where the package's bytes come from, as the probe classified it: `{ type: 'range-http' \| 'chunked' \| 'file', size, … }` — `range-http` streams in place, `chunked` was downloaded whole because the host ignores `Range`, `file` was picked from disk. `null` before a package is loaded |
+| `metadata` | property, read-only | `h5p.json`'s title, licence, authors and the rest as the copyright dialog reads them, plus `mainLibrary`, the content type; `null` until indexed |
+| `libraryBundle` | property, read-only | The bundle that supplied the libraries the package did not carry: `{ url, origin, fromCache }`, `fromCache` when it came from a copy downloaded earlier rather than a request now. `null` when the package carried its own |
 | `scope` | property, read-only | The Service Worker scope the virtual routes live under; `null` until registered |
 
 | Method | What it does |
@@ -164,7 +167,7 @@ Every event is a `CustomEvent`; what it carries is in `event.detail`.
 
 | Event | `detail` | When |
 |---|---|---|
-| `ready` | `{ pkgId }` | The runtime is up and the content is visible |
+| `ready` | `{ pkgId, source, metadata, revision, libraryBundle }` | The runtime is up and the content is visible; the detail is the four properties above as they stand then, so a page can describe the package without a second read |
 | `xapi` | `{ statement, verb }` | Any xAPI statement from the content, `verb` its verb's id (`http://adlnet.gov/expapi/verbs/answered`, …) — the only channel for results; statements are never stored |
 | `finished` | `{ statement }` | The content reported completion; the score is in the statement's `result` |
 | `userdata` | `{ pkgId, dataType, subContentId, data, revision }` | With `resume`: the content saved its state, `data` as the JSON it produced, against the build `revision` names. `data: null` means the content deleted it: drop your copy |

@@ -158,7 +158,9 @@ class VirtualServer {
                 : undefined,
             partial: reader.partial || undefined,
             ready: reader.partial ? reader.bootReady() : undefined,
-            revision: reader.revision()
+            revision: reader.revision(),
+            metadata: reader.metadata,
+            mainLibrary: typeof reader.manifest.mainLibrary === 'string' ? reader.manifest.mainLibrary : undefined
           })
           return
         }

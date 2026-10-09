@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import '../../src/h5p-offline-player'
+import type { ReadyDetail } from '../../src/h5p-offline-player'
 import {
   FIXTURES,
   clearPackageCaches,
@@ -148,6 +149,33 @@ describe('playing a package', () => {
 
     player.removeAttribute('src')
     expect(iframe.title).toBe('H5P content')
+  })
+
+  it('tells a page what it is playing: the source, the metadata and the build, on the element and on ready', async () => {
+    const player = createPlayer()
+    const ready = waitForEvent<ReadyDetail>(player, 'ready')
+    player.setAttribute('src', FIXTURES.basic)
+    const { detail } = await ready
+
+    // The probe's classification, for "streams" versus "downloads whole", and the size.
+    expect(detail.source).toMatchObject({ type: 'range-http', url: new URL(FIXTURES.basic, location.href).href })
+    expect(detail.source?.size).toBeGreaterThan(0)
+    // The manifest, as the copyright dialog reads it, plus the content type.
+    expect(detail.metadata).toMatchObject({ title: 'Offline player test', mainLibrary: 'H5P.OfflineTest' })
+    expect(detail.revision).toMatch(/^sha256:/)
+    // The package carried its own libraries: nothing supplied them.
+    expect(detail.libraryBundle).toBeNull()
+    expect(player.source).toEqual(detail.source)
+    expect(player.metadata).toEqual(detail.metadata)
+
+    player.removeAttribute('src')
+    expect(player.source).toBeNull()
+    expect(player.metadata).toBeNull()
+  })
+
+  it('classifies a host that ignores Range as downloaded whole', async () => {
+    const player = await play(FIXTURES.noRangeBasic)
+    expect(player.source?.type).toBe('chunked')
   })
 
   it('names the frame after the package on a host that ignores Range too, which boots early', async () => {

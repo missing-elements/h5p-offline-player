@@ -282,6 +282,10 @@ export type WorkerReply =
        * bundle's. Absent for a partial index, which has no central directory yet.
        */
       revision?: string
+      /** `h5p.json`'s licence, authors and the rest, as the element's `metadata` shows them. */
+      metadata?: ContentMetadata
+      /** `h5p.json`'s `mainLibrary`, the content type, when the manifest names one. */
+      mainLibrary?: string
     }
   | { ok: true; type: 'ack' }
   | { ok: true; type: 'downloaded-libraries'; pkgId: string | null }

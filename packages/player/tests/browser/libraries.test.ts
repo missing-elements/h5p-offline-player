@@ -41,6 +41,8 @@ describe('supplying missing libraries', () => {
     expect(frameDocument(player).querySelector('.h5p-offline-test-message')?.textContent).toBe(
       'Libraries came from somewhere else.'
     )
+    // Which bundle answered, for a page's "where did the libraries come from" line.
+    expect(player.libraryBundle).toEqual({ url: new URL(FIXTURES.libraries, location.href).href, origin: location.origin, fromCache: false })
   })
 
   it('takes several sources in order, asking the next only for what the one before left absent', async () => {
@@ -178,6 +180,8 @@ describe('a library source that cannot be reached', () => {
     expect(frameDocument(player).querySelector('.h5p-offline-test-message')?.textContent).toBe(
       'Libraries came from somewhere else.'
     )
+    // Served from the copy downloaded before: no request reached the bundle's host this time.
+    expect(player.libraryBundle).toMatchObject({ url: new URL(libraries, location.href).href, fromCache: true })
   })
 
   it('still fails, naming what is missing, when nothing was downloaded from it', async () => {

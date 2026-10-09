@@ -129,7 +129,7 @@ Events (all `CustomEvent`, payload in `detail`):
 
 | Event | When |
 |---|---|
-| `ready` | Runtime initialised, content visible |
+| `ready` | Runtime initialised, content visible. `detail` carries `pkgId`, `source` (how the package is read: `range-http`, `chunked` or `file`, with its size), `metadata` (title, licence, authors, `mainLibrary`), `revision` and `libraryBundle` (which bundle supplied missing libraries, and whether from cache); the same values are the element's `source`, `metadata`, `revision` and `libraryBundle` properties |
 | `xapi` | Any xAPI statement from the content — the only channel for results; statements are never stored |
 | `finished` | Content reported completion / score |
 | `userdata` | With `resume`: the content saved its state — `dataType`, `subContentId`, `data` (the JSON it produced), `revision`. `data: null` means the content deleted it: drop your copy. Under `host`, keep the latest per `dataType` and `subContentId`, by user and package, and hand them back as `userData` |

@@ -1,6 +1,7 @@
 import jobsWorkerSource from 'virtual:h5p-jobs-worker'
 import SHADOW_CSS from './shadow.css?inline'
 import { FRAME_FONTS } from './frame-fonts'
+import type { ContentMetadata } from './shared/metadata'
 import { JobsWorkerHandle, type JobsScript } from './jobs-worker-handle'
 import { SAVE_INTERVAL_S, VERSION, WARM_ENTRY, WORKER_UPDATE_TIMEOUT_MS } from './shared/constants'
 import {
@@ -124,6 +125,41 @@ export type PlayerState = 'idle' | 'probing' | 'downloading' | 'indexing' | 'rea
 
 export type { UserDataEntry } from './shared/protocol'
 
+/**
+ * The package's own account of itself: `h5p.json`'s metadata as the runtime's copyright dialog
+ * reads it — title, licence, authors — plus `mainLibrary`, the content type. What a page shows
+ * beside the player ("Interactive Video, CC BY 4.0, by …"). The manifest is untrusted and the
+ * fields are held to their shapes on the way here; a licence H5P has no name for is left out.
+ */
+export interface PackageMetadata extends ContentMetadata {
+  mainLibrary?: string
+}
+
+/** Where the package's bytes come from, as the probe classified it. See `source`. */
+export type PackageSource = SourceDescriptor
+
+/**
+ * The bundle that supplied the libraries a package did not carry: the URL that answered (the
+ * `libraries` source that won, or the hub's address for the content type), its origin, and
+ * whether it was read from a copy downloaded earlier rather than fetched now. `fromCache` is
+ * what a page needs for "nothing left this origin": a bundle on the page's own origin, or one
+ * served from cache, meant no request to a third party.
+ */
+export interface LibraryBundle {
+  url: string
+  origin: string
+  fromCache: boolean
+}
+
+/** What the `ready` event carries: everything the element knows about the package by then. */
+export interface ReadyDetail {
+  pkgId: string
+  source: PackageSource | null
+  metadata: PackageMetadata | null
+  revision: string | null
+  libraryBundle: LibraryBundle | null
+}
+
 export interface PlayerErrorDetail {
   code: ErrorCode
   message: string
@@ -210,6 +246,10 @@ export class H5PPlayerElement extends HTMLElement {
    * fingerprint is taken from has arrived.
    */
   private revisionSettled = false
+  /** `h5p.json`'s metadata and content type, once the index has read them. See `metadata`. */
+  private internalMetadata: PackageMetadata | null = null
+  /** The bundle that supplied the libraries, once one has. See `libraryBundle`. */
+  private internalLibraryBundle: LibraryBundle | null = null
   private heldStatements: HeldStatement[] = []
   /**
    * The package this element played before the current load, and its revision. Removing the
@@ -355,6 +395,29 @@ export class H5PPlayerElement extends HTMLElement {
     return this.internalRevision
   }
 
+  /**
+   * Where the package's bytes come from, as the probe classified it: `range-http` (read in
+   * place, the host honours `Range`), `chunked` (downloaded whole first, the host does not) or
+   * `file` (picked from disk), with the size and the host's validator. What a page shows as
+   * "streams" versus "downloads"; `null` before a package is loaded.
+   */
+  get source(): PackageSource | null {
+    return this.internalPkgId && this.currentSource ? { ...this.currentSource } : null
+  }
+
+  /** `h5p.json`'s metadata and content type, `null` until the package is indexed. See `PackageMetadata`. */
+  get metadata(): PackageMetadata | null {
+    return this.internalMetadata ? { ...this.internalMetadata } : null
+  }
+
+  /**
+   * The bundle that supplied the libraries this package did not carry, or `null` when it carried
+   * its own, or none have been supplied yet. See `LibraryBundle`.
+   */
+  get libraryBundle(): LibraryBundle | null {
+    return this.internalLibraryBundle ? { ...this.internalLibraryBundle } : null
+  }
+
   /** The resolved Service Worker scope the routes live under. Read-only, `null` until registered. */
   get scope(): string | null {
     return this.routes?.base ?? null
@@ -470,6 +533,8 @@ export class H5PPlayerElement extends HTMLElement {
     if (this.internalPkgId) this.previousStamp = { pkgId: this.internalPkgId, revision: this.internalRevision }
     this.internalPkgId = null
     this.internalRevision = null
+    this.internalMetadata = null
+    this.internalLibraryBundle = null
   }
 
   private async startLoad(): Promise<void> {
@@ -496,6 +561,8 @@ export class H5PPlayerElement extends HTMLElement {
 
       this.currentSource = descriptor
       this.internalPkgId = pkgId
+      this.internalMetadata = null
+      this.internalLibraryBundle = null
       this.holdPackage(pkgId, signal)
 
       await this.send({ type: 'register', record: this.recordFor(pkgId, descriptor) })
@@ -532,6 +599,10 @@ export class H5PPlayerElement extends HTMLElement {
 
       this.iframe.title = frameTitle(indexed.title)
       this.internalRevision = indexed.revision ?? null
+      this.internalMetadata =
+        indexed.metadata || indexed.mainLibrary
+          ? { ...indexed.metadata, ...(indexed.mainLibrary ? { mainLibrary: indexed.mainLibrary } : {}) }
+          : null
       this.revisionSettled = true
       this.releaseStatements()
       // A state saved before this answer — by a frame booted early on a host without `Range` —
@@ -666,6 +737,7 @@ export class H5PPlayerElement extends HTMLElement {
         this.setState('indexing')
         await this.send({ type: 'index', pkgId: earlier })
         await this.send({ type: 'attach-libraries', pkgId, libraryPkgId: earlier })
+        this.internalLibraryBundle = { url, origin: new URL(url).origin, fromCache: true }
         return
       }
       const libraryPkgId = await remotePkgId(url, descriptor.validator)
@@ -692,6 +764,7 @@ export class H5PPlayerElement extends HTMLElement {
       this.setState('indexing')
       await this.send({ type: 'index', pkgId: libraryPkgId })
       await this.send({ type: 'attach-libraries', pkgId, libraryPkgId })
+      this.internalLibraryBundle = { url, origin: new URL(url).origin, fromCache: false }
     } catch (error) {
       if (signal.aborted) throw error
       const reason = error instanceof Error ? error.message : String(error)
@@ -1190,7 +1263,17 @@ export class H5PPlayerElement extends HTMLElement {
         // Only now: until the content is up, the archive reads that boot it are competing for
         // the same connection, and a 200 MB video would make the player itself slower to appear.
         this.advancePrefetch()
-        this.dispatchEvent(new CustomEvent('ready', { detail: { pkgId: data.pkgId } }))
+        this.dispatchEvent(
+          new CustomEvent<ReadyDetail>('ready', {
+            detail: {
+              pkgId: data.pkgId,
+              source: this.source,
+              metadata: this.metadata,
+              revision: this.internalRevision,
+              libraryBundle: this.libraryBundle
+            }
+          })
+        )
         return
 
       case 'xapi':
@@ -1468,6 +1551,9 @@ interface IndexResult {
   title?: string
   /** The xAPI `context.revision`; absent from a worker older than the element. */
   revision?: string
+  /** `h5p.json`'s metadata and content type; absent from a worker older than the element. */
+  metadata?: ContentMetadata
+  mainLibrary?: string
 }
 
 /**
@@ -1488,7 +1574,14 @@ function nothingIndexed(): IndexResult {
 
 function indexResultOf(reply: WorkerReply): IndexResult {
   if (!reply.ok || reply.type !== 'indexed') return nothingIndexed()
-  return { prefetch: reply.prefetch ?? [], warm: reply.warm ?? [], title: reply.title, revision: reply.revision }
+  return {
+    prefetch: reply.prefetch ?? [],
+    warm: reply.warm ?? [],
+    title: reply.title,
+    revision: reply.revision,
+    metadata: reply.metadata,
+    mainLibrary: reply.mainLibrary
+  }
 }
 
 /**
