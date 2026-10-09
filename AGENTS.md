@@ -148,8 +148,8 @@ apps/demo/                the demo app: the dev server for the whole repository,
 
 docs/                     the README's longer sections, one file each: streaming video, libraries, the
                           frame's CSP, the revision on statements, resume, the verifier, cmi5, development; the README links
-                          them by absolute URL because npm renders the same file; docs/releases/<version>.md
-                          the release notes, one file per release, the GitHub release body
+                          them by absolute URL because npm renders the same file; RELEASE_NOTES.md
+                          every release, newest first, each section the body of its GitHub release
 
 skills/                   agent skills, one directory per skill, at the root because that is where
                           `npx skills add <owner/repo>` looks: h5p-verify (when to run the verifier and how
