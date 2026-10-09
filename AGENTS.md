@@ -1361,6 +1361,18 @@ SPA-fallback trap described above cannot happen there.
   path costs nothing that was not its own. `tests/site.test.ts` serves a written site on
   `127.0.0.1` and frames it from `localhost` — two sites, as deployed — with no headers, as
   GitHub Pages would; `http://localhost` and `127.0.0.1` are accepted as origins for that reason.
+  0.1.0 went out with `npm publish` and its dependencies as `workspace:^`, which npm cannot
+  install (`EUNSUPPORTEDPROTOCOL`); found by Embed My on 2026-10-09 when it tried to switch.
+  `prepublishOnly` now refuses unless `npm_config_user_agent` says pnpm, which rewrites those
+  ranges in the tarball; the verifier, the other package with workspace dependencies, has the
+  same guard. 0.2.0, the same day, added what Embed My's own page did and this one did not, so
+  that it can call `startEmbed()` instead of keeping a copy: the `report` posted to any parent on
+  `ready` (source, metadata, library bundle, elapsed time — the `ready` detail, trimmed) and the
+  `error` posted on a failed load or a refusal, in Embed My's exact shapes, since its preview's
+  checks are built from them; `defaultLibraries` and `--default-libraries`, with `libraries=none`
+  to turn it off per address, checked against `--packages` when the site is written so a default
+  the page would refuse never ships; `runtime`, for a bundled element; and `askInOwnFrame:
+  false`, for a site whose own preview frames the page for a package the visitor just chose.
 - **The pages carry their metadata, and the origin is filled in at build time.** Titles,
   descriptions, canonical links, Open Graph and Twitter tags, JSON-LD for the software on the
   front page, `robots.txt` and `sitemap.xml`, and the GitHub link at the right of every page's

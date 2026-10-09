@@ -5,7 +5,7 @@
  * `h5p-embed` was told when it wrote the site, and the demo's `/embed` with the demo's copy of the
  * library pack.
  *
- *   ?src=<package url>[&libraries=pack|hub|<url> …][&preload=auto][&xapi=<parent origin>]
+ *   ?src=<package url>[&libraries=pack|hub|<url> …|none][&preload=auto][&xapi=<parent origin>]
  *    [&frame][&copyright][&export][&icon][&reporting][&fullscreen=off]
  *    [&activity-id=<IRI>][&custom-css=<stylesheet url>]
  *
@@ -13,7 +13,9 @@
  * embed code and its `h5p-resizer.js` use — so a page that already resizes h5p.org iframes
  * resizes this one without a change, and any other page gets `resizer.js` from this origin. xAPI
  * statements are relayed to the parent only when `xapi=` names the parent's origin, and they are
- * posted to that origin only.
+ * posted to that origin only. Once the content is up the page posts one `report` upward, and a
+ * load that fails posts its `error` (see `report` below): what an embedding page that checks a
+ * package — Embed My's preview — shows.
  */
 
 /** Where `libraries=hub` fetches from: the one hub host that sends CORS headers (see the player). */
@@ -22,13 +24,23 @@ const HUB_ORIGIN = 'https://api.h5p.org'
 /**
  * @param {object} [options]
  * @param {string | null} [options.librariesPack] the URL of a copy of `@missing-elements/h5p-libraries`
- *   on this site, which `libraries=pack` names; without one, `pack` is refused
+ *   on this site, which `libraries=pack` names; without one, `pack` means the hub where allowed
  * @param {string[] | null} [options.packages] the origins packages and library bundles may come
  *   from, besides this page's own; `null` plays any, asking first when the storage is this origin's
+ * @param {string | null} [options.defaultLibraries] the `libraries` value for an address that has
+ *   none — `pack`, `hub`, URLs, as the parameter — so a snippet without `&libraries=` still plays
+ *   an export that carries no libraries; `&libraries=none` turns it off for one address
+ * @param {object | null} [options.runtime] the `runtime` export of `@missing-elements/h5p-runtime`,
+ *   for a page that bundles the element; without it the element looks for `frame-assets/` beside itself
+ * @param {boolean} [options.askInOwnFrame] whether a package from another origin waits for a click
+ *   when this page is framed by a page of its own origin, whose storage it shares. A site whose
+ *   own preview frames the page for a package the visitor just chose passes `false`
  */
-export function startEmbed({ librariesPack = null, packages = null } = {}) {
+export function startEmbed({ librariesPack = null, packages = null, defaultLibraries = null, runtime = null, askInOwnFrame = true } = {}) {
   const params = new URLSearchParams(location.search)
   const player = document.querySelector('h5p-player')
+  // Before `src`: the element resolves the runtime's files when a package is set.
+  if (runtime) player.runtime = runtime
   const notice = document.querySelector('#notice')
   const loader = document.querySelector('#loader')
   const framed = window.parent !== window
@@ -53,9 +65,10 @@ export function startEmbed({ librariesPack = null, packages = null } = {}) {
     requestAnimationFrame(announce)
   }
 
-  const refuse = (text) => {
+  const refuse = (text, code = 'refused') => {
     loader.hidden = true
     say(text, 'error')
+    post({ context: 'h5p-offline-player', action: 'error', code, message: text })
   }
 
   /* ---------------------------------------------------------------- sizing, upward */
@@ -93,6 +106,42 @@ export function startEmbed({ librariesPack = null, packages = null } = {}) {
   player.addEventListener('resize', () => requestAnimationFrame(announce))
   player.addEventListener('ready', () => requestAnimationFrame(announce))
 
+  /* ---------------------------------------------------------------- the report, upward */
+
+  /**
+   * What the player learnt about the package, for the embedding page to show: whether the host
+   * streamed it or made the browser download it whole (`source.type`), how big it is, what it
+   * says it is (`metadata`), where libraries it did not carry came from (`libraryBundle`, `null`
+   * when it carried its own), and how long it took here. Posted once, when the content is up:
+   *
+   *   { context: 'h5p-offline-player', action: 'report', source, metadata, libraryBundle, elapsedMs }
+   *
+   * and to any parent, like the heights: the parent named the package, and the manifest's strings
+   * are the package's own to tell. A parent treats them as text. A load that fails before the
+   * content is up posts `{ context: 'h5p-offline-player', action: 'error', code, message }`
+   * instead, a refusal by this page included (`code: 'refused'`). The shapes are Embed My's,
+   * whose preview is built from them.
+   */
+  let startedAt = 0
+
+  player.addEventListener('ready', (event) => {
+    const { source, metadata, libraryBundle } = event.detail
+    post({
+      context: 'h5p-offline-player',
+      action: 'report',
+      source: source && { type: source.type, size: source.size },
+      metadata: metadata && {
+        title: metadata.title,
+        license: metadata.license,
+        licenseVersion: metadata.licenseVersion,
+        authors: metadata.authors?.map(({ name }) => name),
+        mainLibrary: metadata.mainLibrary
+      },
+      libraryBundle,
+      elapsedMs: Math.round(performance.now() - startedAt)
+    })
+  })
+
   /* ---------------------------------------------------------------- xAPI, relayed on request */
 
   /** An origin, or nothing: the parameter has to be exactly what `event.origin` will read. */
@@ -126,6 +175,7 @@ export function startEmbed({ librariesPack = null, packages = null } = {}) {
         href: location.href,
         text: 'Open it on its own'
       })
+      post({ context: 'h5p-offline-player', action: 'error', code, message })
       return
     }
     // Once the content is up, a runtime error inside it is the content's business: it keeps
@@ -135,6 +185,7 @@ export function startEmbed({ librariesPack = null, packages = null } = {}) {
       return
     }
     say(message || code, 'error')
+    post({ context: 'h5p-offline-player', action: 'error', code, message })
   })
 
   player.addEventListener('statechange', (event) => {
@@ -169,6 +220,7 @@ export function startEmbed({ librariesPack = null, packages = null } = {}) {
    */
   const librarySources = (value) => {
     const sources = []
+    if (value === 'none') return { value: '' }
     for (const token of value.split(/\s+/).filter(Boolean)) {
       if (token === 'pack') {
         // The pack, with the hub behind it for what it lacks, where the hub may be reached: an
@@ -213,6 +265,7 @@ export function startEmbed({ librariesPack = null, packages = null } = {}) {
     if (libraries) player.setAttribute('libraries', libraries)
     if (params.get('preload') === 'auto') player.setAttribute('preload', 'auto')
     applyOptions()
+    startedAt = performance.now()
     player.setAttribute('src', value)
   }
 
@@ -225,6 +278,8 @@ export function startEmbed({ librariesPack = null, packages = null } = {}) {
    */
   const sharesOriginStorage = () => {
     if (!framed) return true
+    // Treated as another site's frame: the page around it chose this package, so no click.
+    if (!askInOwnFrame) return false
     try {
       return window.parent.location.origin === location.origin
     } catch {
@@ -236,7 +291,7 @@ export function startEmbed({ librariesPack = null, packages = null } = {}) {
 
   const src = params.get('src')?.trim()
   if (!src) {
-    refuse('No package given. Add ?src=<url of a .h5p file> to the address.')
+    refuse('No package given. Add ?src=<url of a .h5p file> to the address.', 'no-src')
     return
   }
   const origin = urlOrigin(src)
@@ -248,7 +303,8 @@ export function startEmbed({ librariesPack = null, packages = null } = {}) {
     refuse(`This player does not play packages from ${origin}.`)
     return
   }
-  const libraries = params.get('libraries')?.trim()
+  // The address's own value wins, `none` included; an address without one gets the page's default.
+  const libraries = params.get('libraries')?.trim() || defaultLibraries?.trim()
   const sources = libraries ? librarySources(libraries) : { value: '' }
   if (sources.error) {
     refuse(sources.error)

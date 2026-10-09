@@ -51,6 +51,46 @@ export function parseOrigin(value) {
   return url.origin
 }
 
+/**
+ * A `libraries` value for addresses that name none, checked against the site it goes into: the
+ * tokens the page understands (`pack`, `hub`, `none`, https URLs), and with a host list, nothing
+ * the page would then refuse on every load. Returns the value normalised to single spaces.
+ *
+ * @param {string | null | undefined} value
+ * @param {object} [site]
+ * @param {string[] | null} [site.packages] the site's host list, as `parseOrigins` returns it
+ * @param {boolean} [site.libraries] whether the site carries the pack
+ */
+export function parseDefaultLibraries(value, { packages = null, libraries = true } = {}) {
+  if (value == null) return null
+  const tokens = String(value).split(/\s+/).filter(Boolean)
+  if (tokens.length === 0) return null
+  if (tokens.includes('none')) {
+    if (tokens.length > 1) throw new EmbedError('--default-libraries none stands alone.')
+    return null
+  }
+  const hubAllowed = !packages || packages.includes('https://api.h5p.org')
+  for (const token of tokens) {
+    if (token === 'hub') {
+      if (!hubAllowed) throw new EmbedError('--default-libraries names hub, but --packages does not list https://api.h5p.org.')
+    } else if (token === 'pack') {
+      if (!libraries && !hubAllowed) throw new EmbedError('--default-libraries names pack, but the site has no pack (--no-libraries) and no hub to fall back to.')
+    } else {
+      let url
+      try {
+        url = new URL(token)
+      } catch {
+        throw new EmbedError(`--default-libraries: not pack, hub, none or a URL: ${token}`)
+      }
+      if (url.protocol !== 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) {
+        throw new EmbedError(`--default-libraries: not an https URL: ${token}`)
+      }
+      if (packages && !packages.includes(url.origin)) throw new EmbedError(`--default-libraries names ${url.origin}, which --packages does not list.`)
+    }
+  }
+  return tokens.join(' ')
+}
+
 /** Origins given as a list, or as one string separated by commas or whitespace. */
 export function parseOrigins(values) {
   if (values == null) return null
@@ -169,15 +209,17 @@ async function occupied(dir) {
  * @param {boolean} [options.libraries] include the library pack, for `libraries=pack` (default true)
  * @param {string[] | string | null} [options.packages] the only origins packages may come from
  * @param {string[] | string | null} [options.ancestors] the only origins that may frame the page
+ * @param {string | null} [options.defaultLibraries] the `libraries` value for addresses that name none
  * @param {boolean} [options.force]
  */
-export async function buildSite({ out, libraries = true, packages = null, ancestors = null, force = false }) {
+export async function buildSite({ out, libraries = true, packages = null, ancestors = null, defaultLibraries = null, force = false }) {
   if (!out) throw new EmbedError('No output folder given.')
   const target = resolve(out)
   const allowedPackages = parseOrigins(packages)
   const allowedAncestors = parseOrigins(ancestors)
   if (allowedPackages?.length === 0) throw new EmbedError('--packages names no origin.')
   if (allowedAncestors?.length === 0) throw new EmbedError('--ancestors names no origin.')
+  const fallbackLibraries = parseDefaultLibraries(defaultLibraries, { packages: allowedPackages, libraries })
   // Checked with --force too: a path that is a file is refused either way.
   if ((await occupied(target)) && !force) {
     throw new EmbedError(`${out} is not empty. Choose an empty folder, or pass --force to replace the files this writes.`)
@@ -205,7 +247,7 @@ export async function buildSite({ out, libraries = true, packages = null, ancest
   await writeFile(join(target, 'index.html'), html.replace('%CSP%', contentSecurityPolicy({ packages: allowedPackages, meta: true })))
   await writeFile(
     join(target, 'config.js'),
-    `// Written by h5p-embed: what main.js hands the page.\nexport default ${JSON.stringify({ libraries: Boolean(pack), packages: allowedPackages })}\n`
+    `// Written by h5p-embed: what main.js hands the page.\nexport default ${JSON.stringify({ libraries: Boolean(pack), packages: allowedPackages, defaultLibraries: fallbackLibraries })}\n`
   )
 
   const csp = contentSecurityPolicy({ packages: allowedPackages, ancestors: allowedAncestors })
@@ -214,7 +256,16 @@ export async function buildSite({ out, libraries = true, packages = null, ancest
   await writeFile(join(target, 'vercel.json'), vercelConfig(rules))
   await writeFile(join(target, 'NOTICE.txt'), notice({ version, libraries: Boolean(pack) }))
 
-  return { out: target, version, csp, libraries: Boolean(pack), packages: allowedPackages, ancestors: allowedAncestors, size: await sizeOf(target) }
+  return {
+    out: target,
+    version,
+    csp,
+    libraries: Boolean(pack),
+    packages: allowedPackages,
+    ancestors: allowedAncestors,
+    defaultLibraries: fallbackLibraries,
+    size: await sizeOf(target)
+  }
 }
 
 /**

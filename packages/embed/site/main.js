@@ -6,5 +6,6 @@ import { startEmbed } from './embed.js'
 
 startEmbed({
   librariesPack: config.libraries ? new URL('./libraries.h5p', import.meta.url).href : null,
-  packages: config.packages
+  packages: config.packages,
+  defaultLibraries: config.defaultLibraries
 })

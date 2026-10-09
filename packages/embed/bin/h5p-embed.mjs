@@ -16,6 +16,10 @@ Options:
                          URL redirects to. Default: any https host.
   --ancestors <origins>  only these sites may frame the page (frame-ancestors, sent as a header).
                          Default: any site.
+  --default-libraries <sources>
+                         the libraries= value for addresses that name none, so a snippet without
+                         it still plays an export with no libraries: pack, hub, URLs, as the
+                         parameter. Default: none, such exports are refused unless the address asks
   --no-libraries         leave out the 9.5 MB library pack that libraries=pack names
   --force                write into a folder that is not empty, replacing only this tool's files
   -h, --help             show this
@@ -28,6 +32,7 @@ try {
     options: {
       packages: { type: 'string', multiple: true },
       ancestors: { type: 'string', multiple: true },
+      'default-libraries': { type: 'string' },
       'no-libraries': { type: 'boolean' },
       force: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
@@ -61,6 +66,7 @@ try {
     libraries: !values['no-libraries'],
     packages: values.packages ?? null,
     ancestors: values.ancestors ?? null,
+    defaultLibraries: values['default-libraries'] ?? null,
     force: values.force ?? false
   })
   const below = relative(process.cwd(), site.out)
@@ -69,6 +75,7 @@ try {
   console.log(`Wrote ${folder}/ (${megabytes(site.size)}): the embed page, ${parts.join(', ')}.`)
   console.log(`Packages from: ${site.packages ? `this site, ${site.packages.join(', ')}` : 'any https host'}.`)
   console.log(`Framed by: ${site.ancestors ? site.ancestors.join(', ') : 'any site'}.`)
+  console.log(`Libraries for exports without them: ${site.defaultLibraries ?? 'only when the address asks'}.`)
   console.log(`
 Deploy the folder to a domain that holds nothing else — a separate registrable domain, not a
 subdomain of your site — then embed a package:

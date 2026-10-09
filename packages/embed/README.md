@@ -38,6 +38,7 @@ cookies and nothing else on it.
 |---|---|
 | `--packages <origins>` | Play packages, and fetch library bundles, only from these origins (this domain's own is always allowed). The page refuses anything else by name, and the policy's `connect-src` blocks it in the browser. Add `https://api.h5p.org` to allow `libraries=hub` |
 | `--ancestors <origins>` | Only these sites may frame the page: `frame-ancestors`, which only a header can carry |
+| `--default-libraries <sources>` | The `libraries` value for addresses that name none, so a snippet without `&libraries=` still plays an export that carries no libraries (h5p.com and h5p.org exports usually do not): `pack`, `hub`, URLs, as the parameter. Checked against `--packages` when the site is written. Default: none, and such exports are refused unless the address asks |
 | `--no-libraries` | Leave out the 9.5 MB library pack; `libraries=pack` then means the hub, where allowed |
 | `--force` | Write into a folder that is not empty, replacing only this tool's files |
 
@@ -77,7 +78,7 @@ redeploy.
 | Parameter | Effect |
 |---|---|
 | `src=<url>` | The package, required. Encode `&`, `#`, `+`, `%` and spaces in it |
-| `libraries=pack`, `hub` or `<url>` | Libraries for an export that has none (h5p.com and h5p.org exports usually do not). `pack` is the copy on this domain, with the hub behind it where allowed, or the hub alone on a site written with `--no-libraries`; several sources may be given, tried in order |
+| `libraries=pack`, `hub`, `<url>` or `none` | Libraries for an export that has none (h5p.com and h5p.org exports usually do not); `none` turns off the site's `--default-libraries` for this address. `pack` is the copy on this domain, with the hub behind it where allowed, or the hub alone on a site written with `--no-libraries`; several sources may be given, tried in order |
 | `frame`, `copyright`, `export`, `icon`, `reporting` | H5P's action bar under the content and its buttons |
 | `fullscreen=off` | No fullscreen button |
 | `preload=auto` | Start fetching media at once |
@@ -110,6 +111,25 @@ The checks prove where a message came from, not what it says: a package can post
 so treat relayed results as the learner's report, not as proof for a grade. Each statement
 carries `context.revision`, a fingerprint of the package build.
 
+## Messages to the embedding page
+
+Besides the heights and the relayed statements, the frame posts two messages to its parent,
+whatever `xapi=` says. Neither carries anything the embedding page did not hand over itself.
+
+```js
+// Once, when the content is up: what the player learnt about the package.
+{ context: 'h5p-offline-player', action: 'report',
+  source,         // { type: 'range-http' | 'chunked' | 'file', size }: streamed, or downloaded whole
+  metadata,       // { title, license, licenseVersion, authors: [names], mainLibrary }, from h5p.json
+  libraryBundle,  // { url, origin, fromCache } when libraries came from a bundle, else null
+  elapsedMs }     // from setting the package to the content being up
+
+// Instead, when the load fails, or the page refuses the address (code: 'refused', or 'no-src').
+{ context: 'h5p-offline-player', action: 'error', code, message }
+```
+
+The strings in `metadata` are the package's own; show them as text.
+
 ## As a library
 
 ```js
@@ -118,8 +138,27 @@ import { buildSite } from '@missing-elements/h5p-embed'
 await buildSite({ out: 'public/player', packages: ['https://cdn.example.org'] })
 ```
 
-`@missing-elements/h5p-embed/embed.js` exports `startEmbed({ librariesPack, packages })`, the
-page's script, for a site that builds the page into its own pipeline.
+`@missing-elements/h5p-embed/embed.js` exports `startEmbed()`, the page's script, for a site
+that builds the page into its own pipeline. It reads the page's `<h5p-player>`, `#loader` and
+`#notice` (see `site/index.html`, and `site/embed.css` for their styles) and takes:
+
+| Option | |
+|---|---|
+| `librariesPack` | The URL of a copy of `@missing-elements/h5p-libraries`, which `libraries=pack` names |
+| `packages` | The origins packages may come from, besides the page's own; `null` for any |
+| `defaultLibraries` | The `libraries` value for addresses that name none |
+| `runtime` | The `runtime` export of `@missing-elements/h5p-runtime`, for a bundled element |
+| `askInOwnFrame` | `false` to skip the click a package from elsewhere otherwise waits for when a page of the same origin frames this one — for a site whose own preview frames it for a package the visitor just chose. Default `true` |
+
+```js
+import '@missing-elements/h5p-offline-player'
+import { runtime } from '@missing-elements/h5p-runtime'
+import librariesPack from '@missing-elements/h5p-libraries/libraries.h5p?url'
+import '@missing-elements/h5p-embed/embed.css'
+import { startEmbed } from '@missing-elements/h5p-embed/embed.js'
+
+startEmbed({ runtime, librariesPack, defaultLibraries: 'pack' })
+```
 
 ## Licences
 

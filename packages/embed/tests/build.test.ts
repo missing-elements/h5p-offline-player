@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { EmbedError, buildSite, contentSecurityPolicy, parseOrigin, parseOrigins } from '../lib/build.mjs'
+import { EmbedError, buildSite, contentSecurityPolicy, parseDefaultLibraries, parseOrigin, parseOrigins } from '../lib/build.mjs'
 
 /** What the command writes, and what it refuses, without a browser. */
 
@@ -44,6 +44,26 @@ describe('origins', () => {
   })
 })
 
+describe('the default library source', () => {
+  it('takes what the parameter takes, and none as no default', () => {
+    expect(parseDefaultLibraries(null)).toBeNull()
+    expect(parseDefaultLibraries('none')).toBeNull()
+    expect(parseDefaultLibraries('  pack   hub ')).toBe('pack hub')
+    expect(parseDefaultLibraries('https://cdn.example.org/libraries.h5p hub')).toBe('https://cdn.example.org/libraries.h5p hub')
+  })
+
+  it('refuses at build time what the page would refuse on every load', () => {
+    const packages = ['https://cdn.example.org']
+    expect(() => parseDefaultLibraries('hub', { packages })).toThrow(/does not list https:\/\/api\.h5p\.org/)
+    expect(() => parseDefaultLibraries('https://elsewhere.example/l.h5p', { packages })).toThrow(/which --packages does not list/)
+    expect(() => parseDefaultLibraries('pack', { packages, libraries: false })).toThrow(/no pack/)
+    expect(parseDefaultLibraries('pack', { packages })).toBe('pack')
+    expect(() => parseDefaultLibraries('none hub')).toThrow(/stands alone/)
+    expect(() => parseDefaultLibraries('http://cdn.example.org/l.h5p')).toThrow(/not an https URL/)
+    expect(() => parseDefaultLibraries('libraries')).toThrow(/not pack, hub, none or a URL/)
+  })
+})
+
 describe('the policy', () => {
   it('lets packages come from any https host unless told otherwise', () => {
     expect(contentSecurityPolicy()).toContain("connect-src 'self' https:;")
@@ -76,14 +96,14 @@ describe('the site', () => {
     const vercel = JSON.parse(await readFile(join(out, 'vercel.json'), 'utf8'))
     expect(vercel.headers[0]).toEqual({ source: '/(.*)', headers: expect.arrayContaining([{ key: 'Content-Security-Policy', value: site.csp }]) })
     expect(vercel.headers).toContainEqual({ source: '/h5p-sw.js', headers: [{ key: 'Cache-Control', value: 'no-cache' }] })
-    expect(await readFile(join(out, 'config.js'), 'utf8')).toContain('{"libraries":true,"packages":["https://cdn.example.org"]}')
+    expect(await readFile(join(out, 'config.js'), 'utf8')).toContain('{"libraries":true,"packages":["https://cdn.example.org"],"defaultLibraries":null}')
   })
 
   it('leaves the library pack out when asked, and says so to the page', async () => {
     const out = join(dir, 'lean')
     await buildSite({ out, libraries: false })
     expect(existsSync(join(out, 'libraries.h5p'))).toBe(false)
-    expect(await readFile(join(out, 'config.js'), 'utf8')).toContain('{"libraries":false,"packages":null}')
+    expect(await readFile(join(out, 'config.js'), 'utf8')).toContain('{"libraries":false,"packages":null,"defaultLibraries":null}')
     expect(await readFile(join(out, 'NOTICE.txt'), 'utf8')).not.toContain('libraries.h5p')
   })
 

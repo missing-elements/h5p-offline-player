@@ -41,7 +41,7 @@
     "test": "pnpm --filter @missing-elements/h5p-offline-player build && vitest run",
     "typecheck": "tsc -p tsconfig.json",
     "prepack": "node -e \"require('node:fs').copyFileSync('../../LICENSE', 'LICENSE')\"",
-    "prepublishOnly": "pnpm typecheck && pnpm test"
+    "prepublishOnly": "node -e \"if (!/^pnpm\\//.test(process.env.npm_config_user_agent || '')) { console.error('Publish with pnpm publish: npm would ship the workspace:^ dependency ranges as they are, and the package would not install.'); process.exit(1) }\" && pnpm typecheck && pnpm test"
   },
   "dependencies": {
     "@missing-elements/h5p-offline-player": "workspace:^",
