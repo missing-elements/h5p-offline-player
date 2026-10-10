@@ -127,7 +127,9 @@ if (unknown.length > 0) {
 
 // A bundle registered to supply libraries is never held to its own manifest, but the player
 // refuses any archive without an h5p.json.
-const writer = new ZipWriter(new BlobWriter('application/zip'))
+// A fixed date, so the pack's bytes change only when a library does: the weekly refresh
+// (.github/workflows/libraries.yml) opens a pull request only on a real difference.
+const writer = new ZipWriter(new BlobWriter('application/zip'), { lastModDate: new Date(Date.UTC(2000, 0, 1)), extendedTimestamp: false })
 await writer.add(
   'h5p.json',
   new TextReader(

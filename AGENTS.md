@@ -224,7 +224,8 @@ pnpm build:demo        # the hosted demo into apps/demo/dist-demo/, what Vercel 
 pnpm demo:content      # rebuild apps/demo/demo/content/*.h5p from their sources; needs the H5P hub
 pnpm demo:og           # re-render the social card, apps/demo/demo/og-image.png
 pnpm demo:icons        # re-render the installable app's icons, apps/demo/app/icons/
-pnpm libraries         # rebuild packages/libraries from the H5P hub; before a release
+pnpm libraries         # rebuild packages/libraries from the H5P hub; before a release, and every
+                       # Monday by .github/workflows/libraries.yml, which opens a PR when a library changed
 pnpm preview:demo      # serves dist-demo/ with the production headers and the /no-range route
 ```
 
@@ -374,6 +375,7 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   reset one and expects the tail to arrive, and `tests/unit/resilient-stream.test.ts` pins the
   retry policy. Not covered: the archive download from a host without `Range`, which is a plain
   `GET` with nothing to resume by; a silent link there still ends in a 503 from `awaitEntry`.
+  Left so on purpose (2026-10-10): plain-`GET` hosts are supported as they are, not invested in.
 - **Some video cannot be streamed at all, and `preload` is the only lever.** Progressive serving
   assumes the player can use the front of a file. Two package properties together break that: the
   mp4 is deflated in the zip, so no `Range` reaches a byte without the whole stream before it, and

@@ -1,0 +1,79 @@
+name: Library pack
+
+# Rebuilds packages/libraries from the H5P hub every week and opens a pull request when a library
+# changed. The pack is built deterministically, so an unchanged hub leaves the tree clean.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: library-pack
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm libraries
+
+      - name: Open a pull request if a library changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet -- packages/libraries; then
+            echo "The hub has not changed."
+            exit 0
+          fi
+
+          branch=libraries/refresh
+          changes=$(git diff -U0 -- packages/libraries/libraries.txt | grep '^[-+]H5P' | sort -k1.2 || true)
+
+          version=$(node -e "
+            const fs = require('fs'), path = 'packages/libraries/package.json'
+            const pkg = JSON.parse(fs.readFileSync(path, 'utf8'))
+            const [major, minor, patch] = pkg.version.split('.').map(Number)
+            pkg.version = [major, minor, patch + 1].join('.')
+            fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\\n')
+            console.log(pkg.version)")
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -C "$branch"
+          git add packages/libraries
+          git commit -m "chore(libraries): refresh from the H5P hub, $version"
+          git push --force origin "$branch"
+
+          body=$(printf '%s\n' \
+            "The weekly rebuild of the library pack found changes on the H5P hub." \
+            "" \
+            "Before merging: play a package exported without its libraries against the new pack:" \
+            "" \
+            "\`pnpm verify <package> --libraries https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$branch/packages/libraries/libraries.h5p\`" \
+            "" \
+            "Then push to this branch, or close and reopen the pull request, to run CI: it does not start on a pull" \
+            "request opened by a workflow. After merging, publish \`@missing-elements/h5p-libraries\`" \
+            "$version with pnpm." \
+            "" \
+            '```diff' "$changes" '```')
+
+          if gh pr view "$branch" --json state --jq .state 2>/dev/null | grep -q OPEN; then
+            gh pr edit "$branch" --title "Library pack $version" --body "$body"
+          elif ! gh pr create --base main --head "$branch" --title "Library pack $version" --body "$body"; then
+            # Opening a pull request needs "Allow GitHub Actions to create and approve pull
+            # requests" in the repository's Actions settings; without it the branch is still pushed.
+            echo "::warning::Could not open the pull request. Open it from $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/main...$branch"
+            printf '%s\n' "$body" >> "$GITHUB_STEP_SUMMARY"
+          fi
