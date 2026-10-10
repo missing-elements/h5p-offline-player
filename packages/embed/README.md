@@ -10,7 +10,7 @@ npx @missing-elements/h5p-embed h5p-player
 ```
 
 ```
-Wrote h5p-player/ (11.1 MB): the embed page, the player 0.5.1, the H5P runtime, the library pack.
+Wrote h5p-player/ (11.1 MB): the embed page, the player, the H5P runtime, the library pack.
 ```
 
 Deploy the folder to any static host, then embed:
