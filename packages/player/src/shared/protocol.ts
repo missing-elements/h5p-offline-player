@@ -37,23 +37,14 @@ export type RemoteSourceDescriptor = Exclude<SourceDescriptor, { type: 'file' }>
 export type PackageStatus = 'registered' | 'indexed'
 
 /**
- * Where to look for libraries a package does not carry. `hub` resolves per content type against
- * the official H5P content-type server; anything else is the URL of a `.h5p` that carries them.
+ * Where to look for libraries a package does not carry: `pack`, the published library pack (see
+ * `LIBRARY_PACK_URL`), or the URL of a `.h5p` that carries them.
  */
-export type LibrarySource = 'hub' | { url: string }
-
-/** The official H5P content-type server. It answers with CORS and honours `Range`. */
-// Deliberately the old host. H5P Group moved the hub to hub-api.h5p.org in 2026, and the demo's
-// build scripts fetch from there, but this URL is fetched from the browser: checked on
-// 2026-10-07, the new host (S3 behind CloudFront) sends no Access-Control-Allow-Origin header at
-// all, while this one answers `*` on every request, so a `libraries="hub"` load against the new
-// host fails as `no-cors` before a byte arrives. Move it when the new host answers CORS; until
-// then this one still serves the bundles, from an older catalogue.
-export const HUB_CONTENT_TYPE_URL = 'https://api.h5p.org/v1/content-types/'
+export type LibrarySource = 'pack' | { url: string }
 
 /** What an archive declared but does not contain. */
 export interface MissingLibraries {
-  /** `mainLibrary` from `h5p.json`, which is what the hub is keyed on. */
+  /** `mainLibrary` from `h5p.json`: the content type, for the error a host shows. */
   mainLibrary?: string
   /** Folder names as the runtime will ask for them, e.g. `H5P.InteractiveVideo-1.27`. */
   folders: string[]

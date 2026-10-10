@@ -15,8 +15,8 @@ pass  course.h5p  ready in 0.37 s  revision sha256:872ee6f732e6a4b7…
 
 ```
 fail  course.h5p  state error
-  bad-archive: This package contains no libraries, only content. … Missing: H5P.QuestionSet-1.20
-  fix: add the library folders (H5P.QuestionSet-1.20), or --libraries hub if the destination site supplies libraries
+  bad-archive: This package contains no libraries, only content. … Missing: H5P.QuestionSet-1.21
+  fix: add the library folders (H5P.QuestionSet-1.21), or --libraries pack if the destination site supplies libraries
 ```
 
 Exit code 0: it plays (possibly with warnings); 1: it does not; 2: the check could not run.
@@ -31,7 +31,7 @@ does not judge correctness, suitability, accessibility or licensing: look at the
 
 | | |
 |---|---|
-| `--libraries hub\|<url>` | supply libraries for a package exported without them |
+| `--libraries pack\|<url>` | supply libraries for a package exported without them: `pack` is the library pack (`hub` means the same) |
 | `--out <dir>` | where the report and screenshot go |
 | `--browser <path>` | a Chromium-based browser; otherwise Chrome, then Edge, then Playwright's Chromium |
 | `--ready <s>` | time allowed to reach `ready`, default 60 |

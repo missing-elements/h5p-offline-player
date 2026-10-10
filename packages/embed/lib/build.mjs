@@ -51,6 +51,9 @@ export function parseOrigin(value) {
   return url.origin
 }
 
+/** Where the element's `libraries="pack"` fetches from when a site carries no copy of its own. */
+export const PACK_CDN_ORIGIN = 'https://cdn.jsdelivr.net'
+
 /**
  * A `libraries` value for addresses that name none, checked against the site it goes into: the
  * tokens the page understands (`pack`, `hub`, `none`, https URLs), and with a host list, nothing
@@ -69,13 +72,14 @@ export function parseDefaultLibraries(value, { packages = null, libraries = true
     if (tokens.length > 1) throw new EmbedError('--default-libraries none stands alone.')
     return null
   }
-  // An exact match on a parsed origin, not a substring of a URL.
-  const hubAllowed = !packages || packages.some((origin) => origin === 'https://api.h5p.org')
+  // An exact match on a parsed origin, not a substring of a URL. Without its own copy, `pack` is
+  // the copy on jsDelivr that the element names; `hub` has meant `pack` since player 0.6.
+  const cdnAllowed = !packages || packages.some((origin) => origin === PACK_CDN_ORIGIN)
   for (const token of tokens) {
-    if (token === 'hub') {
-      if (!hubAllowed) throw new EmbedError('--default-libraries names hub, but --packages does not list https://api.h5p.org.')
-    } else if (token === 'pack') {
-      if (!libraries && !hubAllowed) throw new EmbedError('--default-libraries names pack, but the site has no pack (--no-libraries) and no hub to fall back to.')
+    if (token === 'pack' || token === 'hub') {
+      if (!libraries && !cdnAllowed) {
+        throw new EmbedError(`--default-libraries names ${token}, but the site has no pack (--no-libraries) and --packages does not list ${PACK_CDN_ORIGIN}.`)
+      }
     } else {
       let url
       try {

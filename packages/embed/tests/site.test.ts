@@ -117,7 +117,7 @@ beforeAll(async () => {
   await buildSite({ out: openDir })
   await cp(quiz, join(openDir, 'quiz.h5p'))
   await buildSite({ out: lockedDir, packages: [embedding.origin] })
-  // The pack and nothing else: the hub is off the list, so the default is the local copy alone.
+  // The pack and nothing else: jsDelivr is off the list, so the default is the local copy alone.
   const fallbackDir = join(dir, 'fallback')
   await buildSite({ out: fallbackDir, packages: [embedding.origin], defaultLibraries: 'pack' })
   // A site whose own preview frames the page, as Embed My's does: no click for the chosen package.
@@ -224,18 +224,18 @@ describe('a written site, framed from another site', () => {
     await page.close()
   })
 
-  it('refuses the hub when the list does not name it', async () => {
+  it('takes libraries=hub as the pack, this site\'s own copy', async () => {
     const page = await browser.newPage()
     await page.goto(`${embedding.origin}/locked-hub.html`)
     const frame = await playerFrame(page, locked.origin)
-    await frame.waitForSelector('#notice:not([hidden])')
-    expect(await frame.textContent('#notice')).toBe('This player does not fetch libraries from the H5P hub.')
+    await frame.waitForFunction((pack) => document.querySelector('h5p-player')!.getAttribute('libraries') === pack, `${locked.origin}/libraries.h5p`)
+    expect(await frame.evaluate(() => document.querySelector('#notice')!.hasAttribute('hidden'))).toBe(true)
     await page.close()
   })
 
-  it('refuses libraries=pack on a site without the pack only when the hub is not allowed either', async () => {
-    // This site lists the embedding host alone, so there is no hub to fall back to. With the
-    // default policy the same address would have used the hub.
+  it('refuses libraries=pack on a site without the pack only when jsDelivr is not allowed either', async () => {
+    // This site lists the embedding host alone, so the copy on jsDelivr is off limits. With the
+    // default policy the same address would have used it.
     const page = await browser.newPage()
     await page.goto(`${embedding.origin}/lean-pack.html`)
     const frame = await playerFrame(page, lean.origin)

@@ -67,8 +67,8 @@ export async function indexFingerprint(entries: Iterable<FingerprintEntry>): Pro
 
 /**
  * The revision of what was played: the package's fingerprint, and each attached library
- * bundle's after it. A bundle is part of what the learner saw — the hub changes its libraries
- * over time — so the same package played against another bundle is another revision.
+ * bundle's after it. A bundle is part of what the learner saw — each pack release changes its
+ * libraries — so the same package played against another bundle is another revision.
  */
 export function revisionOf(content: string, libraries: readonly string[] = []): string {
   return libraries.length === 0 ? content : `${content}; libraries ${libraries.join(', ')}`

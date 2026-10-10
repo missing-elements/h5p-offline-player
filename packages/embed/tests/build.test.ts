@@ -54,7 +54,10 @@ describe('the default library source', () => {
 
   it('refuses at build time what the page would refuse on every load', () => {
     const packages = ['https://cdn.example.org']
-    expect(() => parseDefaultLibraries('hub', { packages })).toThrow(/does not list https:\/\/api\.h5p\.org/)
+    // `hub` means `pack` now: the site's own copy, or jsDelivr's when the site has none.
+    expect(parseDefaultLibraries('hub', { packages })).toBe('hub')
+    expect(() => parseDefaultLibraries('hub', { packages, libraries: false })).toThrow(/does not list https:\/\/cdn\.jsdelivr\.net/)
+    expect(parseDefaultLibraries('pack', { packages: [...packages, 'https://cdn.jsdelivr.net'], libraries: false })).toBe('pack')
     expect(() => parseDefaultLibraries('https://elsewhere.example/l.h5p', { packages })).toThrow(/which --packages does not list/)
     expect(() => parseDefaultLibraries('pack', { packages, libraries: false })).toThrow(/no pack/)
     expect(parseDefaultLibraries('pack', { packages })).toBe('pack')

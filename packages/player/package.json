@@ -1,6 +1,6 @@
 {
   "name": "@missing-elements/h5p-offline-player",
-  "version": "0.5.3",
+  "version": "0.6.0",
   "description": "Self-hosted H5P without an H5P server: a browser-only player web component for your own site. Plays arbitrary .h5p archives from a URL or a local file, with no backend and no extraction.",
   "license": "MIT",
   "repository": {
@@ -58,7 +58,7 @@
     "test:watch": "pnpm prepare:dev && vitest",
     "typecheck": "tsc -b --force && tsc -p tsconfig.test.json",
     "prepack": "node scripts/prepack.mjs",
-    "prepublishOnly": "pnpm typecheck && pnpm test:unit && pnpm build"
+    "prepublishOnly": "node scripts/check-library-pack.mjs && pnpm typecheck && pnpm test:unit && pnpm build"
   },
   "dependencies": {
     "@zip.js/zip.js": "^2.23.0"

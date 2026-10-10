@@ -416,7 +416,7 @@ export class PackageReader {
     // every sub-content library they use — a Question Set's questions, an Interactive Video's
     // interactions. A full export lists those in h5p.json; this puts them back.
     for (const dependency of await this.contentLibraries()) consider(dependency)
-    // A hub bundle's own manifest, which lists its content type's usual set: kept for a package
+    // A bundle's own manifest (a hub bundle's lists its content type's usual set; the pack's is empty): kept for a package
     // whose parameters name a library only through another one.
     for (const fallback of this.fallbacks) {
       for (const dependency of fallback.manifest.preloadedDependencies ?? []) consider(dependency)
@@ -808,7 +808,7 @@ export function indexLibraryFolders(entryNames: Iterable<string>): Map<string, L
  * within a major, which is why a platform installs one version per major and content authored
  * against an older minor keeps working.
  *
- * This matters whenever libraries come from somewhere other than the package: a hub bundle ships
+ * This matters whenever libraries come from somewhere other than the package: the library pack ships
  * the current `H5P.Text-1.1` while content authored earlier asks for `H5P.Text-1.0`, and without
  * this every such request is a 404.
  *

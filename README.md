@@ -57,7 +57,7 @@ that does not emit `new URL(…, import.meta.url)` assets, esbuild among them, s
 
 ```html
 <script type="module"
-  src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@0.5.3/dist/h5p-player.js"></script>
+  src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@0.6.0/dist/h5p-player.js"></script>
 <h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js"
             assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-runtime@0.1.0/dist/"></h5p-player>
 ```
@@ -102,7 +102,7 @@ allows one Service Worker, or must work offline, mounts the player in its own wo
 | `jobs` | attribute | The background worker's URL, for a CSP without `blob:` in `worker-src`. Default: `blob:`, then `h5p-jobs.js` beside the element |
 | `runtime` | property | The `runtime` export of `@missing-elements/h5p-runtime`. Set before `src` |
 | `assets-base` | attribute | Where the runtime's `dist/` is served. Default: `frame-assets/` beside the element |
-| `libraries` | attribute | Sources for a package without its libraries, tried in order: a `.h5p` URL, `hub`, or both — `libraries="/libraries.h5p hub"`. Default: such packages are refused |
+| `libraries` | attribute | Sources for a package without its libraries, tried in order: `pack` (the library pack on jsDelivr), a `.h5p` URL, or both — `libraries="/libraries.h5p pack"`. `hub` means `pack`. Default: such packages are refused |
 | `allow-origins` | attribute | Extra origins for the frame's CSP, space separated |
 | `frame`, `copyright`, `export`, `icon`, `embed` | attribute | Show the H5P action bar and its buttons. `export` needs `download-url` or a package URL, `embed` needs `embed-code` |
 | `fullscreen` | attribute | `off` removes the fullscreen button |

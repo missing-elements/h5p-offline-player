@@ -103,7 +103,7 @@ describe('h5p-verify', () => {
     expect(report.errors[0]?.missingLibraries?.folders).toContainEqual(expect.stringMatching(/^H5P\.QuestionSet-1\.\d+$/))
     expect(report.reasons[0]).toMatch(/^bad-archive: /)
     expect(report.screenshot).toBeNull()
-    expect(summarize(report)).toContain('--libraries hub')
+    expect(summarize(report)).toContain('--libraries pack')
   }, 120_000)
 
   it('fails a file that is not an archive', async () => {

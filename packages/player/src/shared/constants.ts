@@ -1,8 +1,21 @@
 /** Version of the element/worker pair. Kept in sync with package.json by scripts/sync-h5p-assets.mjs. */
-export const VERSION = '0.5.3'
+export const VERSION = '0.6.0'
 
 /** Major version. Cache names carry it, so a major bump discards every cached package. */
 export const MAJOR_VERSION = 0
+
+/**
+ * The version of `@missing-elements/h5p-libraries` that `libraries="pack"` plays against. Stamped
+ * from the checkout by scripts/sync-h5p-assets.mjs, so each player release pins one pack.
+ */
+export const LIBRARY_PACK_VERSION = '0.1.1'
+
+/**
+ * `libraries="pack"`: every H5P hub content type's runtime libraries in one bundle, on a CDN that
+ * answers with CORS and honours `Range`. `hub` means the same: the H5P hub itself is not asked,
+ * since the only host of it that sends CORS headers serves an outdated catalogue.
+ */
+export const LIBRARY_PACK_URL = `https://cdn.jsdelivr.net/npm/@missing-elements/h5p-libraries@${LIBRARY_PACK_VERSION}/libraries.h5p`
 
 /** One cache per package: `h5p-pkg-v<major>-<pkgId>`. */
 export const CACHE_PREFIX = `h5p-pkg-v${MAJOR_VERSION}-`

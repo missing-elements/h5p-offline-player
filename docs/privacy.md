@@ -7,7 +7,7 @@ and the content you play have their own answers. This is not legal advice.
 ## In short
 
 - No account, no cookies, no telemetry. The player itself contacts no service of ours or of
-  H5P Group's, unless you set `libraries` to `hub`.
+  H5P Group's. With `libraries="pack"` it fetches the library pack from jsDelivr.
 - Nothing it stores leaves the learner's browser. It stores no xAPI statements and no results.
 - Results reach your page as `xapi` events. Where they go from there is your decision.
 - Self-hosted, the only processor in the learner's path is your own hosting. That stays true if
@@ -38,8 +38,7 @@ the [README](https://github.com/missing-elements/h5p-offline-player#which-setup)
 |---|---|---|
 | The package | The host in `src` | Every load from a URL. A picked file is not sent anywhere |
 | The player and runtime files | Your site, or a CDN if `assets-base` names one (jsDelivr in the README's example) | Every load |
-| Library bundle | The URL in `libraries` | A package without its own libraries. Serve `libraries.h5p` from your own domain to keep this on your hosting |
-| H5P hub | `api.h5p.org` (H5P Group) | Only with `libraries` naming `hub`, and only when no earlier source covered the package |
+| Library bundle | The URL in `libraries`, or `cdn.jsdelivr.net` for `pack` (and `hub`, which means the same) | A package without its own libraries, once per bundle. Serve `libraries.h5p` from your own domain to keep this on your hosting |
 | MathJax | `cdn.jsdelivr.net` or `cdnjs.cloudflare.com` | Only content that shows formulas (`H5P.MathDisplay`) |
 | Web fonts | `ajax.googleapis.com`, `fonts.googleapis.com`, `fonts.gstatic.com` (Google) | Only content types that load Google Fonts |
 | Video players | YouTube, Vimeo, Panopto | Only content that embeds them. These set their own cookies |

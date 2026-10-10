@@ -3,9 +3,9 @@ import SHADOW_CSS from './shadow.css?inline'
 import { FRAME_FONTS } from './frame-fonts'
 import type { ContentMetadata } from './shared/metadata'
 import { JobsWorkerHandle, type JobsScript } from './jobs-worker-handle'
-import { SAVE_INTERVAL_S, VERSION, WARM_ENTRY, WORKER_UPDATE_TIMEOUT_MS } from './shared/constants'
+import { parseLibrarySources } from './shared/library-sources'
+import { LIBRARY_PACK_URL, SAVE_INTERVAL_S, VERSION, WARM_ENTRY, WORKER_UPDATE_TIMEOUT_MS } from './shared/constants'
 import {
-  HUB_CONTENT_TYPE_URL,
   PlayerError,
   type ErrorCode,
   type LibrarySource,
@@ -140,7 +140,7 @@ export type PackageSource = SourceDescriptor
 
 /**
  * The bundle that supplied the libraries a package did not carry: the URL that answered (the
- * `libraries` source that won, or the hub's address for the content type), its origin, and
+ * `libraries` source that won, the pack's CDN address for `pack`), its origin, and
  * whether it was read from a copy downloaded earlier rather than fetched now. `fromCache` is
  * what a page needs for "nothing left this origin": a bundle on the page's own origin, or one
  * served from cache, meant no request to a third party.
@@ -673,14 +673,14 @@ export class H5PPlayerElement extends HTMLElement {
    *
    * Without a `libraries` attribute this is one call that either works or reports exactly what is
    * missing. Reaching out to a third party is never something the element decides on its own.
-   * With a list — `libraries="/libraries.h5p hub"` — the first source that covers the package
-   * wins, and the next is tried only for what the one before still left absent: a bundle a site
-   * hosts answers the common case with no request to the hub, and the hub answers a content type
-   * the bundle has not got. A source that cannot be reached at all — the bundle's host down, and
+   * With a list — `libraries="/libraries.h5p pack"` — the first source that covers the package
+   * wins, and the next is tried only for what the one before still left absent: a site's own,
+   * older copy of the pack answers the common case with no request to a CDN, and the pack this
+   * release pins answers a library the copy has not got. A source that cannot be reached at all — the bundle's host down, and
    * no copy of it downloaded before — is passed over the same way while another remains, since
    * the point of naming a second one is to have it when the first is not there; only the last
    * source's failure is the load's. The last source attached stays attached: the worker keeps
-   * one bundle per package, and a hub bundle carries its content type's whole set.
+   * one bundle per package, and a later bundle in the list is expected to cover the earlier.
    */
   private async index(pkgId: string, signal: AbortSignal): Promise<IndexResult> {
     const sources = this.librarySources()
@@ -717,7 +717,7 @@ export class H5PPlayerElement extends HTMLElement {
     source: LibrarySource,
     signal: AbortSignal
   ): Promise<void> {
-    const url = libraryBundleUrl(missing, source)
+    const url = libraryBundleUrl(source)
 
     try {
       let descriptor: RemoteSourceDescriptor
@@ -725,7 +725,7 @@ export class H5PPlayerElement extends HTMLElement {
         descriptor = await probeSource(url, signal)
       } catch (error) {
         if (signal.aborted) throw error
-        // The source cannot be reached — no network, or the hub is down — but a bundle
+        // The source cannot be reached — no network, or its host is down — but a bundle
         // downloaded from it before serves as well now as it did then. This is what lets an
         // installed app play a stripped export offline once it has played one online.
         // Briefly, and a silence is a no: a worker older than 0.1.7 — an `h5p-sw.js` copied
@@ -787,11 +787,13 @@ export class H5PPlayerElement extends HTMLElement {
     return value ? value.split(/\s+/) : []
   }
 
-  /** The `libraries` attribute: `hub` or a URL, or several separated by whitespace, in order. */
+  /** The `libraries` attribute, read by `parseLibrarySources`. */
   private librarySources(): LibrarySource[] {
-    const value = this.getAttribute('libraries')?.trim()
-    if (!value) return []
-    return value.split(/\s+/).map((word) => (word === 'hub' ? 'hub' : { url: word }))
+    return parseLibrarySources(this.getAttribute('libraries'), () => {
+      if (hubNoticeShown) return
+      hubNoticeShown = true
+      console.info('<h5p-player>: libraries="hub" now means libraries="pack", the library pack on jsDelivr.')
+    })
   }
 
   private async resolveSource(
@@ -940,7 +942,9 @@ export class H5PPlayerElement extends HTMLElement {
             phase,
             loaded: message.loaded,
             total: message.total,
-            fraction: message.total ? message.loaded / message.total : null
+            // Capped: the total is the probe's, and jsDelivr answers a ranged request with the
+            // length of its compressed copy, so the whole file arrives past it.
+            fraction: message.total ? Math.min(1, message.loaded / message.total) : null
           })
           onProgress?.()
           return
@@ -979,7 +983,7 @@ export class H5PPlayerElement extends HTMLElement {
             phase: 'warm',
             loaded: message.loaded,
             total: message.total,
-            fraction: message.total ? message.loaded / message.total : null
+            fraction: message.total ? Math.min(1, message.loaded / message.total) : null
           })
           return
         }
@@ -1168,7 +1172,7 @@ export class H5PPlayerElement extends HTMLElement {
           entry: message.entry,
           loaded: message.loaded,
           total: message.total,
-          fraction: message.total ? message.loaded / message.total : null
+          fraction: message.total ? Math.min(1, message.loaded / message.total) : null
         })
       }
       if ((message.type === 'done' || message.type === 'failed') && message.entry) {
@@ -1606,23 +1610,13 @@ function indexResultOf(reply: WorkerReply): IndexResult {
   }
 }
 
-/**
- * Where to fetch the libraries a package is missing. The hub is keyed on the content type, so it
- * can only answer once `h5p.json` has named one.
- */
-function libraryBundleUrl(missing: MissingLibraries, source: LibrarySource): string {
-  if (source !== 'hub') return new URL(source.url, location.href).href
-
-  if (!missing.mainLibrary) {
-    throw new PlayerError(
-      'bad-archive',
-      'h5p.json names no mainLibrary, so there is nothing to ask the hub for',
-      { missingLibraries: missing }
-    )
-  }
-
-  return `${HUB_CONTENT_TYPE_URL}${encodeURIComponent(missing.mainLibrary)}`
+/** Where to fetch the libraries a package is missing. */
+function libraryBundleUrl(source: LibrarySource): string {
+  return source === 'pack' ? LIBRARY_PACK_URL : new URL(source.url, location.href).href
 }
+
+/** Whether the `hub` note has been logged on this page; once is enough. */
+let hubNoticeShown = false
 
 /** A token the frame cannot guess: which document's saves the element accepts. */
 function createNonce(): string {

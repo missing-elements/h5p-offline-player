@@ -1,6 +1,6 @@
 {
   "name": "@missing-elements/h5p-embed",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Self-hosted H5P embeds: writes the H5P embed page as a static site for a player domain of your own, then any site frames it with an iframe and one script line. No H5P server, no third-party service; optional allowlists for package hosts and embedding sites.",
   "license": "MIT",
   "repository": {

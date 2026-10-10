@@ -48,11 +48,13 @@ jobs:
             pkg.version = [major, minor, patch + 1].join('.')
             fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\\n')
             console.log(pkg.version)")
+          # The player's libraries="pack" pins this version: stamp it in the same change.
+          pnpm --filter @missing-elements/h5p-offline-player sync:assets
 
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git switch -C "$branch"
-          git add packages/libraries
+          git add packages/libraries packages/player/src/shared/constants.ts
           git commit -m "chore(libraries): refresh from the H5P hub, $version"
           git push --force origin "$branch"
 
@@ -65,7 +67,8 @@ jobs:
             "" \
             "Then push to this branch, or close and reopen the pull request, to run CI: it does not start on a pull" \
             "request opened by a workflow. After merging, publish \`@missing-elements/h5p-libraries\`" \
-            "$version with pnpm." \
+            "$version with pnpm, before the next player release: the player's \`libraries=\"pack\"\` now names it," \
+            "and its prepublishOnly refuses a pack version that is not on npm." \
             "" \
             '```diff' "$changes" '```')
 

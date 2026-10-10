@@ -135,8 +135,8 @@ apps/demo/                the demo app: the dev server for the whole repository,
   index.html                the hosted player page
   embed.html                the embeddable page, /embed: the element alone, driven by the query
                             string (demo/embed-page.js, which runs the embed package's startEmbed;
-                            `libraries=pack` is the site's own copy of the library bundle with the hub
-                            behind it); demo/embed.html is the site that embeds it
+                            `libraries=pack` is the site's own copy of the library bundle);
+                            demo/embed.html is the site that embeds it
   demo/                     demo/index.html is the examples index, demo/setup.html the setup page for
                             integrators, demo/compare.html how it compares with h5p.com, the H5P
                             plugins, Lumi and h5p-standalone, demo/normalize.html why deflated media cannot stream and how
@@ -534,30 +534,43 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   live let a host that switched it mid-lesson drop the running frame's next save, or leave an
   early save on a host without `Range` unstamped. `resume.test.ts`
   drives all of it through the fixture content type, which counts presses of Complete.
-- **The hub has two hosts, and the element is on the old one on purpose.** H5P Group moved the
-  hub from `api.h5p.org` to `hub-api.h5p.org` in 2026, with a newer catalogue behind it (S3 and
-  CloudFront; `content-types/<name>` is a plain `GET` with no parameters, and `POST` to it is
-  gone). The demo's build scripts fetch from the new host, since Node needs no CORS. The
-  element's `HUB_CONTENT_TYPE_URL` does not, checked on 2026-10-07: the new host sends no
-  `Access-Control-Allow-Origin` header on any request, the old one answers `*` on every one, and
-  a browser fetch of the new host therefore fails as `no-cors` before a byte arrives. Do not
-  "update" that constant until `curl -sI -H 'Origin: https://example.com'
-  https://hub-api.h5p.org/v1/content-types/H5P.Accordion` shows the header. When it moves, a
-  learner's offline fallback bundle (keyed by URL) is downloaded once more under the new URL.
+- **`libraries="pack"` is the library pack the release pins, and the H5P hub is not asked.**
+  Decided on 2026-10-10. H5P Group moved the hub from `api.h5p.org` to `hub-api.h5p.org` in 2026,
+  with a newer catalogue behind it; the new host sends no `Access-Control-Allow-Origin` header, so
+  a browser cannot read it, and the old one, which answers `*`, serves the catalogue of October
+  2025. Rebuilding the pack from the new host on 2026-10-10 showed how far apart they were: almost
+  every library newer, Question Set 1.21, Course Presentation 1.27 and Interactive Video 1.28
+  against 1.20, 1.26 and 1.27, and `H5P.Components` new. So `hub` could not supply what a current
+  h5p.com export needs, and it tied the element to a host H5P Group is replacing and to CORS it
+  never promised. `pack` is `LIBRARY_PACK_URL`, `@missing-elements/h5p-libraries` on jsDelivr at
+  `LIBRARY_PACK_VERSION`, which `sync-h5p-assets` stamps from `packages/libraries/package.json`;
+  `hub` is read as `pack` with one console note (`parseLibrarySources`), and `pack hub` is not
+  tried twice. Pinned rather than `@0`, so a player release always plays against the same
+  libraries, and `check-library-pack.mjs` in the player's `prepublishOnly` refuses a version not
+  on npm: the weekly refresh (`.github/workflows/libraries.yml`) bumps the pack on a branch and
+  stamps the player in the same change, and a player published after merging it but before the
+  pack would send every stripped export to a 404. The build scripts still read the hub's new host,
+  from Node, which needs no CORS. The cost is size: a hub bundle was one content type, 0.5 to 3 MB,
+  and the pack is about 10 MB, downloaded whole on first use and then cached; range-reading only
+  the libraries a package needs is possible and not built.
+- **jsDelivr cuts ranges from a compressed copy.** Found on 2026-10-10: a ranged request for the
+  pack answers `206` with bytes from a brotli-sized copy of the file — `Content-Range: bytes
+  0-3/9215927` for a 10,286,146-byte file, the bytes not starting `PK`, no `Content-Encoding` —
+  from curl and from Chromium alike, and 0.1.0 the same (8.8 MB claimed for 9.95). `bytes=0-`
+  returns the whole, correct file under the wrong `Content-Range`. A library bundle survives it
+  because it is never range-read: the probe's size is wrong, but the download stores what
+  arrives and the chunk writer records the bytes written as the size. The progress `fraction` is
+  capped at 1 for this reason. A *package* served from jsDelivr would be range-read and break, so
+  do not recommend jsDelivr for packages.
 - **A library bundle is downloaded, never range-read.** It is read exhaustively — every library's
   JSON, scripts and styles — so the element registers it as `chunked` even when the host honours
   `Range`. Against the real H5P hub this was the difference between 76 and 7 seconds.
-- **`libraries` is a list, and the bundle comes before the hub.** Decided on 2026-10-08, the day
-  the hub's move was weighed as a risk: the only hub host with CORS is the superseded one, so a
-  site that depends on `libraries="hub"` depends on H5P Group leaving it up. The pack the app
-  carried became `@missing-elements/h5p-libraries` — a published package, so jsDelivr serves it
-  versioned with CORS and the demo pages import it as a URL asset — and `libraries` takes
-  several sources separated by whitespace, tried in order: `index()` re-indexes after each
-  attach and hands the next source what is still missing. The worker keeps one `libraryPkgId`
-  per package, so a later source *replaces* the earlier bundle rather than stacking on it, which
-  is right for the hub (its bundle carries the content type's whole set) and is the reason the
-  list is "bundle, then hub" and not a merge. `/embed` has `libraries=pack` for the site's own
-  copy with `hub` behind it, and the docs recommend the CDN URL plus `hub`. A source that fails
+- **`libraries` is a list, tried in order.** Decided on 2026-10-08: `index()` re-indexes after
+  each attach and hands the next source what is still missing. The worker keeps one
+  `libraryPkgId` per package, so a later source *replaces* the earlier bundle rather than stacking
+  on it: a list is "a site's own copy, then the pinned pack", each expected to cover what the one
+  before had, not a merge. `/embed`'s `libraries=pack` is the site's own copy, or the element's
+  `pack` on a site built with `--no-libraries` where jsDelivr is allowed. A source that fails
   outright is passed over while another remains; only the last one's failure is the load's.
 - **The element says what it is playing: `source`, `metadata`, `libraryBundle`.** Added on
   2026-10-09 for Embed My's "package check" under its preview: the probe's classification and
@@ -1372,12 +1385,14 @@ SPA-fallback trap described above cannot happen there.
   them — which cannot carry `frame-ancestors`, so `--ancestors` needs a header. `--packages`
   turns the default `connect-src 'self' https:` into exactly the hosts given, and `config.js`
   hands the same list to the page, which refuses an `src` or a library URL off it by name
-  before fetching anything, and `hub` unless `https://api.h5p.org` is listed (the hub serves
-  from there with no redirect, checked the same day). The page checks only the address it is
+  before fetching anything. (Until 2026-10-10 it also refused `hub` unless `https://api.h5p.org`
+  was listed; `hub` now means `pack`, and a site without its own pack needs
+  `https://cdn.jsdelivr.net` listed for it.) The page checks only the address it is
   given; `connect-src` also applies to every redirect, so a listed host that redirects off the
   list fails as a plain network error — the README says to list every host on the way. With a list, a listed host skips the
   ask-first gate: the host vouched for it when it wrote the site. `pack` resolves to the folder's
-  `libraries.h5p` with `hub` behind it where allowed. The page is at the folder's root, not at
+  `libraries.h5p`, or to the element's own `pack` on jsDelivr for a site built with
+  `--no-libraries`, where allowed. The page is at the folder's root, not at
   `/embed`, because a static host's mapping of `/embed` to `embed.html` differs (S3 does not),
   and every URL in it is relative, so a project site under a path works. MIT: the folder carries
   the GPL runtime and the libraries as separate works with their notices, and `NOTICE.txt` says
@@ -1401,6 +1416,10 @@ SPA-fallback trap described above cannot happen there.
   it is published to require player `^0.5.2`, the null-source straggler fix, because a site is
   written from whatever player is installed — a fix to the player reaches a player domain only
   through an embed release, and then only once the host writes and deploys the site again.
+  0.3.0, the same day, follows player 0.6: `hub` means `pack`, `pack` without a copy of the site's
+  own is the element's on jsDelivr, and `--packages` checks `https://cdn.jsdelivr.net` for it
+  instead of `https://api.h5p.org`. It needs player 0.6, since an older element reads `pack` as a
+  relative URL.
 - **The pages carry their metadata, and the origin is filled in at build time.** Titles,
   descriptions, canonical links, Open Graph and Twitter tags, JSON-LD for the software on the
   front page, `robots.txt` and `sitemap.xml`, and the GitHub link at the right of every page's
@@ -1448,10 +1467,10 @@ SPA-fallback trap described above cannot happen there.
   folders from 52 content types, 9.8 MB, as rebuilt from the new hub host on 2026-10-10 (98 and
   9.5 MB from the old host's catalogue on 2026-09-29) — kept at the newest minor of
   each major, imported by `app.js` as a URL asset so Vite emits it under `assets/` and the
-  precache picks it up from the manifest, and set as `libraries` on every open. The hub is the
-  fallback for what the pack lacks — a newer minor than it was built with, a content type added
-  since — asked for once and then remembered in `localStorage`, and offline the element's own
-  fallback uses a hub bundle downloaded earlier. `pnpm libraries`
+  precache picks it up from the manifest, and set as `libraries` on every open. Nothing else is
+  asked since 2026-10-10: a package that needs a newer minor than the pack, or a content type
+  added since, gets a message that a later version of the app will play it. Until then the hub
+  was the fallback, behind a consent remembered in `localStorage`. `pnpm libraries`
   rebuilds it, and should before a release; it stops on a library whose `library.json` names no
   licence unless `UNDECLARED` in the script names one found in its repository — fifteen H5P
   libraries state MIT in their README only, and flowplayer's GPL-3.0 is in its script's header —
@@ -1492,7 +1511,7 @@ SPA-fallback trap described above cannot happen there.
   player works, and Dialog Cards for its vocabulary. They are built by
   `scripts/build-demo-content.mjs` from `demo/content/src/<name>/` — our `content.json` and a
   `manifest.json` naming the content type — with the libraries taken from the H5P hub's bundle
-  for that type, exactly what `libraries="hub"` fetches at runtime. The script keeps only the
+  for that type (which `libraries="hub"` fetched at runtime until 0.6). The script keeps only the
   dependency closure the content needs (walked from `library.json`, plus every sub-content
   library the params name), drops the editor libraries the hub ships, and runs the result through
   the normalizer, so each package is also an example of what the normalizer produces. The outputs
@@ -1675,7 +1694,8 @@ deliberate additions to it, not drift:
   it; the GPL on the H5P core made that `(MIT AND GPL-3.0-only)`, and from 0.5 the runtime and
   the frame's boot script are `@missing-elements/h5p-runtime` so the player can be MIT alone.
 - A published library bundle, and `libraries` as an ordered list. The design has `hub` or one
-  URL; the hub's move put a bundle the project controls first, with the hub as the fallback.
+  URL; the hub's move put a bundle the project controls first, and since 0.6 `hub` means that
+  bundle and the hub is not asked at all.
 
 ## Not built yet
 

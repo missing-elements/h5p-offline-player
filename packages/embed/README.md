@@ -26,10 +26,10 @@ a subdomain shares your site's cookies.
 
 | Option | Effect |
 |---|---|
-| `--packages <origins>` | Play packages and fetch library bundles only from these origins (the site's own is always allowed). Add `https://api.h5p.org` to allow `libraries=hub`. Default: any https host |
+| `--packages <origins>` | Play packages and fetch library bundles only from these origins (the site's own is always allowed). Add `https://cdn.jsdelivr.net` for `libraries=pack` on a site built with `--no-libraries`. Default: any https host |
 | `--ancestors <origins>` | Only these sites may frame the page (`frame-ancestors`, header only). Default: any site |
-| `--default-libraries <sources>` | The `libraries` value for addresses that name none: `pack`, `hub` or URLs. Checked against `--packages`. Default: none, so exports without libraries are refused unless the address asks |
-| `--no-libraries` | Leave out the 9.8 MB library pack; `libraries=pack` then means the hub, where allowed |
+| `--default-libraries <sources>` | The `libraries` value for addresses that name none: `pack` or URLs. Checked against `--packages`. Default: none, so exports without libraries are refused unless the address asks |
+| `--no-libraries` | Leave out the 9.8 MB library pack; `libraries=pack` then fetches it from jsDelivr, where allowed |
 | `--force` | Write into a non-empty folder, replacing only this tool's files |
 | `-h`, `--help` / `-v`, `--version` | |
 
@@ -60,7 +60,7 @@ It works at a domain's root or under a path, over https. Serve `h5p-sw.js` with
 | Parameter | Effect |
 |---|---|
 | `src=<url>` | The package, required. Encode `&`, `#`, `+`, `%` and spaces |
-| `libraries=pack`, `hub`, `<url>` or `none` | Libraries for an export without them; several are tried in order. `pack` is this domain's copy with the hub behind it where allowed; `none` turns off `--default-libraries` |
+| `libraries=pack`, `<url>` or `none` | Libraries for an export without them; several are tried in order. `pack` is this domain's copy, or jsDelivr's without one; `hub` means `pack`; `none` turns off `--default-libraries` |
 | `frame`, `copyright`, `export`, `icon`, `reporting` | H5P's action bar and its buttons |
 | `fullscreen=off` | No fullscreen button |
 | `preload=auto` | Start fetching media at once |
@@ -127,7 +127,8 @@ startEmbed({ runtime, librariesPack, defaultLibraries: 'pack' })
 ## Privacy
 
 The site sets no cookies and sends nothing anywhere of its own. Learners' browsers contact your
-player domain, the package hosts and, only with `hub`, `api.h5p.org`. What the player stores and
+player domain, the package hosts and, only for `pack` on a site built with `--no-libraries`,
+`cdn.jsdelivr.net`. What the player stores and
 sends, for a privacy notice or a GDPR review:
 [Privacy and data protection](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/privacy.md).
 

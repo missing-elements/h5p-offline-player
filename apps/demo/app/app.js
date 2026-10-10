@@ -21,7 +21,6 @@ const status = document.querySelector('#status')
 const stateBadge = document.querySelector('#state')
 const fileName = document.querySelector('#file-name')
 const message = document.querySelector('#message')
-const offer = document.querySelector('#offer')
 const update = document.querySelector('#update')
 const confirmBox = document.querySelector('#confirm-src')
 
@@ -111,20 +110,18 @@ function offerNewVersion() {
 /**
  * Where a package missing its own libraries gets them: the pack the app carries — every content
  * type's runtime libraries from the H5P hub, `@missing-elements/h5p-libraries`, emitted by Vite
- * under `assets/` and precached with the app — so a stripped export plays offline. The hub
- * itself only for what the pack lacks: a newer minor than it was built with, or a content type
- * added since, and only with the viewer's consent.
+ * under `assets/` and precached with the app — so a stripped export plays offline. Nothing else
+ * is asked: a newer pack arrives with the next version of the app.
  */
 const PACK = librariesPack
 
-/** Replays the last open with a library source, for the retry against the hub. */
+/** Replays the last open with a library source, for Start over. */
 let reopen = null
 /** The URL last opened, so a launch that repeats it does not load it twice. */
 let lastUrl = null
 
 const opening = (label, again) => {
   reopen = again
-  offer.hidden = true
   show('')
   fileName.textContent = label
   fileName.hidden = false
@@ -286,27 +283,16 @@ player.addEventListener('error', (event) => {
   const { code, message: detail, missingLibraries } = event.detail
   const late = code === 'runtime' && player.state === 'ready'
 
-  // Missing even with the pack attached: the package needs a newer minor than the pack was built
-  // with, or a content type added since. The hub has it — asked for, not assumed, since it is a
-  // request to a third party; once the viewer has agreed, every later case retries on its own,
-  // and offline the element then uses a hub bundle downloaded before, if there is one.
+  // Missing even with the pack attached: the package needs a newer minor than the pack has, or a
+  // content type added since. Only a newer version of the app, with a newer pack, can supply it.
   if (missingLibraries) {
     const from = player.getAttribute('libraries')
-    if (from === PACK && remembered()) {
-      void reopen?.('hub')
-      return
-    }
-    const newer = 'This package needs a newer version of an H5P library than the app carries'
-    if (!navigator.onLine) {
-      show(`${newer}, and it has not been fetched on this device yet. Open it once while online, and it plays offline after that.`, 'error')
-      offer.hidden = true
-    } else if (from === PACK) {
-      show(`${newer}. It can be fetched from h5p.org.`, 'error')
-      offer.hidden = false
-    } else {
-      show(detail, 'error')
-      offer.hidden = true
-    }
+    show(
+      from === PACK
+        ? `This package needs a newer version of an H5P library than the app carries (${missingLibraries.folders.join(', ')}). A later version of the app will play it.`
+        : detail,
+      'error'
+    )
     return
   }
 
@@ -314,36 +300,10 @@ player.addEventListener('error', (event) => {
   // probe that finds out how to read it is a request.
   if (!navigator.onLine && (code === 'no-cors' || code === 'network')) {
     show('This package is on the web, and this device is offline. Open a downloaded .h5p with "Open file" instead.', 'error')
-    offer.hidden = true
     return
   }
 
   show(late ? `The content reported an error and kept running: ${detail}` : (EXPLANATIONS[code] ?? detail), late ? 'hint' : 'error')
-  offer.hidden = true
-})
-
-/**
- * Whether this viewer has agreed to fetch from h5p.org what the pack lacks. Kept, so the next
- * visit — offline, say — does not ask again: the element then falls back to the bundle it
- * fetched before by itself. A per-viewer convenience, so browser storage, and a page that works
- * without it.
- */
-const HUB_CONSENT = 'h5p-app:libraries-from-hub'
-const remembered = () => {
-  try {
-    return localStorage.getItem(HUB_CONSENT) === 'yes'
-  } catch {
-    return false
-  }
-}
-document.querySelector('#fetch-libraries').addEventListener('click', () => {
-  offer.hidden = true
-  try {
-    localStorage.setItem(HUB_CONSENT, 'yes')
-  } catch {
-    // Not kept; the next visit asks again.
-  }
-  void reopen?.('hub')
 })
 
 /* ---------------------------------------------------------------- installing */

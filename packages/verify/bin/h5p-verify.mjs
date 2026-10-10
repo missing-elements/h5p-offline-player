@@ -9,7 +9,8 @@ Plays the package in a headless browser through h5p-offline-player and reports w
 works. Exit code 0: it plays (warnings possible). 1: it does not. 2: could not run.
 
 Options:
-  --libraries hub|<url>  supply libraries for a package exported without its own
+  --libraries pack|<url> supply libraries for a package exported without its own (pack: the
+                         published library pack; hub means the same)
   --out <dir>            where report.json and screenshot.png go
                          (default: <package>.verify/ beside the package)
   --browser <path>       a Chromium-based browser; Chrome, Edge or Playwright's found otherwise

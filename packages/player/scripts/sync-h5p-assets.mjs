@@ -62,9 +62,14 @@ if (currentFontsModule !== fontsModule) await writeFile(fontsModulePath, fontsMo
 const constantsPath = resolve(rootDir, 'src', 'shared', 'constants.ts')
 const constants = await readFile(constantsPath, 'utf8')
 const major = Number(packageJson.version.split('.')[0])
+// The library pack `libraries="pack"` names, pinned to the version in this checkout, so a given
+// player release always plays against the same libraries. `prepublishOnly` refuses a version that
+// is not on npm yet.
+const librariesJson = JSON.parse(await readFile(resolve(rootDir, '..', 'libraries', 'package.json'), 'utf8'))
 const stamped = constants
   .replace(/export const VERSION = '[^']*'/, `export const VERSION = '${packageJson.version}'`)
   .replace(/export const MAJOR_VERSION = \d+/, `export const MAJOR_VERSION = ${major}`)
+  .replace(/export const LIBRARY_PACK_VERSION = '[^']*'/, `export const LIBRARY_PACK_VERSION = '${librariesJson.version}'`)
 
 if (stamped !== constants) {
   await writeFile(constantsPath, stamped, 'utf8')

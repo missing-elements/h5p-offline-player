@@ -12,15 +12,15 @@ The folder defaults to ./h5p-player.
 Options:
   --packages <origins>   play packages, and fetch library bundles, only from these origins
                          (comma or space separated; this site's own is always allowed). Add
-                         https://api.h5p.org to allow libraries=hub, and any host a package
-                         URL redirects to. Default: any https host.
+                         any host a package URL redirects to, and https://cdn.jsdelivr.net for
+                         libraries=pack on a site built with --no-libraries. Default: any https host.
   --ancestors <origins>  only these sites may frame the page (frame-ancestors, sent as a header).
                          Default: any site.
   --default-libraries <sources>
                          the libraries= value for addresses that name none, so a snippet without
-                         it still plays an export with no libraries: pack, hub, URLs, as the
+                         it still plays an export with no libraries: pack or URLs, as the
                          parameter. Default: none, such exports are refused unless the address asks
-  --no-libraries         leave out the 9.8 MB library pack that libraries=pack names
+  --no-libraries         leave out the 9.8 MB library pack; libraries=pack then fetches it from jsDelivr
   --force                write into a folder that is not empty, replacing only this tool's files
   -h, --help             show this
   -v, --version          print the version`

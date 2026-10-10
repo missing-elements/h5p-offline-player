@@ -18,7 +18,6 @@ const message = document.querySelector('#message')
 const log = document.querySelector('#log')
 const offer = document.querySelector('#offer')
 const useBundle = document.querySelector('#use-bundle')
-const useHub = document.querySelector('#use-hub')
 const confirmBox = document.querySelector('#confirm-src')
 
 const write = (line) => {
@@ -146,9 +145,8 @@ player.addEventListener('error', (event) => {
   write(`error  ${code}: ${detail}`)
 
   // The element reports what a package is missing; where to get it is the host's call, and here
-  // the visitor's: this site's bundle, or h5p.org, which is a request to a third party. Only the
-  // sources not tried yet are offered — the bundle is built from the hub, so after the hub has
-  // failed it would not help either.
+  // the visitor's: this site's bundle, about 10 MB, offered rather than fetched unasked. Once it
+  // has been tried there is nothing else to offer.
   const tried = player.getAttribute('libraries')
   // The element's own text is written for the developer ("set the libraries attribute"); the
   // visitor gets the buttons instead.
@@ -158,9 +156,7 @@ player.addEventListener('error', (event) => {
       'warning'
     )
   }
-  useBundle.hidden = tried === BUNDLE || tried === 'hub'
-  useHub.hidden = tried === 'hub'
-  offer.hidden = !missingLibraries || (useBundle.hidden && useHub.hidden)
+  offer.hidden = !missingLibraries || tried === BUNDLE
 })
 
 /**
@@ -248,7 +244,6 @@ const retryWith = (source, label) => {
   reload?.()
 }
 useBundle.addEventListener('click', () => retryWith(BUNDLE, "this site's bundle"))
-useHub.addEventListener('click', () => retryWith('hub', 'h5p.org'))
 
 fileInput.addEventListener('change', () => {
   const [file] = fileInput.files

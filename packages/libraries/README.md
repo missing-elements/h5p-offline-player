@@ -4,25 +4,22 @@ One `.h5p` carrying the H5P hub's runtime libraries for every content type it se
 newest minor of its major, for
 [`<h5p-player>`](https://www.npmjs.com/package/@missing-elements/h5p-offline-player)'s
 `libraries` attribute. With it, an export that carries only `content/` (common from h5p.com and
-h5p.org) plays without asking the hub.
+h5p.org) plays.
 
 ## Use
 
-From a CDN, versioned, with CORS:
+The element names this pack itself: `libraries="pack"` fetches the version its release pins,
+from jsDelivr.
 
 ```html
-<h5p-player src="stripped.h5p"
-            libraries="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-libraries@0/libraries.h5p hub"></h5p-player>
+<h5p-player src="stripped.h5p" libraries="pack"></h5p-player>
 ```
 
-Or serve `libraries.h5p` yourself and name that URL. `hub` is the fallback for libraries the
-bundle lacks; leave it out for a site that must not reach h5p.org.
-
-With a bundler:
+Or serve `libraries.h5p` yourself and name that URL. With a bundler:
 
 ```js
 import libraries from '@missing-elements/h5p-libraries/libraries.h5p?url'
-player.setAttribute('libraries', `${libraries} hub`)
+player.setAttribute('libraries', libraries)
 ```
 
 ## Licences

@@ -112,8 +112,8 @@ The player page is a static site that `@missing-elements/h5p-embed` writes:
 npx @missing-elements/h5p-embed h5p-player --packages https://host.example
 ```
 
-`--packages` limits the hosts packages may come from (add `https://api.h5p.org` for
-`libraries=hub`), `--ancestors` the sites that may frame the page; leave both out to allow any.
+`--packages` limits the hosts packages may come from (add `https://cdn.jsdelivr.net` for
+`libraries=pack` on a site built with `--no-libraries`), `--ancestors` the sites that may frame the page; leave both out to allow any.
 Deploy the folder to a domain of the organisation's own: a separate registrable domain
 (`h5p-player.example.net`, not a subdomain of the site, which would receive its cookies) that
 holds nothing else — no accounts, no cookies. Netlify and Cloudflare Pages read the `_headers`
@@ -130,7 +130,7 @@ without `--ancestors`. The site's page then carries:
 The script line sizes the iframe to the content; a page that already has h5p.org's
 `h5p-resizer.js` needs no second one. `title` is what screen readers announce, so name the
 activity; `min-height` is for a platform that strips the script. Encode `&`, `#`, `+`, `%` and
-spaces inside `src`. Parameters, by the element's attribute names: `libraries=pack`, `hub` or
+spaces inside `src`. Parameters, by the element's attribute names: `libraries=pack` or
 `libraries=<url>` for a package without libraries (`libraries=none` turns off the site's default), `preload=auto`, `frame`, `copyright`,
 `export`, `icon`, `reporting`, `fullscreen=off`, `activity-id=<IRI>`, `custom-css=<URL>`, and
 `xapi=<the page's origin>` to receive statements by `postMessage`. Not `custom-js` or `user`.
@@ -181,7 +181,7 @@ to whom: https://github.com/missing-elements/h5p-offline-player/blob/main/docs/p
 | `error: no-worker` | page on `http://` or `file://`; or `sw` points at another origin | serve over https; keep the worker same-origin |
 | `error: network`, "is an http: URL and this page is served over https:" | mixed content: an `http://` package or bundle on an `https://` page | use the `https://` URL; `http://localhost` is exempt |
 | `error: no-cors` | the package host sends no CORS headers | host the package where you control headers (GitHub Pages works as it comes), or offer a file picker: `player.file = input.files[0]` |
-| `error: bad-archive`, "contains no libraries" | an h5p.com / h5p.org export: `content/` only | set `libraries` to a bundle, with the hub behind it: `libraries="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-libraries@0/libraries.h5p hub"` — `@missing-elements/h5p-libraries` carries every hub content type's libraries (serve it yourself with its `libraries.txt` of licences if the site must not reach a CDN), and `hub` is asked only for what it lacks; `libraries="hub"` alone fetches from h5p.org every time |
+| `error: bad-archive`, "contains no libraries" | an h5p.com / h5p.org export: `content/` only | set `libraries="pack"`: `@missing-elements/h5p-libraries`, every hub content type's libraries, from jsDelivr (serve `libraries.h5p` yourself with its `libraries.txt` of licences and name that URL if the site must not reach a CDN). `hub` means `pack`; the H5P hub itself is no longer asked |
 | worker or runtime files 404 after a build | the bundler did not rewrite `new URL` (esbuild); or an install with a bundler but without `player.runtime`, so the element looked for `frame-assets/` beside a hashed bundle | set `runtime` from `@missing-elements/h5p-runtime`; or serve both packages' `dist/` statically and set `sw` and `assets-base` |
 | the frame renders the host page inside itself | an SPA fallback answered a virtual route with `index.html`: the worker is not registered | check the registration; after "clear site data" reload once |
 | content collapsed to 150 px | `auto-resize="off"` with no height from CSS; or the host's CSP has `style-src 'self'` and the browser lacks `adoptedStyleSheets`, so the fallback `<style>` is blocked | remove `auto-resize="off"`, or give the `h5p-player` tag a height; update the browser |

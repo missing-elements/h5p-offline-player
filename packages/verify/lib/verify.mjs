@@ -39,7 +39,7 @@ const MIME = {
 /**
  * @typedef {object} VerifyOptions
  * @property {string} file the `.h5p` to play
- * @property {string} [libraries] `hub`, or the URL of a bundle, for a package without library folders
+ * @property {string} [libraries] `pack`, or the URL of a bundle, for a package without library folders
  * @property {string} [out] where `report.json` and `screenshot.png` go; nothing is written without it
  * @property {string} [browser] a Chromium-based browser executable; found automatically otherwise
  * @property {number} [readyTimeout] ms allowed to reach `ready`; default 60 000
@@ -280,7 +280,7 @@ export function summarize(report) {
   for (const reason of report.reasons) lines.push(`  ${reason}`)
   const missing = report.errors.find((error) => error.missingLibraries)?.missingLibraries
   if (missing) {
-    lines.push(`  fix: add the library folders (${missing.folders.join(', ')}), or --libraries hub if the destination site supplies libraries`)
+    lines.push(`  fix: add the library folders (${missing.folders.join(', ')}), or --libraries pack if the destination site supplies libraries`)
   }
   for (const warning of report.warnings) lines.push(`  warning: ${warning}`)
   if (report.screenshot) lines.push(`  screenshot: ${report.screenshot}`)

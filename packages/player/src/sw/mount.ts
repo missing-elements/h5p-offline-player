@@ -605,7 +605,7 @@ class VirtualServer {
    * The newest library bundle downloaded whole from `url`, if one is still in the chunk store.
    * Whole, not merely registered: a download cut short, or a bundle evicted since, has a row and
    * not the bytes. More than one row can name the same URL, because the id also hashes the
-   * host's validator, so a hub bundle that changed was downloaded again under a new one.
+   * host's validator, so a bundle that changed was downloaded again under a new one.
    */
   private async downloadedBundle(url: string): Promise<string | null> {
     const rows = (await db.allPackages())

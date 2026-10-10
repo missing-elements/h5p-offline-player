@@ -5,7 +5,7 @@
  * `h5p-embed` was told when it wrote the site, and the demo's `/embed` with the demo's copy of the
  * library pack.
  *
- *   ?src=<package url>[&libraries=pack|hub|<url> …|none][&preload=auto][&xapi=<parent origin>]
+ *   ?src=<package url>[&libraries=pack|<url> …|none][&preload=auto][&xapi=<parent origin>]
  *    [&frame][&copyright][&export][&icon][&reporting][&fullscreen=off]
  *    [&activity-id=<IRI>][&custom-css=<stylesheet url>]
  *
@@ -18,17 +18,17 @@
  * package — Embed My's preview — shows.
  */
 
-/** Where `libraries=hub` fetches from: the one hub host that sends CORS headers (see the player). */
-const HUB_ORIGIN = 'https://api.h5p.org'
+/** Where the element's `libraries="pack"` fetches the library pack from, for a site without its own copy. */
+const PACK_CDN_ORIGIN = 'https://cdn.jsdelivr.net'
 
 /**
  * @param {object} [options]
  * @param {string | null} [options.librariesPack] the URL of a copy of `@missing-elements/h5p-libraries`
- *   on this site, which `libraries=pack` names; without one, `pack` means the hub where allowed
+ *   on this site, which `libraries=pack` names; without one, `pack` is the element's copy on jsDelivr
  * @param {string[] | null} [options.packages] the origins packages and library bundles may come
  *   from, besides this page's own; `null` plays any, asking first when the storage is this origin's
  * @param {string | null} [options.defaultLibraries] the `libraries` value for an address that has
- *   none — `pack`, `hub`, URLs, as the parameter — so a snippet without `&libraries=` still plays
+ *   none — `pack` or URLs, as the parameter — so a snippet without `&libraries=` still plays
  *   an export that carries no libraries; `&libraries=none` turns it off for one address
  * @param {object | null} [options.runtime] the `runtime` export of `@missing-elements/h5p-runtime`,
  *   for a page that bundles the element; without it the element looks for `frame-assets/` beside itself
@@ -215,24 +215,21 @@ export function startEmbed({ librariesPack = null, packages = null, defaultLibra
 
   /**
    * The `libraries` value with `pack` resolved to this site's copy, or an error to show. With a
-   * list of hosts, every bundle's origin has to be on it, the hub's included; the CSP that
-   * `h5p-embed` wrote says the same, this only says it in words.
+   * list of hosts, every bundle's origin has to be on it, jsDelivr's included when the pack comes
+   * from there; the CSP that `h5p-embed` wrote says the same, this only says it in words.
    */
   const librarySources = (value) => {
     const sources = []
     if (value === 'none') return { value: '' }
     for (const token of value.split(/\s+/).filter(Boolean)) {
-      if (token === 'pack') {
-        // The pack, with the hub behind it for what it lacks, where the hub may be reached: an
-        // export without its libraries then plays with no request to h5p.org in the common case.
-        // A site set up without the pack falls back to the hub alone, so a snippet written for
-        // `pack` keeps playing after a rebuild with --no-libraries.
+      if (token === 'pack' || token === 'hub') {
+        // This site's copy of the pack; without one, the element's own `pack`, the copy on
+        // jsDelivr, where that may be reached, so a snippet written for `pack` keeps playing after
+        // a rebuild with --no-libraries. `hub` has meant `pack` since player 0.6: the one H5P hub
+        // host that answers a browser serves a catalogue older than current exports need.
         if (librariesPack) sources.push(librariesPack)
-        if (permitted(HUB_ORIGIN)) sources.push('hub')
-        else if (!librariesPack) return { error: 'This player was set up without the library pack, so libraries=pack is not available here.' }
-      } else if (token === 'hub') {
-        if (!permitted(HUB_ORIGIN)) return { error: 'This player does not fetch libraries from the H5P hub.' }
-        sources.push(token)
+        else if (permitted(PACK_CDN_ORIGIN)) sources.push('pack')
+        else return { error: 'This player was set up without the library pack, so libraries=pack is not available here.' }
       } else {
         const origin = urlOrigin(token)
         if (!origin || !permitted(origin)) return { error: `This player does not fetch libraries from ${origin ?? token}.` }

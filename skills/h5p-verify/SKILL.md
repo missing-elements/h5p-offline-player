@@ -17,8 +17,9 @@ until this passes and you have looked at the screenshot.
 Needs Node 20+ and a Chromium-based browser. Chrome or Edge on the machine is used if present;
 otherwise run `npx playwright install chromium` once (about 150 MB). Headless, no display.
 
-- `--libraries hub` — for a package without library folders (what h5p.com and h5p.org export),
-  the way the destination site will supply them. `--libraries <url>` for a library bundle.
+- `--libraries pack` — for a package without library folders (what h5p.com and h5p.org export),
+  played against the library pack, the way a site with `libraries="pack"` supplies them.
+  `--libraries <url>` for another bundle.
 - `--out <dir>` — where `report.json` and `screenshot.png` go; default `<package>.verify/`.
 - `--json` — the report as JSON instead of the summary.
 - `--browser <path>` — a Chromium executable, for CI or a sandbox where none is found.
@@ -34,7 +35,7 @@ Exit 2: the check could not run (no browser, no such file).
 
 | It says | Usual cause | What to do |
 |---|---|---|
-| `bad-archive` … `Missing: <folders>` | no library folders, or not the versions `content.json` names | add the library folders; or rerun with `--libraries hub` if the destination supplies libraries |
+| `bad-archive` … `Missing: <folders>` | no library folders, or not the versions `content.json` names | add the library folders; or rerun with `--libraries pack` if the destination supplies libraries |
 | `bad-archive` otherwise | no `h5p.json`, bad entry names, not a zip | fix the packaging |
 | `runtime: …` with `state: error` | the runtime threw before the content came up: a script of a library it needed failed, or `content.json` breaks the content type at start | same fixes as the next row; the message names what threw |
 | `N uncaught errors while booting: …` | a library script threw as it loaded: a dependency listed that is not a runtime library (`H5PEditor is not defined`), or `content.json` missing a field the content type reads at start | for a manifest problem, list only runtime libraries in `preloadedDependencies`; for a content problem, compare `content.json` with `<Library-x.y>/semantics.json` inside the package and fill in the fields it expects |
