@@ -1,6 +1,6 @@
 {
   "name": "@missing-elements/h5p-cmi5",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "cmi5 for h5p-offline-player: turns a page holding <h5p-player> into a cmi5 assignable unit. Launch handshake, statements to the LMS's LRS with the build's revision, passed or failed by the mastery score, completed, terminated. No dependencies. Checked against ADL's CATAPULT player.",
   "license": "MIT",
   "repository": {
