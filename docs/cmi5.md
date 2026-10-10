@@ -37,7 +37,10 @@ The options of `startCmi5(player, options)`, detailed in the package's README:
 - `client` — a client of your own, such as a simulated LMS or a test double.
 
 The session has `terminate()`, `retry()` for a completion the LRS rejected, `exit()`, and
-`stop()`, which stops listening to the element without sending `terminated`.
+`stop()`, which stops listening to the element without sending `terminated`. It also exposes, read
+only, `launchParameters`, `launchData`, `learnerPreferences` (the LMS's language and audio
+preferences, for the page to apply), `resumed` (a reload picked the session up), `src`, `returnURL`
+(only an http or https address) and `terminated`.
 
 The demo's `/demo/cmi5.html` (`demo/cmi5-page.js`) is a page on it. Opened with `?simulate`, it
 runs the same code against an LMS simulated inside the page, with a mastery score of 0.8, and

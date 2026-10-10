@@ -673,7 +673,7 @@ export class H5PPlayerElement extends HTMLElement {
    *
    * Without a `libraries` attribute this is one call that either works or reports exactly what is
    * missing. Reaching out to a third party is never something the element decides on its own.
-   * With a list — `libraries="/h5p/libraries.h5p hub"` — the first source that covers the package
+   * With a list — `libraries="/libraries.h5p hub"` — the first source that covers the package
    * wins, and the next is tried only for what the one before still left absent: a bundle a site
    * hosts answers the common case with no request to the hub, and the hub answers a content type
    * the bundle has not got. A source that cannot be reached at all — the bundle's host down, and

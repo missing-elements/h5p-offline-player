@@ -21,7 +21,7 @@ Without one, point the element at a copy of `dist/`:
 
 ```html
 <h5p-player src="course.h5p"
-            assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-runtime@0/dist/"></h5p-player>
+            assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-runtime@0.1.0/dist/"></h5p-player>
 ```
 
 Or copy `dist/` to `frame-assets/` next to `h5p-player.js`, where the element looks by default.

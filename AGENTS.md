@@ -588,8 +588,8 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   `resume` off rather than raising a `userdata` event nobody asked for. The custom
   stylesheets' and scripts' origins join the frame's `style-src` and `script-src` the way the
   frame assets' do, since they are the host's choice like `assets-base`. `customJs` is there for
-  completeness, not for MathJax: formulas need `H5P.MathDisplay` in the package (see the setup
-  guide's Troubleshooting), and a host-side analytics script has the `xapi` events instead.
+  completeness, not for MathJax: formulas need `H5P.MathDisplay` in the package (see
+  `docs/troubleshooting.md`), and a host-side analytics script has the `xapi` events instead.
   `tests/browser/options.test.ts` pins each against `H5PIntegration` and the statements the
   fixture sends; `frame-document.test.ts` pins the sanitising and the CSP.
   Two of them were found not to do what they said, the same day, by asking what each option
