@@ -29,7 +29,7 @@ a subdomain shares your site's cookies.
 | `--packages <origins>` | Play packages and fetch library bundles only from these origins (the site's own is always allowed). Add `https://api.h5p.org` to allow `libraries=hub`. Default: any https host |
 | `--ancestors <origins>` | Only these sites may frame the page (`frame-ancestors`, header only). Default: any site |
 | `--default-libraries <sources>` | The `libraries` value for addresses that name none: `pack`, `hub` or URLs. Checked against `--packages`. Default: none, so exports without libraries are refused unless the address asks |
-| `--no-libraries` | Leave out the 9.5 MB library pack; `libraries=pack` then means the hub, where allowed |
+| `--no-libraries` | Leave out the 9.8 MB library pack; `libraries=pack` then means the hub, where allowed |
 | `--force` | Write into a non-empty folder, replacing only this tool's files |
 | `-h`, `--help` / `-v`, `--version` | |
 

@@ -99,7 +99,8 @@ describe('h5p-verify', () => {
     expect(report.verdict).toBe('fail')
     expect(report.state).toBe('error')
     expect(report.errors[0]?.code).toBe('bad-archive')
-    expect(report.errors[0]?.missingLibraries?.folders).toContain('H5P.QuestionSet-1.20')
+    // Any minor: the demo's quiz moves with the hub's catalogue whenever its content is rebuilt.
+    expect(report.errors[0]?.missingLibraries?.folders).toContainEqual(expect.stringMatching(/^H5P\.QuestionSet-1\.\d+$/))
     expect(report.reasons[0]).toMatch(/^bad-archive: /)
     expect(report.screenshot).toBeNull()
     expect(summarize(report)).toContain('--libraries hub')

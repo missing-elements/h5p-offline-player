@@ -1444,8 +1444,9 @@ SPA-fallback trap described above cannot happen there.
   decoding and playing as it does online.
   **A package without its own libraries plays offline from the first open**, because the app
   carries them: `packages/libraries/libraries.h5p` (`@missing-elements/h5p-libraries`, the app's
-  until 2026-10-08) is the H5P hub's runtime libraries for every content type it serves — 98
-  folders from 52 content types, 9.5 MB, measured on 2026-09-29 — kept at the newest minor of
+  until 2026-10-08) is the H5P hub's runtime libraries for every content type it serves — 100
+  folders from 52 content types, 9.8 MB, as rebuilt from the new hub host on 2026-10-10 (98 and
+  9.5 MB from the old host's catalogue on 2026-09-29) — kept at the newest minor of
   each major, imported by `app.js` as a URL asset so Vite emits it under `assets/` and the
   precache picks it up from the manifest, and set as `libraries` on every open. The hub is the
   fallback for what the pack lacks — a newer minor than it was built with, a content type added
@@ -1495,7 +1496,7 @@ SPA-fallback trap described above cannot happen there.
   dependency closure the content needs (walked from `library.json`, plus every sub-content
   library the params name), drops the editor libraries the hub ships, and runs the result through
   the normalizer, so each package is also an example of what the normalizer produces. The outputs
-  are committed, 5.2 MB for the four, because a deploy should need neither the hub nor the video
+  are committed, 5.5 MB for the four, because a deploy should need neither the hub nor the video
   host; `pnpm demo:content` regenerates them. Provenance: the libraries are MIT, the text is
   ours under CC0, and the clip is Big Buck Bunny, © Blender Foundation, CC BY 3.0, credited in the
   package metadata and on the player page. The `/no-range/` route serves this content on the site,

@@ -20,7 +20,7 @@ Options:
                          the libraries= value for addresses that name none, so a snippet without
                          it still plays an export with no libraries: pack, hub, URLs, as the
                          parameter. Default: none, such exports are refused unless the address asks
-  --no-libraries         leave out the 9.5 MB library pack that libraries=pack names
+  --no-libraries         leave out the 9.8 MB library pack that libraries=pack names
   --force                write into a folder that is not empty, replacing only this tool's files
   -h, --help             show this
   -v, --version          print the version`

@@ -75,7 +75,20 @@ async function buildPackage(name) {
     const match = /^([^/]+)\/library\.json$/.exec(entry.filename)
     if (match) libraryJsons.set(match[1], JSON.parse(new TextDecoder().decode(await entry.getData(new Uint8ArrayWriter()))))
   }
-  const byMachineName = new Map([...libraryJsons.values()].map((library) => [library.machineName, library]))
+  // A bundle can carry two minors of one library (the QuestionSet bundle has H5P.Question 1.4 and
+  // 1.5); keep the newest, which every dependant naming an older minor of the same major accepts.
+  // Taking whichever came last in the zip shipped 1.4 to libraries that require 1.5.
+  const version = (library) => [library.majorVersion, library.minorVersion, library.patchVersion ?? 0]
+  const newer = (a, b) => {
+    const [x, y] = [version(a), version(b)]
+    for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i]
+    return false
+  }
+  const byMachineName = new Map()
+  for (const library of libraryJsons.values()) {
+    const current = byMachineName.get(library.machineName)
+    if (!current || newer(library, current)) byMachineName.set(library.machineName, library)
+  }
   const needed = new Map()
   const visit = (machineName) => {
     if (needed.has(machineName)) return
