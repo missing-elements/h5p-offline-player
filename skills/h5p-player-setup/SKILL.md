@@ -158,6 +158,9 @@ test tool — every learner's browser would connect to a service the organisatio
 processing agreement with, which a GDPR or security review will not pass. It is fine for trying
 whether a package embeds before the domain is set up.
 
+For the site's privacy notice, or a reviewer's questions about what is stored, what is sent and
+to whom: https://github.com/missing-elements/h5p-offline-player/blob/main/docs/privacy.md
+
 ## 3. Check it
 
 1. The page is served over `https://` or `localhost`, never `file://`.

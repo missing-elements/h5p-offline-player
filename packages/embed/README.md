@@ -124,6 +124,13 @@ import { startEmbed } from '@missing-elements/h5p-embed/embed.js'
 startEmbed({ runtime, librariesPack, defaultLibraries: 'pack' })
 ```
 
+## Privacy
+
+The site sets no cookies and sends nothing anywhere of its own. Learners' browsers contact your
+player domain, the package hosts and, only with `hub`, `api.h5p.org`. What the player stores and
+sends, for a privacy notice or a GDPR review:
+[Privacy and data protection](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/privacy.md).
+
 ## Licences
 
 MIT. The written folder also carries

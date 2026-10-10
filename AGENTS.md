@@ -173,7 +173,8 @@ README.md                 what npm shows; ACCESSIBILITY.md, SECURITY.md, CONTRIB
 
 docs/                     the README's longer sections, one file each: streaming video, libraries, the
                           frame's CSP, the revision on statements, resume, the verifier, cmi5, development,
-                          troubleshooting, single-worker hosts and upgrades, coming from h5p-standalone; the README links
+                          troubleshooting, single-worker hosts and upgrades, coming from h5p-standalone,
+                          privacy (what is stored and sent, for a host's notice); the README links
                           them by absolute URL because npm renders the same file; suggestions-review.md
                           weighs a note of eight feature suggestions against the code (2026-09-30). The
                           release notes are not in the repository: each GitHub release (`gh release list`)
