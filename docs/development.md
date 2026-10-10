@@ -1,11 +1,8 @@
 # Development
 
-The repository, its commands, and what the demo site is.
-
-A pnpm workspace: the player in `packages/player`, the H5P runtime it loads in
-`packages/runtime`, the library bundle in `packages/libraries`, the normalizer in
-`packages/normalize`, the verifier in `packages/verify`, the cmi5 wiring in `packages/cmi5`, the embed site writer in `packages/embed`, the
-demo site in `apps/demo`.
+A pnpm workspace: `packages/player`, `packages/runtime`, `packages/libraries`,
+`packages/normalize`, `packages/verify`, `packages/cmi5`, `packages/embed`, and the demo site in
+`apps/demo`.
 
 ```bash
 pnpm install
@@ -23,19 +20,12 @@ pnpm demo:icons             # re-render the installable app's icons
 pnpm libraries              # rebuild packages/libraries from the H5P hub
 ```
 
-`pnpm dev` serves the player page with real content — a quiz, an interactive video, an
-accordion and dialog cards, built from H5P hub libraries around text written for this player —
-plus, in dev only, generated test archives under `/fixtures/` covering each path the player
-takes: a host that honours `Range` and one that does not, 20 MB of deflated and of stored media,
-hostile entry names, a file that is not an H5P package. `/demo/` is the two-line integration,
-with the other ways to host it — xAPI, cmi5, a file from disk, a framed player page, two players on one page —
-linked from there.
+`pnpm dev` serves the player page with real content, plus, in dev only, generated test archives
+under `/fixtures/`. `/demo/` links the other ways to host it: xAPI, cmi5, a file from disk, a
+framed player page, two players on one page.
 
-The demo site deploys to Vercel from `vercel.json`: the pages, the element, its worker and the
-frame assets as static files, plus one function that plays a host without `Range` support. Its
-`/app/` page is the player as an installable app: in Chrome or Edge it installs, opens `.h5p`
-files from the file manager and plays them with no network — including packages exported without
-their libraries, since the app carries the H5P hub's libraries for every content type.
-`/app/?src=<url of a .h5p>` is a link that opens a package from the web in the installed app.
+The demo deploys to Vercel from `vercel.json`. Its `/app/` page is the player as an installable
+app that plays `.h5p` files with no network, libraries included; `/app/?src=<url of a .h5p>`
+opens a package from the web in it.
 
 Working on the code? Start with [AGENTS.md](https://github.com/missing-elements/h5p-offline-player/blob/main/AGENTS.md).

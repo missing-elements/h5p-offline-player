@@ -202,4 +202,4 @@ attribute, in the browser's storage on that device (or handed to the host with
 course.h5p` checks a package plays before it is published.
 
 The full guide, with the element's API, the events, single-worker hosts and every symptom:
-https://github.com/missing-elements/h5p-offline-player/blob/main/h5p-player-setup.md
+https://github.com/missing-elements/h5p-offline-player/blob/main/setup.md

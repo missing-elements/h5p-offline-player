@@ -136,7 +136,7 @@ The one file that must be same-origin is the Service Worker script itself (brows
 
 Cache names carry the package's major version; the chunk store is independent of the worker version, so worker updates never invalidate cached packages.
 
-Integration for host developers is in `h5p-player-setup.md`.
+Integration for host developers is in `setup.md`.
 
 ## Out of scope
 Editor; offline management (deliberate save, package library, delete — v2, will reuse the Jobs worker and chunk store); results storage and save-and-resume (events are emitted; persistence is a future module); persistent local file handles (File System Access API); any server-side component.

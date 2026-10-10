@@ -12,7 +12,7 @@ package.
 
 The player handles untrusted archives across a page, Service Worker, and
 dedicated worker. For architectural constraints and security boundaries, read
-[h5p-offline-player-architecture.md](./h5p-offline-player-architecture.md).
+[architecture.md](./architecture.md).
 
 ## Prerequisites
 

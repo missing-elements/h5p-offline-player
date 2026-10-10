@@ -1,19 +1,10 @@
 # @missing-elements/h5p-normalize
 
-Rewrites an `.h5p` package once so that it streams well through
-[h5p-offline-player](https://github.com/missing-elements/h5p-offline-player). The content is not
-changed; only the zip container is:
-
-- media (video, audio, images, fonts, PDF) is stored rather than deflated, so a `Range` request
-  can reach any byte of it directly;
-- an mp4 whose index (`moov`) sits at the end is remuxed so the index comes first — a remux, not
-  a re-encode;
-- entries are ordered `h5p.json`, library folders, content, with content media last, so a host
-  that ignores `Range` still boots the player before the media has arrived;
-- scripts, styles and JSON an exporter left stored are deflated; everything else is copied byte
-  for byte.
-
-Run it once, where the package is published — not in the learner's browser.
+Rewrites an `.h5p` package once, where it is published, so that it streams well through
+[h5p-offline-player](https://github.com/missing-elements/h5p-offline-player). Only the zip
+container changes: media is stored rather than deflated, an mp4 with its index at the end is
+remuxed (not re-encoded) to put it first, content media goes last, and stored scripts, styles and
+JSON are deflated. Everything else is copied byte for byte.
 
 ## Usage
 
@@ -21,31 +12,25 @@ Needs Node 20 or later.
 
 ```bash
 npx @missing-elements/h5p-normalize course.h5p               # writes course.normalized.h5p
-npx @missing-elements/h5p-normalize course.h5p --dry-run     # report only, write nothing
+npx @missing-elements/h5p-normalize course.h5p --dry-run     # report only
 npx @missing-elements/h5p-normalize https://host.example/course.h5p -o course.h5p
 ```
 
-Or install it, and the command is `h5p-normalize`:
-
-```bash
-npm install --save-dev @missing-elements/h5p-normalize
-npx h5p-normalize course.h5p
-```
+Installed (`npm install --save-dev @missing-elements/h5p-normalize`), the command is
+`h5p-normalize`.
 
 | Option | |
 |---|---|
-| `-o, --output <file>` | where to write; default `<name>.normalized.h5p` beside the input, or in the current directory for a URL |
+| `-o, --output <file>` | default `<name>.normalized.h5p` beside the input, or in the current directory for a URL |
 | `-n, --dry-run` | inspect and report, write nothing |
 | `-q, --quiet` | only the summary |
 | `-h, --help` | |
 
-The output is checked as it is written: an entry whose bytes do not match their CRC stops the
-run with its name, and an encrypted entry is refused rather than copied without its key data.
-`unzip -t course.normalized.h5p` is an independent check.
+An entry whose bytes do not match their CRC stops the run with its name; an encrypted entry is
+refused. `unzip -t` is an independent check of the output.
 
-The summary has a `revision` line: what h5p-offline-player will put in `context.revision`
-on every xAPI statement for the file it wrote (for a dry run, the input as it is). Copy it into
-your version record at release, and an audit can match each completion to the build it came from.
+The summary's `revision` line is what the player puts in `context.revision` on every xAPI
+statement for the written file (for a dry run, the input). Record it at release.
 `archiveFingerprint(path)` returns the same from code.
 
 ## From code
@@ -60,17 +45,8 @@ const report = await normalizeArchive({
 })
 ```
 
-`normalizeArchive` reads and writes files on disk; it runs on Node, not in a browser.
-
-## Why
-
-A deflated video cannot be read from the middle: every byte before the one a player seeks to has
-to be downloaded and inflated first. If the mp4 also keeps its index at the end, nothing plays
-until the last byte has arrived. The demo site's
-[normalize page](https://github.com/missing-elements/h5p-offline-player/blob/main/apps/demo/demo/normalize.html)
-explains it with a diagram, and the repository's
-[`AGENTS.md`](https://github.com/missing-elements/h5p-offline-player/blob/main/AGENTS.md#the-normalizer)
-records what the tool does and does not change.
+Node only, not a browser. Why deflated video cannot stream: the demo's
+[normalize page](https://github.com/missing-elements/h5p-offline-player/blob/main/apps/demo/demo/normalize.html).
 
 ## Licence
 

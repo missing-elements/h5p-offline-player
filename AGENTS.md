@@ -1,7 +1,7 @@
 # AGENTS.md
 
-Working notes for this repository. Read `h5p-offline-player-architecture.md` first — it is the
-design, and it is the authority when this file and the code disagree. `h5p-player-setup.md` is
+Working notes for this repository. Read `architecture.md` first — it is the
+design, and it is the authority when this file and the code disagree. `setup.md` is
 the guide written for people integrating the package.
 
 ## What this is
