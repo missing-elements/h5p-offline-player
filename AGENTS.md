@@ -163,8 +163,10 @@ apps/demo/                the demo app: the dev server for the whole repository,
 
 docs/                     the README's longer sections, one file each: streaming video, libraries, the
                           frame's CSP, the revision on statements, resume, the verifier, cmi5, development; the README links
-                          them by absolute URL because npm renders the same file; RELEASE_NOTES.md
-                          every release, newest first, each section the body of its GitHub release
+                          them by absolute URL because npm renders the same file; suggestions-review.md
+                          weighs a note of eight feature suggestions against the code (2026-09-30). The
+                          release notes are not in the repository: each GitHub release (`gh release list`)
+                          carries its own, and `docs/releases/` went on 2026-10-09
 
 skills/                   agent skills, one directory per skill, at the root because that is where
                           `npx skills add <owner/repo>` looks: h5p-verify (when to run the verifier and how
@@ -1380,6 +1382,10 @@ SPA-fallback trap described above cannot happen there.
   to turn it off per address, checked against `--packages` when the site is written so a default
   the page would refuse never ships; `runtime`, for a bundled element; and `askInOwnFrame:
   false`, for a site whose own preview frames the page for a package the visitor just chose.
+  Embed My runs on 0.2.0 since that day. 0.2.1, on 2026-10-10, changes nothing in the package:
+  it is published to require player `^0.5.2`, the null-source straggler fix, because a site is
+  written from whatever player is installed — a fix to the player reaches a player domain only
+  through an embed release, and then only once the host writes and deploys the site again.
 - **The pages carry their metadata, and the origin is filled in at build time.** Titles,
   descriptions, canonical links, Open Graph and Twitter tags, JSON-LD for the software on the
   front page, `robots.txt` and `sitemap.xml`, and the GitHub link at the right of every page's
