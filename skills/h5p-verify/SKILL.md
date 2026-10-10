@@ -22,6 +22,10 @@ otherwise run `npx playwright install chromium` once (about 150 MB). Headless, n
 - `--out <dir>` — where `report.json` and `screenshot.png` go; default `<package>.verify/`.
 - `--json` — the report as JSON instead of the summary.
 - `--browser <path>` — a Chromium executable, for CI or a sandbox where none is found.
+- `--ready <seconds>` — time allowed to reach `ready`, default 60; raise it for a large package
+  on a slow link before reading a timeout as a failure.
+- `--settle <seconds>` — time watched after `ready` for late errors, default 3.
+- `-q` — the verdict line only.
 
 Exit 0: it plays (possibly with warnings). Exit 1: it does not; the summary says why.
 Exit 2: the check could not run (no browser, no such file).

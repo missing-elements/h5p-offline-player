@@ -131,7 +131,7 @@ The script line sizes the iframe to the content; a page that already has h5p.org
 `h5p-resizer.js` needs no second one. `title` is what screen readers announce, so name the
 activity; `min-height` is for a platform that strips the script. Encode `&`, `#`, `+`, `%` and
 spaces inside `src`. Parameters, by the element's attribute names: `libraries=pack`, `hub` or
-`libraries=<url>` for a package without libraries, `preload=auto`, `frame`, `copyright`,
+`libraries=<url>` for a package without libraries (`libraries=none` turns off the site's default), `preload=auto`, `frame`, `copyright`,
 `export`, `icon`, `reporting`, `fullscreen=off`, `activity-id=<IRI>`, `custom-css=<URL>`, and
 `xapi=<the page's origin>` to receive statements by `postMessage`. Not `custom-js` or `user`.
 
@@ -182,7 +182,7 @@ whether a package embeds before the domain is set up.
 | worker or runtime files 404 after a build | the bundler did not rewrite `new URL` (esbuild); or an install with a bundler but without `player.runtime`, so the element looked for `frame-assets/` beside a hashed bundle | set `runtime` from `@missing-elements/h5p-runtime`; or serve both packages' `dist/` statically and set `sw` and `assets-base` |
 | the frame renders the host page inside itself | an SPA fallback answered a virtual route with `index.html`: the worker is not registered | check the registration; after "clear site data" reload once |
 | content collapsed to 150 px | `auto-resize="off"` with no height from CSS; or the host's CSP has `style-src 'self'` and the browser lacks `adoptedStyleSheets`, so the fallback `<style>` is blocked | remove `auto-resize="off"`, or give the `h5p-player` tag a height; update the browser |
-| `error: runtime` after `ready` | a content type threw a non-fatal exception, common on resize | log it; do not hide the player |
+| `error` while `state` stays `ready` | a content type threw a non-fatal exception (`runtime`, common on resize), or one media file failed to extract | log it; hide the player only when `state` is `error` |
 | Vite dev only: worker or assets 404 | the packages are hoisted somewhere Vite does not serve (a monorepo); their own fallback for `.vite/deps/` covers the normal layout | add both packages to `optimizeDeps.exclude`, or set `sw` and `assets-base` |
 | a video takes minutes to start, then plays | the package, not the player: the video is compressed inside the zip and its index is at the end | the `h5p-normalize` skill; `preload="auto"` only moves the wait earlier |
 | the content starts over on every reload | `resume` is not set, which is the default | set `resume` (or `resume="host"`) if the user wants that, see section 2 |
@@ -201,5 +201,6 @@ attribute, in the browser's storage on that device (or handed to the host with
 `resume="host"`), never sent. And if they generate or rewrite packages, `npx @missing-elements/h5p-verify
 course.h5p` checks a package plays before it is published.
 
-The full guide, with the element's API, the events, single-worker hosts and every symptom:
-https://github.com/missing-elements/h5p-offline-player/blob/main/setup.md
+The element's API and events: https://github.com/missing-elements/h5p-offline-player/blob/main/README.md#api
+Every symptom and its fix: https://github.com/missing-elements/h5p-offline-player/blob/main/docs/troubleshooting.md
+Single-worker hosts and upgrades: https://github.com/missing-elements/h5p-offline-player/blob/main/docs/single-worker.md

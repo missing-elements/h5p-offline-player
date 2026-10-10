@@ -4,7 +4,7 @@
 plays a package through the player in a headless browser and says whether it worked:
 
 ```bash
-npx @missing-elements/h5p-verify course.h5p        # exit 0: it plays; 1: it does not; report.json and a screenshot beside it
+npx @missing-elements/h5p-verify course.h5p        # exit 0: it plays; 1: it does not; report.json and a screenshot in course.verify/
 ```
 
 It names missing libraries, fails on an uncaught error while the runtime boots, and checks that

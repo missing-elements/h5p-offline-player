@@ -260,7 +260,7 @@ document.addEventListener('drop', (event) => {
 /* ---------------------------------------------------------------- the player's reports */
 
 const EXPLANATIONS = {
-  'no-worker': 'This page needs a Service Worker. Open it over https:// in Chrome or Edge.',
+  'no-worker': 'This page needs a Service Worker. Open it over https:// in a current Safari, Chrome, Firefox or Edge.',
   'no-cors':
     'That host does not let other sites read the file. Download the .h5p and open it with "Open file".',
   network: 'The package could not be fetched. Check the address and the connection, and try again.'
@@ -320,10 +320,6 @@ player.addEventListener('error', (event) => {
 
   show(late ? `The content reported an error and kept running: ${detail}` : (EXPLANATIONS[code] ?? detail), late ? 'hint' : 'error')
   offer.hidden = true
-})
-
-player.addEventListener('resize', (event) => {
-  player.style.height = `${Math.max(event.detail.height, 240)}px`
 })
 
 /**

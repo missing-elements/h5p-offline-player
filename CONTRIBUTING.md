@@ -4,15 +4,16 @@ Thank you for contributing to `h5p-offline-player`.
 
 ## Before you start
 
-This repository is a pnpm workspace containing the player, normalizer,
-verifier, cmi5 package, and demo application. Read the
+This repository is a pnpm workspace containing the player, the H5P runtime, the
+library bundle, the normalizer, the verifier, the cmi5 package, the embed site writer and the
+demo application. Read the
 [development guide](./docs/development.md) before making changes. It explains
 the workspace layout, generated assets, and the commands that apply to each
 package.
 
 The player handles untrusted archives across a page, Service Worker, and
 dedicated worker. For architectural constraints and security boundaries, read
-[architecture.md](./architecture.md).
+[AGENTS.md](./AGENTS.md).
 
 ## Prerequisites
 

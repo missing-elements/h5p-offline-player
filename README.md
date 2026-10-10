@@ -57,13 +57,15 @@ that does not emit `new URL(…, import.meta.url)` assets, esbuild among them, s
 
 ```html
 <script type="module"
-  src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player/dist/h5p-player.js"></script>
+  src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@0.5.2/dist/h5p-player.js"></script>
 <h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js"
-            assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-runtime/dist/"></h5p-player>
+            assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-runtime@0.1.0/dist/"></h5p-player>
 ```
 
-Copy `dist/h5p-sw.js` onto your own site: browsers register a Service Worker only from the
-page's origin. Its scope is `/h5p/`, so an existing site worker is left alone.
+Copy `dist/h5p-sw.js` of the same version onto your own site: browsers register a Service Worker
+only from the page's origin. Its scope is `/h5p/`, so an existing site worker is left alone. Pin
+the version, and copy the worker again whenever you change it; the element warns when the two
+differ.
 
 ### Embed
 
@@ -86,14 +88,15 @@ your site's cookies) and frame it:
 [Embed My](https://embed-my.org/) runs the same page publicly for trying a package. It is a test
 tool: do not send learners to it.
 
-The [setup guide](https://github.com/missing-elements/h5p-offline-player/blob/main/setup.md)
-covers single-worker hosts, CSP and troubleshooting.
+When something goes wrong, see [Troubleshooting](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/troubleshooting.md). A site that
+allows one Service Worker, or must work offline, mounts the player in its own worker:
+[single-worker hosts](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/single-worker.md).
 
 ## API
 
 | Name | Set as | What it does |
 |---|---|---|
-| `src` | attribute, property | The package URL. Setting it loads; removing it empties the player |
+| `src` | attribute, property | The package URL. Setting a new one loads; removing it empties the player. To reload the same URL, remove it and set it again |
 | `file` | property | A `File` from a picker; wins over `src` |
 | `sw` | attribute | The Service Worker's URL, same-origin. Default: `h5p-sw.js` beside the element |
 | `jobs` | attribute | The background worker's URL, for a CSP without `blob:` in `worker-src`. Default: `blob:`, then `h5p-jobs.js` beside the element |
@@ -111,7 +114,7 @@ covers single-worker hosts, CSP and troubleshooting.
 | `auto-resize` | attribute | `off` to size the element yourself. Default: follows the content's height |
 | `preload` | attribute, property | `auto` pulls large deflated media before it is asked for. Default: `none` |
 | `resume` | attribute, property | `device` keeps the content's saved state on this device; `host` hands it to the page. Default: `off` |
-| `userData` | property | Under `resume="host"`, the state to restore, as `userdata` events carried it. Set before `src` |
+| `userData` | property | Under `resume="host"`, the state to restore, as `userdata` events carried it. Set before `src`. Not checked against the build: compare the `revision` you stored |
 | `state` | read-only | `idle`, `probing`, `downloading`, `indexing`, `ready` or `error` |
 | `pkgId`, `revision` | read-only | The loaded package's id and build fingerprint |
 | `source` | read-only | `{ type: 'range-http' \| 'chunked' \| 'file', size, … }` |
@@ -119,7 +122,7 @@ covers single-worker hosts, CSP and troubleshooting.
 | `libraryBundle` | read-only | `{ url, origin, fromCache }` for the bundle that supplied missing libraries |
 | `scope` | read-only | The Service Worker scope |
 
-`clearUserData()` forgets the state kept on this device for the current package.
+`clearUserData()` forgets the state kept on this device for the current package; remove `src` and set it again to restart the content.
 
 Events are `CustomEvent`s:
 
@@ -129,10 +132,10 @@ Events are `CustomEvent`s:
 | `xapi` | `{ statement, verb }` | Any xAPI statement; nothing is stored |
 | `finished` | `{ statement }` | The content reported completion |
 | `userdata` | `{ pkgId, dataType, subContentId, data, revision }` | With `resume`: the content saved its state; `data: null` means delete it |
-| `progress` | `{ phase, fraction, loaded, total, entry? }` | `download`, `libraries`, `warm` or `extract` |
+| `progress` | `{ phase, fraction, loaded, total, entry? }` | `download`, `libraries`, `warm` or `extract`; `fraction` is 0–1, or `null` while the total is unknown |
 | `resize` | `{ height }` | The content's height changed |
 | `statechange` | `{ state }` | `state` changed |
-| `error` | `{ code, message, missingLibraries? }` | `no-cors`, `no-worker`, `network`, `quota`, `bad-archive` or `runtime`. A `runtime` error after `ready` leaves the content running |
+| `error` | `{ code, message, missingLibraries? }` | `no-cors`, `no-worker`, `network`, `quota`, `bad-archive` or `runtime`. An error while `state` stays `ready` (a content exception, or one media file that failed to extract) leaves the content running |
 
 ```js
 const player = document.querySelector('h5p-player')
@@ -156,8 +159,10 @@ is an example.
 - [Resume](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/resume.md) — saved state on the device or with the host
 - [cmi5](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/cmi5.md) — launching from an LMS
 - [Verifying a package](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/verify.md) — `h5p-verify`
+- [Troubleshooting](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/troubleshooting.md) — symptoms, causes and fixes
+- [Single-worker hosts and upgrades](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/single-worker.md)
+- [Coming from h5p-standalone](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/h5p-standalone.md) — its options by their names here
 - [Accessibility](https://github.com/missing-elements/h5p-offline-player/blob/main/ACCESSIBILITY.md)
-- [Architecture](https://github.com/missing-elements/h5p-offline-player/blob/main/architecture.md) — how the archive is read in place
 
 ## Agent skills
 

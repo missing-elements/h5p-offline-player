@@ -163,10 +163,6 @@ player.addEventListener('error', (event) => {
   offer.hidden = !missingLibraries || (useBundle.hidden && useHub.hidden)
 })
 
-player.addEventListener('resize', (event) => {
-  player.style.height = `${Math.max(event.detail.height, 240)}px`
-})
-
 /**
  * The same bundle the installable app carries: every H5P hub content type's runtime libraries,
  * `@missing-elements/h5p-libraries`, emitted by Vite as an asset. Fetched only once a visitor
@@ -296,7 +292,7 @@ document.querySelector('#confirm-open').addEventListener('click', () => {
   pendingOpen = null
 })
 
-// `?src=` makes the page linkable, which is also what the iframe embed in demo/embed.html uses.
+// `?src=` makes the page linkable.
 const initial = new URLSearchParams(location.search).get('src')
 if (initial) {
   urlInput.value = initial

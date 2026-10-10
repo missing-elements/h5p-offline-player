@@ -29,4 +29,4 @@ package, and before the next load of that package set `userData` to
 `[{ dataType, subContentId, data }]`.
 
 **Starting over.** With `resume` on the device, `clearUserData()` forgets what is held for the
-package loaded now; set `src` again afterwards to restart it.
+package loaded now; to restart it, remove `src` and set it again (or set `file` again).

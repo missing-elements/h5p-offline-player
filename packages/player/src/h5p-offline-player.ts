@@ -354,7 +354,7 @@ export class H5PPlayerElement extends HTMLElement {
 
   /**
    * Forgets the state kept on this device for the package loaded now, or the one loaded last.
-   * The content keeps running as it is; set `src` again to start it over. Saves from the running
+   * The content keeps running as it is; remove `src` and set it again to start it over. Saves from the running
    * document are dropped from here on, so what was cleared stays cleared until the next load.
    */
   async clearUserData(): Promise<void> {

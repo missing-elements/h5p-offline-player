@@ -11,6 +11,9 @@ versions of the packages in this repository:
 | `@missing-elements/h5p-normalize` | Latest release and `main` |
 | `@missing-elements/h5p-verify` | Latest release and `main` |
 | `@missing-elements/h5p-cmi5` | Latest release and `main` |
+| `@missing-elements/h5p-embed` | Latest release and `main` |
+| `@missing-elements/h5p-runtime` | Latest release and `main` |
+| `@missing-elements/h5p-libraries` | Latest release and `main` |
 | Demo and installable app | Deployment from `main` |
 
 Older releases may receive a fix when practical, but users should upgrade to a
@@ -66,8 +69,8 @@ Reports are particularly helpful for issues such as:
 - cross-origin request, redirect, or navigation-policy bypasses;
 - denial of service that defeats documented streaming, size, storage, or
   lifecycle safeguards;
-- vulnerabilities in the published player, normalizer, verifier, cmi5 package,
-  demo, or installable app.
+- vulnerabilities in the published player, runtime, library bundle, normalizer,
+  verifier, cmi5 package, embed site writer, demo, or installable app.
 
 A malicious H5P archive executing its own bundled JavaScript is an expected
 property of H5P, not by itself a vulnerability. It becomes a security issue

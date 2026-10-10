@@ -231,9 +231,10 @@ input.addEventListener('change', () =&gt; { player.file = input.files[0] })</pre
       <h2>Attributes</h2>
       <table class="table">
         <tbody>
-          <tr><td><code>src</code></td><td>The package URL. Setting it loads; setting it again aborts and reloads.</td></tr>
+          <tr><td><code>src</code></td><td>The package URL. Setting a new one loads; to reload the same one, remove it and set it again.</td></tr>
           <tr><td><code>auto-resize</code></td><td>The element follows the content's own height by default. <code>off</code> leaves the height to you, from CSS or the <code>resize</code> event; the height the element writes is an inline style, which would beat your rule.</td></tr>
           <tr><td><code>sw</code></td><td>Where the worker script is. Default: <code>h5p-sw.js</code> next to the element. Must be same-origin.</td></tr>
+          <tr><td><code>jobs</code></td><td>Where the background worker script is, for a page whose Content Security Policy refuses <code>blob:</code> workers: copy <code>dist/h5p-jobs.js</code> beside <code>h5p-sw.js</code> and point this at it. Default: a <code>blob:</code> URL, then <code>h5p-jobs.js</code> next to the element. Must be same-origin.</td></tr>
           <tr><td><code>runtime</code></td><td>A property: the <code>runtime</code> export of <code>@missing-elements/h5p-runtime</code>, for a bundler to emit the files. Set it before <code>src</code>; it wins over <code>assets-base</code>.</td></tr>
           <tr><td><code>assets-base</code></td><td>The folder the runtime's <code>dist/</code> is served from. Default: <code>frame-assets/</code> next to the element. May be a CDN.</td></tr>
           <tr><td><code>libraries</code></td><td>Where an export that ships without its libraries gets them: the URL of a <code>.h5p</code> that carries library folders, <code>hub</code> for the H5P hub, or several separated by spaces, tried in order. <a href="https://www.npmjs.com/package/@missing-elements/h5p-libraries" rel="noopener"><code>@missing-elements/h5p-libraries</code></a> is every hub content type's libraries in one bundle, ~10 MB, with their licences in its <code>libraries.txt</code>: <code>libraries="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-libraries@0/libraries.h5p hub"</code> asks the hub only for what it lacks. Downloaded once and cached; when a URL cannot be reached later, the earlier copy is used. Default: such packages are refused, with the missing libraries named.</td></tr>
@@ -244,10 +245,10 @@ input.addEventListener('change', () =&gt; { player.file = input.files[0] })</pre
       </table>
 
       <p>
-        The full guide, including single-worker hosts and troubleshooting, is
-        <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/setup.md" rel="noopener">setup.md</a>
-        in the repository; the design is in
-        <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/architecture.md" rel="noopener">the architecture document</a>.
+        The element's whole API is in the
+        <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/README.md#api" rel="noopener">README</a>; when something goes wrong, see
+        <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/docs/troubleshooting.md" rel="noopener">Troubleshooting</a>, and for a site
+        with one Service Worker, <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/docs/single-worker.md" rel="noopener">single-worker hosts</a>.
       </p>
 
       <footer>

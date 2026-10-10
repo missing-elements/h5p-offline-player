@@ -184,19 +184,19 @@ describe('startCmi5', () => {
     expect(calls).toHaveLength(before)
   })
 
-  it('drops player statements without complete Activity provenance and keeps the session running', async () => {
+  it('drops player statements without the platform or an Activity and keeps the session running', async () => {
     const { client, calls } = fakeClient()
     const player = new FakePlayer()
     const events: Cmi5Event[] = []
     await startCmi5(player, { client, storage: null, src: false, onEvent: (event) => events.push(event) })
 
-    player.emit('xapi', { ...answered, context: { ...answered.context, revision: undefined } })
     player.emit('xapi', { ...answered, context: { ...answered.context, platform: undefined } })
+    player.emit('xapi', { ...answered, context: { ...answered.context, revision: undefined, platform: undefined } })
     player.emit('xapi', { ...answered, object: { objectType: 'Agent', id: 'https://host/person' } })
     await tick()
     expect(calls.filter((call) => call.call === 'send')).toHaveLength(0)
     expect(events.filter((event) => event.type === 'rejected').map((event) => event.reason)).toEqual([
-      'the player statement has no context.revision',
+      'the player statement has no context.platform',
       'the player statement has no context.platform',
       'the player statement does not describe an Activity'
     ])
@@ -208,6 +208,24 @@ describe('startCmi5', () => {
     player.emit('xapi', answered)
     await tick()
     expect(calls.filter((call) => call.call === 'send')).toHaveLength(2)
+  })
+
+  // The element releases held statements without a revision on a host without Range when the
+  // load ends or the page is hidden before the index answered; cmi5 must not lose them again.
+  it('relays a player statement that carries the platform but no revision', async () => {
+    const { client, calls } = fakeClient()
+    const player = new FakePlayer()
+    const events: Cmi5Event[] = []
+    await startCmi5(player, { client, storage: null, src: false, onEvent: (event) => events.push(event) })
+
+    const { revision: _revision, ...withoutRevision } = answered.context
+    player.emit('xapi', { ...answered, context: withoutRevision })
+    await tick()
+    const sent = calls.filter((call) => call.call === 'send')
+    expect(sent).toHaveLength(1)
+    expect(sent[0].arg.context.platform).toBe('h5p-offline-player 0.1.10')
+    expect(sent[0].arg.context).not.toHaveProperty('revision')
+    expect(events.some((event) => event.type === 'rejected')).toBe(false)
   })
 
   // 9.3.0.0-4, 9.3.2.0-2: initialized is the first statement of the session, whatever the

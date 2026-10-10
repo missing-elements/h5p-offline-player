@@ -1,8 +1,10 @@
 # AGENTS.md
 
-Working notes for this repository. Read `architecture.md` first — it is the
-design, and it is the authority when this file and the code disagree. `setup.md` is
-the guide written for people integrating the package.
+Working notes for this repository, and the authority on its design: where this file and the
+code disagree, one of them is wrong. The README and `docs/` are written for people integrating
+the package. The original architecture document and setup guide were removed on 2026-10-10, the
+first superseded by this file and the second folded into the README and `docs/`; both are in git
+history (`git show 4d7bcdc:h5p-offline-player-architecture.md`).
 
 ## What this is
 
@@ -26,7 +28,7 @@ The hard constraints that shape every file here:
 
 ## Layout
 
-A pnpm workspace of seven parts. Paths elsewhere in this file are relative to the part they
+A pnpm workspace of eight parts: seven packages and the demo app. Paths elsewhere in this file are relative to the part they
 belong to — `src/…` and `scripts/…` mean the player's unless a section says otherwise.
 
 ```
@@ -50,6 +52,8 @@ packages/player/          @missing-elements/h5p-offline-player — the published
       eviction.ts, locks.ts, storage.ts   the eviction policy, the Web Lock names it respects, quota numbers
       idb.ts                the `packages` table
       entry-names.ts        entry-name normalisation — the security boundary for hostile archives
+      revision.ts           `withProvenance` and `indexFingerprint`: the build every statement names
+      metadata.ts           `h5p.json`'s metadata in the shape the runtime reads, held to the core's licence table
       range.ts, mime.ts, pkg-id.ts, stream-utils.ts
     sw/
       sw-entry.ts           standalone worker  -> dist/h5p-sw.js
@@ -95,7 +99,7 @@ packages/libraries/       @missing-elements/h5p-libraries — the hub's runtime 
 packages/normalize/       @missing-elements/h5p-normalize — the package rewriter, published as a command
   bin/h5p-normalize.mjs     the command
   lib/                      normalize.mjs (the policy), mp4-faststart.mjs (the remux), zip-writer.mjs,
-                            crc32.mjs, format.mjs
+                            crc32.mjs, format.mjs, fingerprint.mjs (the player's `indexFingerprint` for Node)
   tests/                    node tests; tests/helpers/mp4.ts builds structurally honest mp4s
 
 packages/verify/          @missing-elements/h5p-verify — plays a package headless and reports whether it works
@@ -104,8 +108,11 @@ packages/verify/          @missing-elements/h5p-verify — plays a package headl
   tests/                    node tests that run the real thing against the demo's committed content
 
 packages/cmi5/            @missing-elements/h5p-cmi5 — cmi5 for the element, published as a library
-  src/index.ts              startCmi5(player): the launch, the allowed statements, the outcome, terminate;
-                            its pure parts (allowedStatement, cmi5Score, webAddress) exported for tests
+  src/index.ts              startCmi5(player): the launch, the outcome, terminate; its pure parts
+                            (allowedStatement, cmi5Score, webAddress) exported for tests
+  src/statement-adapter.ts  the player's statements as cmi5 allowed statements: `adaptPlayerStatement`
+                            relays an Activity statement carrying `context.platform`, revision or not
+  src/ready-phase.ts        holds the element's events until `initialized` has gone out
   src/client.ts             createCmi5Client(): the AU's side of the protocol over fetch — the token,
                             LMS.LaunchData, the learner preferences, the cmi5-defined statements
   tests/                    node tests: the client against a fake fetch, the wiring against a fake
@@ -161,8 +168,12 @@ apps/demo/                the demo app: the dev server for the whole repository,
   vite.config.ts            the dev server and the hosted demo: the pages plus dist/'s layout at the
                             site root -> dist-demo/
 
+README.md                 what npm shows; ACCESSIBILITY.md, SECURITY.md, CONTRIBUTING.md, GLOSSARY.md,
+                          CODE_OF_CONDUCT.md beside it
+
 docs/                     the README's longer sections, one file each: streaming video, libraries, the
-                          frame's CSP, the revision on statements, resume, the verifier, cmi5, development; the README links
+                          frame's CSP, the revision on statements, resume, the verifier, cmi5, development,
+                          troubleshooting, single-worker hosts and upgrades, coming from h5p-standalone; the README links
                           them by absolute URL because npm renders the same file; suggestions-review.md
                           weighs a note of eight feature suggestions against the code (2026-09-30). The
                           release notes are not in the repository: each GitHub release (`gh release list`)
@@ -461,7 +472,8 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   so `emitStatement` holds statements until the index answers and releases them in order — and on
   any end of the load (`abortLoad`), or when the page is hidden (`pagehide`, or `visibilitychange`
   to hidden, the one mobile browsers fire reliably), with no revision if none came, rather than
-  lose a learner's record with the tab. The old content can still send a statement as the next
+  lose a learner's record with the tab. `@missing-elements/h5p-cmi5` relays such a statement too, requiring
+  `context.platform` only (2026-10-10); until then it dropped it for the missing revision. The old content can still send a statement as the next
   load starts, when `internalPkgId` is null and the message filter lets it through:
   `previousStamp` stamps such a straggler with its own package's revision instead of holding it
   for the next one's — found in review, and `playback.test.ts` clicks the old frame's button
@@ -675,7 +687,7 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
 - **Job requests are deduplicated for two seconds, not for the whole wait.** A job can die with
   the tab that owned it; a long window would leave the entry unserved until it expired. The real
   deduplication is the Jobs worker's in-flight map plus a Web Lock. `waitForWatermark` re-asks
-  when the watermark has not moved for `JOB_STALL_MS`.
+  when the watermark has not moved for `COLD_ENTRY_WAIT_MS`.
 
 - **The chunk writer's `abort` publishes nothing.** Everything that reached the store is already
   recorded by the `publish` that followed its write; bytes still in the partial buffer were never
@@ -904,8 +916,8 @@ the deflated, non-faststart video above, applied where it belongs — to the pac
 publishes it. It is its own package, `packages/normalize`, published as
 `@missing-elements/h5p-normalize` so that a publisher runs it with `npx` and needs no checkout:
 `lib/normalize.mjs` holds the policy, `lib/mp4-faststart.mjs` the remux and `lib/zip-writer.mjs`
-the output side; `bin/h5p-normalize.mjs` is the command. Its `exports` name `normalizeArchive`
-(and `formatBytes`, re-exported) and nothing else, so the other modules stay free to change;
+the output side; `bin/h5p-normalize.mjs` is the command. Its documented API is `normalizeArchive`,
+with `formatBytes` and `archiveFingerprint` re-exported, so the other modules stay free to change;
 the demo's content build is the one caller in this repository. Its `prepublishOnly` runs its
 typecheck and tests, and its `prepack` copies the root LICENSE in. Five things about
 it that the code does not say by itself:
@@ -1603,7 +1615,7 @@ if closed forks ever matter.
 **The setups are named, both are self-hosting, and Install comes first.** Decided on
 2026-10-09, after Embed My was repositioned as a test tool: the player's main benefit is that a
 host runs H5P on its own infrastructure — no H5P server, no backend, no third-party service in
-the learner's path — and the README, the setup guide, the demo's setup page ("Host it
+the learner's path — and the README, the demo's setup page ("Host it
 yourself"), the front page, the social card and the `h5p-player-setup` skill lead with that.
 Earlier the same day Embed had been put first, on the ground that Embed My made the safe setup
 the easy one; with Embed My out of production that ground is gone, so the documents present
@@ -1615,9 +1627,10 @@ JavaScript, and installed, it runs as the host site. The letters are gone from t
 which say "formerly Setup A/B/C" under each heading; this file and Embed My's guides still say
 Setup A (bundler), B (no build step) and C (Embed).
 
-## Where this differs from the written design
+## Where this differs from the original design
 
-The architecture and setup documents predate the code. These are deliberate additions, not drift:
+The architecture document, removed on 2026-10-10 and in git history, predates the code. These are
+deliberate additions to it, not drift:
 
 - A `resize` event, and the element follows the content's height by default. H5P content sizes
   itself, and without these every host page has to reimplement the same listener. Following was
@@ -1662,7 +1675,7 @@ The architecture and setup documents predate the code. These are deliberate addi
 
 ## Not built yet
 
-Deliberately out of scope for v1, per the architecture document: the editor, offline management
+Deliberately out of scope for v1, per the original architecture document: the editor, offline management
 (save, library, delete), results storage, persistent file handles. xAPI is emitted as events and
 stored nowhere. Save-and-resume was on that list and is built; see below.
 

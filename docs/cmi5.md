@@ -32,9 +32,12 @@ The options of `startCmi5(player, options)`, detailed in the package's README:
   `launchParameters`. Pass `false` to set the element's `src` yourself, which a page anyone can
   link to should do after checking the package's origin.
 - `storage` — where the session is kept across a reload; default `null`. See *Credentials*.
+- `url` — the page's address, which the launch parameters and the default `src` are read from;
+  default `location.href`.
 - `client` — a client of your own, such as a simulated LMS or a test double.
 
-The session has `terminate()`, `retry()` for a completion the LRS rejected, and `exit()`.
+The session has `terminate()`, `retry()` for a completion the LRS rejected, `exit()`, and
+`stop()`, which stops listening to the element without sending `terminated`.
 
 The demo's `/demo/cmi5.html` (`demo/cmi5-page.js`) is a page on it. Opened with `?simulate`, it
 runs the same code against an LMS simulated inside the page, with a mastery score of 0.8, and
@@ -88,8 +91,11 @@ address. With none, a top-level window closes and a framed page stays where it i
    content emits earlier wait for it.
 2. **Every Activity statement the player emits**, as a cmi5 allowed statement: the launch actor,
    the registration, and the LMS's context template merged in (the template wins on a conflict),
-   with `context.revision` and `context.platform` kept. A statement without both provenance
-   fields, or not about an Activity, is reported and dropped. Each carries a UUID id.
+   with `context.revision` and `context.platform` kept. A statement without `context.platform`,
+   which the player sets on every statement it passes on, or not about an Activity, is reported
+   and dropped. One with the platform but no revision is sent: the player releases held
+   statements without one, on a host without `Range`, when the load ends or the page is hidden
+   before the archive's index answered. Each carries a UUID id.
 3. **On completion** (the `finished` event): `passed` or `failed`, then `completed`. A mastery
    score in the launch decides; without one, H5P's own verdict does. The score, with `min: 0`,
    `max` and `raw`, rides on `passed` or `failed` only. Each goes out once per registration: an

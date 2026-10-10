@@ -27,8 +27,11 @@ export function allowedStatement(statement: Statement, launch: LaunchParameters,
 }
 
 /**
- * Adapts only the Activity statements the player has stamped with its build provenance. Other
- * statements cannot make the build that produced them auditable, so cmi5 reports and drops them.
+ * Adapts only the Activity statements the player has stamped: `context.platform` proves the
+ * element passed the statement through `withProvenance`, so one without it is reported and
+ * dropped. `context.revision` is kept when present but not required, because the element
+ * releases held statements without one on a host without `Range` when the load ends or the page
+ * is hidden before the index answered, rather than lose a learner's record.
  */
 export function adaptPlayerStatement(statement: Statement, launch: LaunchParameters, data: Pick<LaunchData, 'contextTemplate'>): StatementAdaptation {
   const object = statement?.object
@@ -37,10 +40,7 @@ export function adaptPlayerStatement(statement: Statement, launch: LaunchParamet
     return { reason: 'the player statement does not describe an Activity' }
   }
   const context = statement.context
-  if (!context || typeof context.revision !== 'string' || !context.revision) {
-    return { reason: 'the player statement has no context.revision' }
-  }
-  if (typeof context.platform !== 'string' || !context.platform) {
+  if (!context || typeof context.platform !== 'string' || !context.platform) {
     return { reason: 'the player statement has no context.platform' }
   }
   return { statement: allowedStatement(statement, launch, data) }

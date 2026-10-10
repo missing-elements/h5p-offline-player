@@ -90,9 +90,6 @@
       })
 
       player.addEventListener('statechange', (event) => (state.textContent = event.detail.state))
-      player.addEventListener('resize', (event) => {
-        player.style.height = `${Math.max(event.detail.height, 240)}px`
-      })
     </script>
   </body>
 </html>

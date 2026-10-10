@@ -73,12 +73,5 @@
       </footer>
     </main>
 
-    <script type="module">
-      for (const player of document.querySelectorAll('h5p-player')) {
-        player.addEventListener('resize', (event) => {
-          player.style.height = `${Math.max(event.detail.height, 240)}px`
-        })
-      }
-    </script>
   </body>
 </html>

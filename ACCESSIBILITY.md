@@ -40,7 +40,7 @@ inside the package.
 
 - Give the player a heading or label nearby that says what the content is.
 - Show `error` messages in a live region that is on the page from the start, and do not hide
-  the player on a `runtime` error after `ready`: the content is still running.
+  the player on an `error` while `state` stays `ready`: the content is still running.
 - Do not set `tabindex="-1"` on the element or wrap it in something that takes focus.
 - Prefer packages built with current library versions; see *Who is responsible*.
 

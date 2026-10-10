@@ -3,7 +3,8 @@
 ## Statement adapter
 
 The internal cmi5 module that accepts a player-emitted xAPI Activity statement only when its
-`context.revision` and `context.platform` provenance are present, then applies the cmi5 launch
+`context.platform` is present, keeping `context.revision` when the player had one to give (a
+statement released before the index answered has none), then applies the cmi5 launch
 actor, registration, context template, identifier, and timestamp. It reports and drops malformed
 or non-Activity statements without ending the cmi5 session.
 
