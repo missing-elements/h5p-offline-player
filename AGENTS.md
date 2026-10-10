@@ -1479,9 +1479,15 @@ SPA-fallback trap described above cannot happen there.
   GPL runtime. Committed, like the demo content, so a deploy does not depend on the hub. Checked:
   stripped exports of the four demo packages played offline in a fresh browser that had never
   consented to the hub, with no request to h5p.org.
-  Not covered: the file is picked again each visit, though what was extracted stays in the
-  chunk store; and nothing here was tried in Safari, which may clear an
-  installed app's storage after weeks unused.
+  Installs in Safari on macOS (Add to Dock) and on iOS (Add to Home Screen, as a web app),
+  reported by the owner on 2026-10-11; `apple-touch-icon.png` (180, opaque) was added the same
+  day, since iOS takes the home screen icon from that link and draws a screenshot of the page
+  without it. What Safari and iOS do not do, by design rather than a gap here: `file_handlers` and
+  `launch_handler` are Chromium's, so only Chrome and Edge open a `.h5p` from the file manager;
+  iOS opens a `?src=` link in Safari, not in the installed app; and each iOS install has storage
+  of its own, apart from Safari's. Not covered: the file is picked again each visit, though what
+  was extracted stays in the chunk store; offline play in the iOS app, and whether WebKit clears
+  an installed app's storage after weeks unused.
 - **What a public demo means.** The frame is same-origin by design, and a package's libraries
   are JavaScript, so `/?src=<any url>` runs a stranger's code on the demo's origin. That is the
   architecture — a host chooses what it plays — not a flaw in it, and it is why the demo origin
@@ -1746,8 +1752,8 @@ everything, while this one and the sodix.de one deflated everything.
 
 **Offline app shell (PWA) — built**, as `/app/` on the demo site, library pack included; see
 *The hosted demo*. What it left open: persistent file
-handles (`showOpenFilePicker` plus a handle kept in IndexedDB) for a recent-files list; and a
-check in Safari and on iOS.
+handles (`showOpenFilePicker` plus a handle kept in IndexedDB) for a recent-files list.
+Installing works in Safari and on iOS (2026-10-11); offline play there is not yet checked.
 
 **Version proof on xAPI statements — built**; see the invariant *Every statement names the build
 it came from*. Open: an element property is all a host has for its own records today; whether the

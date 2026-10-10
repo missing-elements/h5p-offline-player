@@ -5,7 +5,8 @@ import { chromium } from 'playwright'
 /**
  * Renders the installable app's icons into `app/icons/`: the site's "H5P" mark at 192 and 512,
  * and a maskable 512 whose mark sits inside the safe zone, the centre 80%, since a launcher may
- * crop it to a circle. Rasterized in Chromium for the same reason as the social card — no image
+ * crop it to a circle, and a 180 for iOS, which ignores the manifest's icons for the home screen
+ * and draws a screenshot of the page without one. Rasterized in Chromium for the same reason as the social card — no image
  * tooling in the repository. The output is committed; run this when the mark changes.
  */
 
@@ -29,7 +30,10 @@ const icons = [
   { name: 'icon-192.png', size: 192, inset: 0, radius: 0.22 },
   { name: 'icon-512.png', size: 512, inset: 0, radius: 0.22 },
   // Full bleed: the launcher supplies the shape. The mark stays within the centre 80%.
-  { name: 'icon-maskable-512.png', size: 512, inset: 0.1, radius: 0 }
+  { name: 'icon-maskable-512.png', size: 512, inset: 0.1, radius: 0 },
+  // `apple-touch-icon`: opaque and square, since iOS rounds the corners itself and draws any
+  // transparent pixel black.
+  { name: 'apple-touch-icon.png', size: 180, inset: 0.08, radius: 0 }
 ]
 
 await mkdir(outDir, { recursive: true })
