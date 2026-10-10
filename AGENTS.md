@@ -551,8 +551,12 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   stamps the player in the same change, and a player published after merging it but before the
   pack would send every stripped export to a 404. The build scripts still read the hub's new host,
   from Node, which needs no CORS. The cost is size: a hub bundle was one content type, 0.5 to 3 MB,
-  and the pack is about 10 MB, downloaded whole on first use and then cached; range-reading only
-  the libraries a package needs is possible and not built.
+  and the pack is about 10 MB, downloaded whole on first use and then cached. Range-reading only
+  the libraries a package needs would fetch 5 to 15% of it for the demo's four packages (0.5 to
+  1.5 MB, plus a 0.3 MB central directory), measured 2026-10-11, and is not built: neither public
+  CDN serves the pack's ranges correctly — jsDelivr cuts them from a compressed copy (next
+  invariant), unpkg ignores `Range` — so it could only help a self-hosted copy on a host that
+  honours `Range`, such as an embed site's, and only on a device's first stripped export.
 - **jsDelivr cuts ranges from a compressed copy.** Found on 2026-10-10: a ranged request for the
   pack answers `206` with bytes from a brotli-sized copy of the file — `Content-Range: bytes
   0-3/9215927` for a 10,286,146-byte file, the bytes not starting `PK`, no `Content-Encoding` —
