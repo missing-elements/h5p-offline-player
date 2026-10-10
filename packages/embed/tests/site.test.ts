@@ -162,8 +162,10 @@ const playerFrame = async (page: Page, origin: string) => {
 const playsSized = async (page: Page, origin: string) => {
   const frame = await playerFrame(page, origin)
   await frame.waitForFunction(() => (document.querySelector('h5p-player') as unknown as { state: string } | null)?.state === 'ready', null, { timeout: 60_000 })
-  // `ready` comes before the content has reported its height; the quiz is taller than 300 px.
-  await frame.waitForFunction(() => document.body.getBoundingClientRect().height > 300, null, { timeout: 15_000 })
+  // `ready` comes before the content has reported its height. The quiz's intro page is taller than
+  // an iframe's default 150 px under every Question Set version; 1.21, from the library pack, draws
+  // it at about 300 px where the 1.20 the package carries drew about 370.
+  await frame.waitForFunction(() => document.body.getBoundingClientRect().height > 200, null, { timeout: 15_000 })
   const content = await frame.evaluate(() => Math.ceil(document.body.getBoundingClientRect().height))
   await page.waitForFunction((h) => parseInt(document.querySelector('iframe')!.style.height, 10) === h, content, { timeout: 15_000 })
 }

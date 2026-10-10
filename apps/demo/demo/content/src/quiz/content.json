@@ -1,7 +1,7 @@
 {
   "introPage": {
     "showIntroPage": true,
-    "title": "<p>Do you know what just happened?</p>",
+    "title": "Do you know what just happened?",
     "startButtonText": "Start",
     "introduction": "<p>Four short questions about the player you are using right now. Every file in this quiz came out of a zip archive that was never unpacked.</p>"
   },
