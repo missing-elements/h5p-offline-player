@@ -57,7 +57,7 @@ that does not emit `new URL(…, import.meta.url)` assets, esbuild among them, s
 
 ```html
 <script type="module"
-  src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@0.5.2/dist/h5p-player.js"></script>
+  src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@0.5.3/dist/h5p-player.js"></script>
 <h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js"
             assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-runtime@0.1.0/dist/"></h5p-player>
 ```

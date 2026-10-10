@@ -1,6 +1,6 @@
 {
   "name": "@missing-elements/h5p-offline-player",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Self-hosted H5P without an H5P server: a browser-only player web component for your own site. Plays arbitrary .h5p archives from a URL or a local file, with no backend and no extraction.",
   "license": "MIT",
   "repository": {
