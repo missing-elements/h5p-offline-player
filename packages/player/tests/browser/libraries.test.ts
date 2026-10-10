@@ -155,7 +155,8 @@ describe('supplying missing libraries', () => {
  * libraries again, so it would never reach the fallback.
  */
 describe('a library source that cannot be reached', () => {
-  const outage = (ms: number) => fetch(`/stalling/__outage?ms=${ms}&mode=reset`, { cache: 'no-store' })
+  // A host of its own (`host=`): an outage here must not cut the stalling-host tests' transfers.
+  const outage = (ms: number) => fetch(`/stalling/__outage?ms=${ms}&mode=reset&host=libraries`, { cache: 'no-store' })
   const content = (tag: string) => `${FIXTURES.needsLibraries}?case=${tag}-${Date.now()}`
 
   const settle = async (src: string, libraries: string) => {
@@ -170,7 +171,7 @@ describe('a library source that cannot be reached', () => {
   })
 
   it('plays from the bundle downloaded from it before', async () => {
-    const libraries = `/stalling/libraries.h5p?case=earlier-${Date.now()}`
+    const libraries = `/stalling/libraries.h5p?host=libraries&case=earlier-${Date.now()}`
     const first = await settle(content('online'), libraries)
     expect(first.result).toEqual({ ok: true })
 
@@ -186,14 +187,14 @@ describe('a library source that cannot be reached', () => {
 
   it('still fails, naming what is missing, when nothing was downloaded from it', async () => {
     await outage(30_000)
-    const { result } = await settle(content('never'), `/stalling/libraries.h5p?case=never-${Date.now()}`)
+    const { result } = await settle(content('never'), `/stalling/libraries.h5p?host=libraries&case=never-${Date.now()}`)
     if (result.ok) expect.fail('expected the package to be refused')
     expect(result.detail.code).toBe('bad-archive')
     expect(result.detail.message).toContain('H5P.OfflineTest-1.0')
   })
 
   it('does not use a bundle whose bytes are gone', async () => {
-    const libraries = `/stalling/libraries.h5p?case=evicted-${Date.now()}`
+    const libraries = `/stalling/libraries.h5p?host=libraries&case=evicted-${Date.now()}`
     const first = await settle(content('before'), libraries)
     expect(first.result).toEqual({ ok: true })
 

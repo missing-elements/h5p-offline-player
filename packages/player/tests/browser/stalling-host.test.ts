@@ -15,8 +15,11 @@ import { FIXTURES, clearPackageCaches, frameFetch, play, virtualUrl } from './ut
 const MEDIA = 'content/media/big.bin'
 const TAIL = 1024
 
+/** This file's own host on the stalling server, so other files' outages leave it alone. */
+const HOST = 'stalling-host'
+
 const outage = (ms: number, mode: 'silent' | 'reset') =>
-  fetch(`/stalling/__outage?ms=${ms}&mode=${mode}`, { cache: 'no-store' })
+  fetch(`/stalling/__outage?ms=${ms}&mode=${mode}&host=${HOST}`, { cache: 'no-store' })
 
 /** A request for the entry's last bytes: past the watermark, so its body follows the extraction. */
 async function tailOf(player: Awaited<ReturnType<typeof play>>, errors: string[]) {
@@ -43,7 +46,7 @@ describe('an extraction across an outage of the host', () => {
 
   it('is not given up on while the link is silent for longer than the stall bound', { timeout: 120_000 }, async () => {
     await clearPackageCaches()
-    const player = await play(FIXTURES.stalling)
+    const player = await play(`${FIXTURES.stalling}&host=${HOST}`)
     const errors: string[] = []
     const tail = await tailOf(player, errors)
 
@@ -60,7 +63,7 @@ describe('an extraction across an outage of the host', () => {
 
   it('picks the transfer up where it stopped once a host that dropped it is back', { timeout: 90_000 }, async () => {
     await clearPackageCaches()
-    const player = await play(FIXTURES.stalling)
+    const player = await play(`${FIXTURES.stalling}&host=${HOST}`)
     const errors: string[] = []
     const tail = await tailOf(player, errors)
 

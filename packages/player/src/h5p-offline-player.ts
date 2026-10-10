@@ -1243,6 +1243,28 @@ export class H5PPlayerElement extends HTMLElement {
       return
     }
 
+    // A statement the previous package's document sent just before the next load replaced it.
+    // Removing the iframe's `src` takes it to `about:blank` in Chromium, and a message from the
+    // document that left arrives with `event.source` null, so the check below cannot place it.
+    // Only a statement, only for the package just replaced: anything else from a document that
+    // is gone has nothing left to act on. A null source proves no more than a same-origin sender,
+    // and same-origin script can dispatch an `xapi` event on this element directly anyway.
+    if (
+      event.source === null &&
+      'channel' in data &&
+      data.channel === 'h5p-player' &&
+      (data.type === 'xapi' || data.type === 'finished') &&
+      data.pkgId !== this.internalPkgId &&
+      data.pkgId === this.previousStamp?.pkgId
+    ) {
+      this.emitStatement(
+        data.type === 'xapi'
+          ? { type: 'xapi', pkgId: data.pkgId, statement: data.statement, verb: data.verb }
+          : { type: 'finished', pkgId: data.pkgId, statement: data.statement }
+      )
+      return
+    }
+
     if (event.source !== this.iframe.contentWindow) return
 
     if ('context' in data && data.context === 'h5p') {

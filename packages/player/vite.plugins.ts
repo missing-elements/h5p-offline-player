@@ -270,17 +270,21 @@ function compressingHostHandler(dirs: readonly string[]): Connect.NextHandleFunc
  * headers included, until it is over — a link that has gone quiet. In `reset` mode the responses
  * in flight are destroyed and new requests are answered `503` — a host that is down. Either
  * way nothing is lost that a later request cannot ask for again.
+ *
+ * `&host=<name>` on both the archive URL and the switch scopes an outage to that name, so test
+ * files running in parallel each take down a host of their own: the switch once was one timer,
+ * and one file's `ms=0` cleanup ended another's 35-second outage early. No name is one host.
  */
 function stallingHostHandler(dirs: readonly string[]): Connect.NextHandleFunction {
   const prefix = '/stalling/'
-  const inFlight = new Set<ServerResponse>()
-  let outageUntil = 0
-  let outageMode: 'silent' | 'reset' = 'silent'
+  const inFlight = new Map<ServerResponse, string>()
+  const outages = new Map<string, { until: number; mode: 'silent' | 'reset' }>()
 
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-  const inOutage = () => Date.now() < outageUntil
-  const waitOut = async () => {
-    while (inOutage()) await sleep(50)
+  const outageOf = (host: string) => outages.get(host) ?? { until: 0, mode: 'silent' as const }
+  const inOutage = (host: string) => Date.now() < outageOf(host).until
+  const waitOut = async (host: string) => {
+    while (inOutage(host)) await sleep(50)
   }
   const drained = (res: ServerResponse) =>
     new Promise<void>((resolve) => {
@@ -293,14 +297,14 @@ function stallingHostHandler(dirs: readonly string[]): Connect.NextHandleFunctio
       res.once('close', done)
     })
 
-  const serve = async (req: Connect.IncomingMessage, res: ServerResponse, name: string, rate: number) => {
+  const serve = async (req: Connect.IncomingMessage, res: ServerResponse, name: string, rate: number, host: string) => {
     res.setHeader('access-control-allow-origin', '*')
     res.setHeader('cache-control', 'no-store')
-    if (inOutage() && outageMode === 'reset') {
+    if (inOutage(host) && outageOf(host).mode === 'reset') {
       res.statusCode = 503
       return res.end('outage')
     }
-    await waitOut()
+    await waitOut(host)
 
     let body: Buffer
     try {
@@ -330,16 +334,16 @@ function stallingHostHandler(dirs: readonly string[]): Connect.NextHandleFunctio
     res.setHeader('content-length', String(piece.length))
     if (req.method === 'HEAD') return res.end()
 
-    inFlight.add(res)
+    inFlight.set(res, host)
     try {
       const slice = 64 * 1024
       for (let at = 0; at < piece.length && !res.destroyed; at += slice) {
-        if (inOutage()) {
-          if (outageMode === 'reset') {
+        if (inOutage(host)) {
+          if (outageOf(host).mode === 'reset') {
             res.destroy()
             break
           }
-          await waitOut()
+          await waitOut(host)
         }
         const chunk = piece.subarray(at, Math.min(at + slice, piece.length))
         if (!res.write(chunk)) await drained(res)
@@ -353,17 +357,20 @@ function stallingHostHandler(dirs: readonly string[]): Connect.NextHandleFunctio
 
   return (req, res, next) => {
     const url = new URL(req.url ?? '/', 'http://localhost')
+    const host = url.searchParams.get('host') ?? ''
     if (url.pathname === `${prefix}__outage`) {
-      outageUntil = Date.now() + Number(url.searchParams.get('ms') ?? 0)
-      outageMode = url.searchParams.get('mode') === 'reset' ? 'reset' : 'silent'
-      if (outageMode === 'reset') for (const pending of inFlight) pending.destroy()
+      const mode = url.searchParams.get('mode') === 'reset' ? 'reset' : 'silent'
+      outages.set(host, { until: Date.now() + Number(url.searchParams.get('ms') ?? 0), mode })
+      if (mode === 'reset') {
+        for (const [pending, of] of inFlight) if (of === host) pending.destroy()
+      }
       res.setHeader('cache-control', 'no-store')
       res.statusCode = 204
       return res.end()
     }
     const name = fixtureName(url.pathname, prefix)
     if (!name) return next()
-    void serve(req, res, name, Number(url.searchParams.get('rate') ?? 0))
+    void serve(req, res, name, Number(url.searchParams.get('rate') ?? 0), host)
   }
 }
 

@@ -459,11 +459,18 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   so `emitStatement` holds statements until the index answers and releases them in order — and on
   any end of the load (`abortLoad`), or when the page is hidden (`pagehide`, or `visibilitychange`
   to hidden, the one mobile browsers fire reliably), with no revision if none came, rather than
-  lose a learner's record with the tab. Removing the iframe's `src` does not unload the document
-  in it, so the old content can still send a statement while the next load probes, when
-  `internalPkgId` is null and the message filter lets it through: `previousStamp` stamps such a
-  straggler with its own package's revision instead of holding it for the next one's — found in
-  review, and `playback.test.ts` clicks the old frame's button mid-load to pin it. `clear()` drops
+  lose a learner's record with the tab. The old content can still send a statement as the next
+  load starts, when `internalPkgId` is null and the message filter lets it through:
+  `previousStamp` stamps such a straggler with its own package's revision instead of holding it
+  for the next one's — found in review, and `playback.test.ts` clicks the old frame's button
+  mid-load to pin it. This file once said removing the iframe's `src` does not unload the document;
+  in Chromium it navigates the frame to `about:blank`, and a statement the old document sent just
+  before then arrives with `event.source` null, which the source check dropped. Found on
+  2026-10-10: the test failed on CI, and run alone it failed 14 times in 15 — it had passed only
+  when the message happened to be handled before the navigation committed. So a null-source
+  `xapi` or `finished` naming `previousStamp`'s package is accepted ahead of the source check, and
+  nothing else from a document that is gone; a null source proves no more than a same-origin
+  sender, and same-origin script can dispatch an `xapi` event on the element directly anyway. `clear()` drops
   the revision with the `pkgId`, so a host never reads one package's id beside another's build. `packages/normalize/lib/fingerprint.mjs` is the same recipe for Node, and the normalizer
   prints the output's revision, the line a publisher records at release; `revision.test.ts` checks
   both against one vector, which is why the player's `tsconfig.test.json` has `rootDir: ".."`.
@@ -1511,7 +1518,10 @@ fallback against headers filtered the way CORS filters them.
 body paced, and `/stalling/__outage?ms=<n>&mode=silent|reset` takes it away for a while — every
 response in flight goes quiet and new requests wait, or every response in flight is destroyed and
 new requests get a `503`. It is how the browser suite drives an extraction across a link that
-drops, without CDP, so it runs in the ordinary `browser` project.
+drops, without CDP, so it runs in the ordinary `browser` project — where files run in parallel,
+so each file names a host of its own with `&host=<name>` on the archive URL and on the switch.
+Until 2026-10-10 the switch was one timer for the whole server, and `playback.test.ts`'s `ms=0`
+cleanup ended `stalling-host.test.ts`'s 35-second outage early whenever the two overlapped.
 
 `large-deflated.h5p` carries `content/media/unused.bin`, large and deflated and referenced by
 nothing. It is the only way to tell a prefetch from a demand fetch: the fixture's own

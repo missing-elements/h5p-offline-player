@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import '../../src/h5p-offline-player'
 import { FIXTURES, createPlayer, frameDocument, frameWindow, play, waitForEvent } from './utils'
 
@@ -105,7 +105,9 @@ describe('h5p-standalone options', () => {
     })
     const doc = frameDocument(player)
     expect(doc.querySelector('link[href$="/tests/browser/custom/custom.css"]')).not.toBeNull()
-    expect(getComputedStyle(doc.body).getPropertyValue('--h5p-test-custom').trim()).toBe('applied')
+    // The runtime does not wait for stylesheets before `ready`, the custom one included, so it
+    // may still be on its way; on CI it was, once.
+    await vi.waitFor(() => expect(getComputedStyle(doc.body).getPropertyValue('--h5p-test-custom').trim()).toBe('applied'), { timeout: 5_000 })
     expect((frameWindow(player) as unknown as { __h5pCustom?: string }).__h5pCustom).toBe('ran')
   })
 

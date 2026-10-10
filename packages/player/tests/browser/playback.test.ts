@@ -98,16 +98,19 @@ describe('playing a package', () => {
 
     // Hold the next load's probe open, so the old document is still in the frame and the new
     // package has no id yet — the window a straggler slips through.
-    await fetch('/stalling/__outage?ms=3000&mode=silent', { cache: 'no-store' })
+    // A host of its own (`host=`): the stalling-host tests run in parallel with outages of theirs.
+    await fetch('/stalling/__outage?ms=3000&mode=silent&host=straggler', { cache: 'no-store' })
     try {
       const xapi = waitForEvent<{ statement: { context?: { revision?: string } } }>(player, 'xapi', 2_500)
-      player.setAttribute('src', '/stalling/streamed.h5p')
-      // Removing the iframe's src does not unload its document: the old content still runs,
-      // and a learner's last click in it is still a statement about the old package.
+      player.setAttribute('src', '/stalling/streamed.h5p?host=straggler')
+      // A learner's last click in the old content is still a statement about the old package.
+      // Removing the iframe's src takes it to about:blank in Chromium, so the statement may well
+      // arrive after the document that sent it has gone, with no `event.source`: run alone,
+      // this test caught exactly that 14 times in 15 before the element accepted it.
       oldButton.click()
       expect((await xapi).detail.statement.context?.revision).toBe(oldRevision)
     } finally {
-      await fetch('/stalling/__outage?ms=0&mode=silent', { cache: 'no-store' })
+      await fetch('/stalling/__outage?ms=0&mode=silent&host=straggler', { cache: 'no-store' })
     }
   })
 
