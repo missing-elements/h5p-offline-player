@@ -1,6 +1,6 @@
 {
   "name": "@missing-elements/h5p-libraries",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The H5P hub's runtime libraries for every content type it serves, as one .h5p bundle for <h5p-player>'s `libraries` attribute, so an export without its own libraries plays without asking the hub.",
   "license": "SEE LICENSE IN libraries.txt",
   "repository": {
