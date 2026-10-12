@@ -41,3 +41,5 @@ With `untrusted`, a package's own library folders are ignored and its libraries 
 `libraries`, `pack` when that is not set. A package that needs a library the sources lack is
 refused, and when it carries that library itself, the error's `missingLibraries.carried` is
 `true`: playing it without `untrusted` would run its own copy, which is your decision to make.
+The content is then checked against the `semantics.json` of the libraries the sources serve, so
+those files have to be in the bundle; the pack has them.

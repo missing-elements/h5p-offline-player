@@ -156,6 +156,12 @@ describe('the policy for an untrusted package', () => {
     expect(buildContentSecurityPolicy({ ...options, untrusted: false })).toBe(buildContentSecurityPolicy(options))
     expect(scriptSources(buildContentSecurityPolicy(options))).toContain("'self'")
   })
+
+  it('tells the boot script to check the content, and says nothing of it for a trusted package', () => {
+    const boot = (html: string) => JSON.parse(/id="h5p-boot-config">([^<]*)</.exec(html)![1])
+    expect(boot(buildFrameDocument({ ...options, untrusted: true })).untrusted).toBe(true)
+    expect(boot(buildFrameDocument(options))).not.toHaveProperty('untrusted')
+  })
 })
 
 describe('buildFrameDocument', () => {

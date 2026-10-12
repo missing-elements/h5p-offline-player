@@ -47,6 +47,14 @@ runs the libraries' own upgrade steps on content written for an older minor, by 
 `js/h5p-content-upgrade-process.js` in h5p-php-library (GPL-3.0); it was written for this package
 rather than copied from that file.
 
+It also includes `src/content-check.ts`, which checks the content of a package played `untrusted`
+against its libraries' semantics. That one is a port: of `H5PContentValidator` in `h5p.classes.php`
+from [h5p/h5p-php-library](https://github.com/h5p/h5p-php-library) at commit
+`cb64a1f3884408487c3178e31fc140f5d45ca165`, **GPL-3.0**, and of the HTML filter that class copied
+from Drupal 7's `includes/common.inc` (`filter_xss` and its helpers, based on kses by Ulf
+Harnhammar), Copyright Drupal contributors, **GPL-2.0-or-later**, which the GPL-3.0 accepts. Where
+it departs from the original, the file's leading comment says how and why.
+
 ## The translations in `dist/l10n.js` — GPL-3.0-or-later
 
 `dist/l10n.js` holds the core's interface strings in every language this package has, built from

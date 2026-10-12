@@ -14,6 +14,7 @@
  * it is the one script that runs in the H5P document and calls the core's API directly.
  */
 
+import { checkContent, checkContentMetadata, libraryKey, librariesIn, parseLibrary, type LibraryName, type SemanticField } from './content-check'
 import { upgradeContent, type ServedLibrary, type UpgradeSource, type UpgradeTable } from './content-upgrade'
 import { coreTranslations } from './l10n'
 
@@ -34,7 +35,20 @@ interface BootConfig {
    * the document's `lang`: that is the content's, as H5P writes it.
    */
   language?: string
+  /**
+   * Played as data: the package's own code is withheld, and this script checks its content against
+   * the semantics of the libraries served before the runtime reads it. Absent from a worker older
+   * than the check, which never plays a package so.
+   */
+  untrusted?: boolean
 }
+
+/**
+ * The header the content is asked for with when it is to be checked. The worker serves an
+ * untrusted package's `content.json` only to a request that carries it, so a boot script older
+ * than the check — which would play the content as written — gets no content at all.
+ */
+var CONTENT_CHECK_HEADER = 'X-H5P-Content-Check';
 
 /** The one content h5p-standalone puts in `H5PIntegration.contents`, as far as the upgrade touches it. */
 interface IntegrationContent {
@@ -175,6 +189,11 @@ if (custom.customCss && custom.customCss.length) options.customCss = custom.cust
 if (custom.customJs && custom.customJs.length) options.customJs = custom.customJs;
 if (custom.activityId) options.xAPIObjectIRI = custom.activityId;
 
+// h5p-standalone fetches `h5p.json`, each `library.json` and `content.json` with these.
+if (config.untrusted) {
+  options.assetsRequestFetchOptions = { credentials: 'same-origin', headers: { [CONTENT_CHECK_HEADER]: 'semantics' } };
+}
+
 // The package's own account of itself. h5p-standalone takes `metadata` as an option and, given
 // none, makes one up — `{ title, license: 'U' }`, "Undisclosed" — for every package, whatever
 // its manifest says; the runtime then hides the copyright button, and names no activity in the
@@ -267,9 +286,10 @@ var askForUserData = function (): Promise<UserDataPreload | null> {
  * Its `upgrades.js` is fetched only from a folder the worker listed, so nothing is asked for that
  * is not there; a worker from before the list gets asked anyway, and a 404 then means no steps.
  */
-var upgradeSource = function (base: string, listed: string[] | undefined): UpgradeSource {
+var librarySource = function (base: string, listed: string[] | undefined): UpgradeSource & { semantics(folder: string): Promise<SemanticField[] | null> } {
   var served: Record<string, Promise<ServedLibrary | null>> = {};
   var steps: Record<string, Promise<UpgradeTable | null>> = {};
+  var semantics: Record<string, Promise<SemanticField[] | null>> = {};
 
   var readLibrary = function (folder: string, machineName: string): Promise<ServedLibrary | null> {
     // Bounded, and a read that runs out fails the upgrade rather than passing for "not served":
@@ -293,6 +313,18 @@ var upgradeSource = function (base: string, listed: string[] | undefined): Upgra
   };
 
   return {
+    semantics: function (folder: string): Promise<SemanticField[] | null> {
+      if (!semantics[folder]) {
+        // Bounded like a library.json, and nothing, rather than an error, for one that is not
+        // there: the check removes sub-content it cannot check, and refuses a main library.
+        var signal = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(20000) : undefined;
+        semantics[folder] = fetch(base + '/' + folder + '/semantics.json', { signal: signal })
+          .then(function (response) { return response.ok ? response.json() : null; })
+          .then(function (fields: unknown) { return Array.isArray(fields) ? (fields as SemanticField[]) : null; })
+          .catch(function () { return null; });
+      }
+      return semantics[folder];
+    },
     served: function (machineName, wanted) {
       var versioned = machineName + '-' + wanted.major + '.' + wanted.minor;
       if (!served[versioned]) {
@@ -328,6 +360,33 @@ var upgradeSource = function (base: string, listed: string[] | undefined): Upgra
   };
 };
 
+/** Where the upgrade and the check learn what is served, shared so a library is asked for once. */
+var libraries = librarySource(config.h5pJsonPath, config.upgrades);
+
+interface Manifest {
+  mainLibrary?: unknown
+  preloadedDependencies?: { machineName?: unknown; majorVersion?: unknown; minorVersion?: unknown }[]
+}
+
+var manifestRead: Promise<Manifest> | undefined;
+var readManifest = function (): Promise<Manifest> {
+  if (!manifestRead) manifestRead = fetch(config.h5pJsonPath + '/h5p.json').then(function (response) { return response.json(); });
+  return manifestRead;
+};
+
+/**
+ * The main library as the content was written for it, from `h5p.json`: its name held to the shape
+ * a library string has, since it goes into URLs and a source name. `null` for a manifest without one.
+ */
+var writtenFor = function (manifest: Manifest): LibraryName | null {
+  var main = (manifest.preloadedDependencies || []).filter(function (each) { return each.machineName === manifest.mainLibrary; })[0];
+  if (!main || typeof main.machineName !== 'string' || !/^[A-Za-z0-9_.-]+$/.test(main.machineName)) return null;
+  var major = Number(main.majorVersion);
+  var minor = Number(main.minorVersion);
+  if (!Number.isInteger(major) || !Number.isInteger(minor)) return null;
+  return { machineName: main.machineName, major: major, minor: minor };
+};
+
 /**
  * Brings the content's parameters up to the library versions served, before the runtime reads
  * them, the way the platforms upgrade content when they install a newer minor. A failure leaves
@@ -339,24 +398,20 @@ var upgradeToServed = function (): Promise<void> {
   if (!contents || !key) return Promise.resolve();
   var content = contents[key];
 
-  return fetch(config.h5pJsonPath + '/h5p.json')
-    .then(function (response) { return response.json(); })
-    .then(function (manifest: { mainLibrary?: unknown; preloadedDependencies?: { machineName?: unknown; majorVersion?: unknown; minorVersion?: unknown }[] }) {
+  return readManifest()
+    .then(function (manifest) {
       // The version the content was written for. The one `H5PIntegration` names is the version
       // served, read off the library.json that answered.
-      var main = (manifest.preloadedDependencies || []).filter(function (each) { return each.machineName === manifest.mainLibrary; })[0];
-      var version = main && { major: Number(main.majorVersion), minor: Number(main.minorVersion) };
-      // The name held to the shape a library string has, since it goes into URLs and a source name.
-      if (!main || typeof main.machineName !== 'string' || !/^[A-Za-z0-9_.-]+$/.test(main.machineName)) return;
-      if (!version || !Number.isInteger(version.major) || !Number.isInteger(version.minor)) return;
+      var main = writtenFor(manifest);
+      if (!main) return;
 
       // Copies, both: a step may change what it is handed in place before a later one fails, and
       // a failure has to leave the content exactly as written.
       return upgradeContent(
-        { machineName: main.machineName, version: version },
+        { machineName: main.machineName, version: { major: main.major, minor: main.minor } },
         JSON.parse(content.jsonContent),
         content.metadata === undefined ? undefined : JSON.parse(JSON.stringify(content.metadata)),
-        upgradeSource(config.h5pJsonPath, config.upgrades)
+        libraries
       ).then(function (result) {
         // In full. h5p-standalone builds the name from library.json and leaves out a major or a
         // minor that is 0 — "H5P.Accordion 1" — which the core turns into the folder
@@ -370,6 +425,53 @@ var upgradeToServed = function (): Promise<void> {
     })
     .catch(function (error: unknown) {
       console.error('<h5p-player>: the content could not be brought up to the library versions served, and plays as written:', error);
+    });
+};
+
+/**
+ * For a package played `untrusted`: its content checked against the semantics of the libraries
+ * served, as the H5P platforms check an author's content before showing it (`content-check.ts`).
+ * After the upgrade, so the parameters are the shape the served versions' semantics describe, and
+ * before `H5P.init`, which is the first thing to read them. Content that cannot be checked does not
+ * play: the main library's semantics are required, and sub-content without any is removed.
+ */
+var checkUntrusted = function (): Promise<void> {
+  if (!config.untrusted) return Promise.resolve();
+  var contents = window.H5PIntegration && window.H5PIntegration.contents;
+  var key = contents ? Object.keys(contents)[0] : undefined;
+  if (!contents || !key) return Promise.reject(new Error('the runtime holds no content to check'));
+  var content = contents[key];
+
+  return readManifest()
+    .then(function (manifest) {
+      var main = writtenFor(manifest);
+      if (!main) throw new Error('h5p.json names no main library');
+      return libraries.served(main.machineName, { major: main.major, minor: main.minor }).then(function (served) {
+        if (!served) throw new Error('the library sources do not serve ' + main!.machineName);
+        var library = main!.machineName + ' ' + served.major + '.' + served.minor;
+        var params: unknown = JSON.parse(content.jsonContent);
+        var wanted = [parseLibrary(library)!].concat(librariesIn(params));
+        return Promise.all(
+          wanted.map(function (name) {
+            return libraries.served(name.machineName, { major: name.major, minor: name.minor }).then(function (found) {
+              return found ? libraries.semantics(found.folder) : null;
+            }).then(function (fields) { return [libraryKey(name), fields] as const; });
+          })
+        ).then(function (entries) {
+          var checked = checkContent(library, params, new Map(entries));
+          var metadata = checkContentMetadata(content.metadata);
+          content.jsonContent = JSON.stringify(checked.params);
+          content.metadata = metadata.metadata;
+          content.library = library;
+          var messages = checked.messages.concat(metadata.messages);
+          if (messages.length) {
+            console.warn("<h5p-player>: the content was checked against its libraries' semantics, as the H5P platforms check it, and changed:\n- " + messages.join('\n- '));
+          }
+        });
+      });
+    })
+    .catch(function (error: unknown) {
+      throw new Error("The content could not be checked against its libraries' semantics, so it does not play untrusted: " + String((error && (error as Error).message) || error));
     });
 };
 
@@ -387,6 +489,7 @@ askForUserData()
   })
   // The scripts are in and the content's parameters are in `H5PIntegration`, not yet read.
   .then(upgradeToServed)
+  .then(checkUntrusted)
   .then(function (): Promise<void> {
     // Behind the runtime's own ready handler, not merely after its scripts have loaded. The core
     // registers that handler as it loads and the frame's document is often still `interactive`

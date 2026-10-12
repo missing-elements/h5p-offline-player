@@ -41,6 +41,12 @@ H5P.OfflineTest = (function ($) {
 
     $container.append($message).append($button).append($count);
 
+    // Formatted text, put in the way H5P's own content types put theirs: as HTML, through jQuery,
+    // which runs a `<script>` it finds there. What the untrusted tests check the content for.
+    if (self.params.html) {
+      $container.append($('<div class="h5p-offline-test-html"></div>').html(self.params.html));
+    }
+
     // Sub-content, run the way a real content type runs its questions or interactions, so the
     // upgrade tests can see it reach inside.
     if (self.params.child) {

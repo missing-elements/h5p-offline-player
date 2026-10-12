@@ -28,20 +28,22 @@ picker; can it host a file at all.
 |---|---|
 | Needs the element's API (above) and plays only packages its own team made | **Install**: with a bundler if it has one (Vite, webpack 5, Rollup, Next, Nuxt, Astro, SvelteKit), else without a build step |
 | Static, no sessions, its own packages | **Install**, keeping every request on its own domain; **Embed** works too, at the cost of a second domain |
-| Has signed-in users: an LMS, a portal, anything with accounts or an admin area | **Embed**, from a player domain the organisation runs |
-| Plays packages it did not make: uploads, links from users or teachers, a marketplace | **Embed**, from a player domain the organisation runs |
+| Has signed-in users: an LMS, a portal, anything with accounts or an admin area | **Embed**, from a player domain the organisation runs, or **Install** with every package `untrusted` |
+| Plays packages it did not make: uploads, links from users or teachers, a marketplace | **Install** with `untrusted` on them, or **Embed** |
 | Cannot host a file: a page builder, a hosted CMS, an LMS page the user only edits | **Embed**, from a player domain the organisation runs; the page itself only takes the snippet |
 
 When the site has sessions *and* needs the API, the safety rows win, and say why: installed,
-every package runs as the site. Offer the two ways out — embed a player page hosted on a
-separate domain and take results by the xAPI relay, or install the player only on an origin
-that holds no session (a separate origin for the course pages) — and install on the session
-origin only if the user confirms every package is their own team's.
+a package played as it is runs as the site. Offer the three ways out — install and play every
+package `untrusted`, embed a player page hosted on a separate domain and take results by the xAPI
+relay, or install the player only on an origin that holds no session (a separate origin for the
+course pages) — and install on the session origin without `untrusted` only if the user confirms
+every package is their own team's.
 
-Whatever the setup, a package from elsewhere gets `untrusted` (`<h5p-player untrusted src="…">`):
-it plays as data, with the library pack's code and none of its own. It is a layer, not a reason to
-install where the table says Embed: content is not yet checked against each library's field
-definitions, as the H5P CMS plugins do.
+`untrusted` (`<h5p-player untrusted src="…">`) plays a package as data: none of its own code runs,
+its libraries come from the library pack, and its content is checked against each library's field
+definitions before it is shown, as the H5P CMS plugins check an author's upload — as contained as
+in an H5P plugin on the same site. It needs the runtime at 0.2 or later, and refuses a package
+that needs a newer library than the pack has. Embed adds a separate origin on top.
 
 ## 2. Do it
 

@@ -180,7 +180,7 @@ export async function buildRuntime({ quiet = false } = {}) {
     minify: true,
     legalComments: 'none',
     banner: {
-      js: `/*! @missing-elements/h5p-runtime ${packageJson.version}: the frame boot script. Copyright (c) 2026 missing-elements. GPL-3.0-only, see LICENSE.txt beside this file. */`
+      js: `/*! @missing-elements/h5p-runtime ${packageJson.version}: the frame boot script. Copyright (c) 2026 missing-elements. GPL-3.0-only, see LICENSE.txt beside this file. Includes a port of H5PContentValidator from h5p/h5p-php-library (GPL-3.0) and of Drupal 7's filter_xss (GPL-2.0-or-later). */`
     }
   })
 
@@ -316,7 +316,10 @@ frame-boot.js
   - The frame's boot script, from src/frame-boot.ts in this package. Copyright (c) 2026
     missing-elements, GNU General Public License v3.0 -- LICENSE.txt. It runs in the H5P
     document and calls the core's API, which is why it is part of this package and not of
-    the MIT player.
+    the MIT player. It includes a port of H5PContentValidator from h5p/h5p-php-library
+    (GNU General Public License v3.0) and of the filter_xss functions of Drupal 7's
+    includes/common.inc (Copyright Drupal contributors, GNU General Public License v2.0 or
+    later), which check the content of a package played untrusted.
 
 l10n.js
   - The core's interface strings in other languages, taken from Moodle's language packs

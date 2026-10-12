@@ -44,6 +44,10 @@ export const FIXTURES = {
   untrusted: '/fixtures/untrusted.h5p',
   /** The same from a host that ignores `Range`: booted from the forward index, with the bundle's folders. */
   noRangeUntrusted: '/no-range/untrusted.h5p',
+  /** Content only, with markup and fields its semantics do not allow, at the top and in sub-content. */
+  untrustedMarkup: '/fixtures/untrusted-markup.h5p',
+  /** The fixture bundle without the content type's semantics, which an untrusted package cannot play without. */
+  librariesWithoutSemantics: '/fixtures/libraries-without-semantics.h5p',
   /** Needs the content type at 1.3, which only it carries. */
   untrustedNewer: '/fixtures/untrusted-newer.h5p',
   /** The fixture content type at 1.2 and a sub-content type at 1.1, each with an `upgrades.js`. */

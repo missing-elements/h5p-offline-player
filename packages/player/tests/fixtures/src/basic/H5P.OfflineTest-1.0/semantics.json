@@ -1,0 +1,19 @@
+[
+  { "name": "message", "type": "text", "label": "Message", "optional": true },
+  {
+    "name": "html",
+    "type": "text",
+    "widget": "html",
+    "label": "Formatted text",
+    "tags": ["strong", "em", "a"],
+    "optional": true
+  },
+  {
+    "name": "child",
+    "type": "library",
+    "label": "Sub-content",
+    "options": ["H5P.OfflineTest 1.0", "H5P.OfflineChild 1.1"],
+    "optional": true
+  },
+  { "name": "media", "type": "file", "label": "Media", "optional": true }
+]

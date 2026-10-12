@@ -31,6 +31,17 @@ jQuery), `h5p.css`, `fonts/`, `frame-boot.js`, `l10n.js`, `MANIFEST.json`, `LICE
 `NOTICE.txt`. Use a runtime version within the range the player names as its optional peer
 dependency.
 
+## Checking content
+
+For a package the element plays `untrusted`, the boot script checks the content against the
+`semantics.json` of the libraries served before the runtime reads it, as the H5P platforms check
+an author's content: every field held to its type, text stripped to the tags the field allows and
+plain text escaped, numbers to their range, sub-content to the libraries a field names, anything
+the semantics do not name removed. It is a port of h5p-php-library's `H5PContentValidator`, and
+on the same content it gives the same result. Content whose main library has no `semantics.json`
+does not play. The player serves such a package's `content.json` only to a boot script that
+checks it, so `untrusted` needs this package at 0.2 or later.
+
 ## Languages
 
 `l10n.js` has the core's own strings — "Fullscreen", "Rights of use", the licence names, the

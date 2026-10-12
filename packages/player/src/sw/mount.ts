@@ -30,7 +30,7 @@ import { contentRange, parseRange, type ByteRange } from '../shared/range'
 import { openSource } from '../shared/source'
 import * as db from '../shared/idb'
 import { type IndexedEntry, type LocatedEntry, PackageReader, STORED, locationOf } from './package-reader'
-import { buildFrameDocument, createNonce } from './frame-document'
+import { CONTENT_CHECK_HEADER, buildFrameDocument, createNonce } from './frame-document'
 import { matchRoute, routesFor, type RouteMatch, type Routes } from './routes'
 import { sliceStream } from '../shared/stream-utils'
 import { waitForWatermark } from './watermark-wait'
@@ -300,6 +300,17 @@ class VirtualServer {
     // A 404 here is load-bearing: h5p-standalone probes for `library.json` under both the
     // versioned and unversioned folder names and picks the shape that answers.
     if (!located) return new Response(null, { status: 404 })
+
+    // An untrusted package's content is checked against its libraries' semantics by the boot
+    // script before the runtime reads it, and only a boot script that does so asks with the
+    // header. One older than the check would play the content as written, so it gets none.
+    if (reader.untrusted && name === 'content/content.json' && event.request.headers.get(CONTENT_CHECK_HEADER) !== 'semantics') {
+      return text(
+        'This package is played untrusted, and the runtime does not check its content against its ' +
+          "libraries' semantics: @missing-elements/h5p-runtime 0.2 or newer does.",
+        403
+      )
+    }
 
     const response = await this.serveLocated(event, reader, name, located)
     // For an untrusted package the browser runs nothing whose type is not a script's: with

@@ -23,16 +23,19 @@ An H5P package is JavaScript, and the player runs it on the origin that serves t
 
 | Your site | Setup |
 |---|---|
-| Needs the element's API (results to your backend, `resume="host"`, cmi5, a file picker) and plays only packages you made | **Install** |
-| Has signed-in users, or plays packages you did not make | **Embed**, from a separate domain you run |
+| Needs the element's API (results to your backend, `resume="host"`, cmi5, a file picker) and plays packages you made | **Install** |
+| Plays packages you did not make | **Install** with `untrusted` on them, or **Embed** |
+| Has signed-in users | **Embed**, from a separate domain you run, or **Install** with every package `untrusted` |
 | Cannot host a file (page builder, hosted CMS, LMS page) | **Embed** |
 
-Installed, you get the whole API and every package runs as your site. Embedded, a package never
-sees your cookies, storage or page, and you get results as relayed xAPI.
+Installed, you get the whole API, and a package played as it is runs as your site. Embedded, a
+package never sees your cookies, storage or page, and you get results as relayed xAPI.
 
-In either setup, set `untrusted` on a package you did not make: it plays as data, with the
-library pack's code and none of its own. It does not yet check content against each library's
-field definitions, as the H5P CMS plugins do, so the table above still applies.
+`untrusted` plays a package as data. None of its own code runs: its libraries come from the
+library pack, and its content is checked against each library's field definitions before it is
+shown, as the H5P CMS plugins check an author's upload. Installed with `untrusted`, a package is
+as contained as in an H5P plugin on the same site, and Embed adds a separate origin on top. A
+package that needs a newer library than the pack has is refused until the pack catches up.
 
 Both need the page on `https://` or `localhost`, and CORS headers on the package host. `Range`
 support is optional: without it the archive is downloaded once and played from the cache.
@@ -107,7 +110,7 @@ allows one Service Worker, or must work offline, mounts the player in its own wo
 | `runtime` | property | The `runtime` export of `@missing-elements/h5p-runtime`. Set before `src` |
 | `assets-base` | attribute | Where the runtime's `dist/` is served. Default: `frame-assets/` beside the element |
 | `libraries` | attribute | Sources for a package without its libraries, tried in order: `pack` (the library pack on jsDelivr), a `.h5p` URL, or both — `libraries="/libraries.h5p pack"`. `hub` means `pack`. Default: such packages are refused |
-| `untrusted` | attribute, property | Plays a package you did not make as data: its own library folders are ignored and the libraries come from `libraries` (default `pack`), `content/` serves only H5P's own file types, and the frame's script policy names exact paths. A package that needs its own copy of a library is refused, with `missingLibraries.carried` set |
+| `untrusted` | attribute, property | Plays a package you did not make as data: its own library folders are ignored and the libraries come from `libraries` (default `pack`), `content/` serves only H5P's own file types, and the frame's script policy names exact paths. Its content is checked against each library's `semantics.json`, as the H5P CMS plugins check it. A package that needs its own copy of a library is refused, with `missingLibraries.carried` set. Needs the runtime at 0.2 or later |
 | `allow-origins` | attribute | Extra origins for the frame's CSP, space separated |
 | `frame`, `copyright`, `export`, `icon`, `embed` | attribute | Show the H5P action bar and its buttons. `export` needs `download-url` or a package URL, `embed` needs `embed-code` |
 | `fullscreen` | attribute | `off` removes the fullscreen button |

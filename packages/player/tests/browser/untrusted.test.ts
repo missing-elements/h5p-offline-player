@@ -11,7 +11,13 @@ import { FIXTURES, createPlayer, frameDocument, frameFetch, frameWindow, play, v
  * on screen, and a file of each kind under `content/`.
  */
 
-type Marked = Window & { ownLibraryRan?: boolean; contentFileRan?: boolean }
+type Marked = Window & {
+  ownLibraryRan?: boolean
+  contentFileRan?: boolean
+  contentScriptRan?: boolean
+  childScriptRan?: boolean
+  H5P: { instances: { params: Record<string, unknown> }[] }
+}
 
 const playUntrusted = async (src: string) => {
   const player = createPlayer({ untrusted: '', libraries: FIXTURES.libraries })
@@ -52,7 +58,7 @@ describe('an untrusted package', () => {
       const response = await frameFetch(player, virtualUrl(player, entry))
       return { status: response.status, nosniff: response.headers.get('x-content-type-options') }
     }
-    for (const entry of ['content/content.json', 'content/data.json', 'content/notes.txt', 'content/images/pixel.png']) {
+    for (const entry of ['content/data.json', 'content/notes.txt', 'content/images/pixel.png']) {
       expect(await status(entry), entry).toEqual({ status: 200, nosniff: 'nosniff' })
     }
     for (const entry of ['content/script.js', 'content/page.html', 'content/drawing.svg', 'content/data.xml', 'loose.js']) {
@@ -63,6 +69,60 @@ describe('an untrusted package', () => {
     const library = await frameFetch(player, virtualUrl(player, 'H5P.OfflineTest-1.0/offline-test.js'))
     expect(library.status).toBe(200)
     expect(await library.text()).not.toContain('ownLibraryRan')
+  })
+
+  it('checks the content against its semantics, at the top and in sub-content, before the runtime reads it', async () => {
+    const { player, result } = await playUntrusted(FIXTURES.untrustedMarkup)
+    expect(result).toEqual({ ok: true })
+    const frame = frameWindow(player) as Marked
+    const [main, child] = [...frameDocument(player).querySelectorAll('.h5p-offline-test-html')].map((each) => each.innerHTML)
+
+    // The tags the field allows, with their attributes written anew; the rest gone, text kept.
+    expect(main).toBe('<p class="kept">Kept <strong>bold</strong> and <a href="window.contentScriptRan = true">a link</a></p>window.contentScriptRan = true')
+    expect(child).toBe('<em>Child</em>window.childScriptRan = true')
+    expect(frameDocument(player).querySelector('.h5p-offline-test-html :is(form, input, img, script)')).toBeNull()
+    // A field the semantics do not name never reaches the content type.
+    expect(frame.H5P.instances[0].params).not.toHaveProperty('stray')
+    expect(frame.H5P.instances[0].params.child).toMatchObject({ subContentId: '4f1b0c2e-8a7d-4e3b-9c1a-0d2e3f4a5b6c' })
+  })
+
+  it('lets the same markup through when played trusted, where only the frame policy stops its scripts', async () => {
+    // The same content and the same bundle: only the check differs.
+    const player = await play(FIXTURES.untrustedMarkup, { libraries: FIXTURES.libraries })
+    const frame = frameWindow(player) as Marked
+    const html = frameDocument(player).querySelector('.h5p-offline-test-html')!
+    expect(html.querySelector('form[action="https://evil.example/collect"] input[name="password"]')).not.toBeNull()
+    expect(html.querySelector('img[onerror]')).not.toBeNull()
+    expect(html.querySelector('a[href^="javascript:"]')).not.toBeNull()
+    expect(frame.H5P.instances[0].params).toHaveProperty('stray')
+    // jQuery 3 runs a script it finds as an inline `<script>`, which carries no nonce, and the
+    // frame's policy refuses inline handlers and `javascript:` too: a second layer, not the check.
+    expect(frame.contentScriptRan).toBeUndefined()
+    expect(frame.childScriptRan).toBeUndefined()
+  })
+
+  it('serves the content only to a boot script that checks it', async () => {
+    const { player, result } = await playUntrusted(FIXTURES.untrustedMarkup)
+    expect(result).toEqual({ ok: true })
+    const url = virtualUrl(player, 'content/content.json')
+    // An older runtime asks without the header, and would play the content as written.
+    const refused = await frameFetch(player, url)
+    expect(refused.status).toBe(403)
+    expect(await refused.text()).toContain('h5p-runtime 0.2')
+    const served = await frameFetch(player, url, { headers: { 'X-H5P-Content-Check': 'semantics' } })
+    expect(served.status).toBe(200)
+    expect(served.headers.get('x-content-type-options')).toBe('nosniff')
+  })
+
+  it('does not play content it cannot check: a bundle without the main library\'s semantics', async () => {
+    const player = createPlayer({ untrusted: '', libraries: FIXTURES.librariesWithoutSemantics })
+    const settled = waitForSettled(player)
+    player.setAttribute('src', FIXTURES.untrustedMarkup)
+    const result = await settled
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.detail.message).toMatch(/could not be checked.*semantics\.json for H5P\.OfflineTest 1\.0/)
+    expect((frameWindow(player) as Marked).contentScriptRan).toBeUndefined()
   })
 
   it('runs no content file as a script, and no script from elsewhere on the origin', async () => {

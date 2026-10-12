@@ -49,6 +49,13 @@ const RUNTIME_ALLOWLIST = {
 } as const
 
 /**
+ * The request header the runtime's boot script (0.2 and later) asks for an untrusted package's
+ * `content/content.json` with, `semantics` as its value: it checks the content against its
+ * libraries' semantics before the runtime reads it, and the worker serves the file to nothing else.
+ */
+export const CONTENT_CHECK_HEADER = 'x-h5p-content-check'
+
+/**
  * What an `untrusted` package's frame may load scripts from beyond its own path and the runtime's
  * files: the video players' APIs H5P.Video loads, each by exact path — YouTube's `iframe_api` then
  * its widget script under `/s/player/`, Vimeo's `player.js`, Panopto's embed API. Whole hosts would
@@ -369,7 +376,10 @@ export function buildFrameDocument(options: FrameDocumentOptions): string {
     options: sanitizeFrameOptions(options.frameOptions),
     upgrades: options.upgrades,
     // What the boot script picks H5P's own strings by, when it has the runtime's translations.
-    language: l10nJs ? language : undefined
+    language: l10nJs ? language : undefined,
+    // The boot script checks the content against its libraries' semantics, and asks for it with
+    // `CONTENT_CHECK_HEADER`, which is how the worker knows it will.
+    untrusted: options.untrusted || undefined
   }).replaceAll('<', '\\u003c')
 
   const fontFaces = fontFaceRules(assets.fonts)

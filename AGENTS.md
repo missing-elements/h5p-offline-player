@@ -91,6 +91,9 @@ packages/runtime/         @missing-elements/h5p-runtime — the H5P core runtime
                             the one served; bundled into frame-boot.js, unit-tested in tests/
   src/l10n.ts               which of the translations a frame's language gets; bundled into
                             frame-boot.js, unit-tested in tests/
+  src/content-check.ts      an untrusted package's content checked against its libraries' semantics, a
+                            port of h5p-php-library's H5PContentValidator; bundled into frame-boot.js,
+                            unit-tested in tests/
   scripts/build.mjs         vendors h5p-standalone into dist/ (headers, the rebuilt stylesheet, the fonts,
                             LICENSE.txt, NOTICE.txt, MANIFEST.json), builds the boot script, writes
                             dist/l10n.js from l10n/, writes index.js
@@ -478,12 +481,53 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   On a host without `Range`, `bootReady` does not wait for a withheld folder to finish arriving:
   the folder it resolved is the bundle's, which is whole, and a package laid out libraries-last
   would otherwise boot only with its final byte.
-  Not done, the second phase: filtering the content against `semantics.json`, which the PHP
-  validator does completely and Lumi's port by its own account only in part; until then the setup
-  advice stands — packages a site did not make mean Embed — and `untrusted` is a layer on top.
+  The second phase, built on 2026-10-13: the content is checked against its libraries'
+  `semantics.json` before the runtime reads it (`content-check.ts` in the runtime, a port of
+  `H5PContentValidator` from h5p-php-library at cb64a1f and of the Drupal 7 `filter_xss` it
+  carries). The boot script does it after the content upgrade, so the parameters have the shape
+  the served versions' semantics describe, and before `H5P.init`, the first thing to read them;
+  it reads `semantics.json` off the folders the upgrade's own lookup resolves, which for an
+  untrusted package are the bundle's. The check is synchronous: `librariesIn` finds every library
+  string by shape first, the semantics are fetched, and only then is the content walked, so the
+  rules are tested in Node. Content whose main library has no semantics does not play; sub-content
+  without any is removed, as is sub-content a field does not name — by machine name and major,
+  not the exact string, since the pack serves one minor per major and the upgrade moved the
+  content to it. Its other departures from upstream, each stricter or forced, are in the file's
+  leading comment. Checked against upstream itself, not only against a reading of it: the PHP
+  validator ran in `php:8.3-cli-alpine` through stubs of the framework and the core, beside the
+  port, on 98 cases — 78 XSS vectors through a formatted and a plain field, every field kind, and
+  the content of the demo's four packages, a real Interactive Video export and h5p-standalone's
+  test package against the pack's semantics. 96 came out identical; the two others are a
+  multi-select PHP leaves with a hole (an object `{"0": …, "2": …}`, where the port keeps a list)
+  and a number PHP clamps to the semantics' string maximum. Real content came through unchanged
+  but for empty lists and one `l10n` key the pack's version does not name, which upstream removes
+  too. What testing found about the threat: the frame's jQuery is 3.5, whose `.html()` runs a
+  script it finds as an inline `<script>`, which carries no nonce and is refused by the policy,
+  as are inline handlers and `javascript:` URLs, so content markup could not run script even
+  before the check. What the check adds is everything markup does without one, which the policy
+  allows — a form asking for a password, a frame, styles over the page, a tracking image — and the
+  type of every field, which library code puts into class names and selectors unescaped.
+  Upstream is not watched, decided on 2026-10-13: the class has changed about once a year since
+  2021 (attribute filtering 2021, `svg` and `xml` off the file types 2024, table styling 2026),
+  all in the port. To update by hand, diff `H5PContentValidator` and the two constants
+  (`$defaultContentWhitelist`, which `CONTENT_FILE_TYPES` in the player copies, and
+  `$relativePathRegExp`) between the pinned commit and `master`, port what changed, move the
+  commit named in `content-check.ts`, and run upstream beside the port again.
+  Fail closed across versions: the boot script asks for an untrusted package's `content.json`
+  with `X-H5P-Content-Check: semantics` (`CONTENT_CHECK_HEADER`, through h5p-standalone's
+  `assetsRequestFetchOptions`), and the worker answers anything else with a 403, so a runtime
+  older than the check — which would play the content as written — plays nothing.
+  With it the setup advice changed the same day: packages a site did not make can be installed
+  with `untrusted`, and a site with signed-in users can install with every package `untrusted`,
+  which is the plugins' arrangement — library code the host chose, content checked, same origin.
+  Embed adds a separate origin on top.
   `tests/browser/untrusted.test.ts` plays `untrusted.h5p`, whose own copy of the fixture content
   type marks the frame, against the bundle and then trusted, checks each content type and the
-  header, injects scripts, reads the policy, and refuses `untrusted-newer.h5p` with `carried`.
+  header, injects scripts, reads the policy, and refuses `untrusted-newer.h5p` with `carried`. It
+  plays `untrusted-markup.h5p`, a form, a script, a handler, a `javascript:` link and a field the
+  semantics do not name, at the top and in sub-content, through the fixture content type's
+  `.html()`, untrusted and trusted, and refuses it against `libraries-without-semantics.h5p`; the
+  runtime's `content-check.test.ts` holds the rules.
 - **When a bundle is attached, `h5p.json` is synthesized, not served.** A content-only export
   strips `preloadedDependencies` down to the main library as well as dropping the folders, so the
   runtime would load Interactive Video and none of the interaction types inside it — "Unable to
@@ -1780,8 +1824,8 @@ SPA-fallback trap described above cannot happen there.
 
 Unit tests cover the pure logic: name normalisation, range parsing, chunk arithmetic, strategy
 selection, the CSP and the generated frame document in the player, the writer, remux and
-policy in `packages/normalize`, and the content upgrade, the translations' rules and the choice
-of language in `packages/runtime`, that package's only tests. They are fast and are where a rule belongs. Both test
+policy in `packages/normalize`, and the content upgrade, the content check, the translations'
+rules and the choice of language in `packages/runtime`, that package's only tests. They are fast and are where a rule belongs. Both test
 tsconfigs have `allowJs`, so tests can import the `.mjs` scripts; those are typed through JSDoc
 and not checked. The player's browser suite no longer has an `index.html` behind its dev server
 — the pages moved to the demo — so a missing file is a `404` there, not the SPA fallback's page;
@@ -1902,7 +1946,9 @@ the easy one; with Embed My out of production that ground is gone, so the docume
 a separate player domain the host runs — second. The *Which setup* table still chooses by what
 is on the site's origin, and its safety rows still win: signed-in users, or packages the site
 did not make, mean Embed, for the reason *What a public demo means* gives — a package is
-JavaScript, and installed, it runs as the host site. The letters are gone from the user docs,
+JavaScript, and installed, it runs as the host site — or, since 2026-10-13, Install with those
+packages `untrusted` (every package, on a site with sessions), which runs none of their code and
+checks their content as the CMS plugins do. The letters are gone from the user docs,
 which say "formerly Setup A/B/C" under each heading; this file and Embed My's guides still say
 Setup A (bundler), B (no build step) and C (Embed).
 
@@ -1958,7 +2004,8 @@ deliberate additions to it, not drift:
 - The core's own strings follow the element's language, from translations the runtime carries.
   The design's frame is English throughout.
 - A package can be played `untrusted`, with library code only from the host's bundle and its
-  content as data. The design runs whatever a package carries.
+  content checked against the libraries' semantics, as the CMS plugins check it. The design runs
+  whatever a package carries.
 
 ## Not built yet
 
@@ -2007,13 +2054,11 @@ and the same boot pulled 1.4 MB instead of 81 — and because it is not yet know
 player is handed a deflated video nobody can normalize: the h5p.com export analysed above stored
 everything, while this one and the sodix.de one deflated everything.
 
-**Content checked against `semantics.json` — the second phase of `untrusted`.** The CMS plugins
-filter every field of a package's parameters against the library's field definitions before the
-runtime reads them (`H5PContentValidator` in h5p-php-library): text stripped to the tags a field
-allows, numbers held to their range, sub-content to the libraries a field names. Here it would run
-in the runtime package's boot script, before the content upgrade, on the pack's `semantics.json`
-files; GPL, like the core it ports. With it, `untrusted` would match what the plugins check and
-the setup advice for packages a site did not make could change.
+**Content checked against `semantics.json` — built** on 2026-10-13, after the content upgrade
+rather than before it as first planned here; see the invariant *An untrusted package plays as
+data*. Not done: upstream's addons (`H5P.MathDisplay` added to content whose text matches its
+pattern), which the pack does not carry anyway, and its `extraAttributes`, which it keeps unchecked
+and so does the port.
 
 **Offline app shell (PWA) — built**, as `/app/` on the demo site, library pack included; see
 *The hosted demo*. The list of recent files it left open is built too (2026-10-12), with file

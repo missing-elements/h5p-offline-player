@@ -35,3 +35,13 @@ The worker serves such a package's `content/` only in H5P's own list of content 
 images, audio, video, fonts, documents, subtitles, JSON — and never scripts, stylesheets, HTML,
 SVG or XML. Every response carries `X-Content-Type-Options: nosniff`, so no content file runs as a
 script even under the package's own path.
+
+The policy refuses inline scripts and handlers in every case, since its scripts carry a nonce, so a
+`<script>` in a content field never runs, nor does an `onerror` or a `javascript:` link. Markup
+needs no script to do harm, though: a form asking for a password, a frame, a style laid over the
+page. With `untrusted` the runtime therefore checks the content against each library's
+`semantics.json` before it is shown, as the H5P CMS plugins do: text keeps only the tags its field
+allows, with attributes written anew, and anything the definitions do not name is removed. Content
+whose main library has no `semantics.json` does not play. The check is in the runtime package,
+and the worker serves an untrusted package's `content.json` only to a runtime that does it, 0.2 or
+later.
