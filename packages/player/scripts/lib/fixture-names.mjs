@@ -16,6 +16,7 @@ export const GENERATED_FIXTURES = [
   'libraries.h5p',
   'untrusted.h5p',
   'untrusted-newer.h5p',
+  'needs-dependency.h5p',
   'untrusted-markup.h5p',
   'libraries-without-semantics.h5p',
   'upgrade-libraries.h5p',

@@ -9,8 +9,9 @@ the content picks up where it was:
 
 The content saves what its `getCurrentState()` returns — the slide reached, the answers given,
 the position in a video — every ten seconds, three seconds after a `completed` or `progressed`
-statement, and as the frame goes away. A content type without `getCurrentState()` always starts
-over.
+statement, and as the frame goes away. `save-interval` sets the seconds between saves: the H5P
+plugins default to 30, which suits `resume="host"` with each save sent to a server. A content
+type without `getCurrentState()` always starts over.
 
 **Where it is stored.** In IndexedDB, in the browser's storage for the site the player runs on,
 on that device. Nothing is sent anywhere, and xAPI statements are not stored either way. The

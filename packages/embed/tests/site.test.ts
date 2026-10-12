@@ -68,7 +68,7 @@ let previewing: Host
 /** The embedding site's page: the snippet the README gives, with a listener for the relay. */
 const snippet = (player: string, query: string) => `<!doctype html>
 <html><body>
-<iframe id="embed" src="${player}/?${query}" allow="fullscreen" style="width: 100%; border: 0"></iframe>
+<iframe id="embed" src="${player}/?${query}" allow="fullscreen; microphone; camera" style="width: 100%; border: 0"></iframe>
 <script src="${player}/resizer.js"></script>
 <script>
   window.relayed = []

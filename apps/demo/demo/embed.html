@@ -68,13 +68,13 @@
         trying a package before you embed it, not for learners.
       </p>
 
-      <iframe id="embed" title="H5P player" class="embed-frame" frameBorder="0" allow="fullscreen"></iframe>
+      <iframe id="embed" title="H5P player" class="embed-frame" frameBorder="0" allow="fullscreen; microphone; camera"></iframe>
 
       <h2>Markup</h2>
       <pre class="code">&lt;!-- This site's copy of the page. Your own player domain, from npx @missing-elements/h5p-embed,
      serves it at its root: https://h5p-player.example.net/?src=… --&gt;
 &lt;iframe src="%SITE_URL%/embed?src=%SITE_URL%/demo/content/quiz.h5p&amp;xapi=https://your-site.example"
-        allow="fullscreen" style="width: 100%; border: 0"&gt;&lt;/iframe&gt;
+        allow="fullscreen; microphone; camera" style="width: 100%; border: 0"&gt;&lt;/iframe&gt;
 
 &lt;!-- Optional, as the element's attributes: &amp;libraries=pack  &amp;preload=auto
      &amp;frame&amp;copyright&amp;export&amp;icon  &amp;fullscreen=off  &amp;reporting

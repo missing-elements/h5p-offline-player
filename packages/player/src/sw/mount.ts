@@ -22,6 +22,7 @@ import { contentTypeOf } from '../shared/mime'
 import {
   PlayerError,
   type FromWorkerMessage,
+  type LoadSettings,
   type PackageRecord,
   type ToWorkerMessage,
   type WorkerReply
@@ -29,9 +30,9 @@ import {
 import { contentRange, parseRange, type ByteRange } from '../shared/range'
 import { openSource } from '../shared/source'
 import * as db from '../shared/idb'
-import { type IndexedEntry, type LocatedEntry, PackageReader, STORED, locationOf } from './package-reader'
+import { type IndexedEntry, type LocatedEntry, PackageReader, STORED, explainMissingLibraries, locationOf } from './package-reader'
 import { CONTENT_CHECK_HEADER, buildFrameDocument, createNonce } from './frame-document'
-import { matchRoute, routesFor, type RouteMatch, type Routes } from './routes'
+import { loadSegment, matchRoute, routesFor, type LoadRef, type RouteMatch, type Routes } from './routes'
 import { sliceStream } from '../shared/stream-utils'
 import { waitForWatermark } from './watermark-wait'
 import { quotaMessage } from '../shared/storage'
@@ -90,8 +91,19 @@ export function mountH5P(worker: ServiceWorkerGlobalScope, options: MountOptions
   })
 }
 
+/**
+ * How many loads' settings a package's row keeps. Each load registers its own under a new key,
+ * and a frame whose key has gone gets a 404, so the bound is set well above the number of players
+ * one browser has open on one package at once; each is a couple of kilobytes, mostly the frame
+ * assets' URLs, and eviction reads every row.
+ */
+const KEPT_LOADS = 8
+
 class VirtualServer {
-  /** Open readers, keyed by package. Lost on worker restart and rebuilt on the next request. */
+  /**
+   * Open readers, keyed by load (`loadSegment`): two loads of one package can differ in trust
+   * and in the bundle attached. Lost on worker restart and rebuilt on the next request.
+   */
   private readers = new Map<string, Promise<PackageReader>>()
   /** Picked files, re-sent by the page after a restart because a `File` cannot be persisted. */
   private files = new Map<string, Blob>()
@@ -112,7 +124,7 @@ class VirtualServer {
     private readonly routes: Routes
   ) {
     installEvictionPolicy((pkgId) => {
-      this.readers.delete(pkgId)
+      for (const key of this.readers.keys()) if (key.startsWith(pkgId)) this.readers.delete(key)
     })
   }
 
@@ -134,12 +146,17 @@ class VirtualServer {
           return
 
         case 'register':
-          await this.registerPackage(message.record)
-          reply({ ok: true, type: 'ack' })
+          reply((await this.registerPackage(message.record, message.view)) ? { ok: true, type: 'ack', views: true } : { ok: true, type: 'ack' })
           return
 
         case 'index': {
-          const reader = await this.refresh(message.pkgId, await this.reader(message.pkgId))
+          const load = { pkgId: message.pkgId, view: message.view }
+          const reader = await this.refresh(load, await this.reader(load))
+          if (message.deep && !reader.partial) {
+            const served = reader.hasFallbacks ? await reader.mergedManifest() : reader.manifest
+            const missing = await reader.missingDependencies(served, (located) => this.readJson(located))
+            if (missing) throw new PlayerError('bad-archive', explainMissingLibraries(missing), { missingLibraries: missing })
+          }
           if (!reader.partial) {
             await bookkeeping(db.updatePackage(message.pkgId, { status: 'indexed', lastPlayed: Date.now() }))
           }
@@ -166,9 +183,15 @@ class VirtualServer {
         }
 
         case 'attach-libraries': {
-          await db.updatePackage(message.pkgId, { libraryPkgId: message.libraryPkgId })
+          const { pkgId, view, libraryPkgId } = message
+          const changed = await db.changePackage(pkgId, (record) => {
+            if (!record || !view) return record && { ...record, libraryPkgId }
+            const settings = record.views?.[view]
+            return settings && { ...record, views: { ...record.views, [view]: { ...settings, libraryPkgId } } }
+          })
+          if (view && !changed) throw new UnknownPackageError(pkgId)
           // Dropped so the next request rebuilds the reader with the bundle attached.
-          this.readers.delete(message.pkgId)
+          this.readers.delete(loadSegment({ pkgId, view }))
           reply({ ok: true, type: 'ack' })
           return
         }
@@ -195,17 +218,34 @@ class VirtualServer {
   }
 
   /**
-   * Writes the package's row. On an origin with no room left for even that, a row already there
-   * for the same package is kept and serves: it names the same source — the id is a hash of it —
-   * and a package that played before can play again from an archive nothing needs to store.
+   * Writes the package's row, and the load's settings under its key when the element named one.
+   * Merged in one transaction rather than replaced: the other loads' settings stay, and so do the
+   * title and metadata, which are the archive's and which a reader already open for another load
+   * will not write again.
+   *
+   * On an origin with no room left for even that, a row already there for the same package is
+   * kept and serves: it names the same source — the id is a hash of it — and a package that
+   * played before can play again from an archive nothing needs to store. No key can be written
+   * then, so the load gets the row's own settings, the ones a route without a key is served
+   * by, and only when they are what it asked for: an untrusted load is never handed a trusted
+   * row. Returns whether the settings went under the key.
    */
-  private async registerPackage(record: PackageRecord): Promise<void> {
+  private async registerPackage(record: PackageRecord, view: string | undefined): Promise<boolean> {
+    this.readers.delete(loadSegment({ pkgId: record.pkgId }))
     try {
-      await db.putPackage(record)
+      await db.changePackage(record.pkgId, (existing) => ({
+        ...record,
+        title: record.title ?? existing?.title,
+        metadata: record.metadata ?? existing?.metadata,
+        views: view ? newestLoads({ ...existing?.views, [view]: loadSettings(record) }) : existing?.views
+      }))
     } catch (error) {
-      if (!isQuotaError(error) || !(await db.getPackage(record.pkgId))) throw error
+      const existing = isQuotaError(error) ? await db.getPackage(record.pkgId) : undefined
+      if (!existing || (view && !sameSettings(existing, record))) throw error
+      return false
     }
-    this.readers.delete(record.pkgId)
+    if (view) this.readers.delete(loadSegment({ pkgId: record.pkgId, view }))
+    return Boolean(view)
   }
 
   /* ---------------------------------------------------------------- request routing */
@@ -217,10 +257,10 @@ class VirtualServer {
           return json({ version: VERSION })
 
         case 'frame':
-          return await this.serveFrame(match.pkgId)
+          return await this.serveFrame(match)
 
         case 'entry':
-          return await this.serveEntry(event, match.pkgId, match.path)
+          return await this.serveEntry(event, match, match.path)
 
         default:
           return new Response(null, { status: 404 })
@@ -240,33 +280,34 @@ class VirtualServer {
 
   /* ---------------------------------------------------------------- the frame document */
 
-  private async serveFrame(pkgId: string): Promise<Response> {
-    const record = await db.getPackage(pkgId)
-    if (!record) return text('Unknown package', 404)
+  private async serveFrame(load: LoadRef): Promise<Response> {
+    const record = await db.getPackage(load.pkgId)
+    const settings = record && settingsOf(record, load.view)
+    if (!record || !settings) return text('Unknown package', 404)
 
-    await bookkeeping(db.touchPackage(pkgId))
+    await bookkeeping(db.touchPackage(load.pkgId))
 
     // From the reader the element's `index` left open, never a new one: a picked file's reader
     // asks the page for the file through the frame, and the frame is what is being served. With
     // no reader the list is left out, and the frame asks for each script and takes a 404 as none.
-    const upgrades = await this.readers.get(pkgId)?.then(
+    const upgrades = await this.readers.get(loadSegment(load))?.then(
       (reader) => reader.foldersWithUpgrades(),
       () => undefined
     )
 
     const nonce = createNonce()
     const body = buildFrameDocument({
-      pkgId,
-      virtualRoot: `${this.routes.virtual}${pkgId}`,
-      assets: record.frameAssets,
+      pkgId: load.pkgId,
+      virtualRoot: `${this.routes.virtual}${loadSegment(load)}`,
+      assets: settings.frameAssets,
       nonce,
       title: record.title,
       metadata: record.metadata,
-      allowOrigins: record.allowOrigins,
-      frameOptions: record.frameOptions,
+      allowOrigins: settings.allowOrigins,
+      frameOptions: settings.frameOptions,
       upgrades,
-      language: record.language,
-      untrusted: record.untrusted === true
+      language: settings.language,
+      untrusted: settings.untrusted === true
     })
 
     return new Response(body, {
@@ -281,17 +322,17 @@ class VirtualServer {
 
   /* ---------------------------------------------------------------- package entries */
 
-  private async serveEntry(event: FetchEvent, pkgId: string, rawPath: string): Promise<Response> {
+  private async serveEntry(event: FetchEvent, load: LoadRef, rawPath: string): Promise<Response> {
     const name = normalizeRequestPath(rawPath)
     if (name === null) return text('Bad entry path', 400)
 
-    let reader = await this.reader(pkgId)
+    let reader = await this.reader(load)
     let located = reader.get(name)
 
     if (!located && reader.partial) {
       // On a partial index a miss is ambiguous: absent, or not arrived yet. Wait for the index to
       // grow until the entry appears or the answer becomes certain.
-      const outcome = await this.awaitEntry(pkgId, reader, name)
+      const outcome = await this.awaitEntry(load, reader, name)
       if (outcome === 'stalled') return retryLater(`The download has stalled before ${name}`)
       reader = outcome.reader
       located = outcome.located
@@ -552,10 +593,11 @@ class VirtualServer {
    * a 404 as a fact about the package.
    */
   private async awaitEntry(
-    pkgId: string,
+    load: LoadRef,
     reader: PackageReader,
     name: string
   ): Promise<{ reader: PackageReader; located: LocatedEntry | undefined } | 'stalled'> {
+    const { pkgId } = load
     const store = new ChunkStore(pkgId)
     let wake: (() => void) | null = null
     const stopIndex = onWatermark(pkgId, FORWARD_INDEX_ENTRY, () => wake?.())
@@ -565,7 +607,7 @@ class VirtualServer {
 
     try {
       for (;;) {
-        const current = await this.refresh(pkgId, reader)
+        const current = await this.refresh(load, reader)
         const located = current.get(name)
         if (located || !current.partial || current.provablyAbsent(name)) return { reader: current, located }
 
@@ -651,26 +693,32 @@ class VirtualServer {
   /* ---------------------------------------------------------------- readers */
 
   /**
-   * Returns the reader for a package, rebuilding it from the `packages` table when the worker has
-   * been restarted since it was last used.
+   * Returns the reader for a load of a package, rebuilding it from the `packages` table when the
+   * worker has been restarted since it was last used.
    */
-  private reader(pkgId: string): Promise<PackageReader> {
-    const existing = this.readers.get(pkgId)
+  private reader(load: LoadRef): Promise<PackageReader> {
+    const key = loadSegment(load)
+    const existing = this.readers.get(key)
     if (existing) return existing
 
-    const opening = this.openReader(pkgId)
-    this.readers.set(pkgId, opening)
-    opening.catch(() => this.readers.delete(pkgId))
+    const opening = this.openReader(load)
+    this.readers.set(key, opening)
+    opening.catch(() => {
+      if (this.readers.get(key) === opening) this.readers.delete(key)
+    })
     return opening
   }
 
-  private async openReader(pkgId: string): Promise<PackageReader> {
+  private async openReader(load: LoadRef): Promise<PackageReader> {
+    const { pkgId } = load
     const record = await db.getPackage(pkgId)
-    if (!record) throw new UnknownPackageError(pkgId)
+    const settings = record && settingsOf(record, load.view)
+    if (!record || !settings) throw new UnknownPackageError(pkgId)
 
     const file = record.source.type === 'file' ? await this.fileFor(pkgId) : undefined
     // A bundle registered to supply libraries is the host's choice, never the package's.
-    const untrusted = record.untrusted === true && record.role !== 'libraries'
+    const untrusted = settings.untrusted === true && record.role !== 'libraries'
+    const { libraryPkgId } = settings
 
     // An archive still downloading is served from its forward index — what the local headers
     // have given up so far — until it is whole and the central directory can take over.
@@ -686,7 +734,7 @@ class VirtualServer {
         }
         const partialHandle = await openSource(pkgId, record.source, file, { partial: true })
         const partial = await PackageReader.fromForwardIndex(pkgId, partialHandle, snapshot, { untrusted })
-        if (record.libraryPkgId) partial.use(await this.reader(record.libraryPkgId))
+        if (libraryPkgId) partial.use(await this.reader({ pkgId: libraryPkgId }))
         await this.rememberManifest(record, partial)
         return partial
       }
@@ -696,11 +744,11 @@ class VirtualServer {
 
     // Validation waits until any attached bundle is in place; a bundle registered to supply
     // libraries to something else is never held to its own manifest at all.
-    const standalone = record.role !== 'libraries' && !record.libraryPkgId
+    const standalone = record.role !== 'libraries' && !libraryPkgId
     const reader = await PackageReader.open(pkgId, handle, { requireLibraries: standalone, untrusted })
 
-    if (record.libraryPkgId) {
-      reader.use(await this.reader(record.libraryPkgId))
+    if (libraryPkgId) {
+      reader.use(await this.reader({ pkgId: libraryPkgId }))
       reader.assertLibrariesPresent()
     }
 
@@ -726,19 +774,25 @@ class VirtualServer {
    * Brings a partial reader up to date with the latest forward index, or — once the archive is
    * whole — drops it for a reader built from the central directory, which is the authority.
    */
-  private async refresh(pkgId: string, reader: PackageReader): Promise<PackageReader> {
+  private async refresh(load: LoadRef, reader: PackageReader): Promise<PackageReader> {
     if (!reader.partial) return reader
 
-    const store = new ChunkStore(pkgId)
+    const store = new ChunkStore(load.pkgId)
     const meta = await store.getArchiveMeta()
     if (meta?.complete) {
-      this.readers.delete(pkgId)
-      return this.reader(pkgId)
+      this.readers.delete(loadSegment(load))
+      return this.reader(load)
     }
 
     const snapshot = await store.getForwardIndex()
     if (snapshot) await reader.absorb(snapshot)
     return reader
+  }
+
+  /** An entry's JSON, from the cache when it is there, as every library's is after the warm. */
+  private async readJson({ reader, entry }: LocatedEntry): Promise<unknown> {
+    const cached = await new ChunkStore(reader.pkgId).getWhole(entry.name)
+    return (cached ?? new Response(reader.inflate(entry))).json()
   }
 
   /** Asks the page for a `File` the worker lost on restart, and waits for it to arrive. */
@@ -775,6 +829,34 @@ class VirtualServer {
 }
 
 /* ------------------------------------------------------------------ helpers */
+
+/**
+ * What a load asked for: the settings under its key, or, for a frame an older element opened,
+ * the row's own, which are the last registration's. `undefined` for a key the row does not hold.
+ */
+function settingsOf(record: PackageRecord, view: string | undefined): Omit<LoadSettings, 'registered'> | undefined {
+  return view ? record.views?.[view] : record
+}
+
+/** A registration's settings, as kept under its load key; a bundle is attached by the load itself. */
+function loadSettings(record: PackageRecord): LoadSettings {
+  const { frameAssets, allowOrigins, frameOptions, language, untrusted } = record
+  return { frameAssets, allowOrigins, frameOptions, language, untrusted, registered: Date.now() }
+}
+
+function sameSettings(a: PackageRecord, b: PackageRecord): boolean {
+  const { registered: _a, ...left } = loadSettings(a)
+  const { registered: _b, ...right } = loadSettings(b)
+  return JSON.stringify(left) === JSON.stringify(right)
+}
+
+function newestLoads(views: Record<string, LoadSettings>): Record<string, LoadSettings> {
+  return Object.fromEntries(
+    Object.entries(views)
+      .sort(([, a], [, b]) => b.registered - a.registered)
+      .slice(0, KEPT_LOADS)
+  )
+}
 
 function entryHeaders(
   entry: IndexedEntry,

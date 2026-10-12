@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { matchRoute, routesFor } from '../../src/sw/routes'
+import { loadSegment, matchRoute, routesFor } from '../../src/sw/routes'
 
 const PKG = 'a'.repeat(32)
+const VIEW = 'b'.repeat(16)
 
 describe('routesFor', () => {
   it('uses our own registration scope as it is, since it already ends in h5p/', () => {
@@ -40,6 +41,19 @@ describe('matchRoute', () => {
     })
   })
 
+  it("reads a load's key after the package id, on both routes", () => {
+    const segment = loadSegment({ pkgId: PKG, view: VIEW })
+    expect(segment).toBe(`${PKG}-${VIEW}`)
+    expect(matchRoute(routes, `${routes.frame}${segment}?resume=1`)).toEqual({ kind: 'frame', pkgId: PKG, view: VIEW })
+    expect(matchRoute(routes, `${routes.virtual}${segment}/h5p.json`)).toEqual({
+      kind: 'entry',
+      pkgId: PKG,
+      view: VIEW,
+      path: 'h5p.json'
+    })
+    expect(loadSegment({ pkgId: PKG })).toBe(PKG)
+  })
+
   it('drops the query string, which H5P appends as a cache buster', () => {
     expect(matchRoute(routes, `${routes.virtual}${PKG}/h5p.json?v=2`)).toEqual({
       kind: 'entry',
@@ -52,6 +66,9 @@ describe('matchRoute', () => {
     'https://site.example/assets/h5p/virtual/not-a-pkg-id/h5p.json',
     'https://site.example/assets/h5p/virtual/',
     `https://site.example/assets/h5p/virtual/${PKG}`,
+    `https://site.example/assets/h5p/virtual/${PKG}-${'b'.repeat(15)}/h5p.json`,
+    `https://site.example/assets/h5p/virtual/${PKG}-/h5p.json`,
+    `https://site.example/assets/h5p/frame/${PKG}-${'B'.repeat(16)}`,
     'https://youtube.com/embed/abc',
     'https://site.example/assets/other.js'
   ])('leaves %s to the network', (url) => {

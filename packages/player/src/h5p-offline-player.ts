@@ -30,10 +30,10 @@ import {
   type WorkerReply
 } from './shared/protocol'
 import { packageLockName } from './shared/locks'
-import { filePkgId, remotePkgId } from './shared/pkg-id'
+import { filePkgId, loadKey, remotePkgId } from './shared/pkg-id'
 import { platformOf, withProvenance } from './shared/revision'
 import { probeSource } from './shared/source'
-import { routesFor, type Routes } from './sw/routes'
+import { loadSegment, routesFor, type LoadRef, type Routes } from './sw/routes'
 import { adoptRevision, clearUserData, readUserData, removeUserData, writeUserData } from './user-data-store'
 
 /**
@@ -249,7 +249,7 @@ function adoptShadowStyles(root: ShadowRoot): void {
 export class H5PPlayerElement extends HTMLElement {
   static get observedAttributes(): string[] {
     return [
-      'src', 'sw', 'assets-base', 'auto-resize', 'libraries', 'allow-origins', 'preload', 'resume', 'untrusted',
+      'src', 'sw', 'assets-base', 'auto-resize', 'libraries', 'allow-origins', 'preload', 'resume', 'save-interval', 'untrusted',
       // h5p-standalone's display and loading options, by its names; read when a package is registered.
       'frame', 'copyright', 'export', 'icon', 'embed', 'fullscreen', 'download-url', 'embed-code', 'resize-code',
       'custom-css', 'custom-js', 'reporting', 'activity-id'
@@ -307,6 +307,8 @@ export class H5PPlayerElement extends HTMLElement {
    * answered under another.
    */
   private loadResumeMode: ResumeMode = 'off'
+  /** `saveInterval` as this load read it, for the same reason. */
+  private loadSaveInterval = SAVE_INTERVAL_S
   /** The learner the host named, for the statements' actor; handed to the frame as it boots. */
   private userValue: FrameUser | null = null
   private runtimeValue: FrameAssets | null = null
@@ -372,6 +374,22 @@ export class H5PPlayerElement extends HTMLElement {
   set resume(value: ResumeMode) {
     if (value === 'off') this.removeAttribute('resume')
     else this.setAttribute('resume', value)
+  }
+
+  /**
+   * Seconds between the saves `resume` makes while the content runs: what the H5P plugins call
+   * the user data save interval, and H5P core `saveFreq`. The content is also saved shortly after
+   * each `completed` or `progressed` statement, and as the page goes away. 10 by default, which
+   * costs little on the device; a host that sends each save to a server may want the plugins'
+   * 30. At least 1. Takes effect on the next load.
+   */
+  get saveInterval(): number {
+    const value = Number(this.getAttribute('save-interval'))
+    return Number.isFinite(value) && value >= 1 ? value : SAVE_INTERVAL_S
+  }
+
+  set saveInterval(value: number) {
+    this.setAttribute('save-interval', String(value))
   }
   /**
    * Plays the package as data, for one the host did not make: none of its own code runs. Its
@@ -623,6 +641,7 @@ export class H5PPlayerElement extends HTMLElement {
     this.forgetPackage()
     this.revisionSettled = false
     this.loadResumeMode = this.resume
+    this.loadSaveInterval = this.saveInterval
 
     try {
       this.setState('probing')
@@ -639,8 +658,14 @@ export class H5PPlayerElement extends HTMLElement {
       this.internalLibraryBundle = null
       this.holdPackage(pkgId, signal)
 
-      await this.send({ type: 'register', record: this.recordFor(pkgId, descriptor) })
+      // Under a key of this load's own: another player on the origin may be showing the same
+      // package with other settings — trusted where this one is not, in another language — and
+      // the package's row is shared. A worker older than the element keeps the row's alone, and
+      // its routes name no key.
+      const view = loadKey()
+      const registered = await this.send({ type: 'register', record: this.recordFor(pkgId, descriptor), view })
       if (signal.aborted) return
+      const load: LoadRef = registered.ok && registered.type === 'ack' && registered.views ? { pkgId, view } : { pkgId }
 
       if (descriptor.type === 'file' && this.currentFile) {
         await this.send({ type: 'file', pkgId, file: this.currentFile })
@@ -652,22 +677,27 @@ export class H5PPlayerElement extends HTMLElement {
       // `?user=1` the same way: the host named a learner, and the frame asks for it in the same
       // reply, before the runtime reads its actor.
       const flags = [this.loadResumeMode === 'off' ? '' : 'resume=1', this.userValue ? 'user=1' : ''].filter(Boolean)
-      const frameUrl = `${routes.frame}${pkgId}${flags.length ? `?${flags.join('&')}` : ''}`
+      const frameUrl = `${routes.frame}${loadSegment(load)}${flags.length ? `?${flags.join('&')}` : ''}`
       let indexed: IndexResult
 
       if (descriptor.type === 'chunked') {
         this.setState('downloading')
-        indexed = await this.downloadAndIndex(pkgId, descriptor, signal, frameUrl)
+        indexed = await this.downloadAndIndex(load, descriptor, signal, frameUrl)
       } else {
         this.setState('indexing')
-        indexed = await this.index(pkgId, signal)
+        // A picked file is local, so the libraries' own dependencies are followed at once; over
+        // HTTP each `library.json` would be two requests, so they are followed once warmed.
+        const remote = descriptor.type === 'range-http'
+        indexed = await this.index(load, signal, !remote)
         if (signal.aborted) return
         // The libraries are pulled into the cache in a few requests before the frame boots;
         // read on demand, they cost the runtime one or two round trips per file. Not a step
         // that can fail the load: the frame boots against whatever landed.
-        if (descriptor.type === 'range-http' && indexed.warm.length > 0) {
+        if (remote && indexed.warm.length > 0) {
           await this.runWarm(pkgId, descriptor, indexed.warm, signal)
+          if (signal.aborted) return
         }
+        if (remote) indexed = await this.index(load, signal, true)
       }
       if (signal.aborted) return
 
@@ -705,7 +735,7 @@ export class H5PPlayerElement extends HTMLElement {
    * worker onto it, and is where a package missing libraries is found out.
    */
   private async downloadAndIndex(
-    pkgId: string,
+    load: LoadRef,
     source: SourceDescriptor,
     signal: AbortSignal,
     frameUrl: string
@@ -715,7 +745,7 @@ export class H5PPlayerElement extends HTMLElement {
 
     const tryBoot = () => {
       if (booted || attempt || signal.aborted) return
-      attempt = this.send({ type: 'index', pkgId })
+      attempt = this.send({ type: 'index', ...load })
         .then((reply) => {
           if (signal.aborted || booted) return
           if (reply.ok && reply.type === 'indexed' && reply.ready !== false) {
@@ -732,13 +762,13 @@ export class H5PPlayerElement extends HTMLElement {
         })
     }
 
-    await this.runDownload(pkgId, source, signal, 'download', tryBoot)
+    await this.runDownload(load.pkgId, source, signal, 'download', tryBoot)
     if (signal.aborted) return nothingIndexed()
     if (attempt) await attempt
 
     // A frame already up keeps its state; the rest of this is the worker's bookkeeping.
     if (!booted) this.setState('indexing')
-    return this.index(pkgId, signal)
+    return this.index(load, signal, true)
   }
 
   /**
@@ -755,19 +785,22 @@ export class H5PPlayerElement extends HTMLElement {
    * the point of naming a second one is to have it when the first is not there; only the last
    * source's failure is the load's. The last source attached stays attached: the worker keeps
    * one bundle per package, and a later bundle in the list is expected to cover the earlier.
+   *
+   * With `deep`, the worker also follows each library's own dependencies, as the runtime will,
+   * and what none of the package's folders provides is fetched the same way.
    */
-  private async index(pkgId: string, signal: AbortSignal): Promise<IndexResult> {
+  private async index(load: LoadRef, signal: AbortSignal, deep = false): Promise<IndexResult> {
     const sources = this.librarySources()
     for (let attempt = 0; ; attempt++) {
       try {
-        return indexResultOf(await this.send({ type: 'index', pkgId }))
+        return indexResultOf(await this.send({ type: 'index', ...load, ...(deep ? { deep } : {}) }))
       } catch (error) {
         const missing = error instanceof PlayerError ? error.missingLibraries : undefined
         const source = sources[attempt]
         if (!missing || !source) throw error
 
         try {
-          await this.supplyLibraries(pkgId, missing, source, signal)
+          await this.supplyLibraries(load, missing, source, signal)
         } catch (failure) {
           if (signal.aborted || attempt + 1 >= sources.length) throw failure
         }
@@ -786,7 +819,7 @@ export class H5PPlayerElement extends HTMLElement {
    * this is where the attempt to supply them stopped.
    */
   private async supplyLibraries(
-    pkgId: string,
+    load: LoadRef,
     missing: MissingLibraries,
     source: LibrarySource,
     signal: AbortSignal
@@ -810,7 +843,7 @@ export class H5PPlayerElement extends HTMLElement {
 
         this.setState('indexing')
         await this.send({ type: 'index', pkgId: earlier })
-        await this.send({ type: 'attach-libraries', pkgId, libraryPkgId: earlier })
+        await this.send({ type: 'attach-libraries', ...load, libraryPkgId: earlier })
         this.internalLibraryBundle = { url, origin: new URL(url).origin, fromCache: true }
         return
       }
@@ -838,7 +871,7 @@ export class H5PPlayerElement extends HTMLElement {
 
       this.setState('indexing')
       await this.send({ type: 'index', pkgId: libraryPkgId })
-      await this.send({ type: 'attach-libraries', pkgId, libraryPkgId })
+      await this.send({ type: 'attach-libraries', ...load, libraryPkgId })
       this.internalLibraryBundle = { url, origin: new URL(url).origin, fromCache: false }
     } catch (error) {
       if (signal.aborted) throw error
@@ -1463,7 +1496,7 @@ export class H5PPlayerElement extends HTMLElement {
       channel: 'h5p-player',
       type: 'user-data',
       session,
-      saveInterval: SAVE_INTERVAL_S,
+      saveInterval: this.loadSaveInterval,
       entries,
       ...(this.userValue ? { user: this.userValue } : {})
     }

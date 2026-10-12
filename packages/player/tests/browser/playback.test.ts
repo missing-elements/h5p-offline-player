@@ -6,8 +6,10 @@ import {
   clearPackageCaches,
   createPlayer,
   frameDocument,
+  frameFetch,
   frameWindow,
   play,
+  virtualUrl,
   waitForEvent
 } from './utils'
 
@@ -233,6 +235,18 @@ describe('playing a package', () => {
 
     // Not a CSP violation but a thrown EvalError is what a blocked eval looks like from inside.
     expect(view.eval('1 + 1')).toBe(2)
+  })
+
+  it("answers H5P.getContentPath with the content's own folder, where IFrame Embedder looks", async () => {
+    const player = await play(FIXTURES.basic)
+    type Core = Window & { H5P: { getContentPath(id: string): string }; H5PIntegration: { contents: Record<string, unknown> } }
+    const view = frameWindow(player) as Core
+    const id = Object.keys(view.H5PIntegration.contents)[0].slice('cid-'.length)
+
+    // The core's own answer was `<content id>/content/<content id>`, relative to nothing.
+    const path = view.H5P.getContentPath(id)
+    expect(path).toBe(virtualUrl(player, 'content'))
+    expect((await frameFetch(player, `${path}/content.json`)).status).toBe(200)
   })
 
   it('applies the H5P core styles, which are keyed on the document element', async () => {

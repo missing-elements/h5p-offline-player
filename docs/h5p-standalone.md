@@ -16,7 +16,7 @@ The element runs h5p-standalone inside its frame and takes its options by the sa
 | `translations` | `lang` | H5P's own strings in that language, from the runtime's translations; inherited from the page. Strings of your own cannot be passed |
 | `user` | the `user` property | `{ name, mail }`; never stored |
 | `metadata`, `title` | — | Read from the package's `h5p.json` |
-| `contentUserData`, `saveFreq` | `resume`, `userData` | |
+| `contentUserData`, `saveFreq` | `resume`, `userData`, `save-interval` | |
 | `ajax.setFinishedUrl`, `postUserStatistics` | the `finished` event | Nothing is posted anywhere |
 | `ajax.contentUserDataUrl` | `resume="host"` and the `userdata` event | |
 | `id`, `librariesPath`, `contentJsonPath`, `embedType`, `preventH5PInit` | — | Decided by the package and the frame |

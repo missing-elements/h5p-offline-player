@@ -156,10 +156,10 @@ document.querySelector('h5p-player').runtime = runtime</pre>
         Load the element from the CDN, and copy the one file that has to be yours onto the site.
       </p>
       <pre class="code">&lt;script type="module"
-  src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@0.8.0/dist/h5p-player.js"&gt;&lt;/script&gt;
+  src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@0.9.0/dist/h5p-player.js"&gt;&lt;/script&gt;
 
 &lt;h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js"
-            assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-runtime@0.2.0/dist/"&gt;&lt;/h5p-player&gt;</pre>
+            assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-runtime@0.2.1/dist/"&gt;&lt;/h5p-player&gt;</pre>
       <p>
         Download <code>dist/h5p-sw.js</code> from the same CDN path, place it on your site, and point
         <code>sw</code> at it. The runtime loads from the CDN, from its own package, which
@@ -184,11 +184,13 @@ document.querySelector('h5p-player').runtime = runtime</pre>
         has the rest. Then, on your site:
       </p>
       <pre class="code">&lt;iframe src="https://h5p-player.example.net/?src=%SITE_URL%/demo/content/quiz.h5p&amp;xapi=https://your-site.example"
-        allow="fullscreen" style="width: 100%; border: 0"&gt;&lt;/iframe&gt;
+        allow="fullscreen; microphone; camera" style="width: 100%; border: 0"&gt;&lt;/iframe&gt;
 &lt;script src="https://h5p-player.example.net/resizer.js"&gt;&lt;/script&gt;</pre>
       <p>
         The page sizes itself through H5P's own resizer protocol and relays xAPI statements to
-        your page on request. The address also takes <code>libraries</code>,
+        your page on request. <code>microphone</code> and <code>camera</code> are for Audio
+        Recorder, Speak the Words and AR Scavenger: a frame from another site gets neither unless
+        the page allows it. The address also takes <code>libraries</code>,
         <code>preload=auto</code> and the element's display options by their attribute names:
         <code>frame</code>, <code>copyright</code>, <code>export</code>, <code>icon</code>,
         <code>fullscreen=off</code>, <code>reporting</code>, <code>activity-id</code> and
@@ -241,11 +243,12 @@ input.addEventListener('change', () =&gt; { player.file = input.files[0] })</pre
           <tr><td><code>jobs</code></td><td>Where the background worker script is, for a page whose Content Security Policy refuses <code>blob:</code> workers: copy <code>dist/h5p-jobs.js</code> beside <code>h5p-sw.js</code> and point this at it. Default: a <code>blob:</code> URL, then <code>h5p-jobs.js</code> next to the element. Must be same-origin.</td></tr>
           <tr><td><code>runtime</code></td><td>A property: the <code>runtime</code> export of <code>@missing-elements/h5p-runtime</code>, for a bundler to emit the files. Set it before <code>src</code>; it wins over <code>assets-base</code>.</td></tr>
           <tr><td><code>assets-base</code></td><td>The folder the runtime's <code>dist/</code> is served from. Default: <code>frame-assets/</code> next to the element. May be a CDN.</td></tr>
-          <tr><td><code>libraries</code></td><td>Where an export that ships without its libraries gets them: <code>pack</code> for <a href="https://www.npmjs.com/package/@missing-elements/h5p-libraries" rel="noopener"><code>@missing-elements/h5p-libraries</code></a>, every H5P hub content type's libraries in one bundle, ~10 MB, with their licences in its <code>libraries.txt</code>, from jsDelivr; or the URL of a <code>.h5p</code> that carries library folders, such as your own copy of the pack; or several separated by spaces, tried in order. <code>hub</code> means <code>pack</code>. Downloaded once and cached; when a URL cannot be reached later, the earlier copy is used. Default: such packages are refused, with the missing libraries named.</td></tr>
+          <tr><td><code>libraries</code></td><td>Where an export that ships without its libraries gets them: <code>pack</code> for <a href="https://www.npmjs.com/package/@missing-elements/h5p-libraries" rel="noopener"><code>@missing-elements/h5p-libraries</code></a>, every H5P hub content type's libraries in one bundle, ~14 MB, with their licences in its <code>libraries.txt</code>, from jsDelivr; or the URL of a <code>.h5p</code> that carries library folders, such as your own copy of the pack; or several separated by spaces, tried in order. <code>hub</code> means <code>pack</code>. Downloaded once and cached; when a URL cannot be reached later, the earlier copy is used. Default: such packages are refused, with the missing libraries named.</td></tr>
           <tr><td><code>preload</code></td><td><code>auto</code> pulls large compressed media once the content is up, instead of when the learner presses play.</td></tr>
           <tr><td><code>untrusted</code></td><td>Plays a package you did not make as data: none of its own code runs. Its library folders are ignored and the libraries come from <code>libraries</code>, <code>pack</code> when that is not set; <code>content/</code> serves only H5P's own file types; the frame's script policy names exact paths instead of your origin; the content is checked against each library's <code>semantics.json</code>, as the H5P CMS plugins check it. A package that needs its own copy of a library is refused, and the error's <code>missingLibraries.carried</code> says so. Needs the runtime at 0.2 or later.</td></tr>
           <tr><td><code>allow-origins</code></td><td>Extra origins the frame's Content Security Policy should permit, space separated: a tenant's video host, an in-house CDN.</td></tr>
           <tr><td><code>resume</code></td><td>Keep the content's own saved state &mdash; the slide reached, the answers so far, the position in a video &mdash; in the browser's storage on that device, and pick up there on the next load of the package. <code>host</code> keeps nothing on the device: the page gets a <code>userdata</code> event on every save and hands the state back through <code>userData</code> before the next load. Default: off, nothing is kept. Nothing is sent in either case.</td></tr>
+          <tr><td><code>save-interval</code></td><td>Seconds between saves while the content runs, with <code>resume</code>. The content is also saved shortly after each completion and as the page closes. Default: 10; the H5P plugins use 30, which suits a host that sends each save to a server.</td></tr>
         </tbody>
       </table>
 

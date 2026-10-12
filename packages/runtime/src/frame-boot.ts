@@ -55,6 +55,8 @@ interface IntegrationContent {
   library: string
   jsonContent: string
   metadata?: unknown
+  /** The content's folder, `<virtual root>/content`, as h5p-standalone sets it. */
+  contentUrl?: string
 }
 
 interface FrameOptions {
@@ -102,6 +104,7 @@ declare global {
       getUserData?: (contentId: unknown, dataType: string, done: UserDataDone, subContentId?: unknown) => void
       setUserData?: (contentId: unknown, dataType: string, data: unknown, options?: { subContentId?: unknown; errorCallback?: (error: unknown) => void }) => void
       deleteUserData?: (contentId: unknown, dataType: string, subContentId?: unknown) => void
+      getContentPath?: (contentId: unknown) => string
     }
     H5PIntegration?: { saveFreq?: number | false; contents?: Record<string, IntegrationContent> }
     H5PUpgrades?: Record<string, UpgradeTable | undefined>
@@ -517,6 +520,19 @@ askForUserData()
       H5P.newRunnable = function (library, contentId, attachTo, skipResize, extras) {
         if (extras && extras.standalone) extras.isReportingEnabled = true;
         return newRunnable.call(H5P, library, contentId, attachTo, skipResize, extras);
+      };
+    }
+    // The core builds a content's folder as `H5PIntegration.url + '/content/' + id`, as on a
+    // site, where `url` is the site's H5P folder; h5p-standalone sets `url` to the content id,
+    // so the path pointed nowhere. Its own `H5P.getPath` reads the content's `contentUrl` first,
+    // which h5p-standalone does set, and so does this. IFrame Embedder is the one content type
+    // that asks, for a page the package carries — which, played untrusted, is not served.
+    var getContentPath = H5P.getContentPath;
+    if (typeof getContentPath === 'function') {
+      H5P.getContentPath = function (contentId) {
+        var contents = window.H5PIntegration && window.H5PIntegration.contents;
+        var content = contents && contents['cid-' + contentId];
+        return content && content.contentUrl ? content.contentUrl : getContentPath!.call(H5P, contentId);
       };
     }
     if (typeof H5P.init === 'function') H5P.init();

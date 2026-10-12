@@ -441,6 +441,43 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   404 as "these folders are unversioned", asks again without the version, takes a second 404 and
   fails with nothing anyone can act on. `findMissingLibraries` is pure and unit-tested; the
   end-to-end case is the `content-only.h5p` fixture.
+  **The libraries' own dependencies are checked too, once their files are at hand** (2026-10-13).
+  A platform's export lists the whole tree in `h5p.json`, but an old one can name a version its
+  own libraries have moved past: h5p.org's Impressive Presentation carries Font Awesome 4.3 where
+  six of its libraries ask for 4.5, and h5p-standalone, which follows every `library.json`'s
+  `preloadedDependencies`, read the 404 as JSON and ended the boot with "Unexpected end of JSON
+  input". `PackageReader.missingDependencies` walks the same tree over the manifest the runtime
+  is served, a level at a time, and what nothing reachable provides is refused like a missing
+  top-level library — so the element asks the `libraries` sources for it, and that package plays
+  with the pack. The element asks for it with `deep` on `index`: at once for a picked file or a
+  downloaded archive, and on a host with `Range` only after the warm, reading each `library.json`
+  from the cache, since before it each would be two ranged requests. `needs-dependency.h5p` is
+  the fixture.
+- **What a load asked for is the load's, not the package's.** The `packages` row is keyed by
+  `pkgId`, a hash of the source, and up to 2026-10-13 it also held what the last load asked for:
+  `untrusted`, the language, the display options, the frame assets, `allow-origins` and the
+  attached bundle. Two players of one URL — on one page, or in two tabs — both got whichever
+  registered last. Found by the readiness check for the CMS plugins, measured: a player asked for
+  French showed German, one asked for no action bar showed one, a trusted player was refused as
+  untrusted, and an untrusted one was served the package's own code — a reader cached per package
+  was dropped by the other player's `register` and reopened with its settings. Now the element
+  makes a random key per load (`loadKey`) and registers with it; the worker keeps the record's
+  settings under `views[key]` in the same row (`LoadSettings`), merged in one transaction
+  (`changePackage`, which `updatePackage` and `touchPackage` go through too, so a write never
+  drops another load's), the newest `KEPT_LOADS` (8) of them; and every route names the load,
+  `<pkgId>-<key>` (`loadSegment`, `matchRoute`), so the frame document, every entry and the
+  reader — keyed by the same segment — follow that load's settings, and `attach-libraries` and
+  `index` carry it too. Random rather than a hash of the settings: two identical players would
+  otherwise share a reader, and one reloading would detach the other's bundle between its
+  `register` and its `attach`; and nothing outside a frame can name its key. What stays the
+  package's: the source, the archive's cache, the title and metadata, `status`, the saved state
+  (`resume`, by `pkgId`) and the Web Lock. A worker that knows keys answers `register` with
+  `views`; an older one does not, and the element then uses the bare `pkgId` routes, whose
+  settings are the row's own fields, still written by every `register` and read only for such a
+  route — the same last-registration-wins as before, for an element or worker from before the fix.
+  An unknown key is a 404, like an unknown package. `tests/browser/several-players.test.ts` races
+  an untrusted and a trusted player, a French and a German one, and adds a trusted player beside
+  a running untrusted one; on the code before, all of them failed.
 - **A package may be served from more than one archive.** `PackageReader.get()` returns a
   `LocatedEntry` — the entry *and* the reader it came from — because `libraries` can attach a
   second archive to fill the gaps in a stripped export. Extracted bytes are cached against the
@@ -474,10 +511,11 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   script on the host's whole site, a JSONP endpoint or an old AngularJS among them, which
   `'unsafe-eval'` makes worse; jsDelivr, cdnjs and Google's WebFont loader go too, since a CDN
   serves any npm or GitHub file. H5P.MathDisplay has carried MathJax in its own folder since 1.0,
-  so formulas still render from a bundle that carries it; the pack does not. A source carries no
-  query, and `;` and `,` in a path are percent-encoded so a URL cannot end the policy
-  (`pathSource`); `base-uri` stays `'self'`, as H5P sets a `<base>`. The mode is the load's, read
-  from the record each time, so one package can play untrusted and then trusted under the same id.
+  so formulas still render from a bundle that carries it, and the pack does since 2026-10-13. A
+  source carries no query, and `;` and `,` in a path are percent-encoded so a URL cannot end the
+  policy (`pathSource`); `base-uri` stays `'self'`, as H5P sets a `<base>`. The mode is the
+  load's, kept under its load key (next invariant), so one package can play untrusted and trusted
+  under the same id, at once.
   On a host without `Range`, `bootReady` does not wait for a withheld folder to finish arriving:
   the folder it resolved is the bundle's, which is whole, and a package laid out libraries-last
   would otherwise boot only with its final byte.
@@ -541,6 +579,24 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   nothing, when three of four stripped demo exports booted and then threw on their sub-content.
   Until then only the hub had been attached, and a hub bundle's manifest happens to list its
   content type's usual set, which covered for it. `merged-manifest.test.ts` pins all three.
+- **Addons are added as the platforms add them** (2026-10-13). An addon is a library whose
+  `library.json` names, under `addTo.content.types[].text.regex`, the content it goes with:
+  `H5P.MathDisplay`, for text holding LaTeX, is the one there is. The hub does not serve it; a
+  site's administrator uploads it, and from then on `H5PCore::filterParameters` adds it as a
+  dependency to every content whose parameters have a string matching the pattern
+  (`textAddonMatches`). A content-only export loses it with the rest of the list, and played
+  `untrusted`, a full export from a site that had it lists it and was refused against a pack
+  without it. So the pack carries it — MathDisplay 1.0.50 from h5p.org, MathJax 4.1 in its own
+  folder, 3 MB of the pack's 13.7 — and `mergedManifest()` adds, last, every addon an attached
+  bundle carries (`PackageReader.addons`, the newest version of each, read once per bundle) whose
+  pattern matches a string in `content.json` (`addonPatterns` turns PHP's `/…/flags` into a
+  `RegExp`, leaving out what it cannot; `textMatches` walks the parameters). The bundle stands in
+  for the platform's installed libraries, so nothing is added to a package played trusted with no
+  bundle attached: one that carries its libraries and does not list MathDisplay shows raw LaTeX,
+  as it would on a site without the addon. Checked in Chromium on the demo page with a
+  content-only Accordion holding `\(…\)` and `$$…$$`: two formulas rendered, untrusted, no
+  policy violation (`'self'` covers the fonts and the speech worker MathJax loads from the
+  folder).
 - **Content written for an older minor is upgraded before the runtime reads it.** Found on
   2026-10-11, comparing the player with the CMS plugins. The file server answers for a library at
   1.20 from a folder at 1.21 when that is what is reachable, and the pack keeps one minor per
@@ -724,7 +780,9 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   once per load (`loadResumeMode`) and again latched with the frame's save session
   (`userDataMode`, PR #1, 2026-10-04): `resume` takes effect on the next load, and reading it
   live let a host that switched it mid-lesson drop the running frame's next save, or leave an
-  early save on a host without `Range` unstamped. `resume.test.ts`
+  early save on a host without `Range` unstamped. `save-interval` (2026-10-13) is the
+  `saveFreq` the frame is handed, ten seconds by default, read once per load the same way; the
+  CMS plugins default to thirty and make it a setting. `resume.test.ts`
   drives all of it through the fixture content type, which counts presses of Complete.
 - **`libraries="pack"` is the library pack the release pins, and the H5P hub is not asked.**
   Decided on 2026-10-10. H5P Group moved the hub from `api.h5p.org` to `hub-api.h5p.org` in 2026,
@@ -743,7 +801,7 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   stamps the player in the same change, and a player published after merging it but before the
   pack would send every stripped export to a 404. The build scripts still read the hub's new host,
   from Node, which needs no CORS. The cost is size: a hub bundle was one content type, 0.5 to 3 MB,
-  and the pack is about 10 MB, downloaded whole on first use and then cached. Range-reading only
+  and the pack is about 14 MB, downloaded whole on first use and then cached. Range-reading only
   the libraries a package needs would fetch 5 to 15% of it for the demo's four packages (0.5 to
   1.5 MB, plus a 0.3 MB central directory), measured 2026-10-11, and is not built: neither public
   CDN serves the pack's ranges correctly — jsDelivr cuts them from a compressed copy (next
@@ -838,6 +896,14 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
 - **The frame uses `embedType: 'div'`.** With the default `iframe` type, H5P core creates an inner
   `about:blank` frame, and whether that child inherits the Service Worker controller differs
   between browsers.
+- **`H5P.getContentPath` answers the content's own folder.** The core builds it as
+  `H5PIntegration.url + '/content/' + id`, which on a site is the H5P folder; h5p-standalone sets
+  `url` to the content id, so it answered `<id>/content/<id>`, relative to nothing. Its own
+  `H5P.getPath` reads `contents['cid-<id>'].contentUrl` first, which h5p-standalone does set, and
+  the boot script makes `getContentPath` do the same (2026-10-13). IFrame Embedder is the one
+  content type in the pack that asks, for a page the package carries — so it showed nothing, in
+  either mode, until then; played `untrusted` it still does, by design, since `content/` serves
+  no HTML. `playback.test.ts` pins the path.
 - **The frame is navigated in place, not through its `src`.** Every navigation of a frame that
   already holds a document adds an entry to the page's session history, and the element used to
   set `src` for each package and remove it to empty the frame: two Back steps per package after
@@ -1033,8 +1099,8 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
 - **Bulk fetches are `cache: 'no-store'`.** The chunk store is the cache; a second copy in the
   browser's HTTP cache doubled the storage for nothing.
 - **An unknown `pkgId` is a 404 on every route.** `UnknownPackageError` is what `openReader`
-  throws for a package the table does not know, and `handleFetch` maps it before the generic
-  `bad-archive` → 422.
+  throws for a package the table does not know, or a load key its row does not hold, and
+  `handleFetch` maps it before the generic `bad-archive` → 422.
 - **Eviction empties a cache before it deletes it.** In Chromium `caches.delete()` frees nothing
   the write that triggered it can use: the bytes stay on the books until every `Cache` object
   anyone holds for that cache has been garbage-collected, and the virtual server makes one per
@@ -1534,7 +1600,10 @@ SPA-fallback trap described above cannot happen there.
   names and never returned.
 - **`/embed` is Setup C, and it is a page of its own.** The element alone, `auto-resize`, and
   the query string for `src`, `libraries`, `preload`, `xapi` and the display options by their
-  attribute names (see the h5p-standalone options invariant for which, and why not `custom-js`). Its
+  attribute names (see the h5p-standalone options invariant for which, and why not `custom-js`).
+  Its snippets carry `allow="fullscreen; microphone; camera"` since 2026-10-13: a frame from
+  another site gets neither device unless the embedding page allows it, and Audio Recorder,
+  Speak the Words and AR Scavenger need one; H5P's own embed code allows them too. Its
   script is `packages/embed/site/embed.js`, which the demo calls through `demo/embed-page.js`
   and the embed package deploys, so the two cannot drift. Three decisions in it: it speaks H5P's resizer protocol *upward* — `hello`, then `resize` with
   `scrollHeight` — so a site that already includes h5p.org's `h5p-resizer.js` for its h5p.org
@@ -1639,7 +1708,11 @@ SPA-fallback trap described above cannot happen there.
   same reason, since `npx` keeps a cached copy's dependencies until the package itself changes.
   0.3.2, the same day, passes `lang=` to the element and requires player `^0.6.2` and runtime
   `^0.1.2`, which carry the core's strings in the page's language; verify stays at 0.1.3, since its
-  page is English and the translations change nothing it checks.
+  page is English and the translations change nothing it checks. 0.5.0 (2026-10-13) requires
+  player 0.8 and runtime 0.2, the content check. 0.6.0, the same day, requires player 0.9, runtime
+  0.2.1 and the pack 0.2.0: per-load settings, the pack with AR Scavenger and MathDisplay, and
+  `microphone; camera` in the snippets it prints; verify 0.1.4 went out beside it, since the
+  transitive dependency check and `getContentPath` change what it reports.
 - **The pages carry their metadata, and the origin is filled in at build time.** Titles,
   descriptions, canonical links, Open Graph and Twitter tags, JSON-LD for the software on the
   front page, `robots.txt` and `sitemap.xml`, and the GitHub link at the right of every page's
@@ -1749,9 +1822,10 @@ SPA-fallback trap described above cannot happen there.
   an iPad choosing the file again is the step the list exists to save.
   **A package without its own libraries plays offline from the first open**, because the app
   carries them: `packages/libraries/libraries.h5p` (`@missing-elements/h5p-libraries`, the app's
-  until 2026-10-08) is the H5P hub's runtime libraries for every content type it serves — 100
-  folders from 52 content types, 9.8 MB, as rebuilt from the new hub host on 2026-10-10 (98 and
-  9.5 MB from the old host's catalogue on 2026-09-29) — kept at the newest minor of
+  until 2026-10-08) is the H5P hub's runtime libraries for every content type it serves — 105
+  folders from 53 content types and one addon, 13.7 MB, on 2026-10-13: AR Scavenger and
+  H5P.MathDisplay added to the 100 folders and 9.8 MB rebuilt from the new hub host on
+  2026-10-10 (98 and 9.5 MB from the old host's catalogue on 2026-09-29) — kept at the newest minor of
   each major, imported by `app.js` as a URL asset so Vite emits it under `assets/` and the
   precache picks it up from the manifest, and set as `libraries` on every open. Nothing else is
   asked since 2026-10-10: a package that needs a newer minor than the pack, or a content type
@@ -2056,9 +2130,8 @@ everything, while this one and the sodix.de one deflated everything.
 
 **Content checked against `semantics.json` — built** on 2026-10-13, after the content upgrade
 rather than before it as first planned here; see the invariant *An untrusted package plays as
-data*. Not done: upstream's addons (`H5P.MathDisplay` added to content whose text matches its
-pattern), which the pack does not carry anyway, and its `extraAttributes`, which it keeps unchecked
-and so does the port.
+data*. Not done: upstream's `extraAttributes`, which it keeps unchecked and so does the port.
+Addons were on this list, and are built; see *Addons are added as the platforms add them*.
 
 **Offline app shell (PWA) — built**, as `/app/` on the demo site, library pack included; see
 *The hosted demo*. The list of recent files it left open is built too (2026-10-12), with file

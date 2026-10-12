@@ -11,12 +11,13 @@ Deploy it to any static host, then embed:
 
 ```html
 <iframe src="https://h5p-player.example.net/?src=https://cdn.example.org/course.h5p"
-        allow="fullscreen" style="width: 100%; border: 0"></iframe>
+        allow="fullscreen; microphone; camera" style="width: 100%; border: 0"></iframe>
 <script src="https://h5p-player.example.net/resizer.js"></script>
 ```
 
 The script sizes the iframe to the content; a page that already loads h5p.org's `h5p-resizer.js`
-needs no second one.
+needs no second one. `microphone` and `camera` are for Audio Recorder, Speak the Words and AR
+Scavenger: a frame from another site gets neither unless the page allows it.
 
 **Use a separate registrable domain** — `h5p-player.example.net`, not `h5p.example.com` — and put
 nothing else on it: no accounts, no cookies. A package is JavaScript and runs as that origin, and
@@ -29,7 +30,7 @@ a subdomain shares your site's cookies.
 | `--packages <origins>` | Play packages and fetch library bundles only from these origins (the site's own is always allowed). Add `https://cdn.jsdelivr.net` for `libraries=pack` on a site built with `--no-libraries`. Default: any https host |
 | `--ancestors <origins>` | Only these sites may frame the page (`frame-ancestors`, header only). Default: any site |
 | `--default-libraries <sources>` | The `libraries` value for addresses that name none: `pack` or URLs. Checked against `--packages`. Default: none, so exports without libraries are refused unless the address asks |
-| `--no-libraries` | Leave out the 9.8 MB library pack; `libraries=pack` then fetches it from jsDelivr, where allowed |
+| `--no-libraries` | Leave out the 13.7 MB library pack; `libraries=pack` then fetches it from jsDelivr, where allowed |
 | `--force` | Write into a non-empty folder, replacing only this tool's files |
 | `-h`, `--help` / `-v`, `--version` | |
 

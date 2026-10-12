@@ -130,6 +130,31 @@ export interface PackageRecord {
   lastPlayed: number
   /** The element version that wrote the row. Read by nothing today; a future migration keys on it. */
   version: string
+  /**
+   * What each load asked for, by its load key: the settings above as that load set them, and the
+   * bundle attached for it. The fields above are the last registration's, and serve only a frame
+   * an older element opened, whose URLs carry no load key. See `LoadSettings`.
+   */
+  views?: Record<string, LoadSettings>
+}
+
+/**
+ * What one load asked for, apart from the bytes. The row is the package's, and two players can
+ * show the same package at once with different settings — one untrusted and one trusted, one in
+ * French and one in German — so each load's are kept under a random key of its own, which its
+ * frame's URLs carry. Random rather than a hash of the settings: two loads that asked for the
+ * same thing would share a reader, and one reloading would detach the other's bundle.
+ */
+export interface LoadSettings {
+  frameAssets: FrameAssets
+  allowOrigins?: string[]
+  frameOptions?: FrameOptions
+  language?: string
+  untrusted?: boolean
+  /** The bundle attached for this load; see `PackageRecord.libraryPkgId`. */
+  libraryPkgId?: string
+  /** When a load last registered these, for keeping the newest few. */
+  registered: number
 }
 
 /**
@@ -201,12 +226,20 @@ export class PlayerError extends Error {
 
 export type ToWorkerMessage =
   | { type: 'ping' }
-  | { type: 'register'; record: PackageRecord }
-  | { type: 'index'; pkgId: string }
+  /**
+   * `view`: the load's key, under which the worker keeps the record's settings for this load
+   * alone. A worker that knows it answers `ack` with `views`; one that does not ignores it.
+   */
+  | { type: 'register'; record: PackageRecord; view?: string }
+  /**
+   * `deep`: also follow each library's own dependencies, as the runtime will, and refuse what
+   * none of them provides. Asked for once the library files are local or cached.
+   */
+  | { type: 'index'; pkgId: string; view?: string; deep?: boolean }
   /** Answer to a `need-file` request: the page hands back the `File` the worker lost on restart. */
   | { type: 'file'; pkgId: string; file: File }
   /** Points a package at another one, already registered and indexed, for its libraries. */
-  | { type: 'attach-libraries'; pkgId: string; libraryPkgId: string }
+  | { type: 'attach-libraries'; pkgId: string; libraryPkgId: string; view?: string }
   /**
    * Asks for a library bundle already downloaded whole from `url`, for when `url` cannot be
    * reached now. Answered `downloaded-libraries`, with `null` when there is none.
@@ -298,7 +331,8 @@ export type WorkerReply =
       /** `h5p.json`'s `mainLibrary`, the content type, when the manifest names one. */
       mainLibrary?: string
     }
-  | { ok: true; type: 'ack' }
+  /** `views`: the register named a load key and the worker kept the settings under it. */
+  | { ok: true; type: 'ack'; views?: true }
   | { ok: true; type: 'downloaded-libraries'; pkgId: string | null }
   | { ok: false; code: ErrorCode; message: string; missingLibraries?: MissingLibraries }
 

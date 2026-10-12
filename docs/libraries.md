@@ -8,7 +8,7 @@ player refuses such a package and names what is missing. `libraries` tells it wh
 ```
 
 `pack` is [`@missing-elements/h5p-libraries`](https://www.npmjs.com/package/@missing-elements/h5p-libraries):
-one `.h5p`, about 10 MB, with the H5P hub's runtime libraries for every content type it serves,
+one `.h5p`, about 14 MB, with the H5P hub's runtime libraries for every content type it serves,
 each at the newest minor of its major. Each player release names one version of it, on jsDelivr.
 The pack is rebuilt from the hub weekly and released with the player.
 
@@ -24,7 +24,7 @@ licences ask to travel with the code. Then name that URL instead of `pack`, or b
 bundler, `import libraries from '@missing-elements/h5p-libraries/libraries.h5p?url'` emits it.
 
 `libraries` takes several sources separated by spaces, tried in order, each asked only for what
-the ones before it lack. Nothing is on by default, since a bundle is a 10 MB request.
+the ones before it lack. Nothing is on by default, since a bundle is a 14 MB request.
 
 `hub` means `pack`. Up to player 0.5 it asked the H5P hub itself, but the only hub host that
 answers a browser serves an outdated catalogue, so current exports could not get their libraries
@@ -35,7 +35,16 @@ unreachable later, a bundle downloaded whole from the same URL before is used, s
 export plays offline once it has played online.
 
 A package that needs a library no source carries is still refused, with the missing libraries
-named: usually a library newer than the pack, which the next pack release will carry.
+named: usually a library newer than the pack, which the next pack release will carry. The check
+follows each library's own dependencies too, as the runtime does, so an old export whose
+libraries ask for a version it does not carry gets that version from the sources as well.
+
+The pack also carries `H5P.MathDisplay`, the addon the H5P plugins add to content whose text holds
+LaTeX — `\(…\)`, `\[…\]` or `$$…$$` — once an administrator has installed it. With a bundle
+attached, the player does the same: it adds any addon the bundle carries to the content its
+`library.json` names, so a content-only export shows its formulas. MathDisplay renders them with
+MathJax from its own folder, so they work offline. A package from a site that had it lists it
+among its dependencies, and played `untrusted` it needs the bundle to have it.
 
 With `untrusted`, a package's own library folders are ignored and its libraries come only from
 `libraries`, `pack` when that is not set. A package that needs a library the sources lack is

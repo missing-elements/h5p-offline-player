@@ -20,7 +20,7 @@ Options:
                          the libraries= value for addresses that name none, so a snippet without
                          it still plays an export with no libraries: pack or URLs, as the
                          parameter. Default: none, such exports are refused unless the address asks
-  --no-libraries         leave out the 9.8 MB library pack; libraries=pack then fetches it from jsDelivr
+  --no-libraries         leave out the 13.7 MB library pack; libraries=pack then fetches it from jsDelivr
   --force                write into a folder that is not empty, replacing only this tool's files
   -h, --help             show this
   -v, --version          print the version`
@@ -80,7 +80,7 @@ try {
 Deploy the folder to a domain that holds nothing else — a separate registrable domain, not a
 subdomain of your site — then embed a package:
 
-  <iframe src="https://<player domain>/?src=<package url>" allow="fullscreen"
+  <iframe src="https://<player domain>/?src=<package url>" allow="fullscreen; microphone; camera"
           style="width: 100%; border: 0"></iframe>
   <script src="https://<player domain>/resizer.js"></script>
 

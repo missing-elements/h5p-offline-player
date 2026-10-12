@@ -64,9 +64,9 @@ that does not emit `new URL(…, import.meta.url)` assets, esbuild among them, s
 
 ```html
 <script type="module"
-  src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@0.8.0/dist/h5p-player.js"></script>
+  src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@0.9.0/dist/h5p-player.js"></script>
 <h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js"
-            assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-runtime@0.2.0/dist/"></h5p-player>
+            assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-runtime@0.2.1/dist/"></h5p-player>
 ```
 
 Copy `dist/h5p-sw.js` of the same version onto your own site: browsers register a Service Worker
@@ -88,9 +88,12 @@ your site's cookies) and frame it:
 
 ```html
 <iframe src="https://h5p-player.example.net/?src=https://host.example/course.h5p&xapi=https://your-site.example"
-        allow="fullscreen" style="width: 100%; border: 0"></iframe>
+        allow="fullscreen; microphone; camera" style="width: 100%; border: 0"></iframe>
 <script src="https://h5p-player.example.net/resizer.js"></script>
 ```
+
+`microphone` and `camera` are for the content types that record or film: Audio Recorder, Speak the
+Words and AR Scavenger. A frame from another site gets neither unless the page allows it.
 
 [Embed My](https://embed-my.org/) runs the same page publicly for trying a package. It is a test
 tool: do not send learners to it.
@@ -123,6 +126,7 @@ allows one Service Worker, or must work offline, mounts the player in its own wo
 | `auto-resize` | attribute | `off` to size the element yourself. Default: follows the content's height |
 | `preload` | attribute, property | `auto` pulls large deflated media before it is asked for. Default: `none` |
 | `resume` | attribute, property | `device` keeps the content's saved state on this device; `host` hands it to the page. Default: `off` |
+| `save-interval` | attribute, property | Seconds between saves while the content runs, with `resume`; also saved after each completion and as the page closes. Default: `10` |
 | `userData` | property | Under `resume="host"`, the state to restore, as `userdata` events carried it. Set before `src`. Not checked against the build: compare the `revision` you stored |
 | `state` | read-only | `idle`, `probing`, `downloading`, `indexing`, `ready` or `error` |
 | `pkgId`, `revision` | read-only | The loaded package's id and build fingerprint |

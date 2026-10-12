@@ -47,6 +47,11 @@ export interface LibraryDependency {
   minorVersion: string | number
 }
 
+/** A library that names, in its `library.json`'s `addTo`, the content the platforms add it to. */
+export interface Addon extends LibraryDependency {
+  patterns: RegExp[]
+}
+
 export interface IndexedEntry {
   /** Normalised name, the form the virtual server routes on. */
   name: string
@@ -458,6 +463,47 @@ export class PackageReader {
     return findMissingLibraries(withOwn, this.manifest).length === 0 ? { ...missing, carried: true } : missing
   }
 
+  /**
+   * The libraries the declared ones need in turn, by each `library.json`'s own
+   * `preloadedDependencies`, that nothing reachable from here provides. `manifest` is the one the
+   * runtime is served. A platform's export lists the whole tree in `h5p.json`, but an old one can
+   * name a version its own libraries have moved past — an Impressive Presentation from h5p.org
+   * carries Font Awesome 4.3 where six of its libraries ask for 4.5 — and the runtime, walking the
+   * same tree, ended its boot on the 404, read as JSON: "Unexpected end of JSON input". Each
+   * `library.json` is read through `read`, a level of the tree at a time, so the server can
+   * answer from its cache.
+   */
+  async missingDependencies(
+    manifest: PackageManifest,
+    read: (located: LocatedEntry) => Promise<unknown>
+  ): Promise<MissingLibraries | null> {
+    const missing: string[] = []
+    const seen = new Set<string>()
+    let level = dependenciesIn(manifest)
+
+    while (level.length > 0) {
+      const next: LibraryDependency[] = []
+      await Promise.all(
+        level.map(async (dependency) => {
+          const folders = libraryFolderNames(dependency)
+          if (seen.has(folders[0])) return
+          seen.add(folders[0])
+          const located = folders.map((folder) => this.get(`${folder}/library.json`)).find(Boolean)
+          if (!located) {
+            missing.push(folders[0])
+            return
+          }
+          next.push(...dependenciesIn(await read(located).catch(() => null)))
+        })
+      )
+      level = next
+    }
+
+    if (missing.length === 0) return null
+    const carried = this.withheld.size > 0 && missing.every((folder) => this.withheld.has(`${folder}/library.json`))
+    return { mainLibrary: manifest.mainLibrary, folders: missing.sort(), all: false, ...(carried ? { carried } : {}) }
+  }
+
   /** True when another archive is supplying entries this one does not have. */
   get hasFallbacks(): boolean {
     return this.fallbacks.length > 0
@@ -502,24 +548,59 @@ export class PackageReader {
     for (const fallback of this.fallbacks) {
       for (const dependency of fallback.manifest.preloadedDependencies ?? []) consider(dependency)
     }
+    // Addons, as the platforms add them when content is saved (`H5PCore::filterParameters`): a
+    // library the bundle carries whose `library.json` says which content it goes with — for
+    // H5P.MathDisplay, text with LaTeX in it. A content-only export lost it with the rest of the
+    // list, and content made outside a platform never had it.
+    const params = await this.contentParams()
+    for (const fallback of this.fallbacks) {
+      for (const { machineName, majorVersion, minorVersion, patterns } of await fallback.addons()) {
+        if (textMatches(params, patterns)) consider({ machineName, majorVersion, minorVersion })
+      }
+    }
 
     return { ...this.manifest, preloadedDependencies: [...kept.values()] }
   }
 
-  private namedInContent: Promise<LibraryDependency[]> | null = null
+  private contentJson: Promise<unknown> | null = null
+
+  /**
+   * `content/content.json`, parsed once; `undefined` when it cannot be read. Not remembered while
+   * it is absent, since on an archive still arriving it may yet come.
+   */
+  private contentParams(): Promise<unknown> {
+    if (this.contentJson) return this.contentJson
+    const located = this.locate('content/content.json')
+    if (!located || located.reader !== this) return Promise.resolve(undefined)
+    this.contentJson = new Response(this.inflate(located.entry)).json().catch(() => undefined)
+    return this.contentJson
+  }
 
   /** The sub-content libraries `content/content.json` names; none when it cannot be read. */
-  private contentLibraries(): Promise<LibraryDependency[]> {
-    this.namedInContent ??= (async () => {
-      const located = this.locate('content/content.json')
-      if (!located || located.reader !== this) return []
-      try {
-        return librariesNamedIn(await new Response(this.inflate(located.entry)).json())
-      } catch {
-        return []
+  private async contentLibraries(): Promise<LibraryDependency[]> {
+    return librariesNamedIn(await this.contentParams())
+  }
+
+  private addonList: Promise<Addon[]> | null = null
+
+  /**
+   * The addons this archive carries, the newest version of each, read once: what
+   * `H5PFrameworkInterface::loadAddons` answers on a platform, for the bundle that stands in
+   * for the platform's installed libraries.
+   */
+  addons(): Promise<Addon[]> {
+    this.addonList ??= (async () => {
+      const addons: Addon[] = []
+      for (const [machineName, folders] of indexLibraryFolders(this.entries.keys())) {
+        const newest = folders.reduce((a, b) => (b.major > a.major || (b.major === a.major && b.minor > a.minor) ? b : a))
+        const entry = this.entries.get(`${newest.folder}/library.json`)
+        if (!entry) continue
+        const patterns = addonPatterns(await new Response(this.inflate(entry)).json().catch(() => null))
+        if (patterns.length > 0) addons.push({ machineName, majorVersion: newest.major, minorVersion: newest.minor, patterns })
       }
+      return addons
     })()
-    return this.namedInContent
+    return this.addonList
   }
 
   assertLibrariesPresent(): void {
@@ -832,6 +913,59 @@ export function librariesNamedIn(params: unknown): LibraryDependency[] {
   }
   walk(params, 0)
   return [...found.values()]
+}
+
+/**
+ * The patterns an addon's `library.json` gives under `addTo.content.types[].text.regex`, PHP's
+ * `/…/flags` form made JavaScript's. A pattern JavaScript cannot read is left out, and so is one
+ * with a flag it has no counterpart for.
+ */
+export function addonPatterns(library: unknown): RegExp[] {
+  const types = (library as { addTo?: { content?: { types?: unknown } } } | null)?.addTo?.content?.types
+  if (!Array.isArray(types)) return []
+
+  const patterns: RegExp[] = []
+  for (const type of types) {
+    const source = (type as { text?: { regex?: unknown } } | null)?.text?.regex
+    if (typeof source !== 'string' || source.length < 2) continue
+    // PCRE takes any delimiter that is not a letter, a digit, a backslash or a space; the
+    // bracket pairs are left out, as no addon uses them.
+    const delimiter = source[0]
+    if (/[\p{L}\p{N}\\\s([{<]/u.test(delimiter)) continue
+    const end = source.lastIndexOf(delimiter)
+    const flags = source.slice(end + 1)
+    if (end < 1 || /[^imsu]/.test(flags)) continue
+    try {
+      patterns.push(new RegExp(source.slice(1, end), flags))
+    } catch {
+      // PCRE that JavaScript does not read.
+    }
+  }
+  return patterns
+}
+
+/**
+ * Whether a string anywhere in the parameters matches one of the patterns: upstream's
+ * `textAddonMatches`. The parameters are untrusted, so the walk is bounded in depth.
+ */
+export function textMatches(params: unknown, patterns: RegExp[]): boolean {
+  const walk = (value: unknown, depth: number): boolean => {
+    if (typeof value === 'string') return patterns.some((pattern) => pattern.test(value))
+    if (depth > 64 || !value || typeof value !== 'object') return false
+    return Object.values(value).some((child) => walk(child, depth + 1))
+  }
+  return patterns.length > 0 && walk(params, 0)
+}
+
+/** The well-formed entries of a manifest's or a `library.json`'s `preloadedDependencies`. */
+function dependenciesIn(value: unknown): LibraryDependency[] {
+  const dependencies = (value as { preloadedDependencies?: unknown } | null)?.preloadedDependencies
+  if (!Array.isArray(dependencies)) return []
+  const version = (part: unknown) => typeof part === 'number' || (typeof part === 'string' && /^\d+$/.test(part))
+  return dependencies.filter(
+    (dependency): dependency is LibraryDependency =>
+      typeof dependency?.machineName === 'string' && version(dependency.majorVersion) && version(dependency.minorVersion)
+  )
 }
 
 /**

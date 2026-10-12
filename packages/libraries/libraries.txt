@@ -1,7 +1,8 @@
 H5P Offline Player library pack: the H5P hub runtime libraries the installable app carries,
 so that a package exported without its own libraries plays offline. Each library is used here
 under the licence below; its source is the library folder itself, as shipped by the hub
-(https://hub-api.h5p.org/v1/content-types/<content type>). Built by apps/demo/scripts/build-libraries.mjs.
+(https://hub-api.h5p.org/v1/content-types/<content type>), or for an addon as H5P Group publishes it (https://h5p.org/sites/default/files/h5p-math-display-1-0-50.h5p).
+Built by apps/demo/scripts/build-libraries.mjs.
 
 flowplayer-1.0  1.0.5  GPL-3.0 (header of scripts/flowplayer-3.2.12.min.js)
 FontAwesome-4.5  4.5.4  MIT (library.json)  — Dave Gandy
@@ -9,8 +10,12 @@ H5P.Accordion-1.0  1.0.47  MIT (library.json)  — Joubel
 H5P.AdvancedBlanks-1.2  1.2.7  MIT (library.json)  — S. Rettig
 H5P.AdvancedText-1.1  1.1.14  MIT (README of github.com/h5p/h5p-advanced-text)  — Joubel
 H5P.AdventCalendar-0.3  0.3.4  MIT (library.json)  — Oliver Tacke
+H5P.AFrame-1.0  1.0.4  MIT (library.json)  — A-Frame authors
+H5P.AFrameAR-3.1  3.1.1  MIT (library.json)  — AR.js
+H5P.AFrameOrbitControls-1.3  1.3.0  MIT (library.json)  — Kevin Ngo &lt;me@ngokevin.com&gt;
 H5P.Agamotto-1.6  1.6.8  MIT (library.json)  — Oliver Tacke
 H5P.ArithmeticQuiz-1.1  1.1.25  MIT (library.json)  — Joubel, fabforge
+H5P.ARScavenger-1.4  1.4.1  MIT (library.json)  — Oliver Tacke
 H5P.Audio-1.5  1.5.29  MIT (README of github.com/h5p/h5p-audio)  — Joubel
 H5P.AudioRecorder-1.0  1.0.54  MIT (library.json)  — Joubel
 H5P.Blanks-1.14  1.14.37  MIT (library.json)  — Joubel
@@ -66,6 +71,7 @@ H5P.KewArCode-1.2  1.2.2  MIT (library.json)  — Oliver Tacke
 H5P.Link-1.3  1.3.25  MIT (README of github.com/h5p/h5p-link)  — Joubel
 H5P.MarkTheWords-1.11  1.11.24  MIT (library.json)  — Joubel
 H5P.MaterialDesignIcons-1.0  1.0.0  GPL3 (library.json)  — Joubel
+H5P.MathDisplay-1.0  1.0.50  MIT (library.json); bundles MathJax 4.1, Speech Rule Engine and mhchem, all Apache-2.0  — Joubel
 H5P.MemoryGame-1.3  1.3.51  MIT (library.json)  — Joubel
 H5P.MultiChoice-1.16  1.16.27  MIT (library.json)  — Joubel
 H5P.MultiMediaChoice-0.3  0.3.77  MIT (library.json)  — H5P Group AS

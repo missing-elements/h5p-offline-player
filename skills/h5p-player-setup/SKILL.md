@@ -111,7 +111,9 @@ load; `resume="host"` keeps nothing on the device and gives the host page a `use
 every save, to hand back through `userData` before the next load. Ask before setting it: on a
 shared machine the state one person leaves is what the next one finds, so a site with accounts
 takes `host`, a kiosk or a classroom device takes neither, and a learner's own device takes
-`resume`. Either way nothing is sent anywhere, and xAPI statements are still not stored.
+`resume`. Either way nothing is sent anywhere, and xAPI statements are still not stored. With
+`resume="host"` and each save sent to a server, `save-interval="30"` spaces the saves as the H5P
+plugins do; the default is 10 seconds.
 
 **Embed**
 
@@ -131,7 +133,7 @@ without `--ancestors`. The site's page then carries:
 
 ```html
 <iframe src="https://h5p-player.example.net/?src=https://host.example/activities/week-1-quiz.h5p&frame&copyright&export"
-        title="Week 1 knowledge check" loading="lazy" allow="fullscreen"
+        title="Week 1 knowledge check" loading="lazy" allow="fullscreen; microphone; camera"
         style="width: 100%; min-height: 540px; border: 0"></iframe>
 <script src="https://h5p-player.example.net/resizer.js"></script>
 ```

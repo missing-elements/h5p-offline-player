@@ -154,14 +154,16 @@ player.addEventListener('error', (event) => {
   write(`error  ${code}: ${detail}`)
 
   // The element reports what a package is missing; where to get it is the host's call, and here
-  // the visitor's: this site's bundle, about 10 MB, offered rather than fetched unasked. Once it
+  // the visitor's: this site's bundle, about 14 MB, offered rather than fetched unasked. Once it
   // has been tried there is nothing else to offer.
   const tried = player.getAttribute('libraries')
   // The element's own text is written for the developer ("set the libraries attribute"); the
   // visitor gets the buttons instead.
   if (missingLibraries && !tried) {
     show(
-      `This package was exported without its H5P libraries, as h5p.com and h5p.org do by default. Missing: ${missingLibraries.folders.join(', ')}.`,
+      missingLibraries.all
+        ? `This package was exported without its H5P libraries, as h5p.com and h5p.org do by default. Missing: ${missingLibraries.folders.join(', ')}.`
+        : `This package does not carry every H5P library it needs. Missing: ${missingLibraries.folders.join(', ')}.`,
       'warning'
     )
   }
@@ -205,7 +207,7 @@ const EMBED_ORIGIN = location.origin
  * names the package; a picked file has no URL to embed, and the button stays off.
  */
 const embedCodeFor = (url) =>
-  `<iframe src="${EMBED_ORIGIN}/embed?src=${encodeURIComponent(new URL(url, location.href).href)}" width=":w" height=":h" allow="fullscreen" style="border: 0"></iframe>`
+  `<iframe src="${EMBED_ORIGIN}/embed?src=${encodeURIComponent(new URL(url, location.href).href)}" width=":w" height=":h" allow="fullscreen; microphone; camera" style="border: 0"></iframe>`
 
 // The sizing script the embed dialog offers under "advanced": the page speaks H5P's resizer
 // protocol upward, and `/resizer.js` is the page-side half, so the embedding page sends nothing

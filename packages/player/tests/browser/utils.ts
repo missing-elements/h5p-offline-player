@@ -40,6 +40,9 @@ export const FIXTURES = {
   needsLibraries: '/fixtures/needs-libraries.h5p',
   /** Library folders and nothing else, to fill the gap in the one above. */
   libraries: '/fixtures/libraries.h5p',
+  /** A whole package whose content type's library.json needs H5P.OfflineExtra, which only the bundle has. */
+  needsDependency: '/fixtures/needs-dependency.h5p',
+  needsDependencyNoRange: '/no-range/needs-dependency.h5p',
   /** Its own copy of the content type marks the frame when it runs, and `content/` has a file of each kind. */
   untrusted: '/fixtures/untrusted.h5p',
   /** The same from a host that ignores `Range`: booted from the forward index, with the bundle's folders. */
@@ -150,9 +153,14 @@ export function frameWindow(player: H5PPlayerElement): Window {
   return view
 }
 
-/** Absolute URL of an entry on the virtual file server, for a direct fetch. */
+/**
+ * Absolute URL of an entry on the virtual file server, for a direct fetch: under the frame's own
+ * load, `<pkgId>-<key>`, which is what the runtime's requests name, or the package id alone
+ * before the frame has a document.
+ */
 export function virtualUrl(player: H5PPlayerElement, entry: string): string {
-  return `${player.scope}virtual/${player.pkgId}/${entry}`
+  const load = /\/frame\/([0-9a-f-]+)/.exec(frameWindow(player).location.pathname)?.[1] ?? player.pkgId
+  return `${player.scope}virtual/${load}/${entry}`
 }
 
 /** Drops every cached package, so a test that measures a cold load really gets one. */

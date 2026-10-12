@@ -35,3 +35,12 @@ export function remotePkgId(url: string, validator?: string | null): Promise<str
 export function filePkgId(file: { name: string; size: number; lastModified: number }): Promise<string> {
   return shortHash(`file\u0000${file.name}\u0000${file.size}\u0000${file.lastModified}`)
 }
+
+/**
+ * A key for one load of a package, under which the worker keeps what that load asked for — trust,
+ * language, display options, the bundle attached. Random, so that no two loads share one, and
+ * nothing outside the frame that carries it in its URLs can name it.
+ */
+export function loadKey(): string {
+  return Array.from(crypto.getRandomValues(new Uint8Array(8)), (byte) => byte.toString(16).padStart(2, '0')).join('')
+}

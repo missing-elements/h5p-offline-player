@@ -184,7 +184,7 @@ ${libraries ? `  libraries.h5p     @missing-elements/h5p-libraries, the H5P hub'
 ` : ''}
 Serve it from a domain that holds nothing else, and frame it:
 
-  <iframe src="https://<this domain>/?src=<package url>" allow="fullscreen"
+  <iframe src="https://<this domain>/?src=<package url>" allow="fullscreen; microphone; camera"
           style="width: 100%; border: 0"></iframe>
   <script src="https://<this domain>/resizer.js"></script>
 

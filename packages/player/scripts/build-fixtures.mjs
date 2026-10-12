@@ -259,6 +259,19 @@ built.push([
   })
 ])
 
+// 6. A whole package whose content type asks, in its own library.json, for a library the package
+//    does not carry and h5p.json does not name: the top-level check passes, and the runtime, which
+//    follows every library's dependencies, would end its boot on the 404. The bundle has it.
+built.push([
+  'needs-dependency.h5p',
+  await writeArchive('needs-dependency.h5p', async (writer) => {
+    await addBaseFiles(writer, { skip: ['H5P.OfflineTest-1.0/library.json'] })
+    const library = JSON.parse(await readFile(resolve(sourceDir, 'H5P.OfflineTest-1.0', 'library.json'), 'utf8'))
+    library.preloadedDependencies = [{ machineName: 'H5P.OfflineExtra', majorVersion: 1, minorVersion: 0 }]
+    await writer.add('H5P.OfflineTest-1.0/library.json', new TextReader(JSON.stringify(library)))
+  })
+])
+
 // 6a. A package to play `untrusted`: its own copy of the fixture content type, rewritten to leave
 //     a mark when it runs and to say so on screen, which must never happen there — the bundle's
 //     copy plays instead — and a file of each kind under `content/`, only some of which may be

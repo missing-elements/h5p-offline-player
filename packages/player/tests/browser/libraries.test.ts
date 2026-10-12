@@ -122,6 +122,28 @@ describe('supplying missing libraries', () => {
     expect((frameWindow(player) as unknown as { h5pOfflineExtraLoaded?: boolean }).h5pOfflineExtraLoaded).toBe(true)
   })
 
+  it("refuses a package whose libraries need one it does not carry, by name, rather than fail on a 404 read as JSON", async () => {
+    // Everything h5p.json names is in the package; the content type's own library.json asks for
+    // H5P.OfflineExtra, which is not. The runtime follows that list, and ended its boot on
+    // "Unexpected end of JSON input".
+    const player = createPlayer()
+    const settled = waitForSettled(player)
+    player.setAttribute('src', FIXTURES.needsDependency)
+
+    const result = await settled
+    if (result.ok) expect.fail('expected the package to be refused')
+    expect(result.detail).toMatchObject({ code: 'bad-archive', missingLibraries: { folders: ['H5P.OfflineExtra-1.0'], all: false } })
+    expect(result.detail.message).toContain('H5P.OfflineExtra-1.0')
+  })
+
+  it("supplies a library's own dependency from the bundle, on a host with Range and on one without", async () => {
+    for (const src of [FIXTURES.needsDependency, FIXTURES.needsDependencyNoRange]) {
+      const player = await playWithLibraries(src, FIXTURES.libraries)
+      expect((frameWindow(player) as unknown as { h5pOfflineExtraLoaded?: boolean }).h5pOfflineExtraLoaded, src).toBe(true)
+      expect(player.libraryBundle?.url, src).toBe(new URL(FIXTURES.libraries, location.href).href)
+    }
+  })
+
   it('names the bundle in the revision, after the package', async () => {
     const player = await playWithLibraries(FIXTURES.needsLibraries, FIXTURES.libraries)
     expect(player.revision).toMatch(/^sha256:[0-9a-f]{64}; libraries sha256:[0-9a-f]{64}$/)

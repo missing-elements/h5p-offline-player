@@ -58,6 +58,21 @@ describe('resume', () => {
     expect((await completeAndSave(again)).data).toBe('{"clicks":3}')
   })
 
+  it('saves every ten seconds by default, and as often as save-interval asks', async () => {
+    type Integration = Window & { H5PIntegration?: { saveFreq?: unknown } }
+    const standard = await play(FIXTURES.basic, { resume: '' })
+    expect((frameWindow(standard) as Integration).H5PIntegration?.saveFreq).toBe(10)
+
+    const slower = await play(FIXTURES.basic, { resume: '', 'save-interval': '30' })
+    expect(slower.saveInterval).toBe(30)
+    expect((frameWindow(slower) as Integration).H5PIntegration?.saveFreq).toBe(30)
+
+    // A value that is no interval leaves the default.
+    const nonsense = await play(FIXTURES.basic, { resume: '', 'save-interval': '0' })
+    expect(nonsense.saveInterval).toBe(10)
+    expect((frameWindow(nonsense) as Integration).H5PIntegration?.saveFreq).toBe(10)
+  })
+
   it('saves nothing, and hands nothing back, without the attribute', async () => {
     const player = await play(FIXTURES.basic)
     const frame = frameWindow(player) as Window & { H5PIntegration?: { saveFreq?: unknown } }

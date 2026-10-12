@@ -1,6 +1,6 @@
 {
   "name": "@missing-elements/h5p-runtime",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "The H5P core runtime and the frame boot script that @missing-elements/h5p-offline-player loads inside its frame. GPL-3.0, kept apart from the MIT player on purpose.",
   "license": "GPL-3.0-only",
   "repository": {

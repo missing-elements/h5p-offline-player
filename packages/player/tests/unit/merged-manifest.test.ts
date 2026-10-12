@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { BlobWriter, TextReader, ZipWriter, configure } from '@zip.js/zip.js'
-import { PackageReader, librariesNamedIn } from '../../src/sw/package-reader'
+import { PackageReader, addonPatterns, librariesNamedIn, textMatches } from '../../src/sw/package-reader'
 import type { SourceHandle } from '../../src/shared/source'
 
 configure({ useWebWorkers: false })
@@ -58,9 +58,20 @@ const pack = {
   'H5P.Image-1.1/library.json': library('H5P.Image', 1, 1)
 }
 
-async function withPack(content: Record<string, string>) {
+/** H5P.MathDisplay's `library.json` as h5p.org publishes 1.0.50: an addon for text with LaTeX in it. */
+const mathDisplay = (minor: number) =>
+  JSON.stringify({
+    machineName: 'H5P.MathDisplay',
+    majorVersion: 1,
+    minorVersion: minor,
+    patchVersion: 50,
+    runnable: 0,
+    addTo: { content: { types: [{ text: { regex: '/\\$\\$.+\\$\\$|\\\\\\[.+\\\\\\]|\\\\\\(.+\\\\\\)/' } }] } }
+  })
+
+async function withPack(content: Record<string, string>, bundle: Record<string, string> = pack) {
   const reader = await PackageReader.open('c', handleOf(await zipOf(content)), { requireLibraries: false })
-  reader.use(await PackageReader.open('p', handleOf(await zipOf(pack)), { requireLibraries: false }))
+  reader.use(await PackageReader.open('p', handleOf(await zipOf(bundle)), { requireLibraries: false }))
   return reader
 }
 
@@ -117,5 +128,95 @@ describe('mergedManifest with the pack attached', () => {
   it('does without content.json when it cannot be read', async () => {
     const merged = await (await withPack({ ...stripped, 'content/content.json': 'not json' })).mergedManifest()
     expect(merged.preloadedDependencies?.map((dependency) => dependency.machineName)).toEqual(['H5P.QuestionSet'])
+  })
+
+  it("adds the bundle's addon to content whose text it is for, its newest version, and to no other", async () => {
+    const bundle = {
+      ...pack,
+      'H5P.MathDisplay-1.0/library.json': mathDisplay(0),
+      'H5P.MathDisplay-1.1/library.json': mathDisplay(1)
+    }
+    const withFormula = {
+      ...stripped,
+      'content/content.json': JSON.stringify({ questions: [{ library: 'H5P.MultiChoice 1.16', params: { question: '<p>Solve \\(x^2 = 4\\)</p>' } }] })
+    }
+    const merged = await (await withPack(withFormula, bundle)).mergedManifest()
+    expect(merged.preloadedDependencies?.at(-1)).toEqual({ machineName: 'H5P.MathDisplay', majorVersion: 1, minorVersion: 1 })
+
+    const plain = await (await withPack(stripped, bundle)).mergedManifest()
+    expect(plain.preloadedDependencies?.map((dependency) => dependency.machineName)).not.toContain('H5P.MathDisplay')
+  })
+})
+
+describe('missingDependencies', () => {
+  const needing = (machineName: string, major: number, minor: number, ...dependencies: Array<[string, number, number]>) =>
+    JSON.stringify({
+      machineName,
+      majorVersion: major,
+      minorVersion: minor,
+      preloadedDependencies: dependencies.map(([name, majorVersion, minorVersion]) => ({ machineName: name, majorVersion, minorVersion }))
+    })
+  /** An old export: its manifest names Font Awesome 4.3, which it carries, and its library asks for 4.5. */
+  const inconsistent = {
+    'h5p.json': JSON.stringify({
+      mainLibrary: 'H5P.Main',
+      preloadedDependencies: [
+        { machineName: 'H5P.Main', majorVersion: 1, minorVersion: 0 },
+        { machineName: 'FontAwesome', majorVersion: 4, minorVersion: 3 }
+      ]
+    }),
+    'content/content.json': '{}',
+    'H5P.Main-1.0/library.json': needing('H5P.Main', 1, 0, ['FontAwesome', 4, 5], ['H5P.Helper', 1, 0]),
+    'H5P.Helper-1.0/library.json': needing('H5P.Helper', 1, 0, ['H5P.Deep', 2, 0], ['H5P.Main', 1, 0]),
+    'FontAwesome-4.3/library.json': library('FontAwesome', 4, 3)
+  }
+  const read = ({ reader, entry }: { reader: PackageReader; entry: Parameters<PackageReader['inflate']>[0] }) =>
+    new Response(reader.inflate(entry)).json()
+
+  it("follows each library's own dependencies, as the runtime does, and names what nothing provides", async () => {
+    const reader = await PackageReader.open('c', handleOf(await zipOf(inconsistent)), { requireLibraries: false })
+    // The top-level check passes: everything h5p.json names is there.
+    expect(reader.missingLibraries()).toBeNull()
+    expect(await reader.missingDependencies(reader.manifest, read)).toEqual({
+      mainLibrary: 'H5P.Main',
+      folders: ['FontAwesome-4.5', 'H5P.Deep-2.0'],
+      all: false
+    })
+  })
+
+  it('is satisfied by a bundle that has them, through the same version rule as the files', async () => {
+    const bundle = {
+      'h5p.json': '{}',
+      'FontAwesome-4.6/library.json': library('FontAwesome', 4, 6),
+      'H5P.Deep-2.0/library.json': library('H5P.Deep', 2, 0)
+    }
+    const reader = await withPack(inconsistent, bundle)
+    expect(await reader.missingDependencies(await reader.mergedManifest(), read)).toBeNull()
+  })
+})
+
+describe('addonPatterns and textMatches', () => {
+  it("read MathDisplay's pattern as upstream matches it: $$…$$, \\[…\\] and \\(…\\)", () => {
+    const patterns = addonPatterns(JSON.parse(mathDisplay(0)))
+    expect(patterns).toHaveLength(1)
+    for (const text of ['$$E = mc^2$$', 'a \\[x\\] b', 'inline \\(y\\)']) expect(textMatches({ text }, patterns), text).toBe(true)
+    for (const text of ['$5 and $6', '\\(unclosed', 'no maths']) expect(textMatches({ text }, patterns), text).toBe(false)
+    // In any string, at any depth, as `textAddonMatches` walks arrays and objects alike.
+    expect(textMatches({ a: [{ b: { c: ['$$x$$'] } }] }, patterns)).toBe(true)
+  })
+
+  it('takes other delimiters and the flags JavaScript shares, and leaves out what it cannot read', () => {
+    const typed = (...regexes: unknown[]) => ({ addTo: { content: { types: regexes.map((regex) => ({ text: { regex } })) } } })
+    expect(addonPatterns(typed('#ab+c#i')).map(String)).toEqual(['/ab+c/i'])
+    // `x` has no counterpart, a letter cannot delimit, `(?<` without a name is not JavaScript.
+    expect(addonPatterns(typed('/a b/x', 'aba', '/(?<)/', '/', 42))).toEqual([])
+    expect(addonPatterns({ addTo: 'content' })).toEqual([])
+    expect(addonPatterns(null)).toEqual([])
+  })
+
+  it('survives parameters nested past any real content', () => {
+    let deep: unknown = '$$x$$'
+    for (let i = 0; i < 1000; i++) deep = { child: deep }
+    expect(textMatches(deep, addonPatterns(JSON.parse(mathDisplay(0))))).toBe(false)
   })
 })

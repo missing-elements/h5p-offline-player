@@ -133,22 +133,31 @@ export function allPackages(): Promise<PackageRecord[]> {
   return withStore('readonly', (store) => promisify(store.getAll() as IDBRequest<PackageRecord[]>))
 }
 
-export async function touchPackage(pkgId: string): Promise<void> {
-  const record = await getPackage(pkgId)
-  if (!record) return
-  record.lastPlayed = Date.now()
-  await putPackage(record)
+/**
+ * Reads a row and writes what `change` makes of it, in one transaction, so that two loads of the
+ * same package writing at once — each its own settings into the row's `views` — cannot lose
+ * either. `undefined` from `change` writes nothing.
+ */
+export function changePackage(
+  pkgId: string,
+  change: (record: PackageRecord | undefined) => PackageRecord | undefined
+): Promise<PackageRecord | undefined> {
+  return withStore('readwrite', async (store) => {
+    const next = change(await promisify(store.get(pkgId) as IDBRequest<PackageRecord | undefined>))
+    if (next) await promisify(store.put(next))
+    return next
+  })
 }
 
-export async function updatePackage(
+export async function touchPackage(pkgId: string): Promise<void> {
+  await changePackage(pkgId, (record) => record && { ...record, lastPlayed: Date.now() })
+}
+
+export function updatePackage(
   pkgId: string,
   patch: Partial<PackageRecord>
 ): Promise<PackageRecord | undefined> {
-  const record = await getPackage(pkgId)
-  if (!record) return undefined
-  const next = { ...record, ...patch }
-  await putPackage(next)
-  return next
+  return changePackage(pkgId, (record) => record && { ...record, ...patch })
 }
 
 /** Packages ordered coldest first. Eviction walks this list. */

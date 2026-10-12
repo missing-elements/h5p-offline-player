@@ -14,10 +14,11 @@ import { formatBytes } from '@missing-elements/h5p-normalize'
  * libraries for every content type and attaches them to any package missing its own.
  *
  * Every content type below is fetched from the hub (cached under the OS temp directory, shared
- * with `build-demo-content.mjs`; `--refresh` fetches again), and every library folder in the
+ * with `build-demo-content.mjs`; `--refresh` fetches again), and so is every addon in `ADDONS`
+ * from where H5P Group publishes it, and every library folder in the
  * bundles is kept except the editor's, at the newest minor of each major: H5P keeps a minor
  * compatible with the ones before it, and the player resolves a request for 1.26 to 1.27. A
- * package that needs a newer minor than the pack has plays from the hub instead, online.
+ * package that needs a newer minor than the pack has is refused, naming the library.
  *
  * The outputs are committed, like the demo content: a deploy should not depend on the hub.
  * Refresh them before a release. A library whose `library.json` declares no licence has to be
@@ -31,9 +32,14 @@ configure({ useWebWorkers: false })
 // the element itself has not followed yet.
 const HUB = 'https://hub-api.h5p.org/v1/content-types/'
 
-/** Every content type the hub serves, as of 2026-09-29. One that is gone is reported and skipped. */
+/**
+ * Every content type the hub serves, as of 2026-10-13. One that is gone is reported and skipped.
+ * Kept by hand: the hub's catalogue is read by a registered site, and the build does not register
+ * one. AR Scavenger was missing until 2026-10-13, found by playing one example of every content
+ * type h5p.org lists; that sweep is how to look for another.
+ */
 const CONTENT_TYPES = [
-  'H5P.Accordion', 'H5P.AdventCalendar', 'H5P.Agamotto', 'H5P.ArithmeticQuiz', 'H5P.Audio',
+  'H5P.Accordion', 'H5P.AdventCalendar', 'H5P.Agamotto', 'H5P.ArithmeticQuiz', 'H5P.ARScavenger', 'H5P.Audio',
   'H5P.AudioRecorder', 'H5P.Blanks', 'H5P.BranchingScenario', 'H5P.Chart', 'H5P.Collage',
   'H5P.Column', 'H5P.Cornell', 'H5P.CoursePresentation', 'H5P.Crossword', 'H5P.Dialogcards',
   'H5P.Dictation', 'H5P.DocumentationTool', 'H5P.DragQuestion', 'H5P.DragText', 'H5P.Essay',
@@ -46,6 +52,20 @@ const CONTENT_TYPES = [
   'H5P.SortParagraphs', 'H5P.SpeakTheWords', 'H5P.SpeakTheWordsSet', 'H5P.StructureStrip',
   'H5P.Summary', 'H5P.ThreeImage', 'H5P.Timeline', 'H5P.TrueFalse'
 ]
+
+/**
+ * Addons: libraries a platform adds to content by its text (`addTo` in `library.json`), which the
+ * hub does not serve and a site's administrator uploads by hand. The player adds one to content
+ * that matches, as the platforms do when content is saved. MathDisplay is here because a full
+ * export from a site that has it lists it as a dependency, and played `untrusted` such a package
+ * is refused unless the pack has it too. Its formulas render with MathJax from its own folder.
+ */
+const ADDONS = ['https://h5p.org/sites/default/files/h5p-math-display-1-0-50.h5p']
+
+/** What a library bundles besides its own code, for the notice; checked on 2026-10-13. */
+const BUNDLED = {
+  'H5P.MathDisplay': 'bundles MathJax 4.1, Speech Rule Engine and mhchem, all Apache-2.0'
+}
 
 /**
  * Licences for the libraries whose `library.json` names none, checked on 2026-09-29. The H5P
@@ -88,6 +108,12 @@ for (const machineName of CONTENT_TYPES) {
     skipped.push(machineName)
     continue
   }
+  await keepLibraries(path)
+}
+for (const url of ADDONS) await keepLibraries(await download(url, url.slice(url.lastIndexOf('/') + 1)))
+
+/** Keeps every library folder in a bundle that is newer than the one kept so far. */
+async function keepLibraries(path) {
   const reader = new ZipReader(new BlobReader(await openAsBlob(path)))
   const entries = (await reader.getEntries({ filenameValidation: 'tolerant' })).filter((entry) => !entry.directory)
 
@@ -146,12 +172,14 @@ const lines = [
   'H5P Offline Player library pack: the H5P hub runtime libraries the installable app carries,',
   'so that a package exported without its own libraries plays offline. Each library is used here',
   'under the licence below; its source is the library folder itself, as shipped by the hub',
-  `(${HUB}<content type>). Built by apps/demo/scripts/build-libraries.mjs.`,
+  `(${HUB}<content type>), or for an addon as H5P Group publishes it (${ADDONS.join(', ')}).`,
+  'Built by apps/demo/scripts/build-libraries.mjs.',
   '',
   ...libraries.map(({ folder, library }) => {
     const licence = library.license ? `${library.license} (library.json)` : UNDECLARED[library.machineName]
+    const bundled = BUNDLED[library.machineName] ? `; ${BUNDLED[library.machineName]}` : ''
     const authors = Array.isArray(library.author) ? library.author.join(', ') : library.author
-    return `${folder}  ${library.majorVersion}.${library.minorVersion}.${library.patchVersion}  ${licence}${authors ? `  — ${authors}` : ''}`
+    return `${folder}  ${library.majorVersion}.${library.minorVersion}.${library.patchVersion}  ${licence}${bundled}${authors ? `  — ${authors}` : ''}`
   }),
   ''
 ]
@@ -168,14 +196,18 @@ function newer(a, b) {
 }
 
 /** The hub bundle for a content type, cached; `null` when the hub no longer has it. */
-async function hubBundle(machineName) {
-  const path = join(cacheDir, `${machineName}.h5p`)
+function hubBundle(machineName) {
+  return download(`${HUB}${encodeURIComponent(machineName)}`, `${machineName}.h5p`, true)
+}
+
+/** A file, cached under `name`; with `optional`, `null` when its host says there is no such file. */
+async function download(url, name, optional = false) {
+  const path = join(cacheDir, name)
   if (!refresh && (await stat(path).then(() => true, () => false))) return path
-  const url = `${HUB}${encodeURIComponent(machineName)}`
   console.log(`[libraries] fetching ${url}`)
   const response = await fetch(url)
   // Not a content type. The old host said 404; S3 behind the new one says 403 for a missing key.
-  if (response.status === 404 || response.status === 403) return null
+  if (optional && (response.status === 404 || response.status === 403)) return null
   if (!response.ok || !response.body) throw new Error(`${url} returned ${response.status}`)
   await pipeline(Readable.fromWeb(/** @type {any} */ (response.body)), createWriteStream(path))
   return path
