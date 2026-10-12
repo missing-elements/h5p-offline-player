@@ -89,8 +89,8 @@
             <td data-label="What you run">A PHP site and its database; Moodle has H5P built in</td>
             <td data-label="Edits content">Yes</td>
             <td data-label="Plays a .h5p as it is">Uploaded, then unpacked by the server</td>
-            <td data-label="Offline">No</td>
-            <td data-label="Where learners&rsquo; data goes">Your site&rsquo;s database: basic scores per user</td>
+            <td data-label="Offline">In the Moodle app, for the built-in H5P activity, with attempts sent once back online. WordPress and Drupal: no</td>
+            <td data-label="Where learners&rsquo; data goes">Your site&rsquo;s database: scores per user, and in Moodle a report of each attempt</td>
           </tr>
           <tr>
             <td><strong>Lumi</strong></td>
@@ -114,7 +114,7 @@
       <h2>What only this player does</h2>
       <ul class="list">
         <li><strong>A <code>.h5p</code> plays as it is.</strong> No unzipping, no upload step, no folder per package: a URL to the file, or a file picked from disk. A 300 MB package starts after a few kilobytes on a host that honours <code>Range</code>, and on one that does not it starts as soon as its libraries have arrived.</li>
-        <li><strong>Offline, as an app.</strong> <a href="/app/">The installable app</a> opens <code>.h5p</code> files from the computer and plays them with no network, the libraries included.</li>
+        <li><strong>Offline, with nothing but a browser.</strong> <a href="/app/">The installable app</a> opens a <code>.h5p</code> file on a computer or a phone and plays it with no network, the libraries included: no account, no site to sign in to, nothing to install from an app store.</li>
         <li><strong>Every statement names its build.</strong> Each xAPI statement carries <code>context.revision</code>, a fingerprint of the package it came from, so a completion record says which version the learner finished. <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/docs/revision.md" rel="noopener">How</a>.</li>
         <li><strong>cmi5, without an H5P server.</strong> The package stays on a static host and an LMS launches it as an assignable unit, checked against ADL&rsquo;s CATAPULT. <a href="/demo/cmi5.html">The cmi5 example</a>.</li>
         <li><strong>Tools for packages made by machine.</strong> <code>h5p-verify</code> plays a package headless and says whether it works; <code>h5p-normalize</code> rewrites one so its video streams. Both are commands, both have agent skills.</li>
@@ -124,9 +124,10 @@
       <h2>When to choose something else</h2>
       <ul class="list">
         <li><strong>You need to edit content.</strong> This is a player. Author in Lumi, on h5p.com or in a site with the H5P plugin, export the <code>.h5p</code>, and play it here &mdash; the two work together.</li>
-        <li><strong>Your site already runs Moodle.</strong> Its built-in H5P plays and edits content and records scores in the gradebook. Use it.</li>
+        <li><strong>Your site already runs Moodle.</strong> Its built-in H5P plays and edits content, records scores in the gradebook, and plays offline in the Moodle app. Use it.</li>
         <li><strong>You want it managed for you.</strong> h5p.com hosts, edits, reports and integrates with LMSs, with support, for a subscription. This player needs someone to deploy and update it.</li>
-        <li><strong>You want scores stored per learner with no code.</strong> The H5P plugins for WordPress, Drupal and Moodle keep basic results per user out of the box. Here results are events: your page, an LRS or cmi5 decides where they go.</li>
+        <li><strong>You want scores stored per learner with no code.</strong> The H5P plugins for WordPress, Drupal and Moodle keep results per user out of the box. Here results are events: your page, an LRS or cmi5 decides where they go.</li>
+        <li><strong>Your users upload packages that others play.</strong> The H5P plugins check each upload before any of it runs, and this player does not; <em>Data and trust</em>, below, has the difference.</li>
         <li><strong>You have a few packages and are happy to unzip them.</strong> h5p-standalone is smaller and has been around longer; served from static files, media streams from the host directly.</li>
       </ul>
 
@@ -135,14 +136,26 @@
         Installed, the player and every package run on your site; embedded, on a player domain you
         run. In both cases the learner&rsquo;s browser talks to your hosts and nothing else, unless a
         package or your configuration names another: the library pack on jsDelivr, for an export
-        without its libraries, is the one the player itself may reach, and only when told to. Nothing is
-        stored except the content&rsquo;s own saved state when <code>resume</code> is set, in the
-        browser on that device. Statements are not stored at all.
+        without its libraries, is the one the player itself may reach, and only when told to. The
+        player keeps, in the browser on that device, the packages&rsquo; files and a list of what was
+        played, and the content&rsquo;s own saved state only when <code>resume</code> is set.
+        Statements are not stored at all.
+        <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/docs/privacy.md" rel="noopener">What is stored and sent</a>
+        has the details.
       </p>
       <p>
         A package is JavaScript, here as everywhere H5P runs, and it runs with the rights of the
         origin that serves it. That is why <a href="/demo/setup.html">the setup page</a> asks what
         lives on your site before it recommends a setup.
+      </p>
+      <p>
+        The H5P plugins answer that by checking what is uploaded. An upload adds library code only
+        if the uploader may install libraries, every field of the content is filtered against what
+        its content type allows, and by default the content folder may hold only listed file types,
+        none of them scripts, stylesheets, SVG or HTML. The code that passes then runs on the
+        site&rsquo;s own origin, beside its logins. This player checks none of that and keeps packages
+        apart instead: the Embed setup runs them on a domain of their own, where a hostile package
+        cannot touch your site, though it can read what other packages stored on that domain.
       </p>
 
       <p>
