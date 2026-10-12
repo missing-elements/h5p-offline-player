@@ -68,7 +68,6 @@
         <a href="https://embed-my.org/" rel="noopener">Embed My</a>
       </nav>
       <div class="topbar-actions">
-        <button type="button" class="install" id="install" hidden>Install</button>
         <button type="button" class="icon-button" id="start-over" aria-label="Start over: forget where you were in this file" title="Start over" hidden>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>
         </button>
@@ -90,6 +89,7 @@
 
     <div class="menu" id="menu" popover>
       <button type="button" id="menu-open">Open a file…</button>
+      <button type="button" class="menu-install" id="menu-install" hidden>Install the app</button>
       <button type="button" id="menu-about">About this app</button>
     </div>
 
@@ -116,7 +116,20 @@
           <button type="button" class="primary" id="open">Choose a file</button>
           <p class="dropzone-hint">or drop a <code>.h5p</code> file here</p>
         </div>
-        <p class="offline" id="offline" data-state="preparing">Preparing the offline copy…</p>
+        <!-- Install is here and in the menu, not in the bar: there it pushed the bar's icons onto
+             a row of their own. Shown only while the browser offers it, so never once installed. -->
+        <div class="home-status">
+          <p class="offline" id="offline" data-state="preparing">Preparing the offline copy…</p>
+          <button type="button" class="install" id="install" hidden>Install the app</button>
+        </div>
+        <!-- Filled by app.js from recent.js, and shown once something has been opened. -->
+        <section class="recent" id="recent" aria-labelledby="recent-title" hidden>
+          <div class="recent-head">
+            <h2 id="recent-title">Recent files</h2>
+            <button type="button" class="text-button" id="recent-clear" aria-label="Clear the list of recent files">Clear</button>
+          </div>
+          <ul class="recent-list" id="recent-list"></ul>
+        </section>
       </section>
 
       <div class="stage">
@@ -140,7 +153,7 @@
 
         <h3 class="install-help">Install it</h3>
         <ul class="list install-help">
-          <li>In Chrome or Edge on Windows, macOS, Linux or ChromeOS, press <strong>Install</strong> at the top of this page, or the install icon at the end of the address bar.</li>
+          <li>In Chrome or Edge on Windows, macOS, Linux or ChromeOS, press <strong>Install the app</strong> under <strong>Choose a file</strong>, or the install icon at the end of the address bar.</li>
           <li>On Android, open this page in Chrome and choose <strong>Install app</strong> from the menu.</li>
           <li>In Safari on macOS, choose <strong>File › Add to Dock</strong>.</li>
           <li>On iPhone and iPad, open this page in Safari, tap <strong>Share</strong>, then <strong>Add to Home Screen</strong>, with <strong>Open as Web App</strong> on.</li>
@@ -150,6 +163,7 @@
         <h3>Open a file</h3>
         <ul class="list">
           <li>Press <strong>Choose a file</strong>, or drop a <code>.h5p</code> on the page. The arrow at the top left closes it again.</li>
+          <li>The files you opened are listed under it, the latest first. Choose one to open it again where you left off.</li>
           <li>Installed from Chrome or Edge, the app opens <code>.h5p</code> files from your file manager: double-click one, or use <em>Open with</em>. Safari and iOS do not hand files to installed apps; use <strong>Choose a file</strong> there.</li>
           <li>A link to <code>/app/?src=</code> and a package's address opens that package in the app, for a teacher sending a course by link.</li>
         </ul>
@@ -157,13 +171,14 @@
         <h3>What works offline</h3>
         <ul class="list">
           <li>The player, the H5P runtime and its fonts are stored on install.</li>
-          <li>The app carries the H5P libraries for every content type on the H5P hub, about 10 MB, so a package exported without its own — what h5p.com and h5p.org do by default — plays offline too. Only a package that needs a newer version than the app carries asks to fetch it from h5p.org, once.</li>
-          <li>Files are read on this device and never uploaded. They are not kept either: open one again next time, and what was already extracted comes from this device's cache.</li>
+          <li>The app carries the H5P libraries for every content type on the H5P hub, about 10 MB, so a package exported without its own — what h5p.com and h5p.org do by default — plays offline too. A package that needs a newer version of a library than the app carries says so; a later version of the app will play it.</li>
+          <li>Files are read on this device and never uploaded. Installed from Chrome or Edge on the desktop, the app opens a file from the list of recent files again from where it is on your disk. Anywhere else it keeps a copy of the file in this browser's storage, which opens with one tap, offline too.</li>
         </ul>
 
         <h3>What it keeps on this device, and what it does not</h3>
         <ul class="list">
           <li>Where you were. When a file is open, the content saves its own state — the slide or chapter reached, the answers given so far, the position in a video, whatever that content type keeps — in this browser's storage, on this device only. Open the same file again (same name, size and date) and it picks up there; <strong>Start over</strong>, the circular arrow at the top, forgets it. On a shared device, the next person to open the file finds where the last one left it, so press Start over first. The app sends none of it anywhere. A package's own scripts can read it, though, including what other packages saved here, so the app asks before opening a package from another site's link; open only packages you trust.</li>
+          <li>The files you opened. The list of recent files names each one and when it was opened, and unless the app was installed from Chrome or Edge on the desktop, it holds a copy of each file, its size beside it. Remove a file from the list, or clear the list, and the copy goes with it; on a shared device, clear it before you hand the device on. Like the saved state, it stays on this device, and a package's own scripts can read it.</li>
           <li>Not results. The scores and completions the content reports as xAPI statements are neither stored on this device nor sent anywhere, so nothing here is a record that a course was completed.</li>
           <li>For results that are recorded — a class, a course, a compliance record — use the <a href="/demo/setup.html">player component</a> on a site that sends its xAPI statements to an LRS or an LMS.</li>
         </ul>
@@ -188,7 +203,9 @@
       <p>Plays <code>.h5p</code> files on this device, with or without a network. Files are read here
         and never uploaded.</p>
       <p>It keeps where you were in each file, in this browser on this device, and the start-over
-        button in the bar forgets it. It keeps no scores and sends nothing anywhere.</p>
+        button in the bar forgets it. It lists the files you opened on its home screen; unless
+        installed from Chrome or Edge on the desktop, it keeps a copy of each, and removing one
+        from the list deletes its copy. It keeps no scores and sends nothing anywhere.</p>
       <p class="credit">The player's own code is MIT; the H5P runtime it loads is GPL-3.0, see
         <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/packages/runtime/NOTICE.md" rel="noopener">NOTICE.md</a>.
         The H5P libraries it carries are listed with their licences in

@@ -1,5 +1,7 @@
+import { mkdtemp, rm } from 'node:fs/promises'
 import type { AddressInfo } from 'node:net'
-import { resolve } from 'node:path'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import { chromium, type Browser, type Page } from 'playwright'
 import { createServer, type ViteDevServer } from 'vite'
 import { afterAll, beforeAll, expect, it } from 'vitest'
@@ -62,14 +64,99 @@ const seen = (page: Page) =>
 const playerIs = (page: Page, ...states: string[]) =>
   page.waitForFunction((states) => states.includes((document.querySelector('h5p-player') as HTMLElement & { state: string }).state), states, { timeout: 60_000 })
 
-async function openApp(path = '/app/') {
+/**
+ * The app in a fresh browser profile. Chromium's own picker, `showOpenFilePicker`, is taken away
+ * unless a test brings its own: Playwright cannot answer it, and without it the app takes the path
+ * Safari and Firefox take, the page's file input.
+ */
+async function openApp(path = '/app/', { keepPicker = false } = {}) {
   const page = await browser.newPage({ viewport: { width: 1000, height: 760 } })
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
+  if (!keepPicker) {
+    // An own property of the window, as every operation of the global object is in Web IDL.
+    await page.addInitScript(() => {
+      delete (window as { showOpenFilePicker?: unknown }).showOpenFilePicker
+    })
+  }
   await page.goto(`${origin}${path}`)
-  await page.waitForFunction(() => document.querySelector<HTMLElement>('#offline')?.dataset.state !== 'preparing', null, { timeout: 30_000 })
+  await whenReady(page)
   return { page, errors }
 }
+
+/**
+ * The app as installed, as far as its script can tell: `display-mode` answered as matching, which
+ * Chromium will not emulate. In a profile on disk rather than the private one Playwright gives a
+ * page, in which storing a file handle takes Chromium down — the reason the app keeps handles only
+ * when installed, which a private profile never is.
+ */
+async function openInstalledApp() {
+  const dir = await mkdtemp(join(tmpdir(), 'h5p-app-test-'))
+  const context = await chromium.launchPersistentContext(dir, { viewport: { width: 1000, height: 760 } })
+  await context.addInitScript(() => {
+    const match = window.matchMedia.bind(window)
+    window.matchMedia = (query) => match(query.includes('display-mode') ? 'all' : query)
+  })
+  const page = context.pages()[0] ?? (await context.newPage())
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await page.goto(`${origin}/app/`)
+  await whenReady(page)
+  const close = async () => {
+    await context.close()
+    await rm(dir, { recursive: true, force: true })
+  }
+  return { page, errors, close }
+}
+
+/**
+ * Chrome's picker, standing in: it answers with a real handle, to a copy of the quiz in the
+ * origin's own file system, which the app treats as any other handle.
+ */
+const standInPicker = (page: Page) =>
+  page.evaluate(() => {
+    ;(window as unknown as { showOpenFilePicker: () => Promise<FileSystemFileHandle[]> }).showOpenFilePicker = async () => {
+      const root = await navigator.storage.getDirectory()
+      const handle = await root.getFileHandle('quiz.h5p', { create: true })
+      const writable = await handle.createWritable()
+      await writable.write(await (await fetch('/demo/content/quiz.h5p')).blob())
+      await writable.close()
+      return [handle]
+    }
+  })
+
+const whenReady = (page: Page) =>
+  page.waitForFunction(() => document.querySelector<HTMLElement>('#offline')?.dataset.state !== 'preparing', null, { timeout: 30_000 })
+
+const goneHome = (page: Page) => page.waitForFunction(() => document.body.dataset.screen === 'home')
+
+/** The list of recent files as it reads, once it has drawn what it holds. */
+const recent = (page: Page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('#recent:not([hidden]) .recent-list li')].map((item) => ({
+      title: item.querySelector('.recent-title')!.textContent,
+      meta: item.querySelector('.recent-meta')!.textContent
+    }))
+  )
+
+/** How many copies of files the app keeps, read from its own database. */
+const copiesKept = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<number>((resolve, reject) => {
+        const request = indexedDB.open('h5p-app')
+        request.onerror = () => reject(request.error)
+        request.onsuccess = () => {
+          const db = request.result
+          const count = db.transaction('copies').objectStore('copies').count()
+          count.onsuccess = () => {
+            db.close()
+            resolve(count.result)
+          }
+          count.onerror = () => reject(count.error)
+        }
+      })
+  )
 
 it('opens a file from the keyboard, shows it under its own title, and closes it with Back', async () => {
   const { page, errors } = await openApp()
@@ -132,6 +219,182 @@ it('keeps a link in the address, and takes the browser’s Back and Forward as c
   await page.waitForFunction(() => document.body.dataset.screen === 'home')
   expect((await seen(page)).url).toBe('/app/')
   expect(errors).toEqual([])
+  await page.close()
+})
+
+/**
+ * What Interactive Book does as it turns a page: it writes the chapter into the address of the page
+ * around its frame, which adds a step to that page's history. The app once took any step it had
+ * not made for Back, and closed the book at its first page.
+ */
+const turnPage = (page: Page, chapter: string) =>
+  page
+    .frames()
+    .find((frame) => frame.url().includes('/frame/'))!
+    .evaluate((chapter) => {
+      top!.location.hash = `h5pbookid=1&chapter=${chapter}`
+    }, chapter)
+
+it('keeps a file open while its content writes to the address, and closes it with one Back', async () => {
+  const { page, errors } = await openApp()
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('#open')])
+  const steps = await page.evaluate(() => history.length)
+  await chooser.setFiles(QUIZ)
+  await playerIs(page, 'ready')
+
+  await turnPage(page, 'one')
+  await turnPage(page, 'two')
+  await page.waitForTimeout(100)
+  expect(await seen(page)).toMatchObject({ screen: 'player', player: 'ready' })
+  expect(await page.evaluate(() => history.length)).toBe(steps + 3)
+
+  // The browser's Back turns back what the content wrote first; the file stays open.
+  await page.goBack()
+  expect(await page.evaluate(() => location.hash)).toContain('chapter=one')
+  expect(await seen(page)).toMatchObject({ screen: 'player', player: 'ready' })
+
+  // Back in the bar goes home past the content's steps, in one press.
+  await page.click('#back')
+  await page.waitForFunction(() => document.body.dataset.screen === 'home')
+  await playerIs(page, 'idle')
+  expect(await seen(page)).toMatchObject({ url: '/app/', back: false })
+  expect(await page.evaluate(() => location.hash)).toBe('')
+  expect(errors).toEqual([])
+  await page.close()
+})
+
+it('reopens a link where its content had got to after a reload, and still goes home in one', async () => {
+  const { page, errors } = await openApp('/app/?src=/demo/content/quiz.h5p')
+  await playerIs(page, 'ready')
+  await turnPage(page, 'one')
+  await page.waitForTimeout(100)
+  const steps = await page.evaluate(() => history.length)
+
+  await page.reload()
+  await playerIs(page, 'ready')
+  expect(await seen(page)).toMatchObject({ screen: 'player' })
+  expect(await page.evaluate(() => history.length)).toBe(steps)
+
+  // Home was written by the page before the reload, so going there loads the page again.
+  await page.click('#back')
+  await page.waitForURL(`${origin}/app/`)
+  await page.waitForFunction(() => document.body?.dataset.screen === 'home')
+  expect(await seen(page)).toMatchObject({ screen: 'home', url: '/app/' })
+  expect(errors).toEqual([])
+  await page.close()
+})
+
+it('lists a file it played, keeps a copy where there is no handle, and opens it from the list after a reload', async () => {
+  const { page, errors } = await openApp()
+  expect(await recent(page)).toEqual([])
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('#open')])
+  await chooser.setFiles(QUIZ)
+  await playerIs(page, 'ready')
+  const pkgId = await page.evaluate(() => (document.querySelector('h5p-player') as HTMLElement & { pkgId: string }).pkgId)
+  await page.click('#back')
+  await goneHome(page)
+  await page.waitForFunction(() => !document.querySelector<HTMLElement>('#recent')!.hidden)
+  expect(await recent(page)).toEqual([{ title: 'Do you know what just happened?', meta: expect.stringMatching(/^quiz\.h5p · Today · [\d.]+ (kB|MB) on this device$/) }])
+  expect(await copiesKept(page)).toBe(1)
+
+  // A new visit: the file opens from the copy, as the same file to the player, so its saved place
+  // comes back with it, and no picker opens.
+  await page.reload()
+  await whenReady(page)
+  await page.waitForFunction(() => !document.querySelector<HTMLElement>('#recent')!.hidden)
+  let picked = false
+  page.on('filechooser', () => (picked = true))
+  await page.click('.recent-open')
+  await playerIs(page, 'ready')
+  expect(await seen(page)).toMatchObject({ screen: 'player', bar: 'Do you know what just happened?' })
+  expect(await page.evaluate(() => (document.querySelector('h5p-player') as HTMLElement & { pkgId: string }).pkgId)).toBe(pkgId)
+  expect(picked).toBe(false)
+
+  // Taken off the list, it takes its copy with it, and the keyboard goes back to the picker.
+  await page.click('#back')
+  await goneHome(page)
+  await page.click('.recent-remove')
+  await page.waitForFunction(() => document.querySelector<HTMLElement>('#recent')!.hidden)
+  expect(await copiesKept(page)).toBe(0)
+  expect(await page.evaluate(() => document.activeElement?.id)).toBe('open')
+  expect(errors).toEqual([])
+  await page.close()
+})
+
+it('keeps a handle when installed, keeps no copy, and reads the file from it again', async () => {
+  const { page, errors, close } = await openInstalledApp()
+  try {
+    await standInPicker(page)
+    await page.click('#open')
+    await playerIs(page, 'ready')
+    await page.click('#back')
+    await goneHome(page)
+    await page.waitForFunction(() => !document.querySelector<HTMLElement>('#recent')!.hidden)
+    expect(await recent(page)).toEqual([{ title: 'Do you know what just happened?', meta: 'quiz.h5p · Today' }])
+    expect(await copiesKept(page)).toBe(0)
+
+    await page.reload()
+    await whenReady(page)
+    await page.waitForFunction(() => !document.querySelector<HTMLElement>('#recent')!.hidden)
+    await page.click('.recent-open')
+    await playerIs(page, 'ready')
+    expect((await seen(page)).bar).toBe('Do you know what just happened?')
+    expect(errors).toEqual([])
+  } finally {
+    await close()
+  }
+})
+
+it('keeps a copy in a tab even where the browser gives a handle, which a private profile cannot store', async () => {
+  const { page, errors } = await openApp('/app/', { keepPicker: true })
+  await standInPicker(page)
+  await page.click('#open')
+  await playerIs(page, 'ready')
+  await page.click('#back')
+  await goneHome(page)
+  await page.waitForFunction(() => !document.querySelector<HTMLElement>('#recent')!.hidden)
+  expect(await recent(page)).toEqual([{ title: 'Do you know what just happened?', meta: expect.stringMatching(/^quiz\.h5p · Today · [\d.]+ MB on this device$/) }])
+  expect(await copiesKept(page)).toBe(1)
+  expect(errors).toEqual([])
+  await page.close()
+})
+
+it('lists a link by its host, and opens it from the list', async () => {
+  const { page, errors } = await openApp('/app/?src=/demo/content/glossary.h5p')
+  await playerIs(page, 'ready')
+  await page.click('#back')
+  await goneHome(page)
+  await page.waitForFunction(() => !document.querySelector<HTMLElement>('#recent')!.hidden)
+  expect(await recent(page)).toEqual([{ title: 'Words this player uses', meta: `${new URL(origin).host} · Today` }])
+
+  await page.click('.recent-open')
+  await playerIs(page, 'ready')
+  expect((await seen(page)).url).toContain('?src=')
+  expect(errors).toEqual([])
+  await page.close()
+})
+
+it('keeps the bar’s icons on its first row at every width, with Install off the bar', async () => {
+  const { page } = await openApp()
+  // Chrome's offer to install, as the page receives it.
+  await page.evaluate(() => {
+    const offer = Object.assign(new Event('beforeinstallprompt', { cancelable: true }), { prompt: async () => ({ outcome: 'dismissed' }) })
+    dispatchEvent(offer)
+  })
+  expect(await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('#install, #menu-install')].map((button) => button.hidden))).toEqual([false, false])
+  expect(await page.evaluate(() => document.querySelector('.topbar #install, .topbar .install'))).toBeNull()
+
+  for (const width of [1440, 1100, 1024, 1000, 900, 768, 600, 390, 360]) {
+    await page.setViewportSize({ width, height: 800 })
+    const middles = await page.evaluate(() =>
+      ['#brand', '#menu-button'].map((selector) => {
+        const box = document.querySelector(selector)!.getBoundingClientRect()
+        return Math.round(box.top + box.height / 2)
+      })
+    )
+    expect(Math.abs(middles[0] - middles[1]), `at ${width}px`).toBeLessThan(6)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `no sideways scroll at ${width}px`).toBe(true)
+  }
   await page.close()
 })
 

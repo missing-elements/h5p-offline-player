@@ -29,7 +29,17 @@
 
 .app .topbar-actions { margin-left: auto; }
 
-/* Install, in a tab where the browser offers it: small, beside the icons. */
+/* The site's links take a row of their own sooner than on the other pages, the shared sheet's
+   rule at a wider width: this bar carries one more icon, the menu's, and left to wrap by itself
+   it dropped the icons alone onto a second row. One row stopped fitting at 58rem with the system
+   font of macOS (2026-10-12); the rest is room for a wider one. In a tab only; installed, the
+   links are gone. */
+@media (max-width: 64rem) {
+  .app .topbar nav[aria-label="Site"] { order: 1; flex-basis: 100%; margin-left: 0; }
+}
+
+/* Install, in a tab where the browser offers it: on the home screen beside "Works offline", and
+   in the menu. In the bar it was one item too many, and pushed the icons onto a row of their own. */
 .app .install {
   min-height: 2.1rem;
   padding: 0.25rem 0.85rem;
@@ -128,6 +138,8 @@
 /* A touch screen has nothing to drop. */
 @media (hover: none) { .app .dropzone-hint { display: none; } }
 
+.app .home-status { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.5rem 1rem; }
+
 /* Whether the app can start with no network: set by app.js once the worker controls the page. */
 .app .offline {
   display: inline-flex;
@@ -146,6 +158,60 @@
 }
 .app .offline[data-state="ready"] { color: var(--ok); }
 .app .offline[data-state="ready"]::before { background: var(--ok); }
+
+/* The files opened before, under the drop area and as wide: a row each, the whole row opening it
+   again, and a cross at its end taking it off the list. */
+.app .recent { width: min(100%, 30rem); margin-top: 0.5rem; }
+.app .recent-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem; }
+.app .recent-head h2 { margin: 0; }
+.app .text-button {
+  min-height: 2rem;
+  padding: 0.2rem 0.55rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.875rem;
+}
+.app .text-button:hover { background: var(--accent-soft); }
+.app .recent-list {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+  list-style: none;
+}
+.app .recent-list li { display: flex; align-items: center; padding-right: 0.4rem; }
+.app .recent-list li + li { border-top: 1px solid var(--line); }
+/* One column as wide as the row, the text at its start: the shared sheet centres a button's
+   content, which centred the column, and a column as wide as a long title would overflow the row
+   rather than end it in an ellipsis. */
+.app .recent-open {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr);
+  justify-content: stretch;
+  justify-items: start;
+  gap: 0.1rem;
+  min-width: 0;
+  min-height: 3.4rem;
+  padding: 0.55rem 0.9rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-weight: 400;
+  text-align: left;
+}
+.app .recent-open:hover { background: var(--surface-2); }
+.app .recent-title,
+.app .recent-meta { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app .recent-title { font-weight: 600; }
+.app .recent-meta { color: var(--muted); font-size: 0.8125rem; }
+.app .recent-remove { flex: none; }
+/* The list clips its corners, so an outline drawn outside a row would be cut off. */
+.app .recent-list :focus-visible { outline-offset: -2px; }
 
 /* The player: as wide as the window on a phone, edge to edge, and at the page's width with room
    around it on a larger screen. */
@@ -263,12 +329,15 @@
   .app .topbar nav[aria-label="Site"],
   .app .topbar .github,
   .app .install,
+  .app .menu-install,
   .app .about,
   .app main > footer { display: none; }
-  /* The bar, then the screen filling the rest of the window: home with nothing to scroll. */
+  /* The bar, then the screen filling the rest of the window: home with nothing to scroll until
+     the list of recent files is longer than the window, and then the window scrolls. Never
+     shorter than its content, or the centred content would spill out of the top, out of reach. */
   .app { display: flex; flex-direction: column; }
   .app main { display: flex; flex: 1; flex-direction: column; padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); }
-  .app .home { flex: 1; min-height: 0; }
+  .app .home { flex: 1 0 auto; min-height: 0; }
   .app .topbar { -webkit-user-select: none; user-select: none; }
   :root { overscroll-behavior-y: none; }
 }

@@ -171,7 +171,8 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             the cmi5 page against the player
   demo/content/             the packages the demo plays, committed; built from demo/content/src/ by
                             scripts/build-demo-content.mjs
-  app/                      the installable app, /app/: index.html and app.js the page, sw.js its
+  app/                      the installable app, /app/: index.html and app.js the page, recent.js
+                            its list of recent files, sw.js its
                             worker (the player's handlers mounted, plus the app shell), the web app
                             manifest, icons/ (rendered by scripts/build-app-icons.mjs, committed) and
                             screenshots/ (by scripts/build-app-screenshots.mjs, committed); the
@@ -1601,7 +1602,18 @@ SPA-fallback trap described above cannot happen there.
   loading screen and the download's progress along the bar's edge while it opens. Opening is a
   step in the window's history — a link keeps its `?src=` there — so Back, the bar's, the
   browser's or Android's, closes the file rather than leaving the app; that needed the element to
-  stop adding history of its own (*The frame is navigated in place*). The page's account of
+  stop adding history of its own (*The frame is navigated in place*). Content adds steps of its
+  own: the frame shares the page's origin, and Interactive Book writes its chapter into the
+  page's address (`top.location.hash`) at every move, a step with no state. The app first took
+  any step it had not made for Back and closed the book at its cover's Read button (2026-10-12, an
+  h5p.com portfolio, which the player page played, having no history of its own to keep). So
+  every step the app writes carries its screen and, for the player, its depth above home, and a
+  stateless step with a new fragment is taken for the open file's and marked one past the step
+  before it: the browser's Back turns the book's pages back before it closes the file, a reload
+  keeps its place, and the bar's Back goes home past all of them with one `history.go`. Chrome
+  keeps fifty steps, so a long read can push home out of the history; when nothing answers that
+  `go`, the bar closes the file where it is and makes that step home. A stateless step without a
+  fragment is taken for home, which covers steps written before steps were marked. The page's account of
   itself, written for search engines, follows the home screen in a tab and is gone from the
   installed window, where About in the menu says what matters. Installed is `display-mode:
   standalone`, or `window-controls-overlay` for Chrome and Edge on the desktop, where the manifest's
@@ -1612,10 +1624,36 @@ SPA-fallback trap described above cannot happen there.
   shared sheet. The manifest's screenshots, for Chrome's fuller install dialog, are rendered from
   the built site by `pnpm demo:screenshots`, the installed rules switched on through the CSSOM
   since Chromium cannot emulate `display-mode`, and kept out of the precache. `tests/app.test.ts`
-  drives the screens, the history, the menu and the keyboard. Two shared-sheet bugs came up on the
+  drives the screens, the history, the menu and the keyboard, and writes to the address from the
+  frame as Interactive Book does, across a reload too. Two shared-sheet bugs came up on the
   way: `[hidden]` lost to `button`'s own display, so Start over showed with nothing open; and
   `label.file` hid its input with `display: none`, so no key could open the picker on any page —
-  the input is now out of sight but focusable.
+  the input is now out of sight but focusable. Install is on the home screen beside "Works
+  offline" and in the menu, not in the bar, where it was one item too many and pushed the icons
+  onto a row of their own; for the same reason the site's links take their own row below 64rem
+  in this bar, against 44rem on the other pages.
+  **The files opened before are listed under the drop area** (2026-10-12, asked for by the owner):
+  each one's title, its name or a link's host, when it was opened, and a cross that takes it off;
+  a choice opens it again where it was left, since what the player knows a file by — name, size
+  and date — is kept with it. `recent.js` keeps the list in a database of the app's own,
+  `h5p-app`, and records an open only once it reached `ready`, so the list offers what played; it
+  keeps twenty. What reopens a file differs by browser. Installed from Chrome or Edge on the
+  desktop, the app keeps the file handle — from their picker, `showOpenFilePicker`, which `choose`
+  uses where it exists, from a drop (`getAsFileSystemHandle`, asked for during the drop) and from
+  `launchQueue` — and reads the file from disk again, after the permission prompt Chrome shows
+  once a session, which offers "Allow on every visit"; a file moved or deleted asks to be chosen
+  again. Everywhere else, a tab in Chrome included, it keeps a copy of the file in a store beside
+  the list, and the entry shows the copy's size; taking the entry off deletes the copy. Handles
+  only when installed, because storing one in IndexedDB took the whole browser down in a private
+  profile: Chromium 153 in a context Playwright opens, which is the DevTools protocol's private
+  kind, with a handle to a file dropped from disk and to one in the origin's own file system
+  alike, while a profile on disk stored and read both back (2026-10-12). Whether Chrome's own
+  incognito window does the same was not established — the attempt reported a normal profile's
+  quota — and an installed app never runs in a private profile, where a tab may. The tests that
+  store a handle use a profile on disk and answer `display-mode` as installed through
+  `matchMedia`, the one thing about an installed window a test can stand in for. The choice
+  between a copy and asking for the file again was the owner's, on 2026-10-12: a copy, because on
+  an iPad choosing the file again is the step the list exists to save.
   **A package without its own libraries plays offline from the first open**, because the app
   carries them: `packages/libraries/libraries.h5p` (`@missing-elements/h5p-libraries`, the app's
   until 2026-10-08) is the H5P hub's runtime libraries for every content type it serves — 100
@@ -1641,9 +1679,8 @@ SPA-fallback trap described above cannot happen there.
   without it. What Safari and iOS do not do, by design rather than a gap here: `file_handlers` and
   `launch_handler` are Chromium's, so only Chrome and Edge open a `.h5p` from the file manager;
   iOS opens a `?src=` link in Safari, not in the installed app; and each iOS install has storage
-  of its own, apart from Safari's. Not covered: the file is picked again each visit, though what
-  was extracted stays in the chunk store; and whether WebKit clears an installed app's storage
-  after weeks unused.
+  of its own, apart from Safari's, list of recent files included. Not covered: whether WebKit
+  clears an installed app's storage, the copies the list keeps among it, after weeks unused.
 - **What a public demo means.** The frame is same-origin by design, and a package's libraries
   are JavaScript, so `/?src=<any url>` runs a stranger's code on the demo's origin. That is the
   architecture — a host chooses what it plays — not a flaw in it, and it is why the demo origin
@@ -1656,6 +1693,9 @@ SPA-fallback trap described above cannot happen there.
   `/app/?src=<hostile package>` opened at once, in the installed app too. So the player page,
   the app, the cmi5 page and `/embed` ask before opening a package from another origin, naming
   the host, and open their own origin's packages and what the visitor typed or picked as before.
+  The app's list of recent files does not ask again for a link on it: the learner answered for
+  that host when the link first opened, and only code already running on the origin could have
+  written an entry, which could do whatever the entry would.
   The cmi5 page gates both places a launch names the package, `?src=` and `launchParameters`,
   since a link can carry cmi5 parameters pointing at an LMS of the link-writer's own; it passes
   `src: false` and sets `src` itself on `initialized`. `/embed` in another origin's frame does
@@ -1913,8 +1953,8 @@ player is handed a deflated video nobody can normalize: the h5p.com export analy
 everything, while this one and the sodix.de one deflated everything.
 
 **Offline app shell (PWA) — built**, as `/app/` on the demo site, library pack included; see
-*The hosted demo*. What it left open: persistent file
-handles (`showOpenFilePicker` plus a handle kept in IndexedDB) for a recent-files list.
+*The hosted demo*. The list of recent files it left open is built too (2026-10-12), with file
+handles where installed from Chrome or Edge and a kept copy elsewhere.
 Installing works in Safari and on iOS, and the iOS app plays offline (2026-10-11).
 
 **Version proof on xAPI statements — built**; see the invariant *Every statement names the build

@@ -7,13 +7,14 @@
  * looked before then would register its own worker at `/h5p/`, which plays online and not off.
  *
  * It is laid out as an app rather than a page: a bar, and under it one of two screens — home, to
- * open a file, and the player, from opening one until it is closed. Opening is a step in the
- * window's history, so Back, in the bar, the browser's or Android's, closes the file rather than
- * leaving the app.
+ * open a file, with the files opened before listed under it, and the player, from opening one
+ * until it is closed. Opening is a step in the window's history, so Back, in the bar, the
+ * browser's or Android's, closes the file rather than leaving the app.
  */
 
 import librariesPack from '@missing-elements/h5p-libraries/libraries.h5p?url'
 import librariesNotice from '@missing-elements/h5p-libraries/libraries.txt?url'
+import { copyOf, fileKey, forget, forgetAll, linkKey, recentFiles, remember } from './recent.js'
 
 const $ = (selector) => document.querySelector(selector)
 
@@ -41,6 +42,10 @@ const loadingBar = $('#loading-bar')
 const menu = $('#menu')
 const menuButton = $('#menu-button')
 const aboutDialog = $('#about-dialog')
+const recentSection = $('#recent')
+const recentList = $('#recent-list')
+/** Install, on the home screen and in the menu: each shown only while the browser offers it. */
+const installButtons = [installButton, $('#menu-install')]
 
 const show = (text, kind = 'hint') => {
   message.textContent = text
@@ -101,15 +106,32 @@ function setTitle(name) {
   document.title = `${name} — ${APP_NAME}`
 }
 
+/** The home screen's step in the window's history. */
+const HOME = { screen: 'home' }
+
+/**
+ * How many steps the current one lies above home while a file is open: 1 for the file's own, and
+ * one more for each step its content has added since. Content can add steps: the frame shares
+ * this page's origin, and Interactive Book writes its chapter into this page's address
+ * (`top.location.hash`) at every move, which is a step in the window's history with no state of
+ * its own. Each step carries its depth, so Back in the bar goes home past all of them at once.
+ */
+let depth = 0
+const playerStep = (steps) => ({ screen: 'player', depth: steps })
+
 /**
  * Opening a file is a step forward in the window's history — for a link, with its `?src=`, so a
  * reload opens it again. Another file opened while one is open replaces that step instead of
- * adding one, so Back always leads home in one.
+ * adding one, so Back in the bar still leads home in one.
  */
 function enterPlayer(url) {
-  const state = { screen: 'player' }
-  if (history.state?.screen === 'player') history.replaceState(state, '', url)
-  else history.pushState(state, '', url)
+  if (history.state?.screen === 'player') {
+    depth = history.state.depth ?? 1
+    history.replaceState(playerStep(depth), '', url)
+  } else {
+    depth = 1
+    history.pushState(playerStep(depth), '', url)
+  }
   setScreen('player')
 }
 
@@ -118,27 +140,58 @@ function closePlayer() {
   opens++
   reopen = null
   lastUrl = null
+  current = null
+  depth = 0
   if (player.hasAttribute('src')) player.removeAttribute('src')
   else player.file = null
   show('')
   setScreen('home')
 }
 
+/** Set while Back in the bar waits for the history to reach home. */
+let homeward = null
+
 backButton.addEventListener('click', () => {
-  if (history.state?.screen === 'player') history.back()
-  else closePlayer()
+  const steps = history.state?.screen === 'player' ? (history.state.depth ?? 1) : 0
+  if (!steps) {
+    closePlayer()
+    return
+  }
+  // Home's popstate closes the file. Unless home is no longer in the history, which keeps fifty
+  // steps in Chrome, so that a long read can push it out: then nothing comes back, and the file
+  // is closed here, with this step made home.
+  history.go(-steps)
+  clearTimeout(homeward)
+  homeward = setTimeout(() => {
+    homeward = null
+    closePlayer()
+    history.replaceState(HOME, '', location.pathname)
+  }, 1000)
 })
 
 addEventListener('popstate', (event) => {
-  if (event.state?.screen !== 'player') {
+  clearTimeout(homeward)
+  homeward = null
+  const { state } = event
+  // A step the content added, which comes with no state and a new fragment: it belongs to the open
+  // file, one past the step before it. Marked so, Back walks the content's steps before it closes
+  // the file — an Interactive Book turns back its chapters — and a reload knows it as the file's.
+  if (state === null && location.hash) {
+    if (screen === 'player') history.replaceState(playerStep(++depth), '')
+    else history.replaceState(HOME, '')
+    return
+  }
+  // Home, or a step written before steps carried their screen.
+  if (state?.screen !== 'player') {
     if (screen === 'player') closePlayer()
     return
   }
+  depth = state.depth ?? 1
   // Forward again, onto a file that was closed: a link opens once more; a picked file has gone.
   if (screen === 'player') return
   const src = srcOf(location.href)
   if (src) openLink(src)
-  else history.replaceState(null, '', location.pathname)
+  else history.replaceState(HOME, '', location.pathname)
 })
 
 /* ---------------------------------------------------------------- loading */
@@ -267,6 +320,12 @@ let reopen = null
 /** The URL last opened, so a launch that repeats it does not load it twice. */
 let lastUrl = null
 /**
+ * The open in progress, put on the list of recent files once its content stands, so that what
+ * the list offers is what played: `{ kind: 'file', file, handle, replaces }` or `{ kind: 'link',
+ * url }`. `handle` may still be a promise, from a drop.
+ */
+let current = null
+/**
  * Which open is the latest. The first visit's worker takes a moment to install, and an open that
  * was waiting for it gives way to a later open, or to a close: without this, a file closed with
  * Back during that moment opened into the home screen once the worker was ready.
@@ -286,16 +345,33 @@ function opening(name, again, url) {
   setLoading(true)
 }
 
-async function open(file, libraries = PACK) {
+/**
+ * A file, from the picker, a drop, the file manager or the list of recent files. `handle` is
+ * how to find it again, where the browser gives one; `title` the package's, when the list knows
+ * it; `replaces` the list's entry it was opened from, which a file changed on disk since takes
+ * the place of.
+ */
+async function open(file, { libraries = PACK, handle = null, title = null, replaces = null } = {}) {
   const token = ++opens
   lastUrl = null
   // A file the learner chose answers a pending link's question: they went with the file.
   confirmBox.hidden = true
-  opening(file.name, (source) => open(file, source), location.pathname)
+  current = { kind: 'file', file, handle, replaces }
+  opening(title ?? file.name, (source) => open(file, { libraries: source, handle, title, replaces }), location.pathname)
   await ready
   if (token !== opens) return
   player.setAttribute('libraries', libraries)
   player.file = file
+}
+
+/** A link's file name, for a title until the package says its own, or its host when it has none. */
+function linkName(url) {
+  const last = url.pathname.split('/').pop()
+  try {
+    return decodeURIComponent(last) || url.host
+  } catch {
+    return last || url.host
+  }
 }
 
 /**
@@ -303,7 +379,7 @@ async function open(file, libraries = PACK) {
  * opens such a link in the app's window — its "supported links" — and when that window is
  * already open, hands it the URL through `launchQueue` instead of loading the page again.
  */
-async function openUrl(src, libraries = PACK) {
+async function openUrl(src, { libraries = PACK, title = null } = {}) {
   let url
   try {
     url = new URL(src, location.href)
@@ -312,15 +388,9 @@ async function openUrl(src, libraries = PACK) {
     return
   }
   const token = ++opens
-  const last = url.pathname.split('/').pop()
-  let name = url.host
-  try {
-    name = decodeURIComponent(last) || url.host
-  } catch {
-    name = last || url.host
-  }
   lastUrl = url.href
-  opening(name, (source) => openUrl(url.href, source), `${location.pathname}?src=${encodeURIComponent(url.href)}`)
+  current = { kind: 'link', url: url.href }
+  opening(title ?? linkName(url), (source) => openUrl(url.href, { libraries: source, title }), `${location.pathname}?src=${encodeURIComponent(url.href)}`)
   await ready
   if (token !== opens) return
   player.setAttribute('libraries', libraries)
@@ -378,8 +448,26 @@ function isOpen(src) {
   }
 }
 
-/** The picker, from whichever button asked: they are buttons, so a keyboard reaches them. */
-const choose = () => fileInput.click()
+/**
+ * The picker, from whichever button asked: they are buttons, so a keyboard reaches them. Chrome
+ * and Edge on the desktop have a picker that hands back a handle as well as the file, which the
+ * list of recent files keeps to open the file again from disk; elsewhere the page's own input.
+ */
+async function choose() {
+  if (!('showOpenFilePicker' in window)) {
+    fileInput.click()
+    return
+  }
+  let handle
+  try {
+    ;[handle] = await window.showOpenFilePicker({ id: 'h5p', types: [{ description: 'H5P content', accept: { 'application/zip': ['.h5p'] } }] })
+  } catch (error) {
+    // Closed without a choice. Refused for another reason, the page's own input is the way in.
+    if (error?.name !== 'AbortError') fileInput.click()
+    return
+  }
+  void open(await handle.getFile(), { handle })
+}
 openButton.addEventListener('click', choose)
 // The whole drop area opens the picker too, a larger target than its button.
 dropzone.addEventListener('click', (event) => {
@@ -395,13 +483,14 @@ fileInput.addEventListener('change', () => {
 
 // The page's own address first: `/app/?src=…` opened in a tab, or the link that launched the
 // app. Home goes first in the history and the package a step ahead of it, so Back from the
-// package stays in the app; a reload at that step keeps it, since its state survives the reload,
-// and the package opens into it again. A launch with a file opens at the manifest's action, `/app/`.
+// package stays in the app; a reload at that step, or at one its content added, keeps it, since
+// its state survives the reload, and the package opens into it again. Any other start is home,
+// marked as such: a launch with a file opens at the manifest's action, `/app/`, and a picked file
+// does not survive a reload.
 const initial = srcOf(location.href)
-if (initial) {
-  if (history.state?.screen !== 'player') history.replaceState(null, '', location.pathname)
-  openLink(initial)
-}
+if (initial && history.state?.screen === 'player') depth = history.state.depth ?? 1
+else history.replaceState(HOME, '', location.pathname)
+if (initial) openLink(initial)
 
 // How an installed app is handed what it was launched with. A `.h5p` opened from the file
 // manager arrives as a file handle (the manifest's `file_handlers`); a link to `/app/?src=…`
@@ -412,7 +501,7 @@ if ('launchQueue' in window) {
   window.launchQueue.setConsumer(async (params) => {
     const [handle] = params.files ?? []
     if (handle) {
-      void open(await handle.getFile())
+      void open(await handle.getFile(), { handle })
       return
     }
     const src = params.targetURL ? srcOf(params.targetURL) : null
@@ -438,10 +527,166 @@ document.addEventListener('drop', (event) => {
   event.preventDefault()
   dragDepth = 0
   document.body.classList.remove('dragging')
-  const file = [...(event.dataTransfer?.files ?? [])].find((candidate) => candidate.name.toLowerCase().endsWith('.h5p'))
-  if (file) void open(file)
-  else show('That is not a .h5p file.', 'error')
+  const item = [...(event.dataTransfer?.items ?? [])].find((candidate) => candidate.kind === 'file' && candidate.getAsFile()?.name.toLowerCase().endsWith('.h5p'))
+  if (!item) {
+    show('That is not a .h5p file.', 'error')
+    return
+  }
+  // Chrome and Edge hand over a handle for a dropped file too. It has to be asked for while the
+  // drop is being handled, and it arrives after; the list of recent files waits for it.
+  const handle = item.getAsFileSystemHandle?.().catch(() => null) ?? null
+  void open(item.getAsFile(), { handle })
 })
+
+/* ---------------------------------------------------------------- recent files */
+
+/**
+ * Puts what just came up on the list, or moves it to the top: see `recent.js`. A file's handle is
+ * kept only in the installed window. Storing a handle in IndexedDB took the whole browser down in
+ * a private profile — a context made by the DevTools protocol, the kind Playwright opens, in
+ * Chromium 153, with a handle to a file dropped from disk and to one in the origin's own file
+ * system alike (2026-10-12) — and an installed app never runs in a private profile, where a tab
+ * may be incognito or a guest's. A tab keeps a copy instead, as Safari and Firefox do.
+ */
+async function rememberCurrent() {
+  const opened = current
+  if (!opened) return
+  const title = player.metadata?.title || null
+  if (opened.kind === 'link') {
+    const url = new URL(opened.url)
+    await remember({ id: linkKey(opened.url), kind: 'link', name: linkName(url), title, size: null, lastModified: null, url: opened.url, handle: null })
+  } else {
+    const { file, replaces } = opened
+    const handle = installed.matches ? await opened.handle : null
+    const id = fileKey(file)
+    // Opened from the list, but changed on disk since: the entry for the file as it was goes.
+    if (replaces && replaces !== id) await forget(replaces)
+    await remember({ id, kind: 'file', name: file.name, title, size: file.size, lastModified: file.lastModified, url: null, handle: handle?.kind === 'file' ? handle : null }, file)
+  }
+  await showRecent()
+}
+
+const sizeOf = (bytes) => (bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} kB` : `${megabytes(bytes)} MB`)
+
+const thisYear = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' })
+const anotherYear = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' })
+
+/** When a file was last opened, as a list says it: today, yesterday, or the date. */
+function openedOn(time) {
+  const midnight = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+  const now = new Date()
+  const then = new Date(time)
+  const days = Math.round((midnight(now) - midnight(then)) / 86_400_000)
+  if (days === 0) return 'Today'
+  if (days === 1) return 'Yesterday'
+  return (then.getFullYear() === now.getFullYear() ? thisYear : anotherYear).format(then)
+}
+
+/** The line under an entry's title: where it is, when it was opened, and the room its copy takes. */
+function describe(entry) {
+  const where = entry.kind === 'link' ? new URL(entry.url).host : entry.name
+  const kept = entry.copySize ? ` · ${sizeOf(entry.copySize)} on this device` : ''
+  return `${where} · ${openedOn(entry.openedAt)}${kept}`
+}
+
+const REMOVE_ICON =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>'
+
+function recentItem(entry) {
+  const item = document.createElement('li')
+  const opener = document.createElement('button')
+  opener.type = 'button'
+  opener.className = 'recent-open'
+  const title = document.createElement('span')
+  title.className = 'recent-title'
+  // A package's own words: text, never markup.
+  title.textContent = entry.title || fileTitle(entry.name)
+  const meta = document.createElement('span')
+  meta.className = 'recent-meta'
+  meta.textContent = describe(entry)
+  opener.append(title, meta)
+  opener.addEventListener('click', () => void openRecent(entry))
+
+  const remove = document.createElement('button')
+  remove.type = 'button'
+  remove.className = 'icon-button recent-remove'
+  remove.innerHTML = REMOVE_ICON
+  remove.setAttribute('aria-label', `Remove ${title.textContent} from the list`)
+  remove.title = entry.copySize ? 'Remove it, and the copy kept on this device' : 'Remove it from the list'
+  remove.addEventListener('click', async () => {
+    // The keyboard goes on to the entry that takes this one's place, or the one before it when
+    // this was the last, or back to the picker when the list is empty.
+    const index = [...recentList.children].indexOf(item)
+    await forget(entry.id)
+    await showRecent()
+    const entries = recentList.children
+    const target = entries[Math.min(index, entries.length - 1)]?.querySelector('.recent-open')
+    ;(target ?? openButton).focus()
+  })
+  item.append(opener, remove)
+  return item
+}
+
+/** Draws the list, which shows once there is something on it. */
+async function showRecent() {
+  const entries = await recentFiles()
+  recentList.replaceChildren(...entries.map(recentItem))
+  recentSection.hidden = entries.length === 0
+}
+
+/**
+ * Reads a file from a handle kept for it: `'refused'` when the learner did not allow it, `null`
+ * when the file is no longer where the handle points. Chrome asks once a session, and its prompt
+ * offers to allow it on every visit.
+ */
+async function fileFrom(handle) {
+  const read = { mode: 'read' }
+  try {
+    if ((await handle.queryPermission(read)) !== 'granted' && (await handle.requestPermission(read)) !== 'granted') return 'refused'
+    return await handle.getFile()
+  } catch {
+    return null
+  }
+}
+
+/** Opens an entry of the list again: from disk, from the copy kept, or from its link. */
+async function openRecent(entry) {
+  if (entry.kind === 'link') {
+    // Not asked about again: the learner answered for that site when the link first opened, and
+    // only a package already running on this origin could have put an entry here.
+    void openUrl(entry.url, { title: entry.title })
+    return
+  }
+  const options = { title: entry.title, replaces: entry.id }
+  if (entry.handle) {
+    const file = await fileFrom(entry.handle)
+    if (file === 'refused') {
+      show(`To open ${entry.name} from the list, allow the app to read it.`, 'hint')
+      return
+    }
+    if (file) {
+      void open(file, { ...options, handle: entry.handle })
+      return
+    }
+  }
+  const copy = await copyOf(entry)
+  if (copy) {
+    void open(copy, options)
+    return
+  }
+  // Moved or deleted on disk, its copy cleared by the browser, or no room for one: the learner
+  // still has the file, and the picker opens for it.
+  show(`${entry.name} could not be opened from the list. Choose it again.`, 'hint')
+  void choose()
+}
+
+$('#recent-clear').addEventListener('click', async () => {
+  await forgetAll()
+  await showRecent()
+  openButton.focus()
+})
+
+void showRecent()
 
 /* ---------------------------------------------------------------- the player's reports */
 
@@ -461,6 +706,7 @@ player.addEventListener('statechange', (event) => {
   // The package's own title, once it has been read, in place of the file's name.
   const title = state === 'ready' ? player.metadata?.title : null
   if (title) setTitle(title)
+  if (state === 'ready') void rememberCurrent()
 })
 
 player.addEventListener('progress', (event) => {
@@ -525,35 +771,43 @@ $('#menu-about').addEventListener('click', fromMenu(() => aboutDialog.showModal(
 /* ---------------------------------------------------------------- installing */
 
 let deferredPrompt = null
+const offerInstall = (offered) => {
+  for (const button of installButtons) button.hidden = !offered
+}
 
+// The browser's own install banner is held back, and the app's buttons offer the same instead;
+// Chrome notes as much in the console ("Banner not shown"), which is expected.
 window.addEventListener('beforeinstallprompt', (event) => {
   event.preventDefault()
   deferredPrompt = event
   // Chrome can still offer the prompt inside the installed window — for another copy installed
   // from a different origin, say — and the offer only makes sense in a tab.
-  installButton.hidden = installed.matches
+  offerInstall(!installed.matches)
 })
 installed.addEventListener('change', () => {
-  if (installed.matches) installButton.hidden = true
+  if (installed.matches) offerInstall(false)
   if (screen === 'home') document.title = homeTitle()
 })
 
-installButton.addEventListener('click', async () => {
+const install = async () => {
   if (!deferredPrompt) return
-  installButton.hidden = true
+  offerInstall(false)
   await deferredPrompt.prompt()
   deferredPrompt = null
-})
+}
+installButton.addEventListener('click', install)
+$('#menu-install').addEventListener('click', fromMenu(install))
 
 /**
- * Asks for storage the browser will not evict under pressure: the shell and whatever the chunk
- * store has extracted. Chrome grants it to an installed app without a prompt. Asked once
+ * Asks for storage the browser will not evict under pressure: the shell, whatever the chunk store
+ * has extracted, and the copies the list of recent files keeps. Chrome grants it to an installed
+ * app without a prompt. Asked once
  * installed, not on every visit to the page, because a site in a tab has not earned it.
  */
 const persist = () => navigator.storage?.persist?.().catch(() => false)
 
 window.addEventListener('appinstalled', () => {
-  installButton.hidden = true
+  offerInstall(false)
   void persist()
 })
 if (installed.matches) void persist()
