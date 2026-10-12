@@ -13,6 +13,9 @@ import { formatBytes, normalizeArchive } from '@missing-elements/h5p-normalize'
  * naming the content type; the libraries come from the H5P hub's bundle for that content type,
  * exactly as `libraries="hub"` fetches them at runtime, and the result is a self-contained
  * package run through the normalizer, so it is also an example of what the normalizer produces.
+ * A manifest with `"stripped": true` is written the way h5p.com and h5p.org export: `h5p.json`
+ * naming the main library alone, `content/`, and no library folders — the package the player
+ * page plays `untrusted` against the site's pack.
  *
  * The outputs are committed. This is a maintainer's tool with two network dependencies — the
  * hub, and whatever media a manifest points at — and a deploy should not have either. Hub
@@ -113,11 +116,13 @@ async function buildPackage(name) {
     ...(manifest.licenseVersion ? { licenseVersion: manifest.licenseVersion } : {}),
     ...(manifest.authors ? { authors: manifest.authors } : {}),
     ...(manifest.source ? { source: manifest.source } : {}),
-    preloadedDependencies: [...needed.values()].map((library) => ({
-      machineName: library.machineName,
-      majorVersion: String(library.majorVersion),
-      minorVersion: String(library.minorVersion)
-    }))
+    preloadedDependencies: [...needed.values()]
+      .filter((library) => !manifest.stripped || library.machineName === manifest.mainLibrary)
+      .map((library) => ({
+        machineName: library.machineName,
+        majorVersion: String(library.majorVersion),
+        minorVersion: String(library.minorVersion)
+      }))
   }
 
   const writer = new ZipWriter(new BlobWriter('application/zip'))
@@ -136,7 +141,7 @@ async function buildPackage(name) {
   let libraryBytes = 0
   for (const entry of entries) {
     const folder = entry.filename.slice(0, entry.filename.indexOf('/'))
-    if (!folders.has(folder)) continue
+    if (manifest.stripped || !folders.has(folder)) continue
     const bytes = await entry.getData(new Uint8ArrayWriter())
     libraryBytes += bytes.length
     await writer.add(entry.filename, new Uint8ArrayReader(bytes), { lastModDate: entry.lastModDate })
@@ -152,7 +157,7 @@ async function buildPackage(name) {
 
   console.log(
     `[demo-content] ${name}.h5p ${formatBytes(report.bytesOut ?? 0)}: ${manifest.mainLibrary}, ` +
-      `${folders.size} libraries (${formatBytes(libraryBytes)} uncompressed), ` +
+      (manifest.stripped ? 'content only, ' : `${folders.size} libraries (${formatBytes(libraryBytes)} uncompressed), `) +
       `${report.entries.filter((entry) => entry.target === 'store').length} media entries stored` +
       (report.entries.some((entry) => entry.action === 'faststart') ? ', mp4 index moved to front' : '')
   )

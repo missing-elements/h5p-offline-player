@@ -27,6 +27,7 @@
     <script src="/demo/theme.js" vite-ignore></script>
     <link rel="stylesheet" href="/demo/player-page.css" />
     <script type="module" src="/demo/element.js"></script>
+    <script type="module" src="/demo/analytics.js"></script>
 </head>
 
   <body>
@@ -34,12 +35,12 @@
       <a class="brand" href="/"><img class="brand-mark" src="/demo/favicon.svg" alt="" width="32" height="32" />h5p-offline-player</a>
       <nav aria-label="Site">
         <a href="/">Player</a>
-        <a href="/app/">App</a>
         <a href="/demo/setup.html">Setup</a>
         <a href="/demo/compare.html">Compare</a>
         <a href="/demo/normalize.html">Normalize</a>
         <a href="/demo/" aria-current="page">Examples</a>
         <a href="https://embed-my.org/" rel="noopener">Embed My</a>
+        <a href="/app/">App</a>
       </nav>
       <div class="topbar-actions">
         <button type="button" class="icon-button theme-toggle" aria-label="Switch theme">
@@ -129,7 +130,7 @@
         <li>
           <a class="card" href="/demo/two-players.html">
             <strong>Two on one page</strong>
-            <span>H5P assumes it owns the page. Each player gets its own frame document, so two do not collide.</span>
+            <span>H5P assumes it owns the page. Each player gets its own frame document, so two do not collide — the same package twice, in two languages, included.</span>
           </a>
         </li>
       </ul>

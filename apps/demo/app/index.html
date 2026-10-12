@@ -47,6 +47,7 @@
     <link rel="stylesheet" href="/app/app.css" />
     <script type="module" src="/demo/element.js"></script>
     <script type="module" src="/app/app.js"></script>
+    <script type="module" src="/demo/analytics.js"></script>
   </head>
 
   <!-- `app` scopes app.css, which the build links ahead of the shared sheet; `data-screen` is
@@ -60,12 +61,12 @@
       <p class="appbar-title" id="title" hidden></p>
       <nav aria-label="Site">
         <a href="/">Player</a>
-        <a href="/app/" aria-current="page">App</a>
         <a href="/demo/setup.html">Setup</a>
         <a href="/demo/compare.html">Compare</a>
         <a href="/demo/normalize.html">Normalize</a>
         <a href="/demo/">Examples</a>
         <a href="https://embed-my.org/" rel="noopener">Embed My</a>
+        <a href="/app/" aria-current="page">App</a>
       </nav>
       <div class="topbar-actions">
         <button type="button" class="icon-button" id="start-over" aria-label="Start over: forget where you were in this file" title="Start over" hidden>

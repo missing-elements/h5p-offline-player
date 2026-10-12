@@ -35,7 +35,7 @@ Exit 2: the check could not run (no browser, no such file).
 
 | It says | Usual cause | What to do |
 |---|---|---|
-| `bad-archive` … `Missing: <folders>` | no library folders, or not the versions `content.json` names | add the library folders; or rerun with `--libraries pack` if the destination supplies libraries |
+| `bad-archive` … `Missing: <folders>` | no library folders, not the versions `content.json` names, or a version one of the package's own libraries asks for in its `library.json` and the package does not carry | add the library folders; or rerun with `--libraries pack` if the destination supplies libraries |
 | `bad-archive` otherwise | no `h5p.json`, bad entry names, not a zip | fix the packaging |
 | `runtime: …` with `state: error` | the runtime threw before the content came up: a script of a library it needed failed, or `content.json` breaks the content type at start | same fixes as the next row; the message names what threw |
 | `N uncaught errors while booting: …` | a library script threw as it loaded: a dependency listed that is not a runtime library (`H5PEditor is not defined`), or `content.json` missing a field the content type reads at start | for a manifest problem, list only runtime libraries in `preloadedDependencies`; for a content problem, compare `content.json` with `<Library-x.y>/semantics.json` inside the package and fill in the fields it expects |

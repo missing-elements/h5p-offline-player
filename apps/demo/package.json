@@ -18,7 +18,8 @@
   "dependencies": {
     "@missing-elements/h5p-cmi5": "workspace:*",
     "@missing-elements/h5p-embed": "workspace:*",
-    "@missing-elements/h5p-offline-player": "workspace:*"
+    "@missing-elements/h5p-offline-player": "workspace:*",
+    "@vercel/analytics": "^2.0.1"
   },
   "devDependencies": {
     "@missing-elements/h5p-libraries": "workspace:*",

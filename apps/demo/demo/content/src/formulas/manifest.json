@@ -1,0 +1,12 @@
+{
+  "title": "Formulas, from a content-only export",
+  "mainLibrary": "H5P.QuestionSet",
+  "stripped": true,
+  "license": "CC0 1.0",
+  "authors": [
+    {
+      "name": "missing-elements",
+      "role": "Author"
+    }
+  ]
+}

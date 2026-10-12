@@ -45,6 +45,7 @@
     </script>
     <script type="module" src="/demo/element.js"></script>
     <script type="module" src="/demo/player-page.js"></script>
+    <script type="module" src="/demo/analytics.js"></script>
 </head>
 
   <body>
@@ -52,12 +53,12 @@
       <a class="brand" href="/"><img class="brand-mark" src="/demo/favicon.svg" alt="" width="32" height="32" />h5p-offline-player</a>
       <nav aria-label="Site">
         <a href="/" aria-current="page">Player</a>
-        <a href="/app/">App</a>
         <a href="/demo/setup.html">Setup</a>
         <a href="/demo/compare.html">Compare</a>
         <a href="/demo/normalize.html">Normalize</a>
         <a href="/demo/">Examples</a>
         <a href="https://embed-my.org/" rel="noopener">Embed My</a>
+        <a href="/app/">App</a>
       </nav>
       <div class="topbar-actions">
         <button type="button" class="icon-button theme-toggle" aria-label="Switch theme">
@@ -105,6 +106,7 @@
         <button type="button" data-src="/demo/content/how-it-works.h5p">How it works</button>
         <button type="button" data-src="/demo/content/glossary.h5p">Glossary cards</button>
         <button type="button" data-src="/no-range/video.h5p">Interactive video · host without Range</button>
+        <button type="button" data-src="/demo/content/formulas.h5p" data-untrusted>Formulas · content only, played untrusted</button>
       </div>
 
       <div class="status" id="status" data-state="idle">

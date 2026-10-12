@@ -273,10 +273,12 @@ fileInput.addEventListener('change', () => {
   if (file) loadFile(file)
 })
 
+// A sample marked `data-untrusted` plays as data against this site's bundle: a content-only
+// export, as h5p.com and h5p.org make them, the way a site plays a package it did not make.
 for (const button of document.querySelectorAll('.samples button')) {
   button.addEventListener('click', () => {
     urlInput.value = button.dataset.src
-    loadUrl(button.dataset.src)
+    loadUrl(button.dataset.src, { trusted: !('untrusted' in button.dataset) })
   })
 }
 

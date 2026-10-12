@@ -27,6 +27,7 @@
     <script src="/demo/theme.js" vite-ignore></script>
     <link rel="stylesheet" href="/demo/player-page.css" />
     <script type="module" src="/demo/element.js"></script>
+    <script type="module" src="/demo/analytics.js"></script>
 </head>
 
   <body>
@@ -34,12 +35,12 @@
       <a class="brand" href="/"><img class="brand-mark" src="/demo/favicon.svg" alt="" width="32" height="32" />h5p-offline-player</a>
       <nav aria-label="Site">
         <a href="/">Player</a>
-        <a href="/app/">App</a>
         <a href="/demo/setup.html">Setup</a>
         <a href="/demo/compare.html">Compare</a>
         <a href="/demo/normalize.html">Normalize</a>
         <a href="/demo/" aria-current="page">Examples</a>
         <a href="https://embed-my.org/" rel="noopener">Embed My</a>
+        <a href="/app/">App</a>
       </nav>
       <div class="topbar-actions">
         <button type="button" class="icon-button theme-toggle" aria-label="Switch theme">
@@ -59,11 +60,13 @@
       <p class="lede">
         H5P core assumes it owns the page — global <code>H5P</code>, global
         <code>H5PIntegration</code>, global CSS. Each player gets its own frame document, so two of
-        them on one page do not collide.
+        them on one page do not collide. Below, the same package twice: the second in German, with
+        the action bar, which the first does not have. The archive is read once and cached for
+        both; what each player asked for stays its own.
       </p>
 
       <h5p-player src="/demo/content/how-it-works.h5p"></h5p-player>
-      <h5p-player src="/demo/content/glossary.h5p"></h5p-player>
+      <h5p-player src="/demo/content/how-it-works.h5p" lang="de" frame copyright></h5p-player>
 
       <footer>
         <nav class="footer-links" aria-label="More on this site">

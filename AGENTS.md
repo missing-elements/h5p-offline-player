@@ -1874,6 +1874,12 @@ SPA-fallback trap described above cannot happen there.
   passes `askInOwnFrame: false` — Embed My's preview — plays as it is. Every check fails closed: a
   `data:` URL, with no host, counts as another site's. The rule stays: any package whose own code
   runs on an origin can read every other package's data there.
+- **Page views are counted by Vercel Web Analytics**, through `demo/analytics.js` in every
+  page's head, including `/embed` and the app: `inject()` from `@vercel/analytics`, which loads
+  `/_vercel/insights/script.js` from the site's own origin and reports to it, so the CSP needs no
+  change and no cookie is set; in dev it logs to the console. Added on 2026-09-26, removed on
+  2026-10-07 and put back on 2026-10-13 by the owner. Demo only: the packages carry none, and
+  `docs/privacy.md` describes the packages, not this site.
 - **Caching.** Hashed files under `/assets/` are immutable; `h5p-sw.js` is `no-cache`;
   `frame-assets/` and `fixtures/` revalidate hourly. Fixtures also carry permissive CORS with
   `Range` allowed and `Content-Range` exposed, so another player instance can be pointed at them.
@@ -1887,7 +1893,14 @@ SPA-fallback trap described above cannot happen there.
   for that type (which `libraries="hub"` fetched at runtime until 0.6). The script keeps only the
   dependency closure the content needs (walked from `library.json`, plus every sub-content
   library the params name), drops the editor libraries the hub ships, and runs the result through
-  the normalizer, so each package is also an example of what the normalizer produces. The outputs
+  the normalizer, so each package is also an example of what the normalizer produces. A fifth,
+  `formulas.h5p` (2026-10-13), is a Question Set with LaTeX in it written with `"stripped": true`
+  in its manifest — `h5p.json` naming the main library alone, `content/`, no library folders, as
+  h5p.com and h5p.org export — which the player page's sample button marked `data-untrusted`
+  plays `untrusted` against the site's pack: the one place on the site that shows the untrusted
+  path, the addon rule and the pack's MathDisplay. The two-players example plays
+  `how-it-works.h5p` twice since the same day, the second `lang="de" frame copyright`, since
+  one package under two settings is what the per-load fix is for. The outputs
   are committed, 5.5 MB for the four, because a deploy should need neither the hub nor the video
   host; `pnpm demo:content` regenerates them. Provenance: the libraries are MIT, the text is
   ours under CC0, and the clip is Big Buck Bunny, © Blender Foundation, CC BY 3.0, credited in the
