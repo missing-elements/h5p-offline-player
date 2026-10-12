@@ -1466,7 +1466,9 @@ SPA-fallback trap described above cannot happen there.
   0.3.0, the same day, follows player 0.6: `hub` means `pack`, `pack` without a copy of the site's
   own is the element's on jsDelivr, and `--packages` checks `https://cdn.jsdelivr.net` for it
   instead of `https://api.h5p.org`. It needs player 0.6, since an older element reads `pack` as a
-  relative URL.
+  relative URL. 0.3.1, on 2026-10-12, changes nothing in the package either: it requires player
+  `^0.6.1` and runtime `^0.1.1`, for the content upgrade, and verify 0.1.3 went out beside it for the
+  same reason, since `npx` keeps a cached copy's dependencies until the package itself changes.
 - **The pages carry their metadata, and the origin is filled in at build time.** Titles,
   descriptions, canonical links, Open Graph and Twitter tags, JSON-LD for the software on the
   front page, `robots.txt` and `sitemap.xml`, and the GitHub link at the right of every page's
