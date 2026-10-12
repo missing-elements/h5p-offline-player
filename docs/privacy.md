@@ -22,7 +22,7 @@ setup, that is your player domain, kept separately for each site that frames it.
 | What | Where | Contains | Personal? |
 |---|---|---|---|
 | Extracted package files | Cache API, `h5p-pkg-v0-*` | The package's own files | No, unless the package contains personal data |
-| Package list | IndexedDB `h5p-player`, table `packages` | Each package's URL or picked file name, title, metadata, display options, last played time | Shows which content was played on this device |
+| Package list | IndexedDB `h5p-player`, table `packages` | Each package's URL or picked file name, title, metadata, language tag, display options, last played time | Shows which content was played on this device |
 | Saved state | IndexedDB `h5p-player-userdata` | Only with `resume` (or `resume="device"`): the content's own state, such as the slide reached, the answers given and the position in a video, with the time it was saved | Yes: a learner's answers |
 
 The learner's name and email, if you set the `user` property, are not stored. They go into each

@@ -15,6 +15,7 @@
  */
 
 import { upgradeContent, type ServedLibrary, type UpgradeSource, type UpgradeTable } from './content-upgrade'
+import { coreTranslations } from './l10n'
 
 interface BootConfig {
   pkgId: string
@@ -28,6 +29,11 @@ interface BootConfig {
   options?: FrameOptions
   /** The library folders, reachable from this package, that carry an `upgrades.js`. Absent from a worker older than the list. */
   upgrades?: string[]
+  /**
+   * The element's language, which H5P's own strings follow, when the worker named `l10n.js`. Not
+   * the document's `lang`: that is the content's, as H5P writes it.
+   */
+  language?: string
 }
 
 /** The one content h5p-standalone puts in `H5PIntegration.contents`, as far as the upgrade touches it. */
@@ -85,6 +91,8 @@ declare global {
     }
     H5PIntegration?: { saveFreq?: number | false; contents?: Record<string, IntegrationContent> }
     H5PUpgrades?: Record<string, UpgradeTable | undefined>
+    /** Left by `l10n.js`, which the frame document names before this script unless its language is English. */
+    H5PRuntimeL10n?: unknown
   }
 }
 
@@ -173,6 +181,14 @@ if (custom.activityId) options.xAPIObjectIRI = custom.activityId;
 // statements' object. The worker read it off `h5p.json`.
 if (config.title) options.title = config.title;
 if (config.metadata) options.metadata = config.metadata;
+
+// The core's own strings in the element's language, when this package has them: the worker names
+// `l10n.js` ahead of this script for any language but English, and the strings for the language
+// the configuration names are picked from it. h5p-standalone lays `translations` over its English
+// defaults key by key, so a string a language lacks stays English, and it does so before the
+// core's ready handler builds the licence names from them.
+var translations = coreTranslations(window.H5PRuntimeL10n, config.language);
+if (translations) options.translations = translations;
 
 /**
  * Whether the element opened this frame with `resume`. In the URL rather than in the boot

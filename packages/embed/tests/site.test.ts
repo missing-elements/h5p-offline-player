@@ -133,6 +133,7 @@ beforeAll(async () => {
   locked = await host(lockedDir, '127.0.0.1')
 
   pages.set('/open.html', snippet(open.origin, `src=${open.origin}/quiz.h5p&xapi=${embedding.origin}`))
+  pages.set('/open-de.html', snippet(open.origin, `src=${open.origin}/quiz.h5p&lang=de`))
   pages.set('/locked.html', snippet(locked.origin, `src=${embedding.origin}/quiz.h5p`))
   pages.set('/locked-elsewhere.html', snippet(locked.origin, `src=${open.origin}/quiz.h5p`))
   pages.set('/locked-hub.html', snippet(locked.origin, `src=${embedding.origin}/quiz.h5p&libraries=hub`))
@@ -183,6 +184,22 @@ describe('a written site, framed from another site', () => {
     )
     await page.waitForFunction(() => (window as unknown as { relayed: unknown[] }).relayed.length > 0)
     expect(await heard(page)).toContainEqual(expect.objectContaining({ origin: open.origin, action: 'xapi' }))
+    await page.close()
+  })
+
+  it('shows H5P\'s own strings in the language the address names', async () => {
+    const page = await browser.newPage()
+    await page.goto(`${embedding.origin}/open-de.html`)
+    const frame = await playerFrame(page, open.origin)
+    await frame.waitForFunction(() => (document.querySelector('h5p-player') as unknown as { state: string } | null)?.state === 'ready', null, { timeout: 60_000 })
+    // The runtime's frame, inside the page's own: the same origin, so its window can be read.
+    const seen = await frame.evaluate(() => {
+      const inner = document.querySelector('h5p-player')!.shadowRoot!.querySelector('iframe')!
+      const core = (inner.contentWindow as unknown as { H5P: { t(key: string): string } }).H5P
+      return { lang: inner.contentDocument!.documentElement.lang, fullscreen: core.t('fullscreen') }
+    })
+    // The quiz is in English, which stays the document's language for a screen reader; the buttons are German.
+    expect(seen).toEqual({ lang: 'en', fullscreen: 'Vollbild' })
     await page.close()
   })
 

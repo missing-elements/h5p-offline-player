@@ -40,7 +40,8 @@
   ],
   "scripts": {
     "build": "node scripts/build.mjs",
-    "typecheck": "tsc -p tsconfig.json",
+    "l10n": "node scripts/build-l10n.mjs",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
     "test": "pnpm typecheck && vitest run",
     "test:unit": "pnpm typecheck && vitest run",
     "prepublishOnly": "pnpm test && pnpm build"
@@ -49,6 +50,8 @@
     "h5p-standalone": "^3.8.2"
   },
   "devDependencies": {
+    "@types/node": "^26.6.4",
+    "@zip.js/zip.js": "^2.23.0",
     "esbuild": "^0.28.2",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3"

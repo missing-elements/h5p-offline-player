@@ -29,6 +29,9 @@ import { build } from 'esbuild'
  *
  * That is the only change made to H5P's files, and it changes no rule the content sees.
  *
+ * Beside them, `l10n.js` holds the core's interface strings in every language this package has,
+ * from the committed `l10n/`, which `scripts/build-l10n.mjs` writes.
+ *
  * `dist/` also gets a `LICENSE.txt` and a `NOTICE.txt`, written here rather than kept by hand so
  * that they always name the h5p-standalone version actually vendored — that tag is the
  * corresponding source — and so that they land beside the files they describe wherever `dist/`
@@ -54,6 +57,9 @@ const exists = async (path) => {
 const FAMILY = /^[A-Za-z][A-Za-z0-9 -]*$/
 const STYLE = /^(normal|italic)$/
 const WEIGHT = /^\d{3}$/
+
+/** A language tag as the player's `shared/language.ts` accepts one — keep the two in step. */
+const LANGUAGE_TAG = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/
 
 export const DIST_DIR = resolve(rootDir, 'dist')
 
@@ -182,6 +188,33 @@ export async function buildRuntime({ quiet = false } = {}) {
   await cp(resolve(standaloneDir, 'fonts', 'inter', 'LICENSE.txt'), resolve(DIST_DIR, 'fonts', 'Inter-LICENSE.txt'))
   await cp(resolve(standaloneDir, 'fonts', 'open-sans', 'OFL.txt'), resolve(DIST_DIR, 'fonts', 'OpenSans-OFL.txt'))
 
+  // The core's strings in other languages, from `l10n/` (`scripts/build-l10n.mjs`), all in one
+  // classic script with the aliases beside them: the player's frame document names it before the
+  // boot script when the element's language is not English, and the boot script picks the
+  // language from it. One file, so that the player needs no list of languages and a language
+  // added is a release of this package alone; the frame of a learner who is not reading English
+  // fetches it once, about 50 kB compressed, and a cache keeps it. A script rather than JSON
+  // because the frame's policy lets the runtime's origin run scripts and fetches nothing from it.
+  // It carries its notice, like the runtime's other files, since a bundler emits it on its own.
+  const l10n = JSON.parse(await readFile(resolve(rootDir, 'l10n', 'index.json'), 'utf8'))
+  const languages = {}
+  for (const tag of Object.keys(l10n.languages).sort()) {
+    if (!LANGUAGE_TAG.test(tag)) fail(`l10n/index.json names a language "${tag}" that is not a language tag`)
+    const { H5P } = JSON.parse(await readFile(resolve(rootDir, 'l10n', `${tag}.json`), 'utf8'))
+    if (!H5P || typeof H5P !== 'object' || !Object.values(H5P).every((value) => typeof value === 'string')) {
+      fail(`l10n/${tag}.json is not a set of strings`)
+    }
+    languages[tag] = H5P
+  }
+  const aliases = l10n.aliases ?? {}
+  for (const [tag, target] of Object.entries(aliases)) {
+    if (!LANGUAGE_TAG.test(tag) || !languages[target]) fail(`l10n/index.json takes ${tag} to ${target}, which is not a language it has`)
+  }
+  // The source and the date come from the generator; neither may close the comment early.
+  const plain = (text) => String(text).replaceAll('*/', '')
+  const l10nHeader = `/*! The H5P core's interface strings in ${Object.keys(languages).length} languages, from ${plain(l10n.source)}, taken ${plain(l10n.retrieved)}: GPL-3.0-or-later, by Moodle and its translators. Part of @missing-elements/h5p-runtime ${packageJson.version}, GPL-3.0-only; see NOTICE.txt in the runtime's directory. */`
+  await writeFile(resolve(DIST_DIR, 'l10n.js'), `${l10nHeader}\nwindow.H5PRuntimeL10n=${JSON.stringify({ languages, aliases })};\n`, 'utf8')
+
   const manifest = {
     runtime: packageJson.version,
     h5pStandalone: standaloneVersion,
@@ -242,7 +275,9 @@ ${fonts
       `    { family: ${JSON.stringify(font.family)}, style: ${JSON.stringify(font.style)}, weight: ${JSON.stringify(font.weight)}, url: ${url(`fonts/${font.file}`)} }`
   )
   .join(',\n')}
-  ]
+  ],
+  /** The core's strings in every language this package has; the frame loads it unless the element's language is English. */
+  l10nJs: ${url('l10n.js')}
 }
 `
 }
@@ -282,6 +317,13 @@ frame-boot.js
     missing-elements, GNU General Public License v3.0 -- LICENSE.txt. It runs in the H5P
     document and calls the core's API, which is why it is part of this package and not of
     the MIT player.
+
+l10n.js
+  - The core's interface strings in other languages, taken from Moodle's language packs
+    (https://download.moodle.org/langpack/), where Moodle's translators keep them.
+    Copyright Moodle and its translators, GNU General Public License v3.0 or later.
+    l10n/index.json in this package's source names the pack each language came from and
+    when they were taken.
 
 Corresponding source for the GPL parts as built:
 https://github.com/tunapanda/h5p-standalone/tree/v${standalone} (src/ and vendor/h5p/), and

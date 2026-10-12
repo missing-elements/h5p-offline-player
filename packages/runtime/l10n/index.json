@@ -1,0 +1,456 @@
+{
+  "source": "Moodle 5.2 language packs, https://packaging.moodle.org/langpack/5.2/<language>.zip",
+  "retrieved": "2026-10-12",
+  "map": "https://raw.githubusercontent.com/moodle/moodle/244d94041df0b9193d99146bf3e235ba0534caa1/public/h5p/classes/framework.php",
+  "licence": "GPL-3.0-or-later, by Moodle and its translators",
+  "strings": 67,
+  "languages": {
+    "af": {
+      "name": "Afrikaans",
+      "moodle": "af",
+      "strings": 67
+    },
+    "ar": {
+      "name": "Arabic",
+      "moodle": "ar",
+      "strings": 67
+    },
+    "az": {
+      "name": "Azerbaijani",
+      "moodle": "az",
+      "strings": 67
+    },
+    "be": {
+      "name": "Belarusian",
+      "moodle": "be",
+      "strings": 66,
+      "english": [
+        "by"
+      ]
+    },
+    "ca": {
+      "name": "Catalan",
+      "moodle": "ca",
+      "strings": 67
+    },
+    "ca-valencia": {
+      "name": "Catalan (Valencian)",
+      "moodle": "ca_valencia",
+      "strings": 67
+    },
+    "cs": {
+      "name": "Czech",
+      "moodle": "cs",
+      "strings": 67
+    },
+    "da": {
+      "name": "Danish",
+      "moodle": "da",
+      "strings": 67
+    },
+    "de": {
+      "name": "German",
+      "moodle": "de",
+      "strings": 67
+    },
+    "de-CH": {
+      "name": "German Swiss High",
+      "moodle": "de_ch",
+      "strings": 67
+    },
+    "el": {
+      "name": "Greek",
+      "moodle": "el",
+      "strings": 66,
+      "english": [
+        "offlineDialogRetryMessage"
+      ]
+    },
+    "es": {
+      "name": "Spanish (international)",
+      "moodle": "es",
+      "strings": 67
+    },
+    "es-MX": {
+      "name": "Spanish - Mexico",
+      "moodle": "es_mx",
+      "strings": 67
+    },
+    "et": {
+      "name": "Estonian",
+      "moodle": "et",
+      "strings": 66,
+      "english": [
+        "offlineDialogRetryMessage"
+      ]
+    },
+    "eu": {
+      "name": "Basque",
+      "moodle": "eu",
+      "strings": 67
+    },
+    "fi": {
+      "name": "Finnish",
+      "moodle": "fi",
+      "strings": 67
+    },
+    "fr": {
+      "name": "French",
+      "moodle": "fr",
+      "strings": 67
+    },
+    "gd": {
+      "name": "Scottish Gaelic",
+      "moodle": "gd",
+      "strings": 51,
+      "english": [
+        "advancedHelp",
+        "h5pDescription",
+        "subLevel",
+        "licenseCCBY",
+        "licenseCCBYSA",
+        "licenseCCBYND",
+        "licenseCCBYNC",
+        "licenseCCBYNCSA",
+        "licenseCCBYNCND",
+        "licenseCC30",
+        "licenseCC010",
+        "licensePDM",
+        "licenseExtras",
+        "changes",
+        "offlineDialogRetryMessage",
+        "showAdvanced"
+      ]
+    },
+    "gl": {
+      "name": "Galego",
+      "moodle": "gl",
+      "strings": 67
+    },
+    "he": {
+      "name": "Hebrew",
+      "moodle": "he",
+      "strings": 48,
+      "english": [
+        "advancedHelp",
+        "reuse",
+        "reuseContent",
+        "reuseDescription",
+        "startingOver",
+        "licenseCC40",
+        "licenseCC30",
+        "licenseCC25",
+        "licenseCC20",
+        "licenseCC10",
+        "licenseGPL",
+        "licenseV3",
+        "licenseV2",
+        "licenseV1",
+        "licensePD",
+        "licenseCC010",
+        "licensePDM",
+        "licenseExtras",
+        "resubmitScores"
+      ]
+    },
+    "hi": {
+      "name": "Hindi",
+      "moodle": "hi",
+      "strings": 65,
+      "english": [
+        "changes",
+        "offlineDialogRetryMessage"
+      ]
+    },
+    "hr": {
+      "name": "Croatian",
+      "moodle": "hr",
+      "strings": 45,
+      "english": [
+        "showAdvanced",
+        "advancedHelp",
+        "thumbnail",
+        "noCopyrights",
+        "reuseContent",
+        "reuseDescription",
+        "embedDescription",
+        "h5pDescription",
+        "startingOver",
+        "subLevel",
+        "confirmDialogBody",
+        "licenseU",
+        "licenseCC40",
+        "licenseCC30",
+        "licensePDM",
+        "licenseExtras",
+        "connectionLost",
+        "resubmitScores",
+        "offlineDialogHeader",
+        "offlineDialogBody",
+        "offlineDialogRetryMessage",
+        "offlineSuccessfulSubmit"
+      ]
+    },
+    "hsb": {
+      "name": "Upper Sorbian",
+      "moodle": "hsb",
+      "strings": 66,
+      "english": [
+        "offlineDialogRetryMessage"
+      ]
+    },
+    "hu": {
+      "name": "Hungarian",
+      "moodle": "hu",
+      "strings": 66,
+      "english": [
+        "offlineDialogRetryMessage"
+      ]
+    },
+    "hy": {
+      "name": "Armenian",
+      "moodle": "hy",
+      "strings": 67
+    },
+    "ia": {
+      "name": "Interlingua",
+      "moodle": "ia",
+      "strings": 67
+    },
+    "id": {
+      "name": "Indonesian",
+      "moodle": "id",
+      "strings": 66,
+      "english": [
+        "offlineDialogRetryMessage"
+      ]
+    },
+    "it": {
+      "name": "Italian",
+      "moodle": "it",
+      "strings": 67
+    },
+    "ja": {
+      "name": "Japanese",
+      "moodle": "ja",
+      "strings": 67
+    },
+    "ko": {
+      "name": "Korean",
+      "moodle": "ko",
+      "strings": 57,
+      "english": [
+        "source",
+        "startingOver",
+        "subLevel",
+        "licenseU",
+        "licenseCC40",
+        "licenseCC30",
+        "licenseCC25",
+        "licenseCC20",
+        "licenseCC10",
+        "offlineDialogRetryMessage"
+      ]
+    },
+    "lo": {
+      "name": "Lao",
+      "moodle": "lo",
+      "strings": 67
+    },
+    "lt": {
+      "name": "Lithuanian",
+      "moodle": "lt",
+      "strings": 67
+    },
+    "lv": {
+      "name": "Latvian",
+      "moodle": "lv",
+      "strings": 55,
+      "english": [
+        "licenseCCBYSA",
+        "licenseCCBYND",
+        "licenseCCBYNCSA",
+        "licenseCCBYNCND",
+        "licenseCC40",
+        "licenseCC30",
+        "licenseCC25",
+        "licenseCC20",
+        "licenseCC10",
+        "licenseGPL",
+        "licenseCC010",
+        "licensePDM"
+      ]
+    },
+    "mn": {
+      "name": "Mongolian",
+      "moodle": "mn",
+      "strings": 67
+    },
+    "ms": {
+      "name": "Malaysian",
+      "moodle": "ms",
+      "strings": 46,
+      "english": [
+        "size",
+        "showAdvanced",
+        "advancedHelp",
+        "title",
+        "year",
+        "source",
+        "thumbnail",
+        "reuse",
+        "reuseContent",
+        "reuseDescription",
+        "startingOver",
+        "showMore",
+        "showLess",
+        "subLevel",
+        "licenseU",
+        "licensePD",
+        "licensePDM",
+        "resubmitScores",
+        "offlineDialogRetryMessage",
+        "offlineDialogRetryButtonLabel",
+        "offlineSuccessfulSubmit"
+      ]
+    },
+    "nl": {
+      "name": "Dutch",
+      "moodle": "nl",
+      "strings": 66,
+      "english": [
+        "offlineDialogRetryMessage"
+      ]
+    },
+    "no": {
+      "name": "Norwegian",
+      "moodle": "no",
+      "strings": 67
+    },
+    "pl": {
+      "name": "Polish",
+      "moodle": "pl",
+      "strings": 67
+    },
+    "pt": {
+      "name": "Portuguese",
+      "moodle": "pt",
+      "strings": 67
+    },
+    "pt-BR": {
+      "name": "Portuguese - Brazil",
+      "moodle": "pt_br",
+      "strings": 67
+    },
+    "ro": {
+      "name": "Romanian",
+      "moodle": "ro",
+      "strings": 66,
+      "english": [
+        "offlineDialogRetryMessage"
+      ]
+    },
+    "ru": {
+      "name": "Russian",
+      "moodle": "ru",
+      "strings": 67
+    },
+    "se": {
+      "name": "Northern Sami",
+      "moodle": "se",
+      "strings": 67
+    },
+    "sk": {
+      "name": "Slovak",
+      "moodle": "sk",
+      "strings": 67
+    },
+    "sl": {
+      "name": "Slovenian",
+      "moodle": "sl",
+      "strings": 67
+    },
+    "sq": {
+      "name": "Albanian",
+      "moodle": "sq",
+      "strings": 67
+    },
+    "sr-Cyrl": {
+      "name": "Serbian (Cyrillic)",
+      "moodle": "sr_cr",
+      "strings": 67
+    },
+    "sr-Latn": {
+      "name": "Serbian (Latin)",
+      "moodle": "sr_lt",
+      "strings": 67
+    },
+    "sv": {
+      "name": "Swedish",
+      "moodle": "sv",
+      "strings": 67
+    },
+    "szl": {
+      "name": "Silesian",
+      "moodle": "szl",
+      "strings": 67
+    },
+    "tr": {
+      "name": "Turkish",
+      "moodle": "tr",
+      "strings": 67
+    },
+    "uk": {
+      "name": "Ukrainian",
+      "moodle": "uk",
+      "strings": 67
+    },
+    "ur": {
+      "name": "Urdu",
+      "moodle": "ur",
+      "strings": 67
+    },
+    "uz": {
+      "name": "Uzbek",
+      "moodle": "uz",
+      "strings": 67
+    },
+    "zh-CN": {
+      "name": "Chinese (simplified)",
+      "moodle": "zh_cn",
+      "strings": 66,
+      "english": [
+        "offlineDialogRetryMessage"
+      ]
+    },
+    "zh-TW": {
+      "name": "Chinese (traditional/big5)",
+      "moodle": "zh_tw",
+      "strings": 66,
+      "english": [
+        "offlineDialogRetryMessage"
+      ]
+    }
+  },
+  "aliases": {
+    "bar": "de",
+    "ca-ES-valencia": "ca-valencia",
+    "dsb": "de",
+    "fkv": "no",
+    "in": "id",
+    "iw": "he",
+    "kl": "da",
+    "nb": "no",
+    "nn": "no",
+    "sma": "no",
+    "smj": "no",
+    "sr": "sr-Cyrl",
+    "wo": "fr",
+    "zh": "zh-CN",
+    "zh-HK": "zh-TW",
+    "zh-Hans": "zh-CN",
+    "zh-Hant": "zh-TW",
+    "zh-MO": "zh-TW",
+    "zh-SG": "zh-CN"
+  }
+}

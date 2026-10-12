@@ -28,6 +28,11 @@ inside the package.
 - **The frame is named after the package.** A screen reader announces the frame by the title
   in the package's `h5p.json`, and by "H5P content" before a package has loaded or when it has
   no title. From 0.1.10; up to 0.1.9 every frame was "H5P content".
+- **The frame says the content's language.** The frame document's `lang` is the package's own,
+  `defaultLanguage` in its `h5p.json`, as H5P declares it, so a screen reader reads the content
+  in its language; a package that names none takes the element's. H5P's own buttons and dialogs
+  follow the element's `lang`, its own or the page's, wherever the runtime has a translation. Up
+  to 0.6.1 every frame said it was English.
 - **Fullscreen works from the keyboard.** The content type's Fullscreen button enters it, its
   Exit fullscreen button leaves it, and focus comes back to the Fullscreen button.
 - **Failures are events, not messages.** The element renders nothing when a package fails; it
@@ -39,6 +44,8 @@ inside the package.
 ## What a host page should do
 
 - Give the player a heading or label nearby that says what the content is.
+- Declare the page's language, `<html lang="…">`, or the element's own `lang`: H5P's buttons
+  and dialogs follow it, and so does the frame of a package that does not name its language.
 - Show `error` messages in a live region that is on the page from the start, and do not hide
   the player on an `error` while `state` stays `ready`: the content is still running.
 - Do not set `tabindex="-1"` on the element or wrap it in something that takes focus.

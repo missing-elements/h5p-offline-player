@@ -150,6 +150,12 @@ importers:
         specifier: ^3.8.2
         version: 3.8.2
     devDependencies:
+      '@types/node':
+        specifier: ^26.6.4
+        version: 26.6.4
+      '@zip.js/zip.js':
+        specifier: ^2.23.0
+        version: 2.23.0
       esbuild:
         specifier: ^0.28.2
         version: 0.28.2

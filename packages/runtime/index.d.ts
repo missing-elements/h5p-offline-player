@@ -26,6 +26,12 @@ export interface FrameRuntime {
   /** The frame's boot script, which the player's Service Worker names in the frame document. */
   bootJs: string
   fonts: RuntimeFont[]
+  /**
+   * The core's interface strings in every language this package has, and which language tag gets
+   * which: one script, which the frame loads ahead of the boot script when the element's `lang`
+   * is not English, the core's own.
+   */
+  l10nJs: string
 }
 
 export const runtime: FrameRuntime

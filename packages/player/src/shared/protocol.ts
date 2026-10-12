@@ -110,6 +110,8 @@ export interface PackageRecord {
   allowOrigins?: string[]
   /** The display and loading options the host set; absent from a record an older element wrote. */
   frameOptions?: FrameOptions
+  /** The language tag the element was in when it loaded the package; absent when none was declared, and from a record an older element wrote. */
+  language?: string
   status: PackageStatus
   title?: string
   /** `h5p.json`'s licence, authors and the rest, for the frame's copyright dialog; absent from an older row. */
@@ -143,6 +145,13 @@ export interface FrameAssets {
    * from a record an older element wrote, whose `frameCss` still declares them.
    */
   fonts?: FrameFont[]
+  /**
+   * The core's strings in every language the runtime has, `l10n.js`, which the worker names in
+   * the frame document when the element's language is not English; the boot script picks the
+   * language. Absent from a record an older element wrote, and from a `runtime` older than the
+   * translations: the frame is then English.
+   */
+  l10nJs?: string
 }
 
 export interface FrameFont {

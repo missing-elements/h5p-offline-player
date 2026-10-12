@@ -1,6 +1,7 @@
 import jobsWorkerSource from 'virtual:h5p-jobs-worker'
 import SHADOW_CSS from './shadow.css?inline'
 import { FRAME_FONTS } from './frame-fonts'
+import { languageTag } from './shared/language'
 import type { ContentMetadata } from './shared/metadata'
 import { JobsWorkerHandle, type JobsScript } from './jobs-worker-handle'
 import { parseLibrarySources } from './shared/library-sources'
@@ -52,7 +53,8 @@ const ASSET_FILES = {
   mainJs: 'main.bundle.js',
   frameJs: 'frame.bundle.js',
   frameCss: 'h5p.css',
-  bootJs: 'frame-boot.js'
+  bootJs: 'frame-boot.js',
+  l10nJs: 'l10n.js'
 } as const
 
 // The two files this package ships beside the element are named here, one static
@@ -110,7 +112,22 @@ function assetsIn(base: string): FrameAssets {
     frameJs: new URL(ASSET_FILES.frameJs, base).href,
     frameCss: new URL(ASSET_FILES.frameCss, base).href,
     bootJs: new URL(ASSET_FILES.bootJs, base).href,
+    l10nJs: new URL(ASSET_FILES.l10nJs, base).href,
     fonts: FRAME_FONTS.map(({ family, style, weight, file }) => ({ family, style, weight, url: new URL(`fonts/${file}`, base).href }))
+  }
+}
+
+/**
+ * A `runtime`'s `l10nJs`, resolved against the page: the worker takes it only as an absolute
+ * http(s) URL, as it does the host's own scripts, and a relative one would otherwise be dropped
+ * there without a word. Absent, or not a URL, it leaves the frame English.
+ */
+function l10nFile(url: unknown): { l10nJs?: string } {
+  if (typeof url !== 'string' || !url) return {}
+  try {
+    return { l10nJs: new URL(url, location.href).href }
+  } catch {
+    return {}
   }
 }
 
@@ -120,6 +137,18 @@ const DEFAULT_ASSETS_DIR = 'frame-assets/'
 const DEFAULT_ASSETS: FrameAssets = import.meta.env.DEV
   ? assetsIn(new URL(DEV_ASSETS_BASE, location.href).href)
   : assetsIn(unbundled(new URL(DEFAULT_ASSETS_DIR, import.meta.url).href))
+
+/**
+ * The language an element is in: its own `lang`, or the nearest one above it, across a shadow
+ * root to its host, as HTML resolves an element's language. An empty `lang` says the language is
+ * unknown, which reads as none.
+ */
+function declaredLanguage(element: Element): string | undefined {
+  for (let node: Node | null = element; node; node = node.parentNode instanceof ShadowRoot ? node.parentNode.host : node.parentNode) {
+    if (node instanceof Element && node.hasAttribute('lang')) return node.getAttribute('lang')?.trim() || undefined
+  }
+  return undefined
+}
 
 export type PlayerState = 'idle' | 'probing' | 'downloading' | 'indexing' | 'ready' | 'error'
 
@@ -825,6 +854,7 @@ export class H5PPlayerElement extends HTMLElement {
       frameAssets: this.frameAssets(),
       allowOrigins: this.allowOrigins(),
       frameOptions: this.frameOptions(source),
+      language: this.frameLanguage(),
       status: 'registered',
       lastPlayed: Date.now(),
       version: VERSION
@@ -893,7 +923,9 @@ export class H5PPlayerElement extends HTMLElement {
    * The runtime's files, resolved by the host: the `runtime` export of
    * `@missing-elements/h5p-runtime`, which a bundler emits beside the host's own code. Read by the
    * load, so set it before `src`; it takes precedence over `assets-base`. A value missing any of
-   * the four files is refused, since a frame without one of them is a frame that never boots.
+   * the four files is refused, since a frame without one of them is a frame that never boots;
+   * `l10nJs` may be missing, as from a runtime older than the translations, and the frame is then
+   * English.
    */
   get runtime(): FrameAssets | null {
     return this.runtimeValue
@@ -906,6 +938,7 @@ export class H5PPlayerElement extends HTMLElement {
           frameJs: value.frameJs,
           frameCss: value.frameCss,
           bootJs: value.bootJs,
+          ...l10nFile(value.l10nJs),
           fonts: Array.isArray(value.fonts)
             ? value.fonts.filter((font) => font && typeof font === 'object').map(({ family, style, weight, url }) => ({ family, style, weight, url }))
             : []
@@ -919,6 +952,16 @@ export class H5PPlayerElement extends HTMLElement {
     const raw = this.getAttribute('assets-base')?.trim()
     if (!raw) return DEFAULT_ASSETS
     return assetsIn(new URL(raw.endsWith('/') ? raw : `${raw}/`, location.href).href)
+  }
+
+  /**
+   * The language the frame is in, read by the load like the attributes the record keeps: the
+   * element's `lang`, or the one it inherits from the page. The worker writes it as the frame
+   * document's language, and the runtime's boot script picks its translation of the core's
+   * strings for it, or leaves them English.
+   */
+  private frameLanguage(): string | undefined {
+    return languageTag(declaredLanguage(this))
   }
 
 

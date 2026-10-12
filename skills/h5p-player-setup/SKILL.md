@@ -92,7 +92,9 @@ element writes is an inline style and would beat the page's rule. Any CSS goes o
 **Coming from h5p-standalone:** its options carry over by name as attributes — `frame`,
 `copyright`, `export`, `icon`, `embed` (bare = on), `fullscreen="off"`, `download-url`,
 `embed-code`, `custom-css`, `custom-js`, `reporting`, `activity-id` — and `user` as a property.
-The guide's "Coming from h5p-standalone" table maps every option, including the ones the `.h5p`
+Its `translations` are `lang`: H5P's own buttons and dialogs follow the element's language, which
+it inherits from the page's `<html lang>` like any element, so a page in German shows them in German;
+strings of the host's own cannot be passed. The guide's "Coming from h5p-standalone" table maps every option, including the ones the `.h5p`
 or the events replace. Formulas need `H5P.MathDisplay` in the package, not a `customJs` recipe.
 
 **Resume, only when asked for.** By default a reload starts the content over and nothing is
@@ -132,8 +134,9 @@ The script line sizes the iframe to the content; a page that already has h5p.org
 activity; `min-height` is for a platform that strips the script. Encode `&`, `#`, `+`, `%` and
 spaces inside `src`. Parameters, by the element's attribute names: `libraries=pack` or
 `libraries=<url>` for a package without libraries (`libraries=none` turns off the site's default), `preload=auto`, `frame`, `copyright`,
-`export`, `icon`, `reporting`, `fullscreen=off`, `activity-id=<IRI>`, `custom-css=<URL>`, and
-`xapi=<the page's origin>` to receive statements by `postMessage`. Not `custom-js` or `user`.
+`export`, `icon`, `reporting`, `fullscreen=off`, `activity-id=<IRI>`, `custom-css=<URL>`,
+`lang=<the page's language>` for H5P's own buttons and dialogs, and `xapi=<the page's origin>` to
+receive statements by `postMessage`. Not `custom-js` or `user`.
 
 Paste it into the platform's HTML block (Custom HTML in WordPress, Embed in Squarespace, Wix or
 Google Sites, HTML view in Moodle). The embedding page must be https (or localhost); the frame

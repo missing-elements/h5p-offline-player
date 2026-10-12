@@ -372,3 +372,62 @@ describe('the package’s metadata', () => {
     expect(html).not.toContain('"title"')
   })
 })
+
+describe('the frame’s language', () => {
+  const l10nJs = 'https://site.example/frame-assets/l10n.js'
+  const translated = { ...options, assets: { ...options.assets, l10nJs } }
+  const bootLanguage = (html: string) => JSON.parse(/id="h5p-boot-config">([^<]*)</.exec(html)![1]).language
+  const htmlTag = (html: string) => /<html [^>]*>/.exec(html)![0]
+
+  it('is English when neither the element nor the package says otherwise, with no translations', () => {
+    const html = buildFrameDocument(translated)
+    expect(htmlTag(html)).toBe('<html lang="en" class="h5p-iframe">')
+    expect(html).not.toContain('l10n.js')
+    expect(bootLanguage(html)).toBeUndefined()
+  })
+
+  it('names the runtime’s translations ahead of the boot script, and tells it the element’s language', () => {
+    const html = buildFrameDocument({ ...translated, language: 'de-AT' })
+    const at = html.indexOf(`<script nonce="${options.nonce}" src="${l10nJs}" charset="UTF-8"></script>`)
+    expect(at).toBeGreaterThan(html.indexOf('main.bundle.js'))
+    expect(at).toBeLessThan(html.indexOf('frame-boot.js'))
+    expect(bootLanguage(html)).toBe('de-AT')
+  })
+
+  it('declares the content’s own language as the document’s, as H5P does, whatever the buttons are in', () => {
+    // An English quiz on a German page: read in English, with German buttons around it.
+    const html = buildFrameDocument({ ...translated, language: 'de', metadata: { title: 'Quiz', defaultLanguage: 'en' } })
+    expect(htmlTag(html)).toBe('<html lang="en" class="h5p-iframe">')
+    expect(bootLanguage(html)).toBe('de')
+    // A package that names no language, or `und`, takes the element’s.
+    expect(htmlTag(buildFrameDocument({ ...translated, language: 'de' }))).toBe('<html lang="de" class="h5p-iframe">')
+    expect(htmlTag(buildFrameDocument({ ...translated, language: 'de', metadata: { defaultLanguage: 'und' } }))).toBe('<html lang="de" class="h5p-iframe">')
+  })
+
+  it('needs no translations in any English', () => {
+    const html = buildFrameDocument({ ...translated, language: 'en-GB', metadata: { defaultLanguage: 'de' } })
+    expect(htmlTag(html)).toBe('<html lang="de" class="h5p-iframe">')
+    expect(html).not.toContain('l10n.js')
+    expect(bootLanguage(html)).toBeUndefined()
+  })
+
+  it('names no translations when the record has none, as an older element’s does', () => {
+    const html = buildFrameDocument({ ...options, language: 'de' })
+    expect(htmlTag(html)).toBe('<html lang="de" class="h5p-iframe">')
+    expect(html).not.toContain('l10n.js')
+  })
+
+  it('lets the translations load from their own origin, as the frame assets do', () => {
+    const csp = buildContentSecurityPolicy({ ...options, assets: { ...options.assets, l10nJs: 'https://cdn.example/runtime/l10n.js' }, language: 'de' })
+    const [scriptSrc] = csp.split('; ').filter((part) => part.startsWith('script-src'))
+    expect(scriptSrc).toContain('https://cdn.example')
+  })
+
+  it('is held to its shape on the way out, since the record came back from storage', () => {
+    const hostile = { ...options, assets: { ...options.assets, l10nJs: 'javascript:alert(2)' } }
+    const html = buildFrameDocument({ ...hostile, language: 'de" onload="alert(1)', metadata: { defaultLanguage: 'en" onload="alert(3)' } })
+    expect(htmlTag(html)).toBe('<html lang="en" class="h5p-iframe">')
+    expect(html).not.toContain('alert(1)')
+    expect(buildFrameDocument({ ...hostile, language: 'de' })).not.toContain('alert(2)')
+  })
+})

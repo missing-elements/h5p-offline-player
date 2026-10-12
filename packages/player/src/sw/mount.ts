@@ -264,7 +264,8 @@ class VirtualServer {
       metadata: record.metadata,
       allowOrigins: record.allowOrigins,
       frameOptions: record.frameOptions,
-      upgrades
+      upgrades,
+      language: record.language
     })
 
     return new Response(body, {

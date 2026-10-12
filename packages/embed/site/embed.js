@@ -7,7 +7,7 @@
  *
  *   ?src=<package url>[&libraries=pack|<url> …|none][&preload=auto][&xapi=<parent origin>]
  *    [&frame][&copyright][&export][&icon][&reporting][&fullscreen=off]
- *    [&activity-id=<IRI>][&custom-css=<stylesheet url>]
+ *    [&activity-id=<IRI>][&custom-css=<stylesheet url>][&lang=<language tag>]
  *
  * Upward it speaks H5P's own resizer protocol — the `hello` / `resize` exchange that h5p.org's
  * embed code and its `h5p-resizer.js` use — so a page that already resizes h5p.org iframes
@@ -243,9 +243,10 @@ export function startEmbed({ librariesPack = null, packages = null, defaultLibra
    * The element's display options, by their attribute names, for the embedding page to ask for:
    * `&frame&copyright&export` shows H5P's action bar with those buttons, `&fullscreen=off` takes
    * that one away, `&activity-id=` names the statements' object and `&custom-css=` restyles the
-   * content to the embedding site's taste. Not `custom-js`, `embed-code` or `user`: a script is
-   * a capability on this origin that a link should not hand out, the embed is the embed, and a
-   * learner's name has no place in a URL.
+   * content to the embedding site's taste. `&lang=` is the embedding page's language, which this
+   * page cannot read across origins: H5P's own buttons and dialogs follow it. Not `custom-js`,
+   * `embed-code` or `user`: a script is a capability on this origin that a link should not hand
+   * out, the embed is the embed, and a learner's name has no place in a URL.
    */
   const applyOptions = () => {
     for (const name of ['frame', 'copyright', 'export', 'icon', 'reporting']) {
@@ -256,6 +257,8 @@ export function startEmbed({ librariesPack = null, packages = null, defaultLibra
       const value = params.get(name)?.trim()
       if (value) player.setAttribute(name, value)
     }
+    const lang = params.get('lang')?.trim().replaceAll('_', '-')
+    if (lang && /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/.test(lang)) player.setAttribute('lang', lang)
   }
 
   const start = (value, libraries) => {

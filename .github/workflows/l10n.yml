@@ -1,0 +1,73 @@
+name: Translations
+
+# Takes the H5P core's strings from Moodle's language packs again every week and opens a pull
+# request when a translation changed. The generator writes nothing when none did, its date
+# included, so an unchanged week leaves the tree clean.
+
+on:
+  schedule:
+    - cron: '30 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: translations
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm l10n
+      # The rules the files are held to: every string fit to stand in for the core's, every alias
+      # leading to a language that is there.
+      - run: pnpm --filter @missing-elements/h5p-runtime test
+
+      - name: Open a pull request if a translation changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Status rather than diff: a language that crossed the line is a new, untracked file.
+          if [ -z "$(git status --porcelain -- packages/runtime/l10n)" ]; then
+            echo "No translation has changed."
+            exit 0
+          fi
+
+          branch=l10n/refresh
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -C "$branch"
+          git add packages/runtime/l10n
+          changes=$(git diff --cached --stat -- packages/runtime/l10n)
+          git commit -m "chore(l10n): refresh the core's translations from Moodle"
+          git push --force origin "$branch"
+
+          body=$(printf '%s\n' \
+            "The weekly run of \`pnpm l10n\` found changed translations in Moodle's language packs; the" \
+            "runtime's tests passed on them in that run." \
+            "" \
+            "Push to this branch, or close and reopen the pull request, to run CI: it does not start on a pull" \
+            "request opened by a workflow. After merging, release \`@missing-elements/h5p-runtime\`: bump its" \
+            "version and the version the setup snippets pin, then publish it with pnpm. The player needs no" \
+            "release: hosts get the strings when they update the runtime." \
+            "" \
+            '```' "$changes" '```')
+
+          if gh pr view "$branch" --json state --jq .state 2>/dev/null | grep -q OPEN; then
+            gh pr edit "$branch" --title "Translations from Moodle" --body "$body"
+          elif ! gh pr create --base main --head "$branch" --title "Translations from Moodle" --body "$body"; then
+            # Opening a pull request needs "Allow GitHub Actions to create and approve pull
+            # requests" in the repository's Actions settings; without it the branch is still pushed.
+            echo "::warning::Could not open the pull request. Open it from $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/main...$branch"
+            printf '%s\n' "$body" >> "$GITHUB_STEP_SUMMARY"
+          fi

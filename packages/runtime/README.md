@@ -27,5 +27,21 @@ Without one, point the element at a copy of `dist/`:
 Or copy `dist/` to `frame-assets/` next to `h5p-player.js`, where the element looks by default.
 
 `dist/` holds `main.bundle.js` and `frame.bundle.js` (h5p-standalone's loader, the H5P core and
-jQuery), `h5p.css`, `fonts/`, `frame-boot.js`, `MANIFEST.json`, `LICENSE.txt` and `NOTICE.txt`.
-Use a runtime version within the range the player names as its optional peer dependency.
+jQuery), `h5p.css`, `fonts/`, `frame-boot.js`, `l10n.js`, `MANIFEST.json`, `LICENSE.txt` and
+`NOTICE.txt`. Use a runtime version within the range the player names as its optional peer
+dependency.
+
+## Languages
+
+`l10n.js` has the core's own strings — "Fullscreen", "Rights of use", the licence names, the
+"this content has changed" dialog — in more than fifty languages, taken from Moodle's language
+packs, where Moodle's translators keep them. The frame loads it when the element's `lang`, which
+the element inherits from the page like any other, is not English, and picks the language from
+it: `<html lang="de">` shows them in German, `de-AT` gets `de` and `nb` gets Norwegian. A string a
+language lacks stays English, and so does a language with none. The file is about 50 kB
+compressed, fetched once; a page in English never asks for it. `runtime.l10nJs` names it for a
+bundler.
+
+`pnpm l10n` in this package takes the strings from Moodle again, and a weekly workflow does the
+same and opens a pull request when a translation changed. A language added or corrected is a
+release of this package alone: the player knows no list of languages.

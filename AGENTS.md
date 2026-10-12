@@ -54,6 +54,7 @@ packages/player/          @missing-elements/h5p-offline-player — the published
       entry-names.ts        entry-name normalisation — the security boundary for hostile archives
       revision.ts           `withProvenance` and `indexFingerprint`: the build every statement names
       metadata.ts           `h5p.json`'s metadata in the shape the runtime reads, held to the core's licence table
+      language.ts           the element's language tag, and that English needs none of the runtime's translations
       range.ts, mime.ts, pkg-id.ts, stream-utils.ts
     sw/
       sw-entry.ts           standalone worker  -> dist/h5p-sw.js
@@ -69,7 +70,8 @@ packages/player/          @missing-elements/h5p-offline-player — the published
       chunk-writer.ts       a WritableStream that lands bytes in the chunk store and publishes a watermark
       warm.ts               walks the library spans off one ranged request each and caches their entries
   scripts/                  sync-h5p-assets (builds the runtime package and copies its dist/ to public/frame-assets/,
-                            writes frame-fonts.ts, stamps the version), build-workers, build-fixtures, prepack;
+                            writes frame-fonts.ts, stamps the version), build-workers,
+                            build-fixtures, prepack;
                             scripts/lib/worker-bundle.mjs builds both workers, and a host's own worker with the
                             handlers mounted (the demo uses it for h5p-sw.js and the app's sw.js)
   vite.config.ts            the library build and the test runner
@@ -87,8 +89,15 @@ packages/runtime/         @missing-elements/h5p-runtime — the H5P core runtime
                             the core's API, so it ships here, under the GPL, as dist/frame-boot.js
   src/content-upgrade.ts    the libraries' upgrade steps, run on content written for an older minor than
                             the one served; bundled into frame-boot.js, unit-tested in tests/
+  src/l10n.ts               which of the translations a frame's language gets; bundled into
+                            frame-boot.js, unit-tested in tests/
   scripts/build.mjs         vendors h5p-standalone into dist/ (headers, the rebuilt stylesheet, the fonts,
-                            LICENSE.txt, NOTICE.txt, MANIFEST.json), builds the boot script, writes index.js
+                            LICENSE.txt, NOTICE.txt, MANIFEST.json), builds the boot script, writes
+                            dist/l10n.js from l10n/, writes index.js
+  l10n/                     the core's interface strings, one JSON file per language, from Moodle's
+                            language packs, and index.json, their sources and aliases; committed,
+                            written by scripts/build-l10n.mjs (`pnpm l10n`, and every Monday by
+                            .github/workflows/l10n.yml)
   index.js                  generated, not in git: `runtime`, one static `new URL` per file, for a bundler;
                             index.d.ts its types
   LICENSE, NOTICE.md        the GPL text, and what is in the package and where it came from
@@ -228,6 +237,9 @@ pnpm demo:og           # re-render the social card, apps/demo/demo/og-image.png
 pnpm demo:icons        # re-render the installable app's icons, apps/demo/app/icons/
 pnpm libraries         # rebuild packages/libraries from the H5P hub; before a release, and every
                        # Monday by .github/workflows/libraries.yml, which opens a PR when a library changed
+pnpm l10n              # take the core's translations from Moodle's language packs again, into
+                       # packages/runtime/l10n/; every Monday by .github/workflows/l10n.yml, which
+                       # opens a PR when a translation changed
 pnpm preview:demo      # serves dist-demo/ with the production headers and the /no-range route
 ```
 
@@ -481,6 +493,52 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   and upstream's checks against the parent's semantics. `packages/runtime/tests/` pins the rules;
   `tests/browser/upgrades.test.ts` plays exports written for 1.0, 1.1 and 1.2, sub-content
   included, against a bundle at 1.2, and one whose step throws.
+- **The core's strings follow the element's language.** Built on 2026-10-12, to match the CMS
+  plugins, which show H5P's own strings — the fullscreen button, "Rights of use" and the licence
+  names in it, the "this content has changed" dialog — in the site's language; h5p-standalone's
+  are English. The element reads its `lang`, its own or inherited across a shadow root to its host
+  (`declaredLanguage`), and the record keeps the tag; unless it is English, the worker names the
+  runtime's `l10n.js` before the boot script and puts the tag in the boot configuration. The
+  frame's `<html lang>` is the content's, not that tag: `h5p.json`'s `defaultLanguage`, which H5P
+  writes into the iframe it makes, so a screen reader reads an English quiz on a German page in
+  English with German buttons around it — the first cut wrote the element's tag there, and review
+  caught it the same day — and the element's tag only for a package that names none. That one
+  file has every language and the aliases; the boot script picks one by RFC 4647 lookup through
+  the aliases (`src/l10n.ts` in the runtime — `de-AT` gets `de`, `nb` Norwegian) and hands it to
+  h5p-standalone as `translations`, deep-merged over its English, so a missing key stays English,
+  and in time for the core's ready handler to build the licence names from it. The player holds
+  no list of languages, decided the same day: a first cut had a file per language and the player
+  matching tags against the runtime's list, so a new language took a release of both. Now it is a
+  runtime release, at the price of one file, about 50 kB gzipped, fetched once by a learner whose
+  page is not in English, Thai included, which finds nothing in it. A script rather than JSON
+  because the frame's `script-src` names the runtime's origin and its `connect-src` does not. A
+  `runtime` without `l10nJs`, or a runtime directory without the file (its 404 ignored: no
+  `data-h5p`), leaves the frame English. The embed page takes `&lang=`.
+
+  The translations are Moodle's: H5P publishes none for the core, each platform translates it
+  itself, and Moodle's translators (AMOS) are the most complete, under GPL-3.0-or-later; Lumi's set
+  is machine-translated, reviewed by no native speaker by its own account
+  (Lumieducation/H5P-Nodejs-library#4654). `pnpm l10n` reads `h5p.php` and `langconfig.php` from
+  every pack in Moodle 5.2's `languages.md5`, by range through zip.js, maps each core key through
+  its English message to Moodle's id by `$translationsmap` at a pinned commit, and writes
+  `l10n/<tag>.json` and `index.json`, committed. `.github/workflows/l10n.yml` runs it every Monday
+  and opens a pull request when a file changed; an unchanged week writes nothing, its date
+  included, and one that would lose more than three languages at once stops before deleting
+  anything (`--allow-loss` once someone has looked). When Moodle branches, `MOODLE_VERSION` is what
+  moves. Which packs become languages is a rule, not a list (`packTag`): two thirds of the 67
+  strings or more; a code of letters is its tag, `xx_yy` a region only where the pack's
+  `langconfig.php` places it there — `fi_co` is Finnish for companies, not Colombia — `sr_cr`,
+  `sr_lt` and `ca_valencia` named, other variants out, every tag in its canonical form (`pan` is
+  written `pa`). A pack with nothing of its own beyond its parent's is left to the lookup when it
+  is a region of the parent's language, and becomes an alias when it is another language, as Moodle
+  shows Nynorsk, Greenlandic and Lower Sorbian learners the Norwegian, Danish and German; a few
+  aliases are fixed (`iw`, `in`, Chinese by script and region, `sr`, `ca-ES-valencia`). A
+  translation that renamed a `:placeholder`, or that carries markup or a double quote, which the
+  core writes into attributes, is dropped, and a licence name loses the bracketed abbreviation
+  Moodle's English added, "Attribution (CC BY)". `tests/l10n.test.ts` in the runtime holds every
+  file and alias to those rules and pins the lookup; `tests/browser/l10n.test.ts` plays German,
+  Brazilian Portuguese, Austrian German, Bokmål, Greek one string short, English and Thai, and a
+  `runtime` with and without `l10nJs`; the embed's `site.test.ts` an English quiz on a German page.
 - **An unreachable library source falls back to a bundle downloaded from it before.** When the
   probe of `libraries`' URL fails — offline, the hub down, a 5xx — the element asks the worker
   (`find-downloaded-libraries`) for the newest `role: 'libraries'` row with the same URL whose
@@ -683,7 +741,7 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   snippet for the loaded URL as the embed code (per load, since it names the package; off for a
   picked file), the embed example asks for `&frame&copyright&export`, and the xAPI example sets
   `user`. `/embed` passes `frame`, `copyright`, `export`, `icon`, `reporting`, `fullscreen=off`,
-  `activity-id` and `custom-css` through from its query string, and not `custom-js`,
+  `activity-id`, `custom-css` and `lang` through from its query string, and not `custom-js`,
   `embed-code` or `user`: a script is a capability on this origin a link should not hand out,
   and a learner's name has no place in a URL.
 - **The frame uses `embedType: 'div'`.** With the default `iframe` type, H5P core creates an inner
@@ -1173,7 +1231,7 @@ extra pass. Vite's own output was 215 kB with every JSDoc block in it.
 **A host's bundler copies every file; nobody copies anything by hand.** Each package names each
 file it ships with its own literal `new URL('./file', import.meta.url)` — the element its worker
 and `h5p-jobs.js`, the runtime's generated `index.js` the two runtime scripts, `frame-boot.js`,
-`h5p.css` and the twelve text fonts — because that is the one shape Vite, Rollup and webpack 5
+`l10n.js`, `h5p.css` and the twelve text fonts — because that is the one shape Vite, Rollup and webpack 5
 emit as an asset and rewrite. A directory (`./frame-assets/` plus a name at runtime) cannot be
 emitted that way, and neither can a file that reaches a sibling by a relative URL, since each
 asset lands under a hashed name of its own. So the runtime's build rebuilds the core stylesheet:
@@ -1581,8 +1639,8 @@ SPA-fallback trap described above cannot happen there.
 
 Unit tests cover the pure logic: name normalisation, range parsing, chunk arithmetic, strategy
 selection, the CSP and the generated frame document in the player, the writer, remux and
-policy in `packages/normalize`, and the content upgrade in `packages/runtime`, that package's only
-tests. They are fast and are where a rule belongs. Both test
+policy in `packages/normalize`, and the content upgrade, the translations' rules and the choice
+of language in `packages/runtime`, that package's only tests. They are fast and are where a rule belongs. Both test
 tsconfigs have `allowJs`, so tests can import the `.mjs` scripts; those are typed through JSDoc
 and not checked. The player's browser suite no longer has an `index.html` behind its dev server
 — the pages moved to the demo — so a missing file is a `404` there, not the SPA fallback's page;
@@ -1756,6 +1814,8 @@ deliberate additions to it, not drift:
 - Content written for an older minor than the one served is upgraded in the frame with the
   libraries' own steps. The design serves what a package carries; a bundle that serves newer
   minors needs the step the platforms take when they install one.
+- The core's own strings follow the element's language, from translations the runtime carries.
+  The design's frame is English throughout.
 
 ## Not built yet
 

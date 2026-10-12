@@ -110,6 +110,7 @@ allows one Service Worker, or must work offline, mounts the player in its own wo
 | `custom-css`, `custom-js` | attribute | Stylesheets and scripts loaded in the frame after the runtime's own |
 | `reporting` | attribute | Enables the submit button in content types that have one |
 | `activity-id` | attribute | The statements' object id. Default: the package URL |
+| `lang` | attribute | The language of H5P's own buttons and dialogs, such as "Fullscreen" and "Rights of use", in more than fifty languages. Inherited from the page like any element's language, and read at each load. Default: English |
 | `user` | property | `{ name, mail }`, the actor of every statement. Set before `src` |
 | `auto-resize` | attribute | `off` to size the element yourself. Default: follows the content's height |
 | `preload` | attribute, property | `auto` pulls large deflated media before it is asked for. Default: `none` |

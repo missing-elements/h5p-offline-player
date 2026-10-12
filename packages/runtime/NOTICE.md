@@ -47,14 +47,27 @@ runs the libraries' own upgrade steps on content written for an older minor, by 
 `js/h5p-content-upgrade-process.js` in h5p-php-library (GPL-3.0); it was written for this package
 rather than copied from that file.
 
+## The translations in `dist/l10n.js` — GPL-3.0-or-later
+
+`dist/l10n.js` holds the core's interface strings in every language this package has, built from
+`l10n/` in this package's source, which `scripts/build-l10n.mjs` writes from
+[Moodle's language packs](https://download.moodle.org/langpack/): Moodle translates the same
+strings for its own H5P support, and `core_h5p\framework::t()` in Moodle says which of its
+strings is which. Copyright Moodle and its translators, under the **GNU General Public License
+v3.0 or later**, which this package's GPL-3.0 accepts. `l10n/index.json` in the
+[repository](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/runtime/l10n)
+names the pack each
+language came from, the date they were taken and the strings left in English, where a pack
+had none or one that broke a placeholder. The file opens with a comment naming its source.
+
 ## What this means for a site
 
 A site that serves `dist/` to browsers is distributing GPL-3.0 code, with what that entails for
 keeping the notices and making the source available; the notices above and the files beside the
 directory are what it needs. With a bundler the files are emitted under hashed names and the
-text files do not travel; `frame.bundle.js`, `main.bundle.js`, `h5p.css` and `frame-boot.js`
-therefore each open with a `/*! … */` comment naming their licences and the corresponding source,
-which bundlers leave in an emitted asset.
+text files do not travel; `frame.bundle.js`, `main.bundle.js`, `h5p.css`, `frame-boot.js` and
+`l10n.js` therefore open with a `/*! … */` comment naming their licences and the
+corresponding source, which bundlers leave in an emitted asset.
 
 Whether the copyleft reaches the page around the player is a legal question this file does not
 answer. The arrangement is this: the player is a separate program, under its own MIT licence,

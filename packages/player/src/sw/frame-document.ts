@@ -1,5 +1,6 @@
 import type { FrameAssets, FrameFont, FrameOptions } from '../shared/protocol'
 import { contentMetadata, type ContentMetadata } from '../shared/metadata'
+import { isEnglish, LANGUAGE_TAG } from '../shared/language'
 
 /**
  * The frame document, generated per request. H5P core assumes it owns the page — it plants
@@ -80,6 +81,8 @@ export interface FrameDocumentOptions {
    * written for an older minor than the one served.
    */
   upgrades?: string[]
+  /** The language tag the element was in, which H5P's own strings follow; English without one. */
+  language?: string
 }
 
 function escapeHtml(value: string): string {
@@ -107,10 +110,49 @@ export function bootScriptUrl(assets: FrameAssets): string {
   }
 }
 
+/** A tag from a record, which came back from IndexedDB: held to a tag's shape, `und` read as none. */
+function recordedTag(value: unknown): string | undefined {
+  return typeof value === 'string' && LANGUAGE_TAG.test(value) && value.toLowerCase() !== 'und' ? value : undefined
+}
+
+/** The language H5P's own buttons and dialogs are in: the element's, else English, the core's own. */
+function frameLanguage(language: string | undefined): string {
+  return recordedTag(language) ?? 'en'
+}
+
+/**
+ * The document's language, which is the content's: `h5p.json`'s `defaultLanguage`, which H5P
+ * writes as the `lang` of the iframe it makes, so that a screen reader reads the content in its
+ * own language while the buttons around it follow the page's. A package that names none takes the
+ * element's language, likelier its own than English is; with neither, the document is English.
+ */
+function documentLanguage(metadata: ContentMetadata | undefined, language: string | undefined): string {
+  return recordedTag(metadata?.defaultLanguage) ?? frameLanguage(language)
+}
+
+/**
+ * The runtime's `l10n.js`, which the boot script picks the core's strings from, when the frame
+ * needs it: in any language but English, the core's own. The URL comes back from IndexedDB too,
+ * so it is held to http(s), like the host's own scripts. A record an older element wrote has
+ * none, and its frame stays English.
+ */
+function l10nScriptUrl(assets: FrameAssets, language: string): string | undefined {
+  if (isEnglish(language)) return undefined
+  return customUrls(typeof assets.l10nJs === 'string' ? [assets.l10nJs] : [])[0]
+}
+
 /** Origins that appear in a CSP directive, deduplicated. `'self'` covers same-origin assets. */
-function assetOrigins(assets: FrameAssets, base: string): string[] {
+function assetOrigins(assets: FrameAssets, base: string, language: string): string[] {
   const origins = new Set<string>()
-  const urls = [assets.mainJs, assets.frameJs, assets.frameCss, bootScriptUrl(assets), ...(assets.fonts ?? []).map((font) => font.url)]
+  const strings = l10nScriptUrl(assets, language)
+  const urls = [
+    assets.mainJs,
+    assets.frameJs,
+    assets.frameCss,
+    bootScriptUrl(assets),
+    ...(assets.fonts ?? []).map((font) => font.url),
+    ...(strings ? [strings] : [])
+  ]
   for (const url of urls) {
     try {
       const origin = new URL(url, base).origin
@@ -197,7 +239,7 @@ function sanitizeFrameOptions(options: FrameOptions | undefined): FrameOptions |
 }
 
 export function buildContentSecurityPolicy(options: FrameDocumentOptions): string {
-  const origins = assetOrigins(options.assets, options.virtualRoot)
+  const origins = assetOrigins(options.assets, options.virtualRoot, frameLanguage(options.language))
   const extra = sanitizeOrigins(options.allowOrigins)
   // The host's own stylesheets and scripts are the host's choice, like `assets-base`: their
   // origins join the directive they load under without an `allow-origins` entry.
@@ -258,6 +300,8 @@ export function buildContentSecurityPolicy(options: FrameDocumentOptions): strin
 export function buildFrameDocument(options: FrameDocumentOptions): string {
   const { pkgId, virtualRoot, assets, nonce } = options
   const csp = buildContentSecurityPolicy(options)
+  const language = frameLanguage(options.language)
+  const l10nJs = l10nScriptUrl(assets, language)
 
   // A JSON block, not a script: it is data, so it needs no nonce, and the boot script proper —
   // `frame-boot.js` from the runtime package, loaded by URL under the nonce — is the same bytes
@@ -271,10 +315,16 @@ export function buildFrameDocument(options: FrameDocumentOptions): string {
     // Checked again on the way out, as the options are: the record came back from IndexedDB.
     metadata: contentMetadata(options.metadata),
     options: sanitizeFrameOptions(options.frameOptions),
-    upgrades: options.upgrades
+    upgrades: options.upgrades,
+    // What the boot script picks H5P's own strings by, when it has the runtime's translations.
+    language: l10nJs ? language : undefined
   }).replaceAll('<', '\\u003c')
 
   const fontFaces = fontFaceRules(assets.fonts)
+  // The core's strings in every language the runtime has, a script that leaves them on `window`
+  // for the boot script, which picks the element's language and hands its strings to
+  // h5p-standalone: so it comes before it.
+  const strings = l10nJs ? `<script nonce="${nonce}" src="${escapeHtml(l10nJs)}" charset="UTF-8"></script>\n` : ''
 
   // The last rule in the style block is for H5P.Video's YouTube handler, which pins its iframe
   // over the 16:9 box it builds with one line that reaches into the YouTube API object's minified
@@ -282,7 +332,7 @@ export function buildFrameDocument(options: FrameDocumentOptions): string {
   // line throws and the iframe flows below the box instead: a black picture with sound. The rule
   // says what that line meant; a fixed library (1.6.80, `getIframe()`) sets the same styles.
   return `<!DOCTYPE html>
-<html lang="en" class="h5p-iframe">
+<html lang="${escapeHtml(documentLanguage(options.metadata, options.language))}" class="h5p-iframe">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -299,7 +349,7 @@ ${fontFaces}
 <body>
 <div id="h5p-root"></div>
 <script nonce="${nonce}" src="${escapeHtml(assets.mainJs)}" charset="UTF-8"></script>
-<script type="application/json" id="h5p-boot-config">${bootConfig}</script>
+${strings}<script type="application/json" id="h5p-boot-config">${bootConfig}</script>
 <script nonce="${nonce}" src="${escapeHtml(bootScriptUrl(assets))}"></script>
 </body>
 </html>`

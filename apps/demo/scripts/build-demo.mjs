@@ -80,6 +80,8 @@ async function appPrecache() {
     .filter((entry) => entry.isFile())
     .map((entry) => relative(outDir, resolve(entry.parentPath, entry.name)).split(sep).join('/'))
   for (const name of [...(await under('frame-assets')), ...(await under('app'))]) files.add(name)
+  // The app's page is English, so its frame never asks for the runtime's translations.
+  files.delete('frame-assets/l10n.js')
 
   // The page is cached under its directory URL, the one the app is opened at.
   files.delete('app/index.html')

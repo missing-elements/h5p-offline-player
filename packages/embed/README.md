@@ -66,6 +66,7 @@ It works at a domain's root or under a path, over https. Serve `h5p-sw.js` with
 | `preload=auto` | Start fetching media at once |
 | `activity-id=<IRI>` | The xAPI object id, instead of the package URL |
 | `custom-css=<url>` | A stylesheet loaded into the content |
+| `lang=<tag>` | The language of H5P's own buttons and dialogs, such as `de` or `pt-BR`. Default: English |
 | `xapi=<origin>` | Relay statements to the embedding page |
 
 A custom script and a learner's name cannot be set on the address. Opened unframed, the page asks
