@@ -1643,7 +1643,13 @@ SPA-fallback trap described above cannot happen there.
   `launchQueue` — and reads the file from disk again, after the permission prompt Chrome shows
   once a session, which offers "Allow on every visit"; a file moved or deleted asks to be chosen
   again. Everywhere else, a tab in Chrome included, it keeps a copy of the file in a store beside
-  the list, and the entry shows the copy's size; taking the entry off deletes the copy. Handles
+  the list, and the entry shows the copy's size; taking the entry off deletes the copy. A private
+  profile keeps a reference to the file there, not its bytes: in the one Playwright opens, a file
+  deleted after it was opened could not be read from its "copy", and the player said "Could not
+  read the archive index", where a profile on disk, Chromium's and Chrome's, kept the bytes and
+  reopened it (2026-10-12). So `copyOf` reads a byte before handing a copy over, and an entry that
+  cannot open its file asks for it, and goes from the list until it is chosen again — a copy kept
+  already is never written again, so the dead one would otherwise stay. Handles
   only when installed, because storing one in IndexedDB took the whole browser down in a private
   profile: Chromium 153 in a context Playwright opens, which is the DevTools protocol's private
   kind, with a handle to a file dropped from disk and to one in the origin's own file system

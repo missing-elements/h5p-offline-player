@@ -126,12 +126,18 @@ async function keepCopy(id, file) {
 
 /**
  * The copy kept of a file, under the name and date of the file it copies, which the player knows
- * a file by; `null` when none is kept, or the browser has cleared it.
+ * a file by; `null` when none is kept, the browser has cleared it, or it cannot be read. A private
+ * profile keeps a reference to the file on disk rather than its bytes — Chromium in the profile
+ * Playwright opens did, where a profile on disk, Chromium's and Chrome's, kept the bytes
+ * (2026-10-12) — so there a file moved or deleted since has no copy left, which a byte read finds
+ * out before the player is handed it.
  */
 export async function copyOf(entry) {
   try {
     const blob = await read(COPIES, (store) => store.get(entry.id))
-    return blob ? new File([blob], entry.name, { lastModified: entry.lastModified, type: blob.type }) : null
+    if (!blob) return null
+    await blob.slice(0, 1).arrayBuffer()
+    return new File([blob], entry.name, { lastModified: entry.lastModified, type: blob.type })
   } catch (error) {
     console.warn(`[app] the copy of ${entry.name} could not be read`, error)
     return null

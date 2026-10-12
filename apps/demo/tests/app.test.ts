@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { copyFile, mkdtemp, rm } from 'node:fs/promises'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -324,6 +324,37 @@ it('lists a file it played, keeps a copy where there is no handle, and opens it 
   await page.waitForFunction(() => document.querySelector<HTMLElement>('#recent')!.hidden)
   expect(await copiesKept(page)).toBe(0)
   expect(await page.evaluate(() => document.activeElement?.id)).toBe('open')
+  expect(errors).toEqual([])
+  await page.close()
+})
+
+it('asks for a file again when its copy cannot be read, and lists it afresh once chosen', async () => {
+  // The private profile Playwright gives a page keeps a reference to a file rather than a copy of
+  // its bytes, as a private window may: deleting the file is what takes the copy away.
+  const dir = await mkdtemp(join(tmpdir(), 'h5p-app-moved-'))
+  const moved = join(dir, 'quiz.h5p')
+  await copyFile(QUIZ, moved)
+  const { page, errors } = await openApp()
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('#open')])
+  await chooser.setFiles(moved)
+  await playerIs(page, 'ready')
+  await page.click('#back')
+  await goneHome(page)
+  await page.waitForFunction(() => !document.querySelector<HTMLElement>('#recent')!.hidden)
+  await rm(dir, { recursive: true, force: true })
+
+  // Not "Could not read the archive index": the picker, and the entry gone until it is chosen.
+  const [again] = await Promise.all([page.waitForEvent('filechooser'), page.click('.recent-open')])
+  await page.waitForFunction(() => document.querySelector<HTMLElement>('#recent')!.hidden)
+  expect(await seen(page)).toMatchObject({ screen: 'home', player: 'idle', message: 'quiz.h5p could not be opened from the list. Choose it again.' })
+  expect(await copiesKept(page)).toBe(0)
+  await again.setFiles(QUIZ)
+  await playerIs(page, 'ready')
+  await page.click('#back')
+  await goneHome(page)
+  await page.waitForFunction(() => !document.querySelector<HTMLElement>('#recent')!.hidden)
+  expect((await recent(page)).length).toBe(1)
+  expect(await copiesKept(page)).toBe(1)
   expect(errors).toEqual([])
   await page.close()
 })

@@ -674,10 +674,15 @@ async function openRecent(entry) {
     void open(copy, options)
     return
   }
-  // Moved or deleted on disk, its copy cleared by the browser, or no room for one: the learner
-  // still has the file, and the picker opens for it.
+  // Moved or deleted on disk, its copy cleared by the browser or never more than a reference to
+  // the file, or no room for one: the learner still has the file, and the picker opens for it.
+  // The entry goes, since it cannot open anything; choosing the file puts it back, with a copy
+  // made afresh, where one kept already would not have been written again.
   show(`${entry.name} could not be opened from the list. Choose it again.`, 'hint')
   void choose()
+  await forget(entry.id)
+  await showRecent()
+  openButton.focus()
 }
 
 $('#recent-clear').addEventListener('click', async () => {
