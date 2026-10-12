@@ -1527,6 +1527,9 @@ SPA-fallback trap described above cannot happen there.
   relative URL. 0.3.1, on 2026-10-12, changes nothing in the package either: it requires player
   `^0.6.1` and runtime `^0.1.1`, for the content upgrade, and verify 0.1.3 went out beside it for the
   same reason, since `npx` keeps a cached copy's dependencies until the package itself changes.
+  0.3.2, the same day, passes `lang=` to the element and requires player `^0.6.2` and runtime
+  `^0.1.2`, which carry the core's strings in the page's language; verify stays at 0.1.3, since its
+  page is English and the translations change nothing it checks.
 - **The pages carry their metadata, and the origin is filled in at build time.** Titles,
   descriptions, canonical links, Open Graph and Twitter tags, JSON-LD for the software on the
   front page, `robots.txt` and `sitemap.xml`, and the GitHub link at the right of every page's
