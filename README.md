@@ -64,9 +64,9 @@ that does not emit `new URL(…, import.meta.url)` assets, esbuild among them, s
 
 ```html
 <script type="module"
-  src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@0.7.0/dist/h5p-player.js"></script>
+  src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@0.8.0/dist/h5p-player.js"></script>
 <h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js"
-            assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-runtime@0.1.2/dist/"></h5p-player>
+            assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-runtime@0.2.0/dist/"></h5p-player>
 ```
 
 Copy `dist/h5p-sw.js` of the same version onto your own site: browsers register a Service Worker
