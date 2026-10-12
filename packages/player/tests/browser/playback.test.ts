@@ -187,6 +187,25 @@ describe('playing a package', () => {
     expect(iframe.title).toBe('Offline player test')
   })
 
+  it('leaves the page’s history alone, package after package and when emptied', async () => {
+    // Setting the frame's `src` for every package added two Back steps per switch and one per
+    // clear, which walked the frame through old packages before the page itself.
+    const player = await play(FIXTURES.basic)
+    const before = history.length
+
+    let settled = waitForEvent(player, 'ready')
+    player.setAttribute('src', FIXTURES.noRangeBasic)
+    await settled
+    settled = waitForEvent(player, 'ready')
+    player.setAttribute('src', FIXTURES.basic)
+    await settled
+    player.removeAttribute('src')
+    await new Promise((resolve) => setTimeout(resolve, 300))
+
+    expect(history.length).toBe(before)
+    expect(frameWindow(player).location.href).toBe('about:blank')
+  })
+
   it('reloads when the same src is set again after being removed', async () => {
     const player = await play(FIXTURES.basic)
     player.removeAttribute('src')

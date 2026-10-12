@@ -317,6 +317,11 @@ export class H5PPlayerElement extends HTMLElement {
    */
   private userDataMode: ResumeMode = 'off'
   private prefetching: string | null = null
+  /**
+   * Where this element sent its frame, or `null` while the frame shows nothing. Not the frame's
+   * `src`, which is set for the first package only and then left alone: see `navigateFrame`.
+   */
+  private frameLocation: string | null = null
 
   constructor() {
     super()
@@ -473,6 +478,10 @@ export class H5PPlayerElement extends HTMLElement {
     this.abortLoad()
     this.jobs?.terminate()
     this.jobs = null
+    // Out of the document the frame has no browsing context, so this navigates nothing; put back,
+    // it would otherwise load whatever its `src` last named before the next load could say.
+    this.iframe.removeAttribute('src')
+    this.frameLocation = null
   }
 
   attributeChangedCallback(name: string, previous: string | null, next: string | null): void {
@@ -548,10 +557,30 @@ export class H5PPlayerElement extends HTMLElement {
       .catch(() => {})
   }
 
+  /**
+   * Sends the frame to `url`, or empties it with `null`, without a step in the page's history.
+   * Every navigation of a frame that already holds a document adds an entry to the page's session
+   * history: setting `src` for each package after the first added two, one emptying the frame and
+   * one loading the next, and emptying it added one, so a learner's Back walked the frame through
+   * old packages before it left the page, and a page's own history steps lost what lay ahead of
+   * them. Found on 2026-10-12 by the installable app, whose Back closes a file. `location.replace`
+   * navigates the frame in place; the first navigation, away from the frame's initial
+   * `about:blank`, replaces by itself, and goes through `src`.
+   */
+  private navigateFrame(url: string | null): void {
+    if (url === this.frameLocation) return
+    this.frameLocation = url
+    if (!this.iframe.hasAttribute('src')) {
+      if (url !== null) this.iframe.src = url
+      return
+    }
+    this.iframe.contentWindow?.location.replace(url ?? 'about:blank')
+  }
+
   /** Empties the player without an error: what removing `src`, or setting `file` to null, means. */
   private clear(): void {
     this.abortLoad()
-    this.iframe.removeAttribute('src')
+    this.navigateFrame(null)
     this.iframe.title = FRAME_TITLE
     this.forgetPackage()
     this.setState('idle')
@@ -573,7 +602,7 @@ export class H5PPlayerElement extends HTMLElement {
     this.load = controller
     const { signal } = controller
 
-    this.iframe.removeAttribute('src')
+    this.navigateFrame(null)
     this.iframe.title = FRAME_TITLE
     this.forgetPackage()
     this.revisionSettled = false
@@ -644,7 +673,7 @@ export class H5PPlayerElement extends HTMLElement {
       // A download that booted early already has its frame; the final index only swapped the
       // worker onto the real one. Otherwise: the registration has to be `activated` before this
       // navigation, or it reaches the server and 404s — there is no such file.
-      if (this.iframe.getAttribute('src') !== frameUrl) this.iframe.src = frameUrl
+      if (this.frameLocation !== frameUrl) this.navigateFrame(frameUrl)
       else if (this.internalState === 'ready') this.advancePrefetch()
     } catch (error) {
       if (signal.aborted) return
@@ -676,7 +705,7 @@ export class H5PPlayerElement extends HTMLElement {
           if (reply.ok && reply.type === 'indexed' && reply.ready !== false) {
             booted = true
             this.iframe.title = frameTitle(reply.title)
-            this.iframe.src = frameUrl
+            this.navigateFrame(frameUrl)
           }
         })
         .catch(() => {

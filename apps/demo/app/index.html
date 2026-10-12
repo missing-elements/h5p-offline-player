@@ -2,11 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>H5P Offline Player — an installable H5P app (PWA) that plays .h5p files offline</title>
     <meta name="description" content="A free H5P player you install from the browser (PWA). Open a .h5p file from your computer and play it with no server, no account and, once installed, no network. Chrome, Edge and Safari on desktop, iPhone, iPad and Android." />
     <link rel="canonical" href="%SITE_URL%/app/" />
-    <meta name="theme-color" content="#2f6df6" />
+    <!-- The window's bar in the page's own colour, so the two read as one bar: these two for a
+         theme that follows the system; app.js sets both for one pinned against it. -->
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f1114" media="(prefers-color-scheme: dark)" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="h5p-offline-player" />
     <meta property="og:title" content="H5P Offline Player — an installable H5P app (PWA) that plays .h5p files offline" />
@@ -46,9 +49,15 @@
     <script type="module" src="/app/app.js"></script>
   </head>
 
-  <body>
+  <!-- `app` scopes app.css, which the build links ahead of the shared sheet; `data-screen` is
+       which of the two screens shows: home, to open a file, or the player. -->
+  <body class="app" data-screen="home">
     <header class="topbar">
-      <a class="brand" href="/app/"><img class="brand-mark" src="/demo/favicon.svg" alt="" width="32" height="32" />H5P Offline Player</a>
+      <button type="button" class="icon-button" id="back" aria-label="Close the file" title="Close the file" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
+      </button>
+      <a class="brand" id="brand" href="/app/"><img class="brand-mark" src="/demo/favicon.svg" alt="" width="32" height="32" />H5P Offline Player</a>
+      <p class="appbar-title" id="title" hidden></p>
       <nav aria-label="Site">
         <a href="/">Player</a>
         <a href="/app/" aria-current="page">App</a>
@@ -59,42 +68,32 @@
         <a href="https://embed-my.org/" rel="noopener">Embed My</a>
       </nav>
       <div class="topbar-actions">
+        <button type="button" class="install" id="install" hidden>Install</button>
+        <button type="button" class="icon-button" id="start-over" aria-label="Start over: forget where you were in this file" title="Start over" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>
+        </button>
         <button type="button" class="icon-button theme-toggle" aria-label="Switch theme">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path class="icon-moon" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
             <g class="icon-sun"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" /></g>
           </svg>
         </button>
-        <a class="icon-button" href="https://github.com/missing-elements/h5p-offline-player" rel="noopener" aria-label="GitHub repository" title="GitHub repository">
+        <a class="icon-button github" href="https://github.com/missing-elements/h5p-offline-player" rel="noopener" aria-label="GitHub repository" title="GitHub repository">
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.9 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.7 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3" /></svg>
         </a>
+        <button type="button" class="icon-button" id="menu-button" popovertarget="menu" aria-label="More" title="More">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="12" cy="19" r="1.8" /></svg>
+        </button>
       </div>
+      <div class="loading-bar" id="loading-bar" hidden><span></span></div>
     </header>
 
+    <div class="menu" id="menu" popover>
+      <button type="button" id="menu-open">Open a file…</button>
+      <button type="button" id="menu-about">About this app</button>
+    </div>
+
     <main>
-      <h1>Open an H5P file</h1>
-      <p class="lede">
-        Pick a <code>.h5p</code> from your computer, or drop it on this page. It is read in place,
-        on this device — nothing is uploaded. Install the app and it works with no network; in
-        Chrome and Edge it also opens <code>.h5p</code> files from your file manager. Firefox on
-        the desktop cannot install it, but plays files on this page all the same.
-      </p>
-
-      <div class="controls">
-        <label class="file primary">
-          Open file
-          <input type="file" id="file" accept=".h5p" />
-        </label>
-        <button type="button" id="install" hidden>Install app</button>
-        <button type="button" id="start-over" hidden>Start over</button>
-        <span class="offline" id="offline" data-state="preparing">Preparing the offline copy…</span>
-      </div>
-
-      <div class="status" id="status" data-state="idle">
-        <span class="badge" id="state" data-state="idle">idle</span>
-        <span class="file-name" id="file-name" hidden></span>
-      </div>
-
       <!-- The live region is on the page from the start and the message is put into it, which is
            what screen readers announce reliably; a region that appears with its text already
            in it may be read or may not. -->
@@ -108,16 +107,28 @@
         only if you trust that site.</span>
         <button type="button" id="confirm-open">Open the package</button>
       </p>
-      <p class="message hint" id="update" hidden>
-        A new version of the app is ready.
-        <button type="button" id="reload">Reload</button>
-      </p>
 
-      <!-- `resume`: the content's own saved state stays in this browser's storage, on this
-           device, so a file opened again picks up where it was. See "What it keeps" below. -->
-      <h5p-player resume></h5p-player>
+      <section class="home" aria-labelledby="home-title">
+        <div class="dropzone">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /><path d="M12 18v-6M9 15l3-3 3 3" /></svg>
+          <h1 id="home-title">Open an H5P file</h1>
+          <p>It plays on this device, with or without a network. Nothing is uploaded.</p>
+          <button type="button" class="primary" id="open">Choose a file</button>
+          <p class="dropzone-hint">or drop a <code>.h5p</code> file here</p>
+        </div>
+        <p class="offline" id="offline" data-state="preparing">Preparing the offline copy…</p>
+      </section>
 
-      <p class="drop-hint" id="drop-hint" aria-hidden="true">Drop the .h5p file to open it</p>
+      <div class="stage">
+        <!-- `resume`: the content's own saved state stays in this browser's storage, on this
+             device, so a file opened again picks up where it was. See "What it keeps" below. -->
+        <h5p-player resume></h5p-player>
+        <div class="loading" id="loading" hidden>
+          <span class="spinner" aria-hidden="true"></span>
+          <span id="loading-text">Opening…</span>
+          <span class="loading-detail" id="loading-detail" aria-hidden="true"></span>
+        </div>
+      </div>
 
       <section class="about" aria-labelledby="about-title">
         <h2 id="about-title">An H5P player that works offline</h2>
@@ -129,7 +140,7 @@
 
         <h3 class="install-help">Install it</h3>
         <ul class="list install-help">
-          <li>In Chrome or Edge on Windows, macOS, Linux or ChromeOS, press <strong>Install app</strong> above, or the install icon at the end of the address bar.</li>
+          <li>In Chrome or Edge on Windows, macOS, Linux or ChromeOS, press <strong>Install</strong> at the top of this page, or the install icon at the end of the address bar.</li>
           <li>On Android, open this page in Chrome and choose <strong>Install app</strong> from the menu.</li>
           <li>In Safari on macOS, choose <strong>File › Add to Dock</strong>.</li>
           <li>On iPhone and iPad, open this page in Safari, tap <strong>Share</strong>, then <strong>Add to Home Screen</strong>, with <strong>Open as Web App</strong> on.</li>
@@ -138,8 +149,8 @@
 
         <h3>Open a file</h3>
         <ul class="list">
-          <li>Press <strong>Open file</strong>, or drop a <code>.h5p</code> on the page.</li>
-          <li>Installed from Chrome or Edge, the app opens <code>.h5p</code> files from your file manager: double-click one, or use <em>Open with</em>. Safari and iOS do not hand files to installed apps; use <strong>Open file</strong> there.</li>
+          <li>Press <strong>Choose a file</strong>, or drop a <code>.h5p</code> on the page. The arrow at the top left closes it again.</li>
+          <li>Installed from Chrome or Edge, the app opens <code>.h5p</code> files from your file manager: double-click one, or use <em>Open with</em>. Safari and iOS do not hand files to installed apps; use <strong>Choose a file</strong> there.</li>
           <li>A link to <code>/app/?src=</code> and a package's address opens that package in the app, for a teacher sending a course by link.</li>
         </ul>
 
@@ -152,7 +163,7 @@
 
         <h3>What it keeps on this device, and what it does not</h3>
         <ul class="list">
-          <li>Where you were. When a file is open, the content saves its own state — the slide or chapter reached, the answers given so far, the position in a video, whatever that content type keeps — in this browser's storage, on this device only. Open the same file again (same name, size and date) and it picks up there; <strong>Start over</strong> forgets it. On a shared device, the next person to open the file finds where the last one left it, so press Start over first. The app sends none of it anywhere. A package's own scripts can read it, though, including what other packages saved here, so the app asks before opening a package from another site's link; open only packages you trust.</li>
+          <li>Where you were. When a file is open, the content saves its own state — the slide or chapter reached, the answers given so far, the position in a video, whatever that content type keeps — in this browser's storage, on this device only. Open the same file again (same name, size and date) and it picks up there; <strong>Start over</strong>, the circular arrow at the top, forgets it. On a shared device, the next person to open the file finds where the last one left it, so press Start over first. The app sends none of it anywhere. A package's own scripts can read it, though, including what other packages saved here, so the app asks before opening a package from another site's link; open only packages you trust.</li>
           <li>Not results. The scores and completions the content reports as xAPI statements are neither stored on this device nor sent anywhere, so nothing here is a record that a course was completed.</li>
           <li>For results that are recorded — a class, a course, a compliance record — use the <a href="/demo/setup.html">player component</a> on a site that sends its xAPI statements to an LRS or an LMS.</li>
         </ul>
@@ -163,9 +174,35 @@
           The player's own code is MIT; the H5P core runtime it loads is GPL-3.0, see
           <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/packages/runtime/NOTICE.md" rel="noopener">NOTICE.md</a>.
           The libraries it carries are listed with their licences in
-          <a id="libraries-notice" href="https://github.com/missing-elements/h5p-offline-player/blob/main/packages/libraries/libraries.txt">libraries.txt</a>.
+          <a class="libraries-notice" href="https://github.com/missing-elements/h5p-offline-player/blob/main/packages/libraries/libraries.txt">libraries.txt</a>.
         </p>
       </footer>
     </main>
+
+    <!-- Out of sight: the buttons that open it say what it does, and a label around a hidden
+         input could not be reached from the keyboard. -->
+    <input type="file" id="file" accept=".h5p" hidden />
+
+    <dialog class="about-dialog" id="about-dialog" aria-labelledby="about-dialog-title">
+      <h2 id="about-dialog-title">H5P Offline Player</h2>
+      <p>Plays <code>.h5p</code> files on this device, with or without a network. Files are read here
+        and never uploaded.</p>
+      <p>It keeps where you were in each file, in this browser on this device, and the start-over
+        button in the bar forgets it. It keeps no scores and sends nothing anywhere.</p>
+      <p class="credit">The player's own code is MIT; the H5P runtime it loads is GPL-3.0, see
+        <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/packages/runtime/NOTICE.md" rel="noopener">NOTICE.md</a>.
+        The H5P libraries it carries are listed with their licences in
+        <a class="libraries-notice" href="https://github.com/missing-elements/h5p-offline-player/blob/main/packages/libraries/libraries.txt">libraries.txt</a>.</p>
+      <form method="dialog" class="dialog-actions">
+        <a href="https://github.com/missing-elements/h5p-offline-player" rel="noopener">Source code</a>
+        <button type="submit" class="primary">Close</button>
+      </form>
+    </dialog>
+
+    <p class="drop-hint" id="drop-hint" aria-hidden="true">Drop the .h5p file to open it</p>
+    <p class="message hint snackbar" id="update" hidden>
+      A new version of the app is ready.
+      <button type="button" id="reload">Reload</button>
+    </p>
   </body>
 </html>

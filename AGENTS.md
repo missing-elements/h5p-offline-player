@@ -163,6 +163,7 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             first paint
   tests/embed.test.ts       /resizer.js (the embed package's, served by a dev middleware and
                             copied by the build) sizing the framed /embed
+  tests/app.test.ts         the installable app's screens, history and keyboard, through the dev server
   tests/                    cmi5.test.ts: the cmi5 page against a mock LMS and LRS on a second
                             origin, through the dev server and a real browser
   cmi5-catapult/            docker-compose.yml for ADL's CATAPULT player, MySQL and the SQL LRS;
@@ -172,10 +173,12 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             scripts/build-demo-content.mjs
   app/                      the installable app, /app/: index.html and app.js the page, sw.js its
                             worker (the player's handlers mounted, plus the app shell), the web app
-                            manifest and icons/ (rendered by scripts/build-app-icons.mjs, committed);
-                            the library pack it carries is packages/libraries, imported as a URL asset
+                            manifest, icons/ (rendered by scripts/build-app-icons.mjs, committed) and
+                            screenshots/ (by scripts/build-app-screenshots.mjs, committed); the
+                            library pack it carries is packages/libraries, imported as a URL asset
   scripts/                  build-demo (the site into dist-demo/), build-demo-content, build-og-image,
-                            build-app-icons, build-libraries (the pack, into packages/libraries)
+                            build-app-icons, build-app-screenshots, build-libraries (the pack, into
+                            packages/libraries)
   vite.config.ts            the dev server and the hosted demo: the pages plus dist/'s layout at the
                             site root -> dist-demo/
 
@@ -235,6 +238,8 @@ pnpm build:demo        # the hosted demo into apps/demo/dist-demo/, what Vercel 
 pnpm demo:content      # rebuild apps/demo/demo/content/*.h5p from their sources; needs the H5P hub
 pnpm demo:og           # re-render the social card, apps/demo/demo/og-image.png
 pnpm demo:icons        # re-render the installable app's icons, apps/demo/app/icons/
+pnpm demo:screenshots  # re-render the app's install-dialog screenshots, apps/demo/app/screenshots/,
+                       # from the built site: after pnpm build:demo
 pnpm libraries         # rebuild packages/libraries from the H5P hub; before a release, and every
                        # Monday by .github/workflows/libraries.yml, which opens a PR when a library changed
 pnpm l10n              # take the core's translations from Moodle's language packs again, into
@@ -583,9 +588,11 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   for the next one's — found in review, and `playback.test.ts` clicks the old frame's button
   mid-load to pin it. This file once said removing the iframe's `src` does not unload the document;
   in Chromium it navigates the frame to `about:blank`, and a statement the old document sent just
-  before then arrives with `event.source` null, which the source check dropped. Found on
-  2026-10-10: the test failed on CI, and run alone it failed 14 times in 15 — it had passed only
-  when the message happened to be handled before the navigation committed. So a null-source
+  before then arrives with `event.source` null, which the source check dropped. The frame is
+  emptied with `location.replace` now (*The frame is navigated in place*), which unloads it the
+  same way. Found on 2026-10-10: the test failed on CI, and run alone it failed 14 times in 15 —
+  it had passed only when the message happened to be handled before the navigation committed. So
+  a null-source
   `xapi` or `finished` naming `previousStamp`'s package is accepted ahead of the source check, and
   nothing else from a document that is gone; a null source proves no more than a same-origin
   sender, and same-origin script can dispatch an `xapi` event on the element directly anyway. `clear()` drops
@@ -747,6 +754,21 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
 - **The frame uses `embedType: 'div'`.** With the default `iframe` type, H5P core creates an inner
   `about:blank` frame, and whether that child inherits the Service Worker controller differs
   between browsers.
+- **The frame is navigated in place, not through its `src`.** Every navigation of a frame that
+  already holds a document adds an entry to the page's session history, and the element used to
+  set `src` for each package and remove it to empty the frame: two Back steps per package after
+  the first, one per clear. Measured on 2026-10-12 on a plain page, two switches and a clear took
+  the history from 2 entries to 7, and Back walked the frame through the old packages, booting
+  them again, before it left the page. Found by the installable app, whose Back closes a file and
+  whose Forward then had nothing to go to. `navigateFrame` sets `src` for the first navigation
+  only, which replaces the frame's initial `about:blank` by itself, and uses
+  `contentWindow.location.replace` from then on; `frameLocation` holds where the frame was sent,
+  since the attribute no longer says. The attribute is removed when the element leaves the
+  document, where that navigates nothing, so that putting the element back does not load what it
+  last named. A fresh iframe for each load would also have kept the history clean, but would
+  change where an old document's last messages come from, which the straggler rule depends on.
+  `playback.test.ts` counts the history across two switches and a clear; the app's test goes
+  Back and Forward over a link.
 - **The frame's `<html>` carries `class="h5p-iframe"`.** Seven rules in the core stylesheet are
   keyed on `html.h5p-iframe`: the base sans-serif font, the content's 16px/1.5 type, full width,
   the fullscreen heights. In a normal install H5P writes that class onto the `<html>` of the
@@ -1571,6 +1593,29 @@ SPA-fallback trap described above cannot happen there.
   Chromium against `pnpm preview:demo`: installable with no manifest errors, and after going
   offline and reloading, the Interactive Video and the Accordion play from picked files, the video
   decoding and playing as it does online.
+  **It is laid out as an app, not as the page with its menu hidden** (2026-10-12, after a review
+  found the installed window showing the site's header, a paragraph on installing, a strip that
+  read IDLE and an empty box, with the content below the fold). A bar, and one of two screens:
+  home, a drop area around one button; and the player, the content under a bar with Back, the
+  package's own title (`h5p.json`'s, the file's name until it is read) and Start over, with a
+  loading screen and the download's progress along the bar's edge while it opens. Opening is a
+  step in the window's history — a link keeps its `?src=` there — so Back, the bar's, the
+  browser's or Android's, closes the file rather than leaving the app; that needed the element to
+  stop adding history of its own (*The frame is navigated in place*). The page's account of
+  itself, written for search engines, follows the home screen in a tab and is gone from the
+  installed window, where About in the menu says what matters. Installed is `display-mode:
+  standalone`, or `window-controls-overlay` for Chrome and Edge on the desktop, where the manifest's
+  `display_override` puts the bar in the title bar's place between the window's controls; the
+  stylesheet names both. The title bar takes the page's colour (`theme-color`, which `app.js` keeps
+  for a theme pinned against the system's) and says the app's name, not the page's search title.
+  `app.css` scopes every rule to `.app`, the body's class, because the build links it ahead of the
+  shared sheet. The manifest's screenshots, for Chrome's fuller install dialog, are rendered from
+  the built site by `pnpm demo:screenshots`, the installed rules switched on through the CSSOM
+  since Chromium cannot emulate `display-mode`, and kept out of the precache. `tests/app.test.ts`
+  drives the screens, the history, the menu and the keyboard. Two shared-sheet bugs came up on the
+  way: `[hidden]` lost to `button`'s own display, so Start over showed with nothing open; and
+  `label.file` hid its input with `display: none`, so no key could open the picker on any page —
+  the input is now out of sight but focusable.
   **A package without its own libraries plays offline from the first open**, because the app
   carries them: `packages/libraries/libraries.h5p` (`@missing-elements/h5p-libraries`, the app's
   until 2026-10-08) is the H5P hub's runtime libraries for every content type it serves — 100

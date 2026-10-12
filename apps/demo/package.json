@@ -10,6 +10,7 @@
     "demo:content": "node scripts/build-demo-content.mjs",
     "demo:og": "node scripts/build-og-image.mjs",
     "demo:icons": "node scripts/build-app-icons.mjs",
+    "demo:screenshots": "node scripts/build-app-screenshots.mjs",
     "typecheck": "tsc -p tsconfig.json",
     "libraries": "node scripts/build-libraries.mjs",
     "cmi5:catapult": "node scripts/cmi5-catapult.mjs"

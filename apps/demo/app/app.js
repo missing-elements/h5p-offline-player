@@ -5,24 +5,42 @@
  * `_ping` check in `findMountedRoutes` — and registers nothing of its own. That is what makes it
  * work offline, and it is why nothing is played until the page is controlled: an element that
  * looked before then would register its own worker at `/h5p/`, which plays online and not off.
+ *
+ * It is laid out as an app rather than a page: a bar, and under it one of two screens — home, to
+ * open a file, and the player, from opening one until it is closed. Opening is a step in the
+ * window's history, so Back, in the bar, the browser's or Android's, closes the file rather than
+ * leaving the app.
  */
 
 import librariesPack from '@missing-elements/h5p-libraries/libraries.h5p?url'
 import librariesNotice from '@missing-elements/h5p-libraries/libraries.txt?url'
 
-const player = document.querySelector('h5p-player')
+const $ = (selector) => document.querySelector(selector)
+
+const player = $('h5p-player')
 // The pack's licence list, emitted beside it: the page links it, so a reader finds the notices of what the app carries.
-document.querySelector('#libraries-notice').href = librariesNotice
-const fileInput = document.querySelector('#file')
-const installButton = document.querySelector('#install')
-const startOver = document.querySelector('#start-over')
-const offline = document.querySelector('#offline')
-const status = document.querySelector('#status')
-const stateBadge = document.querySelector('#state')
-const fileName = document.querySelector('#file-name')
-const message = document.querySelector('#message')
-const update = document.querySelector('#update')
-const confirmBox = document.querySelector('#confirm-src')
+for (const link of document.querySelectorAll('.libraries-notice')) link.href = librariesNotice
+const fileInput = $('#file')
+const openButton = $('#open')
+const dropzone = $('.dropzone')
+const home = $('.home')
+const stage = $('.stage')
+const installButton = $('#install')
+const startOver = $('#start-over')
+const offline = $('#offline')
+const message = $('#message')
+const update = $('#update')
+const confirmBox = $('#confirm-src')
+const backButton = $('#back')
+const brand = $('#brand')
+const titleText = $('#title')
+const loading = $('#loading')
+const loadingText = $('#loading-text')
+const loadingDetail = $('#loading-detail')
+const loadingBar = $('#loading-bar')
+const menu = $('#menu')
+const menuButton = $('#menu-button')
+const aboutDialog = $('#about-dialog')
 
 const show = (text, kind = 'hint') => {
   message.textContent = text
@@ -30,12 +48,140 @@ const show = (text, kind = 'hint') => {
   message.hidden = !text
 }
 
+/* ---------------------------------------------------------------- the window */
+
+/** The installed app's own window: standalone, or on the desktop with its bar in the title bar. */
+const installed = matchMedia('(display-mode: standalone), (display-mode: window-controls-overlay)')
+
+const APP_NAME = 'H5P Offline Player'
+/** The page's title in a tab, which search engines show too; an installed window's says the app's name. */
+const PAGE_TITLE = document.title
+const homeTitle = () => (installed.matches ? APP_NAME : PAGE_TITLE)
+if (installed.matches) document.title = APP_NAME
+
+// The window's title bar in the page's colour, whichever theme shows: the head's two
+// `theme-color`s cover a theme that follows the system, and one pinned against it needs this.
+const themeColors = document.querySelectorAll('meta[name="theme-color"]')
+const paintTitleBar = () => {
+  const color = getComputedStyle(document.body).backgroundColor
+  for (const meta of themeColors) meta.content = color
+}
+new MutationObserver(paintTitleBar).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintTitleBar)
+paintTitleBar()
+
+/* ---------------------------------------------------------------- the two screens */
+
+let screen = 'home'
+
+/**
+ * Shows one of the screens, with the bar's left end to match: the app's name at home, the file's
+ * name and a way back in the player. Focus left on the screen that goes moves to the one that
+ * comes, so a keyboard is not stranded on a hidden button.
+ */
+function setScreen(next) {
+  if (next === screen) return
+  const playing = next === 'player'
+  const stranded = playing ? home.contains(document.activeElement) : stage.contains(document.activeElement) || document.activeElement === backButton
+  screen = next
+  document.body.dataset.screen = next
+  backButton.hidden = !playing
+  titleText.hidden = !playing
+  brand.hidden = playing
+  if (!playing) {
+    document.title = homeTitle()
+    startOver.hidden = true
+  }
+  if (stranded) (playing ? backButton : openButton).focus()
+}
+
+/** The bar's and the window's title for the open file. */
+function setTitle(name) {
+  titleText.textContent = name
+  document.title = `${name} — ${APP_NAME}`
+}
+
+/**
+ * Opening a file is a step forward in the window's history — for a link, with its `?src=`, so a
+ * reload opens it again. Another file opened while one is open replaces that step instead of
+ * adding one, so Back always leads home in one.
+ */
+function enterPlayer(url) {
+  const state = { screen: 'player' }
+  if (history.state?.screen === 'player') history.replaceState(state, '', url)
+  else history.pushState(state, '', url)
+  setScreen('player')
+}
+
+/** Empties the player and goes home. The content saves where it was as its document goes. */
+function closePlayer() {
+  opens++
+  reopen = null
+  lastUrl = null
+  if (player.hasAttribute('src')) player.removeAttribute('src')
+  else player.file = null
+  show('')
+  setScreen('home')
+}
+
+backButton.addEventListener('click', () => {
+  if (history.state?.screen === 'player') history.back()
+  else closePlayer()
+})
+
+addEventListener('popstate', (event) => {
+  if (event.state?.screen !== 'player') {
+    if (screen === 'player') closePlayer()
+    return
+  }
+  // Forward again, onto a file that was closed: a link opens once more; a picked file has gone.
+  if (screen === 'player') return
+  const src = srcOf(location.href)
+  if (src) openLink(src)
+  else history.replaceState(null, '', location.pathname)
+})
+
+/* ---------------------------------------------------------------- loading */
+
+/** The states between asking for a package and its content standing: the loading screen's. */
+const LOADING = new Set(['probing', 'downloading', 'indexing'])
+
+const megabytes = (bytes) => (bytes / 1024 / 1024).toFixed(1)
+
+/** How far a download has got, along the bar's edge; a sweep while the size is not known. */
+function setProgress(fraction) {
+  if (fraction === null || fraction === undefined) {
+    delete loadingBar.dataset.known
+    loadingBar.style.removeProperty('--progress')
+  } else {
+    loadingBar.dataset.known = ''
+    loadingBar.style.setProperty('--progress', `${Math.round(fraction * 100)}%`)
+  }
+}
+
+function setLoading(busy) {
+  loading.hidden = !busy
+  loadingBar.hidden = !busy
+  if (!busy) {
+    setProgress(null)
+    loadingDetail.textContent = ''
+  }
+}
+
+/* ---------------------------------------------------------------- the worker */
+
 const setOffline = (state, text) => {
   offline.dataset.state = state
   offline.textContent = text
 }
 
-/* ---------------------------------------------------------------- the worker */
+/** Once the app can start without a network, whether it has one now. */
+const describeOffline = () => {
+  if (offline.dataset.state !== 'ready') return
+  offline.textContent = navigator.onLine ? 'Works offline' : 'Offline: files on this device still open'
+}
+addEventListener('online', describeOffline)
+addEventListener('offline', describeOffline)
 
 /**
  * Resolves once this page is controlled by the app's worker, or with `false` when it will not
@@ -79,6 +225,7 @@ const ready = controlled().then(
   (isControlled) => {
     if (isControlled) {
       setOffline('ready', 'Works offline')
+      describeOffline()
       offerNewVersion()
     } else setOffline('online-only', 'Online only — reload to enable offline use')
     return isControlled
@@ -102,7 +249,7 @@ function offerNewVersion() {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     update.hidden = false
   })
-  document.querySelector('#reload').addEventListener('click', () => location.reload())
+  $('#reload').addEventListener('click', () => location.reload())
 }
 
 /* ---------------------------------------------------------------- opening a file */
@@ -119,21 +266,34 @@ const PACK = librariesPack
 let reopen = null
 /** The URL last opened, so a launch that repeats it does not load it twice. */
 let lastUrl = null
+/**
+ * Which open is the latest. The first visit's worker takes a moment to install, and an open that
+ * was waiting for it gives way to a later open, or to a close: without this, a file closed with
+ * Back during that moment opened into the home screen once the worker was ready.
+ */
+let opens = 0
 
-const opening = (label, again) => {
+/** A file's name as a title until the package says its own: without the extension. */
+const fileTitle = (name) => name.replace(/\.h5p$/i, '') || name
+
+/** Shows the player for a package being opened, under the name it is known by so far. */
+function opening(name, again, url) {
   reopen = again
   show('')
-  fileName.textContent = label
-  fileName.hidden = false
+  enterPlayer(url)
+  setTitle(fileTitle(name))
+  loadingText.textContent = `Opening ${name}…`
+  setLoading(true)
 }
 
 async function open(file, libraries = PACK) {
+  const token = ++opens
   lastUrl = null
   // A file the learner chose answers a pending link's question: they went with the file.
   confirmBox.hidden = true
-  opening(`${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB`, (source) => open(file, source))
-  document.title = `${file.name} — H5P Offline Player`
+  opening(file.name, (source) => open(file, source), location.pathname)
   await ready
+  if (token !== opens) return
   player.setAttribute('libraries', libraries)
   player.file = file
 }
@@ -151,11 +311,18 @@ async function openUrl(src, libraries = PACK) {
     show(`That is not a URL: ${src}`, 'error')
     return
   }
-  const name = decodeURIComponent(url.pathname.split('/').pop() || url.host)
+  const token = ++opens
+  const last = url.pathname.split('/').pop()
+  let name = url.host
+  try {
+    name = decodeURIComponent(last) || url.host
+  } catch {
+    name = last || url.host
+  }
   lastUrl = url.href
-  opening(url.href, (source) => openUrl(url.href, source))
-  document.title = `${name} — H5P Offline Player`
+  opening(name, (source) => openUrl(url.href, source), `${location.pathname}?src=${encodeURIComponent(url.href)}`)
   await ready
+  if (token !== opens) return
   player.setAttribute('libraries', libraries)
   // Removed first, so opening the same link again still counts as a change.
   player.removeAttribute('src')
@@ -181,7 +348,7 @@ const foreignHost = (src) => {
 }
 
 let confirmed = null
-const openLink = (src) => {
+function openLink(src) {
   confirmBox.hidden = true
   const host = foreignHost(src)
   if (!host) return void openUrl(src)
@@ -189,18 +356,35 @@ const openLink = (src) => {
   confirmBox.hidden = false
   confirmed = () => openUrl(src)
 }
-document.querySelector('#confirm-open').addEventListener('click', () => {
+$('#confirm-open').addEventListener('click', () => {
   confirmBox.hidden = true
   void confirmed?.()
 })
 
-const srcOf = (href) => {
+function srcOf(href) {
   try {
     return new URL(href).searchParams.get('src')
   } catch {
     return null
   }
 }
+
+/** Whether `src` names the URL that is open; what is not a URL is not, and `openUrl` says so. */
+function isOpen(src) {
+  try {
+    return new URL(src, location.href).href === lastUrl
+  } catch {
+    return false
+  }
+}
+
+/** The picker, from whichever button asked: they are buttons, so a keyboard reaches them. */
+const choose = () => fileInput.click()
+openButton.addEventListener('click', choose)
+// The whole drop area opens the picker too, a larger target than its button.
+dropzone.addEventListener('click', (event) => {
+  if (!event.target.closest('button, a')) choose()
+})
 
 fileInput.addEventListener('change', () => {
   const [file] = fileInput.files
@@ -210,9 +394,14 @@ fileInput.addEventListener('change', () => {
 })
 
 // The page's own address first: `/app/?src=…` opened in a tab, or the link that launched the
-// app. A launch with a file opens at the manifest's action, `/app/`, which has no `src`.
+// app. Home goes first in the history and the package a step ahead of it, so Back from the
+// package stays in the app; a reload at that step keeps it, since its state survives the reload,
+// and the package opens into it again. A launch with a file opens at the manifest's action, `/app/`.
 const initial = srcOf(location.href)
-if (initial) openLink(initial)
+if (initial) {
+  if (history.state?.screen !== 'player') history.replaceState(null, '', location.pathname)
+  openLink(initial)
+}
 
 // How an installed app is handed what it was launched with. A `.h5p` opened from the file
 // manager arrives as a file handle (the manifest's `file_handlers`); a link to `/app/?src=…`
@@ -227,7 +416,7 @@ if ('launchQueue' in window) {
       return
     }
     const src = params.targetURL ? srcOf(params.targetURL) : null
-    if (src && new URL(src, location.href).href !== lastUrl) openLink(src)
+    if (src && !isOpen(src)) openLink(src)
   })
 }
 
@@ -259,17 +448,27 @@ document.addEventListener('drop', (event) => {
 const EXPLANATIONS = {
   'no-worker': 'This page needs a Service Worker. Open it over https:// in a current Safari, Chrome, Firefox or Edge.',
   'no-cors':
-    'That host does not let other sites read the file. Download the .h5p and open it with "Open file".',
+    'That host does not let other sites read the file. Download the .h5p and open it with "Choose a file".',
   network: 'The package could not be fetched. Check the address and the connection, and try again.'
 }
 
 player.addEventListener('statechange', (event) => {
   const { state } = event.detail
-  stateBadge.textContent = state
-  stateBadge.dataset.state = state
-  status.dataset.state = state
+  // Follows the state rather than the opening: reopening a link empties the player for a moment.
+  setLoading(LOADING.has(state))
   if (state !== 'error') show('')
   startOver.hidden = state !== 'ready'
+  // The package's own title, once it has been read, in place of the file's name.
+  const title = state === 'ready' ? player.metadata?.title : null
+  if (title) setTitle(title)
+})
+
+player.addEventListener('progress', (event) => {
+  // Extraction while the content plays, a video's, is the content's business, not this screen's.
+  if (player.state === 'ready') return
+  const { fraction, loaded, total, phase } = event.detail
+  setProgress(fraction)
+  loadingDetail.textContent = phase !== 'extract' && total ? `${megabytes(loaded)} of ${megabytes(total)} MB` : ''
 })
 
 // The element keeps the content's saved state on this device (`resume`); this forgets it for
@@ -299,29 +498,44 @@ player.addEventListener('error', (event) => {
   // A package at a URL needs the network to be read, whatever was cached from it before: the
   // probe that finds out how to read it is a request.
   if (!navigator.onLine && (code === 'no-cors' || code === 'network')) {
-    show('This package is on the web, and this device is offline. Open a downloaded .h5p with "Open file" instead.', 'error')
+    show('This package is on the web, and this device is offline. Open a downloaded .h5p with "Choose a file" instead.', 'error')
     return
   }
 
   show(late ? `The content reported an error and kept running: ${detail}` : (EXPLANATIONS[code] ?? detail), late ? 'hint' : 'error')
 })
 
+/* ---------------------------------------------------------------- the menu */
+
+// Under its button, wherever the bar has put it; the stylesheet's place is the fallback.
+menu.addEventListener('beforetoggle', (event) => {
+  if (event.newState !== 'open') return
+  const button = menuButton.getBoundingClientRect()
+  menu.style.top = `${button.bottom + 6}px`
+  menu.style.right = `${Math.max(8, document.documentElement.clientWidth - button.right)}px`
+})
+
+const fromMenu = (action) => () => {
+  menu.hidePopover?.()
+  action()
+}
+$('#menu-open').addEventListener('click', fromMenu(choose))
+$('#menu-about').addEventListener('click', fromMenu(() => aboutDialog.showModal()))
+
 /* ---------------------------------------------------------------- installing */
 
 let deferredPrompt = null
-
-/** True in the installed app's own window, where there is nothing left to install. */
-const standalone = matchMedia('(display-mode: standalone)')
 
 window.addEventListener('beforeinstallprompt', (event) => {
   event.preventDefault()
   deferredPrompt = event
   // Chrome can still offer the prompt inside the installed window — for another copy installed
   // from a different origin, say — and the offer only makes sense in a tab.
-  installButton.hidden = standalone.matches
+  installButton.hidden = installed.matches
 })
-standalone.addEventListener('change', () => {
-  if (standalone.matches) installButton.hidden = true
+installed.addEventListener('change', () => {
+  if (installed.matches) installButton.hidden = true
+  if (screen === 'home') document.title = homeTitle()
 })
 
 installButton.addEventListener('click', async () => {
@@ -342,4 +556,4 @@ window.addEventListener('appinstalled', () => {
   installButton.hidden = true
   void persist()
 })
-if (standalone.matches) void persist()
+if (installed.matches) void persist()

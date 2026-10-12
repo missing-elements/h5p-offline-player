@@ -42,10 +42,11 @@ for (const name of packages) {
   await cp(resolve(contentDir, name), resolve(outDir, 'demo', 'content', name))
 }
 
-// The installable app, `/app/`. Its manifest and icons are copied as they are: the page links the
-// manifest with `vite-ignore`, and the manifest names its icons relative to itself.
+// The installable app, `/app/`. Its manifest, icons and screenshots are copied as they are: the
+// page links the manifest with `vite-ignore`, and the manifest names the rest relative to itself.
 await cp(resolve(rootDir, 'app', 'manifest.webmanifest'), resolve(outDir, 'app', 'manifest.webmanifest'))
 await cp(resolve(rootDir, 'app', 'icons'), resolve(outDir, 'app', 'icons'), { recursive: true })
+await cp(resolve(rootDir, 'app', 'screenshots'), resolve(outDir, 'app', 'screenshots'), { recursive: true })
 // The library pack the app attaches to packages without their own is not copied here: the page
 // imports it from `@missing-elements/h5p-libraries` as a URL, so Vite emits it under `assets/`
 // and the precache below picks it up from the manifest with everything else the page pulls in.
@@ -82,6 +83,8 @@ async function appPrecache() {
   for (const name of [...(await under('frame-assets')), ...(await under('app'))]) files.add(name)
   // The app's page is English, so its frame never asks for the runtime's translations.
   files.delete('frame-assets/l10n.js')
+  // The manifest's screenshots are for the install dialog, which shows them before there is an app.
+  for (const name of files) if (name.startsWith('app/screenshots/')) files.delete(name)
 
   // The page is cached under its directory URL, the one the app is opened at.
   files.delete('app/index.html')

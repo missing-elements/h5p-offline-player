@@ -84,6 +84,11 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+/* Hidden means hidden, whatever display a rule gives the element: the browser's own `[hidden]`
+   rule loses to any of them, `button`'s `display: inline-flex` below among them, which once left
+   the app's Start over button on screen with nothing open. */
+[hidden] { display: none !important; }
+
 html { -webkit-text-size-adjust: 100%; }
 
 body {
@@ -280,7 +285,11 @@ button:active, label.file:active { transform: translateY(1px); }
 button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 button.primary:hover { filter: brightness(1.06); }
 button:disabled { opacity: 0.5; cursor: default; transform: none; }
-label.file input { display: none; }
+/* Out of sight, not out of reach: a label takes no focus of its own, so the input has to, and
+   with it at `display: none` no key could open the picker. Enter or Space on it does now. */
+label.file { position: relative; }
+label.file input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
+label.file:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .samples { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.875rem 0 0; }
 

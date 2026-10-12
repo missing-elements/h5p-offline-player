@@ -1,45 +1,200 @@
-/* The installable app's additions to the shared sheet. */
+/* The installable app's page, on top of the shared sheet. Every rule starts with `.app`, the class
+   on <body>: the build links this sheet ahead of the shared one, so a rule here has to outweigh
+   the one it changes rather than come after it. */
 
-/* The hover rule names the background again: the shared sheet's `label.file:hover` weighs the
-   same as `label.file.primary`, and the build emits that sheet after this one, so it won and the
-   button went grey behind white text. The extra `:hover` here outweighs it in either order. */
-label.file.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-label.file.primary:hover { background: var(--accent); filter: brightness(1.06); }
+/* ---------------------------------------------------------------- the bar */
+
+/* Opaque, in the page's own colour, which app.js also gives the window's title bar
+   (theme-color), so an installed app's two bars read as one; the insets keep it clear of a
+   phone's notch in landscape. */
+.app .topbar {
+  padding: max(0.5rem, env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right)) 0.5rem
+    max(var(--gutter), env(safe-area-inset-left));
+  background: var(--bg);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The open file's own title, where the app's name was. */
+.app .appbar-title {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app .topbar-actions { margin-left: auto; }
+
+/* Install, in a tab where the browser offers it: small, beside the icons. */
+.app .install {
+  min-height: 2.1rem;
+  padding: 0.25rem 0.85rem;
+  border-color: var(--accent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.875rem;
+}
+.app .install:hover { background: var(--accent-soft); }
+
+/* The load's progress along the bar's lower edge: how far a download has got when its size is
+   known, a sweep while it is not. */
+.app .loading-bar {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 3px;
+  overflow: hidden;
+}
+.app .loading-bar > span {
+  display: block;
+  width: var(--progress, 35%);
+  height: 100%;
+  background: var(--accent);
+  transition: width var(--ease);
+}
+.app .loading-bar:not([data-known]) > span { animation: sweep 1.3s ease-in-out infinite; }
+
+@keyframes sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(300%); }
+}
+
+/* ---------------------------------------------------------------- the menu */
+
+/* A popover; app.js puts it under its button, and these are the places it falls back to. Hidden
+   by a rule of its own as well as the browser's, so that without the Popover API (Safari before
+   17, Firefox before 125) it is not a block on the page: there it is left out, button and all,
+   and Choose a file is on the home screen. */
+.app .menu {
+  display: none;
+  inset: auto;
+  top: calc(3.5rem + env(safe-area-inset-top));
+  right: max(var(--gutter), env(safe-area-inset-right));
+  min-width: 12rem;
+  margin: 0;
+  padding: 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  box-shadow: var(--shadow);
+}
+.app .menu:popover-open { display: grid; gap: 0.15rem; }
+@supports not selector(:popover-open) { .app #menu-button { display: none; } }
+.app .menu button { justify-content: flex-start; min-height: 2.5rem; border: 0; background: transparent; font-weight: 400; }
+.app .menu button:hover { background: var(--surface-2); }
+
+/* ---------------------------------------------------------------- the screens */
+
+/* Home until a file is opened, and the player from then until it is closed. In a tab the page's
+   account of itself follows the home screen, where search engines read it; nothing follows the
+   player. */
+.app[data-screen="player"] :is(.home, .about, main > footer) { display: none; }
+.app[data-screen="home"] .stage { display: none; }
+
+.app .home {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 1rem;
+  /* In a tab, short enough that the page's account of itself shows below it. */
+  min-height: min(70dvh, 34rem);
+}
+
+.app .dropzone {
+  display: grid;
+  justify-items: center;
+  gap: 0.6rem;
+  width: min(100%, 30rem);
+  padding: clamp(2rem, 6vw, 3rem) 1.5rem;
+  border: 2px dashed var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  text-align: center;
+  transition: border-color var(--ease), background var(--ease);
+}
+.app.dragging .dropzone { border-color: var(--accent); background: var(--accent-soft); }
+.app .dropzone-icon { width: 3rem; height: 3rem; color: var(--accent); }
+.app .dropzone h1 { margin: 0; font-size: clamp(1.35rem, 1.15rem + 1vw, 1.75rem); }
+.app .dropzone p { margin: 0; color: var(--muted); }
+.app .dropzone button { min-width: 11rem; margin-top: 0.5rem; }
+.app .dropzone-hint { font-size: 0.875rem; }
+/* A touch screen has nothing to drop. */
+@media (hover: none) { .app .dropzone-hint { display: none; } }
 
 /* Whether the app can start with no network: set by app.js once the worker controls the page. */
-.offline {
+.app .offline {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  margin-left: auto;
+  margin: 0;
   color: var(--muted);
   font-size: 0.875rem;
 }
-
-.offline::before {
+.app .offline::before {
   content: "";
   width: 0.5rem;
   height: 0.5rem;
   border-radius: 50%;
   background: var(--line-strong);
 }
+.app .offline[data-state="ready"] { color: var(--ok); }
+.app .offline[data-state="ready"]::before { background: var(--ok); }
 
-.offline[data-state="ready"] { color: var(--ok); }
-.offline[data-state="ready"]::before { background: var(--ok); }
+/* The player: as wide as the window on a phone, edge to edge, and at the page's width with room
+   around it on a larger screen. */
+.app[data-screen="player"] main { width: min(100%, var(--content)); padding: 0 0 env(safe-area-inset-bottom); }
+.app[data-screen="player"] .message { margin: 0.75rem var(--gutter) 0; }
 
-.file-name {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 0.875rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+@media (min-width: 48rem) {
+  .app[data-screen="player"] main { width: min(100% - 2 * var(--gutter), var(--content)); padding-top: 1.25rem; }
+  .app[data-screen="player"] .message { margin: 0 0 1rem; }
 }
 
-.file-name[hidden] { display: none; }
+.app .stage { position: relative; }
+.app h5p-player { margin-top: 0; }
+/* While it loads the screen says so, in place of the shared sheet's empty box; once the content
+   stands, it is as tall as the content says. */
+.app h5p-player:not([state="ready"]) { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.app h5p-player[state="ready"] { min-height: 0; }
 
-/* Dropping a file anywhere on the page opens it; this is the only sign the page gives. */
-.drop-hint {
+.app .loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.6rem;
+  padding: 1rem;
+  color: var(--muted);
+  text-align: center;
+  pointer-events: none;
+}
+.app .spinner {
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 3px solid var(--line-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+.app .loading-detail { font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+
+@keyframes spin { to { transform: rotate(1turn); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .app .spinner { animation-duration: 3s; }
+  .app .loading-bar:not([data-known]) > span { width: 100%; opacity: 0.5; animation: none; }
+}
+
+/* Dropping a file on the player's screen opens it too; this is the only sign of it there. */
+.app .drop-hint {
   position: fixed;
   inset: 0.75rem;
   z-index: 20;
@@ -54,25 +209,86 @@ label.file.primary:hover { background: var(--accent); filter: brightness(1.06); 
   font-weight: 600;
   pointer-events: none;
 }
+/* Shown, it takes the drop as well: a file let go over the content's frame, another document
+   whose events this page never sees, still reaches the handler. */
+.app.dragging[data-screen="player"] .drop-hint { display: grid; pointer-events: auto; }
 
-body.dragging .drop-hint { display: grid; }
-
-/* Installed, the app is a window of its own: the site's navigation leads out of it. More
-   specific than the shared sheet's `.topbar nav` on purpose: the build emits this sheet's link
-   before that one, so a rule that relied on coming later lost, and the menu stayed. */
-@media (display-mode: standalone) {
-  .topbar nav[aria-label="Site"] { display: none; }
-  .controls #install { display: none; }
-  /* Already installed: how to install is noise. */
-  .install-help { display: none; }
+/* A new version, offered at the foot of the window as apps do, not above the content. */
+.app .message.snackbar {
+  position: fixed;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  left: 50%;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: max-content;
+  max-width: calc(100% - 2rem);
+  margin: 0;
+  background: var(--bg);
+  box-shadow: var(--shadow);
+  transform: translateX(-50%);
 }
 
-/* `hidden` has to be said again for the install button: the shared sheet gives every button
-   `display: inline-flex`, which beats the browser's own `[hidden]` rule, so the button showed on
-   every visit — installed or not, with nothing behind it to click. */
-#install[hidden] { display: none; }
+/* ---------------------------------------------------------------- about */
 
-/* The page's explanation of itself, which is also what a search engine reads: the rest is controls. */
-.about { max-width: 48rem; margin-top: 2.5rem; }
-.about p { margin: 0 0 1rem; line-height: 1.6; }
-.about h3 { margin: 1.5rem 0 0.5rem; font-size: 1rem; }
+.app .about-dialog {
+  width: min(100% - 2rem, 30rem);
+  max-height: calc(100dvh - 2rem);
+  padding: 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--fg);
+  box-shadow: var(--shadow);
+}
+.app .about-dialog::backdrop { background: rgb(0 0 0 / 0.45); }
+.app .about-dialog h2 { margin: 0 0 0.75rem; color: var(--fg); font-size: 1.15rem; letter-spacing: -0.01em; text-transform: none; }
+.app .about-dialog p { margin: 0 0 0.75rem; line-height: 1.55; }
+.app .about-dialog .credit { color: var(--muted); font-size: 0.875rem; }
+.app .dialog-actions { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1.25rem; }
+
+/* The page's account of itself, in a tab: what a search engine reads. */
+.app .about { max-width: 48rem; margin-top: 2.5rem; }
+.app .about p { margin: 0 0 1rem; line-height: 1.6; }
+.app .about h3 { margin: 1.5rem 0 0.5rem; font-size: 1rem; }
+
+/* ---------------------------------------------------------------- installed */
+
+/* Installed, the app is a window of its own: the site's navigation and the page's account of
+   itself lead out of it, so they go, and About in the menu says what matters; and the window
+   acts as an app's does, with no pull-to-refresh and no text selected in its bar. On the desktop
+   Chrome and Edge report `window-controls-overlay` rather than `standalone`, so both are named. */
+@media (display-mode: standalone), (display-mode: window-controls-overlay) {
+  .app .topbar nav[aria-label="Site"],
+  .app .topbar .github,
+  .app .install,
+  .app .about,
+  .app main > footer { display: none; }
+  /* The bar, then the screen filling the rest of the window: home with nothing to scroll. */
+  .app { display: flex; flex-direction: column; }
+  .app main { display: flex; flex: 1; flex-direction: column; padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); }
+  .app .home { flex: 1; min-height: 0; }
+  .app .topbar { -webkit-user-select: none; user-select: none; }
+  :root { overscroll-behavior-y: none; }
+}
+
+/* On the desktop the bar takes the title bar's place: the space between the window's own
+   controls, which the browser reports, and dragged by its empty parts as a title bar is. */
+@media (display-mode: window-controls-overlay) {
+  .app .topbar {
+    position: fixed;
+    top: env(titlebar-area-y, 0);
+    left: env(titlebar-area-x, 0);
+    width: env(titlebar-area-width, 100%);
+    height: env(titlebar-area-height, 2.5rem);
+    padding: 0 0.5rem;
+    -webkit-app-region: drag;
+    app-region: drag;
+  }
+  .app .topbar :is(a, button) { -webkit-app-region: no-drag; app-region: no-drag; }
+  .app .topbar .icon-button { width: 1.9rem; height: 1.9rem; }
+  .app .brand-mark { width: 1.35rem; height: 1.35rem; }
+  /* The bar is out of the flow now; the page starts below it. */
+  .app { padding-top: env(titlebar-area-height, 2.5rem); }
+}

@@ -62,7 +62,7 @@ describe('resume', () => {
     const player = await play(FIXTURES.basic)
     const frame = frameWindow(player) as Window & { H5PIntegration?: { saveFreq?: unknown } }
     expect(frame.H5PIntegration?.saveFreq).toBe(false)
-    expect(player.shadowRoot?.querySelector('iframe')?.getAttribute('src')).not.toContain('resume')
+    expect(frame.location.href).not.toContain('resume')
 
     complete(player)
     await new Promise((resolve) => setTimeout(resolve, 3500))
