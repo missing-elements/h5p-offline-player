@@ -163,6 +163,12 @@ it('opens a file from the keyboard, shows it under its own title, and closes it 
   let state = await seen(page)
   expect(state).toMatchObject({ screen: 'home', startOver: false, back: false })
 
+  // Listening from before the first key, not from beside Enter. Playwright switches Chromium's
+  // picker interception on when the first listener is added, and Enter opens the picker on
+  // keydown, the very next event the page gets: in Chromium on Linux the picker then went unseen
+  // in seven runs of ten, on CI too (2026-10-12).
+  const choosing = page.waitForEvent('filechooser')
+
   // "Choose a file" is a button, so Tab reaches it and Enter opens the picker.
   let reached = false
   for (let i = 0; i < 12 && !reached; i++) {
@@ -170,7 +176,8 @@ it('opens a file from the keyboard, shows it under its own title, and closes it 
     reached = await page.evaluate(() => document.activeElement?.id === 'open')
   }
   expect(reached).toBe(true)
-  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.keyboard.press('Enter')])
+  await page.keyboard.press('Enter')
+  const chooser = await choosing
   const steps = await page.evaluate(() => history.length)
   await chooser.setFiles(QUIZ)
   await playerIs(page, 'ready')
