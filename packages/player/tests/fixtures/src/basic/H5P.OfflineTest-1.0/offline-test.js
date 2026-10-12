@@ -41,6 +41,14 @@ H5P.OfflineTest = (function ($) {
 
     $container.append($message).append($button).append($count);
 
+    // Sub-content, run the way a real content type runs its questions or interactions, so the
+    // upgrade tests can see it reach inside.
+    if (self.params.child) {
+      var $child = $('<div class="h5p-offline-test-child"></div>');
+      $container.append($child);
+      self.child = H5P.newRunnable(self.params.child, self.contentId, $child, true, { parent: self });
+    }
+
     if (self.params.media && self.params.media.path) {
       var source = H5P.getPath(self.params.media.path, self.contentId);
       $container.append(

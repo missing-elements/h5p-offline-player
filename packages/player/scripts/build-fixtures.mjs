@@ -259,6 +259,75 @@ built.push([
   })
 ])
 
+// 6b. Content written for older minors than a bundle serves. The bundle carries the fixture
+//     content type at 1.2 and a sub-content type at 1.1, each with an `upgrades.js`, and the
+//     exports name 1.0 and 1.1: the frame has to run the steps in between before the runtime reads
+//     the parameters, as the platforms do when they install a newer minor.
+const upgradeLibFiles = await collectFiles(resolve(rootDir, 'tests', 'fixtures', 'src', 'upgrade'))
+const offlineTestLibrary = JSON.parse(await readFile(resolve(sourceDir, 'H5P.OfflineTest-1.0', 'library.json'), 'utf8'))
+
+built.push([
+  'upgrade-libraries.h5p',
+  await writeArchive('upgrade-libraries.h5p', async (writer) => {
+    // The content type's own scripts and styles, as 1.2; its upgrade steps come from the source folder.
+    for (const { entryName, path } of baseFiles) {
+      if (!entryName.startsWith('H5P.OfflineTest-1.0/') || entryName.endsWith('/library.json')) continue
+      const name = entryName.replace('H5P.OfflineTest-1.0/', 'H5P.OfflineTest-1.2/')
+      await writer.add(name, new Uint8ArrayReader(new Uint8Array(await readFile(path))))
+    }
+    await writer.add('H5P.OfflineTest-1.2/library.json', new TextReader(JSON.stringify({ ...offlineTestLibrary, minorVersion: 2 })))
+    for (const { entryName, path } of upgradeLibFiles) {
+      await writer.add(entryName, new Uint8ArrayReader(new Uint8Array(await readFile(path))))
+    }
+    await writer.add(
+      'h5p.json',
+      new TextReader(
+        JSON.stringify({
+          title: 'Library bundle with newer minors',
+          language: 'und',
+          mainLibrary: 'H5P.OfflineTest',
+          embedTypes: ['div'],
+          license: 'U',
+          preloadedDependencies: [{ machineName: 'H5P.OfflineTest', majorVersion: 1, minorVersion: 2 }]
+        })
+      )
+    )
+  })
+])
+
+const offlineChild = (version, text) => ({ library: `H5P.OfflineChild ${version}`, params: { text }, subContentId: 'offline-child' })
+for (const [name, minor, content] of [
+  // Every step of both libraries.
+  ['upgrade-1.0.h5p', '0', { message: 'Written for 1.0', child: offlineChild('1.0', 'Child written for 1.0') }],
+  // Only the step to 1.2.
+  ['upgrade-1.1.h5p', '1', { message: 'Written for 1.1' }],
+  // The versions the bundle serves: nothing to run.
+  ['upgrade-1.2.h5p', '2', { message: 'Written for 1.2', child: offlineChild('1.1', 'Child written for 1.1') }],
+  // The first step throws: played as written.
+  ['upgrade-fails.h5p', '0', { message: 'Written for 1.0', failUpgrade: true, child: offlineChild('1.0', 'Child written for 1.0') }]
+]) {
+  built.push([
+    name,
+    await writeArchive(name, async (writer) => {
+      await writer.add(
+        'h5p.json',
+        new TextReader(
+          JSON.stringify({
+            title: `Written for H5P.OfflineTest 1.${minor}`,
+            language: 'en',
+            mainLibrary: 'H5P.OfflineTest',
+            embedTypes: ['div'],
+            license: 'U',
+            // A stripped export's list: the main library alone, its versions as strings.
+            preloadedDependencies: [{ machineName: 'H5P.OfflineTest', majorVersion: '1', minorVersion: minor }]
+          })
+        )
+      )
+      await writer.add('content/content.json', new TextReader(JSON.stringify(content)))
+    })
+  ])
+}
+
 // 7. Library folders with no version suffix, the way older packages are built. h5p-standalone
 //    probes the versioned name first, takes the 404 and falls back to the bare one.
 built.push([
@@ -293,5 +362,5 @@ await writeFile(resolve(outDir, 'html-page.h5p'), page)
 built.push(['html-page.h5p', page.length])
 
 for (const [name, size] of built) {
-  console.log(`[fixtures] ${name.padEnd(20)} ${(size / 1024).toFixed(1)} kB`)
+  console.log(`[fixtures] ${name.padEnd(22)} ${(size / 1024).toFixed(1)} kB`)
 }

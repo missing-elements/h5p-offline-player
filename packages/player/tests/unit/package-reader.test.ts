@@ -108,6 +108,32 @@ describe('PackageReader.use', () => {
   })
 })
 
+describe('PackageReader.foldersWithUpgrades', () => {
+  it('names the library folders, its own and an attached bundle’s, that carry an upgrades.js', async () => {
+    const content = await zipOf({
+      'h5p.json': manifest('H5P.A', [['H5P.A', 1, 2]]),
+      'H5P.A-1.2/library.json': '{}',
+      'H5P.A-1.2/upgrades.js': 'void 0',
+      'H5P.B-1.0/library.json': '{}',
+      'H5P.Bare/library.json': '{}',
+      'H5P.Bare/upgrades.js': 'void 0',
+      // Not a library folder: a content file that happens to have the name.
+      'content/upgrades.js': 'void 0',
+      'content/content.json': '{}'
+    })
+    const bundle = await zipOf({
+      'h5p.json': manifest('H5P.C', []),
+      'H5P.C-2.1/library.json': '{}',
+      'H5P.C-2.1/upgrades.js': 'void 0',
+      'H5P.C-2.1/nested/upgrades.js': 'void 0'
+    })
+    const reader = await PackageReader.open('content', memoryHandle(content).handle)
+    reader.use(await PackageReader.open('bundle', memoryHandle(bundle).handle, { requireLibraries: false }))
+
+    expect(reader.foldersWithUpgrades()).toEqual(['H5P.A-1.2', 'H5P.Bare', 'H5P.C-2.1'])
+  })
+})
+
 describe('PackageReader.title', () => {
   const open = async (h5pJson: string) =>
     PackageReader.open('t', memoryHandle(await zipOf({ 'h5p.json': h5pJson, 'content/content.json': '{}' })).handle, {

@@ -41,16 +41,17 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "pnpm typecheck",
-    "test:unit": "pnpm typecheck",
-    "prepublishOnly": "pnpm typecheck && pnpm build"
+    "test": "pnpm typecheck && vitest run",
+    "test:unit": "pnpm typecheck && vitest run",
+    "prepublishOnly": "pnpm test && pnpm build"
   },
   "dependencies": {
     "h5p-standalone": "^3.8.2"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
   },
   "engines": {
     "node": ">=20"

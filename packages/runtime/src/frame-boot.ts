@@ -14,6 +14,8 @@
  * it is the one script that runs in the H5P document and calls the core's API directly.
  */
 
+import { upgradeContent, type ServedLibrary, type UpgradeSource, type UpgradeTable } from './content-upgrade'
+
 interface BootConfig {
   pkgId: string
   h5pJsonPath: string
@@ -24,6 +26,15 @@ interface BootConfig {
   metadata?: Record<string, unknown>
   /** What the host asked for; the same shape as `FrameOptions` in shared/protocol.ts. */
   options?: FrameOptions
+  /** The library folders, reachable from this package, that carry an `upgrades.js`. Absent from a worker older than the list. */
+  upgrades?: string[]
+}
+
+/** The one content h5p-standalone puts in `H5PIntegration.contents`, as far as the upgrade touches it. */
+interface IntegrationContent {
+  library: string
+  jsonContent: string
+  metadata?: unknown
 }
 
 interface FrameOptions {
@@ -72,7 +83,8 @@ declare global {
       setUserData?: (contentId: unknown, dataType: string, data: unknown, options?: { subContentId?: unknown; errorCallback?: (error: unknown) => void }) => void
       deleteUserData?: (contentId: unknown, dataType: string, subContentId?: unknown) => void
     }
-    H5PIntegration?: { saveFreq?: number | false }
+    H5PIntegration?: { saveFreq?: number | false; contents?: Record<string, IntegrationContent> }
+    H5PUpgrades?: Record<string, UpgradeTable | undefined>
   }
 }
 
@@ -232,6 +244,119 @@ var askForUserData = function (): Promise<UserDataPreload | null> {
   });
 };
 
+/**
+ * Where the upgrade learns what runs. A library's `library.json`, asked for under the version the
+ * content names, says which version answered: the worker serves a newer minor when the exact one
+ * is absent, and the bare folder name is tried after the versioned one, as h5p-standalone does.
+ * Its `upgrades.js` is fetched only from a folder the worker listed, so nothing is asked for that
+ * is not there; a worker from before the list gets asked anyway, and a 404 then means no steps.
+ */
+var upgradeSource = function (base: string, listed: string[] | undefined): UpgradeSource {
+  var served: Record<string, Promise<ServedLibrary | null>> = {};
+  var steps: Record<string, Promise<UpgradeTable | null>> = {};
+
+  var readLibrary = function (folder: string, machineName: string): Promise<ServedLibrary | null> {
+    // Bounded, and a read that runs out fails the upgrade rather than passing for "not served":
+    // on a host without `Range` a miss waits until the download proves the entry absent, and a
+    // library the content names but nothing carries would hold the boot back that long.
+    var signal = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(20000) : undefined;
+    return fetch(base + '/' + folder + '/library.json', { signal: signal })
+      .then(function (response) {
+        // Not JSON is not a library; the runtime fails on it in its own way.
+        return response.ok ? response.json().catch(function () { return null; }) : null;
+      })
+      .then(function (library: { machineName?: unknown; majorVersion?: unknown; minorVersion?: unknown } | null) {
+        if (!library || library.machineName !== machineName) return null;
+        var major = Number(library.majorVersion);
+        var minor = Number(library.minorVersion);
+        if (!Number.isInteger(major) || !Number.isInteger(minor)) return null;
+        // A versioned name is answered from the folder of the version served, which is where its
+        // `upgrades.js` is; a bare one is a folder of its own.
+        return { major: major, minor: minor, folder: folder === machineName ? folder : machineName + '-' + major + '.' + minor };
+      });
+  };
+
+  return {
+    served: function (machineName, wanted) {
+      var versioned = machineName + '-' + wanted.major + '.' + wanted.minor;
+      if (!served[versioned]) {
+        served[versioned] = readLibrary(versioned, machineName).then(function (found) {
+          return found || readLibrary(machineName, machineName);
+        });
+      }
+      return served[versioned];
+    },
+    steps: function (machineName, library) {
+      if (listed && listed.indexOf(library.folder) < 0) return Promise.resolve(null);
+      var url = base + '/' + library.folder + '/upgrades.js';
+      if (!steps[url]) {
+        steps[url] = fetch(url).then(function (response) {
+          if (!response.ok) {
+            if (listed) throw new Error('could not load ' + library.folder + '/upgrades.js (' + response.status + ')');
+            return null;
+          }
+          return response.text().then(function (code) {
+            // Evaluated, not added as a script: the platforms' upgrade worker loads these with
+            // `importScripts` inside a try, so one that throws as it loads fails the upgrade
+            // rather than the content. An uncaught error here would reach the listener below,
+            // which reports it as the boot failing. The script declares `H5PUpgrades` itself as
+            // a rule; one that only assigns to it still finds it.
+            window.H5PUpgrades = window.H5PUpgrades || {};
+            (0, eval)(code + '\n//# sourceURL=' + url);
+            return window.H5PUpgrades[machineName] || null;
+          });
+        });
+      }
+      return steps[url];
+    }
+  };
+};
+
+/**
+ * Brings the content's parameters up to the library versions served, before the runtime reads
+ * them, the way the platforms upgrade content when they install a newer minor. A failure leaves
+ * them as written, which is how every package played before this ran, and says so in the console.
+ */
+var upgradeToServed = function (): Promise<void> {
+  var contents = window.H5PIntegration && window.H5PIntegration.contents;
+  var key = contents ? Object.keys(contents)[0] : undefined;
+  if (!contents || !key) return Promise.resolve();
+  var content = contents[key];
+
+  return fetch(config.h5pJsonPath + '/h5p.json')
+    .then(function (response) { return response.json(); })
+    .then(function (manifest: { mainLibrary?: unknown; preloadedDependencies?: { machineName?: unknown; majorVersion?: unknown; minorVersion?: unknown }[] }) {
+      // The version the content was written for. The one `H5PIntegration` names is the version
+      // served, read off the library.json that answered.
+      var main = (manifest.preloadedDependencies || []).filter(function (each) { return each.machineName === manifest.mainLibrary; })[0];
+      var version = main && { major: Number(main.majorVersion), minor: Number(main.minorVersion) };
+      // The name held to the shape a library string has, since it goes into URLs and a source name.
+      if (!main || typeof main.machineName !== 'string' || !/^[A-Za-z0-9_.-]+$/.test(main.machineName)) return;
+      if (!version || !Number.isInteger(version.major) || !Number.isInteger(version.minor)) return;
+
+      // Copies, both: a step may change what it is handed in place before a later one fails, and
+      // a failure has to leave the content exactly as written.
+      return upgradeContent(
+        { machineName: main.machineName, version: version },
+        JSON.parse(content.jsonContent),
+        content.metadata === undefined ? undefined : JSON.parse(JSON.stringify(content.metadata)),
+        upgradeSource(config.h5pJsonPath, config.upgrades)
+      ).then(function (result) {
+        // In full. h5p-standalone builds the name from library.json and leaves out a major or a
+        // minor that is 0 — "H5P.Accordion 1" — which the core turns into the folder
+        // `H5P.Accordion-1.undefined`, the category every statement then carries.
+        if (result.library) content.library = result.library;
+        if (result.changed) {
+          content.jsonContent = JSON.stringify(result.params);
+          if (result.metadata) content.metadata = result.metadata;
+        }
+      });
+    })
+    .catch(function (error: unknown) {
+      console.error('<h5p-player>: the content could not be brought up to the library versions served, and plays as written:', error);
+    });
+};
+
 askForUserData()
   .then(function (preload) {
     if (preload && preload.user) options.user = preload.user;
@@ -244,6 +369,8 @@ askForUserData()
       if (preload) installUserData(preload);
     });
   })
+  // The scripts are in and the content's parameters are in `H5PIntegration`, not yet read.
+  .then(upgradeToServed)
   .then(function (): Promise<void> {
     // Behind the runtime's own ready handler, not merely after its scripts have loaded. The core
     // registers that handler as it loads and the frame's document is often still `interactive`

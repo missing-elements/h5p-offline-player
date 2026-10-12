@@ -42,7 +42,10 @@ Also inside `dist/`:
 missing-elements, and released under the GPL-3.0 like the runtime it boots. It is the one piece
 of the player's own code that runs inside the H5P document and calls the core's API — `H5P.init`,
 `newRunnable`, the user-data functions — so it belongs with the core rather than with the
-element, which talks to it over `postMessage` only.
+element, which talks to it over `postMessage` only. It includes `src/content-upgrade.ts`, which
+runs the libraries' own upgrade steps on content written for an older minor, by the rules of
+`js/h5p-content-upgrade-process.js` in h5p-php-library (GPL-3.0); it was written for this package
+rather than copied from that file.
 
 ## What this means for a site
 

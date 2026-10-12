@@ -14,6 +14,11 @@ export const GENERATED_FIXTURES = [
   'content-only.h5p',
   'needs-libraries.h5p',
   'libraries.h5p',
+  'upgrade-libraries.h5p',
+  'upgrade-1.0.h5p',
+  'upgrade-1.1.h5p',
+  'upgrade-1.2.h5p',
+  'upgrade-fails.h5p',
   'unversioned.h5p',
   'corrupt.h5p',
   'html-page.h5p'

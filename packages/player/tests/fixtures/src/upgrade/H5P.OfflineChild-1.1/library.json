@@ -1,0 +1,12 @@
+{
+  "title": "Offline Child",
+  "description": "Sub-content for the fixture content type, at a newer minor than the content names.",
+  "machineName": "H5P.OfflineChild",
+  "majorVersion": 1,
+  "minorVersion": 1,
+  "patchVersion": 0,
+  "runnable": 0,
+  "license": "MIT",
+  "coreApi": { "majorVersion": 1, "minorVersion": 24 },
+  "preloadedJs": [{ "path": "child.js" }]
+}

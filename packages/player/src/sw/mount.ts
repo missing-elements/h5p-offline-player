@@ -246,6 +246,14 @@ class VirtualServer {
 
     await bookkeeping(db.touchPackage(pkgId))
 
+    // From the reader the element's `index` left open, never a new one: a picked file's reader
+    // asks the page for the file through the frame, and the frame is what is being served. With
+    // no reader the list is left out, and the frame asks for each script and takes a 404 as none.
+    const upgrades = await this.readers.get(pkgId)?.then(
+      (reader) => reader.foldersWithUpgrades(),
+      () => undefined
+    )
+
     const nonce = createNonce()
     const body = buildFrameDocument({
       pkgId,
@@ -255,7 +263,8 @@ class VirtualServer {
       title: record.title,
       metadata: record.metadata,
       allowOrigins: record.allowOrigins,
-      frameOptions: record.frameOptions
+      frameOptions: record.frameOptions,
+      upgrades
     })
 
     return new Response(body, {

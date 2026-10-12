@@ -154,6 +154,15 @@ describe('buildFrameDocument', () => {
     expect(buildFrameDocument({ ...options, virtualRoot: 'https://site.example/</script>' })).not.toContain('</script>"')
   })
 
+  it('tells the boot script which library folders carry an upgrades.js, and leaves the list out when it has none', () => {
+    // The boot script fetches upgrade steps only from these, so it never asks for a script that
+    // is not there; with no list, from a worker older than it, it asks and takes a 404 as none.
+    expect(buildFrameDocument({ ...options, upgrades: ['H5P.QuestionSet-1.21', 'H5P.Summary-1.10'] })).toContain(
+      '"upgrades":["H5P.QuestionSet-1.21","H5P.Summary-1.10"]'
+    )
+    expect(html).not.toContain('"upgrades"')
+  })
+
 })
 
 describe('allow-origins', () => {
@@ -247,8 +256,9 @@ describe('createNonce', () => {
 })
 
 describe('the boot script', () => {
-  // Its source is in the runtime package (`packages/runtime/src/frame-boot.ts`), which has no
-  // test runner of its own; the invariant is pinned here, on the source text.
+  // Its source is in the runtime package (`packages/runtime/src/frame-boot.ts`). That package's
+  // tests cover what the script imports; the script itself runs as it loads, so the invariants of
+  // the boot are pinned here, on the source text.
   const source = readFileSync(resolve(import.meta.dirname, '../../../runtime/src/frame-boot.ts'), 'utf8')
 
   it('posts to its own origin, never to whatever page happens to frame the document', () => {

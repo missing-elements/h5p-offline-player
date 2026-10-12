@@ -12,6 +12,12 @@ one `.h5p`, about 10 MB, with the H5P hub's runtime libraries for every content 
 each at the newest minor of its major. Each player release names one version of it, on jsDelivr.
 The pack is rebuilt from the hub weekly and released with the player.
 
+Content written for an older minor plays against the newer one. Before it starts, the player runs
+the steps each library ships in its `upgrades.js` on the content's parameters, as the H5P plugins
+do when a site installs a newer version: a Question Set written for 1.20 keeps its background
+image under 1.21, which reads it from a new place. If a step fails, the content plays as written
+and the console says so.
+
 To keep the request on your own hosting, install the package and serve `libraries.h5p` yourself,
 together with `libraries.txt`, the list of each library's licence and authors, which those
 licences ask to travel with the code. Then name that URL instead of `pack`, or before it. With a

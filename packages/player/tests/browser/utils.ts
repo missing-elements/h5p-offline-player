@@ -40,6 +40,13 @@ export const FIXTURES = {
   needsLibraries: '/fixtures/needs-libraries.h5p',
   /** Library folders and nothing else, to fill the gap in the one above. */
   libraries: '/fixtures/libraries.h5p',
+  /** The fixture content type at 1.2 and a sub-content type at 1.1, each with an `upgrades.js`. */
+  upgradeLibraries: '/fixtures/upgrade-libraries.h5p',
+  /** Stripped exports written for 1.0 (with sub-content at 1.0), 1.1 and 1.2, and one whose first step throws. */
+  writtenFor10: '/fixtures/upgrade-1.0.h5p',
+  writtenFor11: '/fixtures/upgrade-1.1.h5p',
+  writtenFor12: '/fixtures/upgrade-1.2.h5p',
+  upgradeFails: '/fixtures/upgrade-fails.h5p',
   /** Library folders with no version suffix, the shape older packages use. */
   unversioned: '/fixtures/unversioned.h5p'
 } as const

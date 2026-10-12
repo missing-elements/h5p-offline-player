@@ -372,6 +372,21 @@ export class PackageReader {
     return names
   }
 
+  /**
+   * The library folders reachable from here that carry an `upgrades.js`. The frame brings content
+   * written for an older minor up to the one served before the runtime starts, and fetches a
+   * library's upgrade steps only from a folder named here, so it never asks for a missing one.
+   */
+  foldersWithUpgrades(): string[] {
+    const names = this.entryNames()
+    const folders: string[] = []
+    for (const name of names) {
+      const match = /^([^/]+)\/upgrades\.js$/.exec(name)
+      if (match && names.has(`${match[1]}/library.json`)) folders.push(match[1])
+    }
+    return folders.sort()
+  }
+
   /** What `h5p.json` declares but nothing reachable from here provides. */
   missingLibraries(): MissingLibraries | null {
     return describeMissingLibraries(this.entryNames(), this.manifest)
@@ -803,10 +818,11 @@ export function indexLibraryFolders(entryNames: Iterable<string>): Map<string, L
 }
 
 /**
- * Picks the folder that satisfies a dependency, by H5P's own compatibility rule: the same major
- * version, and a minor at least as high as the one asked for. Libraries are backward compatible
- * within a major, which is why a platform installs one version per major and content authored
- * against an older minor keeps working.
+ * Picks the folder that satisfies a dependency: the same major version, and a minor at least as
+ * high as the one asked for. H5P bumps the major for a change content cannot follow, and gives a
+ * minor that changed the shape of a library's parameters a step in its `upgrades.js`; the frame
+ * runs those steps on content written for an older minor before the runtime starts
+ * (`content-upgrade.ts` in the runtime package), as the platforms do when they install a newer one.
  *
  * This matters whenever libraries come from somewhere other than the package: the library pack ships
  * the current `H5P.Text-1.1` while content authored earlier asks for `H5P.Text-1.0`, and without

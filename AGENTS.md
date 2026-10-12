@@ -85,6 +85,8 @@ packages/runtime/         @missing-elements/h5p-runtime — the H5P core runtime
                           own so the player can be MIT and carry none of it
   src/frame-boot.ts         the script that runs inside the frame; the one piece of our code that calls
                             the core's API, so it ships here, under the GPL, as dist/frame-boot.js
+  src/content-upgrade.ts    the libraries' upgrade steps, run on content written for an older minor than
+                            the one served; bundled into frame-boot.js, unit-tested in tests/
   scripts/build.mjs         vendors h5p-standalone into dist/ (headers, the rebuilt stylesheet, the fonts,
                             LICENSE.txt, NOTICE.txt, MANIFEST.json), builds the boot script, writes index.js
   index.js                  generated, not in git: `runtime`, one static `new URL` per file, for a bundler;
@@ -438,6 +440,47 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   nothing, when three of four stripped demo exports booted and then threw on their sub-content.
   Until then only the hub had been attached, and a hub bundle's manifest happens to list its
   content type's usual set, which covered for it. `merged-manifest.test.ts` pins all three.
+- **Content written for an older minor is upgraded before the runtime reads it.** Found on
+  2026-10-11, comparing the player with the CMS plugins. The file server answers for a library at
+  1.20 from a folder at 1.21 when that is what is reachable, and the pack keeps one minor per
+  major, so a stripped export written before the pack's versions ran newer code on parameters
+  that code no longer reads. A library's `upgrades.js` holds a step for each minor that changed
+  the shape of its parameters, which the platforms run when they install a newer minor; 21 of the
+  pack's 47 have a step at their own minor. Question Set 1.21's step 21 moves `backgroundImage` to
+  `override.backgroundImage`: a 1.20 quiz with a background played against the pack showed none
+  until this, and shows it now — measured with a red background beside a control declared 1.21.
+  `content-upgrade.ts` in the runtime package runs the steps by the rules of h5p-php-library's
+  `h5p-content-upgrade-process.js`: the steps after the content's minor up to the target, lowest
+  first, each given the parameters, a callback and `{ metadata }`, the `{ contentUpgrade }` form
+  beside a bare function. The boot script calls it once h5p-standalone has resolved, when the
+  parameters are in `H5PIntegration` and not yet read, and before `H5P.init`. Four things differ
+  from upstream. The target is the version served, read off the `library.json` that answers under
+  the version the content names, so the reader's rule stays the only one; upstream upgrades to the
+  version the parent's semantics name. Sub-content is found by its shape, as `librariesNamedIn`
+  finds it, and not through semantics, so sub-content already at the version served is still
+  looked inside — upstream does not look into sub-content whose version its parent's semantics
+  accept — and no `semantics.json` is read. An `upgrades.js` is fetched and evaluated
+  (`(0, eval)`, which the frame's `'unsafe-eval'` allows) in a promise chain whose rejection
+  fails the upgrade, as the platforms' upgrade worker runs `importScripts` in a try: a `<script>`
+  that threw as it loaded would reach the frame's error listener and fail the boot. Evaluated in
+  the frame, where the core is loaded: H5P.SimpleMultiChoice's script takes `H5P.jQuery` as it
+  loads, which that worker could not give it. And a step that does not call back within
+  `STEP_TIMEOUT_MS` has failed, as has a `library.json` read that takes more than twenty seconds —
+  loudly, not as "not served". Any failure leaves the parameters as written,
+  which is how every package played before, and logs a console error, which the verifier reports
+  as a warning. Sub-content takes the served version into its `library` string, as upstream does,
+  and so does the main library: h5p-standalone builds that name from `library.json` and drops a
+  major or minor that is 0 — "H5P.Accordion 1" — which the core turned into
+  `H5P.Accordion-1.undefined`, the category of every statement; fifteen runnable libraries in the
+  pack have a 0, the demo's Accordion among them. The worker lists the folders that carry an
+  `upgrades.js` in the boot config (`PackageReader.foldersWithUpgrades`, as `upgrades`), so nothing
+  is fetched that is not there. `serveFrame` takes the list from the reader the element's `index`
+  left open and never opens one, since a picked file's reader would ask for the file through the
+  very frame being served; without a list — a worker older than the boot script — each script is
+  asked for and a 404 means none. Not done: a change of major, which the file server never makes,
+  and upstream's checks against the parent's semantics. `packages/runtime/tests/` pins the rules;
+  `tests/browser/upgrades.test.ts` plays exports written for 1.0, 1.1 and 1.2, sub-content
+  included, against a bundle at 1.2, and one whose step throws.
 - **An unreachable library source falls back to a bundle downloaded from it before.** When the
   probe of `libraries`' URL fails — offline, the hub down, a 5xx — the element asks the worker
   (`find-downloaded-libraries`) for the newest `role: 'libraries'` row with the same URL whose
@@ -1535,8 +1578,9 @@ SPA-fallback trap described above cannot happen there.
 ## Testing
 
 Unit tests cover the pure logic: name normalisation, range parsing, chunk arithmetic, strategy
-selection, the CSP and the generated frame document in the player, and the writer, remux and
-policy in `packages/normalize`. They are fast and are where a rule belongs. Both test
+selection, the CSP and the generated frame document in the player, the writer, remux and
+policy in `packages/normalize`, and the content upgrade in `packages/runtime`, that package's only
+tests. They are fast and are where a rule belongs. Both test
 tsconfigs have `allowJs`, so tests can import the `.mjs` scripts; those are typed through JSDoc
 and not checked. The player's browser suite no longer has an `index.html` behind its dev server
 — the pages moved to the demo — so a missing file is a `404` there, not the SPA fallback's page;
@@ -1707,6 +1751,9 @@ deliberate additions to it, not drift:
 - A published library bundle, and `libraries` as an ordered list. The design has `hub` or one
   URL; the hub's move put a bundle the project controls first, and since 0.6 `hub` means that
   bundle and the hub is not asked at all.
+- Content written for an older minor than the one served is upgraded in the frame with the
+  libraries' own steps. The design serves what a package carries; a bundle that serves newer
+  minors needs the step the platforms take when they install one.
 
 ## Not built yet
 

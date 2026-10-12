@@ -75,6 +75,11 @@ export interface FrameDocumentOptions {
   allowOrigins?: string[]
   /** What the host asked the frame to show and load; see `FrameOptions`. */
   frameOptions?: FrameOptions
+  /**
+   * The library folders that carry an `upgrades.js`, for the boot script's upgrade of content
+   * written for an older minor than the one served.
+   */
+  upgrades?: string[]
 }
 
 function escapeHtml(value: string): string {
@@ -265,7 +270,8 @@ export function buildFrameDocument(options: FrameDocumentOptions): string {
     title: options.title,
     // Checked again on the way out, as the options are: the record came back from IndexedDB.
     metadata: contentMetadata(options.metadata),
-    options: sanitizeFrameOptions(options.frameOptions)
+    options: sanitizeFrameOptions(options.frameOptions),
+    upgrades: options.upgrades
   }).replaceAll('<', '\\u003c')
 
   const fontFaces = fontFaceRules(assets.fonts)
