@@ -49,6 +49,22 @@ const RUNTIME_ALLOWLIST = {
 } as const
 
 /**
+ * What an `untrusted` package's frame may load scripts from beyond its own path and the runtime's
+ * files: the video players' APIs H5P.Video loads, each by exact path — YouTube's `iframe_api` then
+ * its widget script under `/s/player/`, Vimeo's `player.js`, Panopto's embed API. Whole hosts would
+ * let markup a package injects load any script those hosts serve; a CDN such as jsDelivr serves
+ * any file on npm and GitHub. MathJax is not here: H5P.MathDisplay carries it in its own folder
+ * since 1.0, and an older copy fetching it from a CDN is the package's code, which does not run.
+ * Google's WebFont loader is not here either, so an old Arithmetic Quiz falls back to its fonts.
+ */
+const UNTRUSTED_SCRIPT_PATHS = [
+  'https://www.youtube.com/iframe_api',
+  'https://www.youtube.com/s/player/',
+  'https://player.vimeo.com/api/player.js',
+  'https://developers.panopto.com/scripts/'
+]
+
+/**
  * A CSP host-source, and nothing else. Values reach this from the host page's own markup, but
  * they end up inside a policy: one containing a `;` or a quote would append directives of its
  * own rather than a host, so anything that is not plainly a host is dropped.
@@ -83,6 +99,8 @@ export interface FrameDocumentOptions {
   upgrades?: string[]
   /** The language tag the element was in, which H5P's own strings follow; English without one. */
   language?: string
+  /** Played as data: scripts by exact path only. See `untrustedScriptSources`. */
+  untrusted?: boolean
 }
 
 function escapeHtml(value: string): string {
@@ -238,6 +256,43 @@ function sanitizeFrameOptions(options: FrameOptions | undefined): FrameOptions |
   return Object.keys(out).length ? out : undefined
 }
 
+/**
+ * Where an `untrusted` package's frame may load scripts from: the package's own path on the
+ * virtual file server, which serves library code only from the attached bundle; the runtime's
+ * files and the host's own `custom-js`, each by exact URL; and the video players' APIs. Not
+ * `'self'`: the frame shares the host's origin, and `'self'` would let markup a package injects
+ * load any script on the host's whole site, a JSONP endpoint or an old framework among them, which
+ * `'unsafe-eval'` makes worse.
+ */
+function untrustedScriptSources(options: FrameDocumentOptions): string[] {
+  const strings = l10nScriptUrl(options.assets, frameLanguage(options.language))
+  const files = [
+    options.assets.mainJs,
+    options.assets.frameJs,
+    bootScriptUrl(options.assets),
+    ...(strings ? [strings] : []),
+    ...customUrls(options.frameOptions?.customJs)
+  ]
+  return [pathSource(`${options.virtualRoot}/`, options.virtualRoot), ...files.map((url) => pathSource(url, options.virtualRoot)), ...UNTRUSTED_SCRIPT_PATHS].filter(
+    (source): source is string => source !== null
+  )
+}
+
+/**
+ * A URL as a CSP source by its path: origin and path only, since a source carries no query, and
+ * `;` and `,` percent-encoded so a URL cannot end the directive or the policy. The browser decodes
+ * a path before it compares, so the encoded source still matches. `null` for what is not http(s).
+ */
+function pathSource(url: string, base: string): string | null {
+  try {
+    const parsed = new URL(url, base)
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null
+    return `${parsed.origin}${parsed.pathname.replaceAll(';', '%3B').replaceAll(',', '%2C')}`
+  } catch {
+    return null
+  }
+}
+
 export function buildContentSecurityPolicy(options: FrameDocumentOptions): string {
   const origins = assetOrigins(options.assets, options.virtualRoot, frameLanguage(options.language))
   const extra = sanitizeOrigins(options.allowOrigins)
@@ -252,10 +307,7 @@ export function buildContentSecurityPolicy(options: FrameDocumentOptions): strin
     `default-src 'self'`,
     directive(
       'script-src',
-      "'self'",
-      ...origins,
-      ...customJs,
-      ...RUNTIME_ALLOWLIST.script,
+      ...(options.untrusted ? untrustedScriptSources(options) : ["'self'", ...origins, ...customJs, ...RUNTIME_ALLOWLIST.script]),
       ...extra,
       `'nonce-${options.nonce}'`,
       // EmbeddedJS compiles its templates with `eval`, and content types built on it — the board

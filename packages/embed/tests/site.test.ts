@@ -278,28 +278,45 @@ describe('a written site, framed from another site', () => {
     await page.close()
   })
 
-  it('asks in a frame of its own origin by default, and not when the page says it need not', async () => {
+  it('plays untrusted in a frame of its own origin by default, and as it is when the page says so', async () => {
+    const untrusted = (frame: Awaited<ReturnType<typeof playerFrame>>) =>
+      frame.evaluate(() => (document.querySelector('h5p-player') as unknown as { untrusted: boolean }).untrusted)
+    const started = (frame: Awaited<ReturnType<typeof playerFrame>>) =>
+      frame.waitForFunction((src) => document.querySelector('h5p-player')!.getAttribute('src') === src, `${embedding.origin}/quiz.h5p`)
     const page = await browser.newPage()
     await page.goto(`${open.origin}/preview.html`)
-    const asking = await playerFrame(page, open.origin)
-    await asking.waitForSelector('#notice button')
+    const shared = await playerFrame(page, open.origin)
+    await started(shared)
+    expect(await untrusted(shared)).toBe(true)
     await page.goto(`${previewing.origin}/preview.html`)
     const trusting = await playerFrame(page, previewing.origin)
-    await trusting.waitForFunction((src) => document.querySelector('h5p-player')!.getAttribute('src') === src, `${embedding.origin}/quiz.h5p`)
+    await started(trusting)
+    expect(await untrusted(trusting)).toBe(false)
     expect(await trusting.evaluate(() => document.querySelector('#notice button'))).toBeNull()
     await page.close()
   })
 
-  it('asks before playing a package from elsewhere when opened on its own', async () => {
+  it('plays a package from elsewhere untrusted when opened on its own, with no question', async () => {
     const page = await browser.newPage()
     await page.goto(`${open.origin}/?src=${embedding.origin}/quiz.h5p`)
-    await page.waitForSelector('#notice button')
-    expect(await page.textContent('#notice')).toContain(`This link opens a package from ${new URL(embedding.origin).host}.`)
-    expect(await page.evaluate(() => document.querySelector('h5p-player')!.getAttribute('src'))).toBeNull()
-    // The click starts the load. Whether it then plays is the policy's call: this site allows any
-    // https host, and the test's package is on plain http.
-    await page.click('#notice button')
-    expect(await page.evaluate(() => document.querySelector('h5p-player')!.getAttribute('src'))).toBe(`${embedding.origin}/quiz.h5p`)
+    // Started at once, as data: the question comes only for a package that needs its own code.
+    // Whether it then plays is the policy's call: this site allows any https host, and the test's
+    // package is on plain http.
+    await page.waitForFunction((src) => document.querySelector('h5p-player')!.getAttribute('src') === src, `${embedding.origin}/quiz.h5p`)
+    expect(await page.evaluate(() => (document.querySelector('h5p-player') as unknown as { untrusted: boolean }).untrusted)).toBe(true)
+    expect(await page.evaluate(() => document.querySelector('h5p-player')!.getAttribute('libraries'))).toMatch(/libraries\.h5p$/)
+    expect(await page.evaluate(() => document.querySelector('#notice button'))).toBeNull()
+    await page.close()
+  })
+
+  it("plays an untrusted package with this site's libraries, not the bundle the address names", async () => {
+    // A bundle's code runs as the host's own, so the link-writer's `libraries=` would hand out
+    // what `untrusted` withholds. The address's bundle counts only once the click has trusted it.
+    const page = await browser.newPage()
+    await page.goto(`${open.origin}/?src=${embedding.origin}/quiz.h5p&libraries=${embedding.origin}/stripped.h5p`)
+    await page.waitForFunction((src) => document.querySelector('h5p-player')!.getAttribute('src') === src, `${embedding.origin}/quiz.h5p`)
+    expect(await page.evaluate(() => (document.querySelector('h5p-player') as unknown as { untrusted: boolean }).untrusted)).toBe(true)
+    expect(await page.evaluate(() => document.querySelector('h5p-player')!.getAttribute('libraries'))).toMatch(/libraries\.h5p$/)
     await page.close()
   })
 })

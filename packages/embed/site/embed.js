@@ -26,15 +26,17 @@ const PACK_CDN_ORIGIN = 'https://cdn.jsdelivr.net'
  * @param {string | null} [options.librariesPack] the URL of a copy of `@missing-elements/h5p-libraries`
  *   on this site, which `libraries=pack` names; without one, `pack` is the element's copy on jsDelivr
  * @param {string[] | null} [options.packages] the origins packages and library bundles may come
- *   from, besides this page's own; `null` plays any, asking first when the storage is this origin's
+ *   from, besides this page's own; `null` plays any, one from another origin `untrusted` when the
+ *   storage is this origin's
  * @param {string | null} [options.defaultLibraries] the `libraries` value for an address that has
  *   none — `pack` or URLs, as the parameter — so a snippet without `&libraries=` still plays
  *   an export that carries no libraries; `&libraries=none` turns it off for one address
  * @param {object | null} [options.runtime] the `runtime` export of `@missing-elements/h5p-runtime`,
  *   for a page that bundles the element; without it the element looks for `frame-assets/` beside itself
- * @param {boolean} [options.askInOwnFrame] whether a package from another origin waits for a click
- *   when this page is framed by a page of its own origin, whose storage it shares. A site whose
- *   own preview frames the page for a package the visitor just chose passes `false`
+ * @param {boolean} [options.askInOwnFrame] whether a package from another origin plays `untrusted`,
+ *   with a click to play it with its own code when it needs that, when this page is framed by a
+ *   page of its own origin, whose storage it shares. A site whose own preview frames the page for
+ *   a package the visitor just chose passes `false`
  */
 export function startEmbed({ librariesPack = null, packages = null, defaultLibraries = null, runtime = null, askInOwnFrame = true } = {}) {
   const params = new URLSearchParams(location.search)
@@ -166,8 +168,16 @@ export function startEmbed({ librariesPack = null, packages = null, defaultLibra
 
   /* ---------------------------------------------------------------- errors, and Safari */
 
+  /** Asks whether to play an untrusted package with its own code; set when one is played so. */
+  let askToTrust = null
+
   player.addEventListener('error', (event) => {
-    const { code, message } = event.detail
+    const { code, message, missingLibraries } = event.detail
+    // Played untrusted, it cannot do without its own copy of a library: a click decides.
+    if (missingLibraries?.carried && player.untrusted && askToTrust) {
+      askToTrust()
+      return
+    }
     if (code === 'no-worker' && framed) {
       // Detected, not sniffed: a browser, an in-app one or a page that is not https may give a
       // frame no Service Worker, and the player cannot run without one. Safari does allow it.
@@ -311,25 +321,44 @@ export function startEmbed({ librariesPack = null, packages = null, defaultLibra
     return
   }
 
-  // A host on the list was vouched for when the site was set up; anything else from another
-  // origin waits for a click when it would share this origin's storage.
+  // A host on the list was vouched for when the site was set up, and in another site's frame the
+  // storage is that site's own: those play as they are.
   if (origin === location.origin || allowed || !sharesOriginStorage()) {
     start(src, sources.value)
     return
   }
-  loader.hidden = true
+
+  // Anything else from another origin would share this origin's storage. It plays untrusted, as
+  // data with the library pack's code and none of its own, and waits for a click that names the
+  // host only when it cannot play without its own, or there is no pack to play it with.
   const host = new URL(src, location.href).host || origin
-  const button = document.createElement('button')
-  button.type = 'button'
-  button.textContent = 'Open the package'
-  button.addEventListener('click', () => {
-    say('')
-    loader.hidden = false
-    start(src, sources.value)
-  })
-  say(
-    `This link opens a package from ${host}. A package runs its own scripts on this site, and they ` +
-      'can read what other packages saved in this browser. Open it only if you trust that site.'
-  )
-  notice.append(' ', button)
+  askToTrust = () => {
+    loader.hidden = true
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.textContent = 'Open with its own scripts'
+    button.addEventListener('click', () => {
+      say('')
+      loader.hidden = false
+      player.untrusted = false
+      player.removeAttribute('src')
+      start(src, sources.value)
+    })
+    say(
+      `This package from ${host} plays only with its own scripts. They would run on this site and ` +
+        'could read what other packages saved in this browser. Open it only if you trust that site.'
+    )
+    notice.append(' ', button)
+  }
+  // The address's `libraries=` is the link-writer's as much as its `src`, and a bundle's code runs
+  // as the host's own: an untrusted package plays with this site's sources alone, the page's
+  // default or its pack, and the address's only once the click has trusted it.
+  const own = defaultLibraries?.trim() ? librarySources(defaultLibraries.trim()).value : ''
+  const pack = own || librarySources('pack').value
+  if (!pack) {
+    askToTrust()
+    return
+  }
+  player.untrusted = true
+  start(src, pack)
 }

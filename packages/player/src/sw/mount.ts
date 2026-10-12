@@ -265,7 +265,8 @@ class VirtualServer {
       allowOrigins: record.allowOrigins,
       frameOptions: record.frameOptions,
       upgrades,
-      language: record.language
+      language: record.language,
+      untrusted: record.untrusted === true
     })
 
     return new Response(body, {
@@ -300,6 +301,14 @@ class VirtualServer {
     // versioned and unversioned folder names and picks the shape that answers.
     if (!located) return new Response(null, { status: 404 })
 
+    const response = await this.serveLocated(event, reader, name, located)
+    // For an untrusted package the browser runs nothing whose type is not a script's: with
+    // `script-src` naming the package's own path, a `content/` file of any listed type would
+    // otherwise run as a script if injected markup named it, since a browser sniffs by default.
+    return reader.untrusted ? withNoSniff(response) : response
+  }
+
+  private async serveLocated(event: FetchEvent, reader: PackageReader, name: string, located: LocatedEntry): Promise<Response> {
     // With a bundle attached, `h5p.json` is answered from the merged manifest rather than from
     // the archive: the dependency list in a content-only export names only the main library.
     if (name === 'h5p.json' && reader.hasFallbacks) {
@@ -649,6 +658,8 @@ class VirtualServer {
     if (!record) throw new UnknownPackageError(pkgId)
 
     const file = record.source.type === 'file' ? await this.fileFor(pkgId) : undefined
+    // A bundle registered to supply libraries is the host's choice, never the package's.
+    const untrusted = record.untrusted === true && record.role !== 'libraries'
 
     // An archive still downloading is served from its forward index — what the local headers
     // have given up so far — until it is whole and the central directory can take over.
@@ -663,7 +674,7 @@ class VirtualServer {
           stopped: null
         }
         const partialHandle = await openSource(pkgId, record.source, file, { partial: true })
-        const partial = await PackageReader.fromForwardIndex(pkgId, partialHandle, snapshot)
+        const partial = await PackageReader.fromForwardIndex(pkgId, partialHandle, snapshot, { untrusted })
         if (record.libraryPkgId) partial.use(await this.reader(record.libraryPkgId))
         await this.rememberManifest(record, partial)
         return partial
@@ -675,7 +686,7 @@ class VirtualServer {
     // Validation waits until any attached bundle is in place; a bundle registered to supply
     // libraries to something else is never held to its own manifest at all.
     const standalone = record.role !== 'libraries' && !record.libraryPkgId
-    const reader = await PackageReader.open(pkgId, handle, { requireLibraries: standalone })
+    const reader = await PackageReader.open(pkgId, handle, { requireLibraries: standalone, untrusted })
 
     if (record.libraryPkgId) {
       reader.use(await this.reader(record.libraryPkgId))
@@ -769,6 +780,16 @@ function entryHeaders(
   })
   if (options.contentRange) headers.set('content-range', options.contentRange)
   return headers
+}
+
+/**
+ * The same response with `X-Content-Type-Options: nosniff`, built anew because one read out of the
+ * Cache API has headers that cannot be changed. The body passes through as it streams.
+ */
+function withNoSniff(response: Response): Response {
+  const headers = new Headers(response.headers)
+  headers.set('x-content-type-options', 'nosniff')
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
 }
 
 function unsatisfiable(size: number): Response {

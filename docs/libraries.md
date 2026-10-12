@@ -36,3 +36,8 @@ export plays offline once it has played online.
 
 A package that needs a library no source carries is still refused, with the missing libraries
 named: usually a library newer than the pack, which the next pack release will carry.
+
+With `untrusted`, a package's own library folders are ignored and its libraries come only from
+`libraries`, `pack` when that is not set. A package that needs a library the sources lack is
+refused, and when it carries that library itself, the error's `missingLibraries.carried` is
+`true`: playing it without `untrusted` would run its own copy, which is your decision to make.

@@ -249,7 +249,7 @@ function adoptShadowStyles(root: ShadowRoot): void {
 export class H5PPlayerElement extends HTMLElement {
   static get observedAttributes(): string[] {
     return [
-      'src', 'sw', 'assets-base', 'auto-resize', 'libraries', 'allow-origins', 'preload', 'resume',
+      'src', 'sw', 'assets-base', 'auto-resize', 'libraries', 'allow-origins', 'preload', 'resume', 'untrusted',
       // h5p-standalone's display and loading options, by its names; read when a package is registered.
       'frame', 'copyright', 'export', 'icon', 'embed', 'fullscreen', 'download-url', 'embed-code', 'resize-code',
       'custom-css', 'custom-js', 'reporting', 'activity-id'
@@ -373,6 +373,22 @@ export class H5PPlayerElement extends HTMLElement {
     if (value === 'off') this.removeAttribute('resume')
     else this.setAttribute('resume', value)
   }
+  /**
+   * Plays the package as data, for one the host did not make: none of its own code runs. Its
+   * library folders are ignored and the libraries come from `libraries` — the pack when that is
+   * not set — `content/` serves only H5P's own list of content file types, and the frame's policy
+   * names script paths exactly instead of the whole origin. A package that needs a library the
+   * sources do not have is refused, and the error's `missingLibraries.carried` says when its own
+   * copy would have played it. Takes effect on the next load.
+   */
+  get untrusted(): boolean {
+    return this.hasAttribute('untrusted')
+  }
+
+  set untrusted(value: boolean) {
+    this.toggleAttribute('untrusted', Boolean(value))
+  }
+
 
   /**
    * Under `resume="host"`, the state to hand the content on the next load: what earlier
@@ -812,7 +828,8 @@ export class H5PPlayerElement extends HTMLElement {
 
       await this.send({
         type: 'register',
-        record: { ...this.recordFor(libraryPkgId, bundle), role: 'libraries' }
+        // The bundle is the host's choice: it serves its libraries whatever the package's trust.
+        record: { ...this.recordFor(libraryPkgId, bundle), role: 'libraries', untrusted: undefined }
       })
 
       this.setState('downloading')
@@ -845,9 +862,12 @@ export class H5PPlayerElement extends HTMLElement {
     return value ? value.split(/\s+/) : []
   }
 
-  /** The `libraries` attribute, read by `parseLibrarySources`. */
+  /**
+   * The `libraries` attribute, read by `parseLibrarySources`. An untrusted package's own folders do
+   * not count, so without the attribute it takes the pack: otherwise nothing could play it.
+   */
   private librarySources(): LibrarySource[] {
-    return parseLibrarySources(this.getAttribute('libraries'), () => {
+    return parseLibrarySources(this.getAttribute('libraries')?.trim() || (this.untrusted ? 'pack' : null), () => {
       if (hubNoticeShown) return
       hubNoticeShown = true
       console.info('<h5p-player>: libraries="hub" now means libraries="pack", the library pack on jsDelivr.')
@@ -884,6 +904,7 @@ export class H5PPlayerElement extends HTMLElement {
       allowOrigins: this.allowOrigins(),
       frameOptions: this.frameOptions(source),
       language: this.frameLanguage(),
+      ...(this.untrusted ? { untrusted: true } : {}),
       status: 'registered',
       lastPlayed: Date.now(),
       version: VERSION

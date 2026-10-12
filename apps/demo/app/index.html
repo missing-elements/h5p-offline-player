@@ -100,12 +100,13 @@
       <div role="status" aria-live="polite">
         <p class="message" id="message" hidden></p>
       </div>
-      <!-- A link's ?src= on another site waits for a click: see foreignHost in app.js. -->
+      <!-- A link's ?src= on another site plays untrusted, and asks only when it needs its own
+           code: see foreignHost in app.js. -->
       <p class="message warning" id="confirm-src" hidden>
-        <span>This link opens a package from <strong class="host"></strong>. A package runs its own
-        scripts on this site, and they can read what other packages saved in this browser. Open it
+        <span>This package from <strong class="host"></strong> plays only with its own scripts. They
+        would run on this site and could read what other packages saved in this browser. Open it
         only if you trust that site.</span>
-        <button type="button" id="confirm-open">Open the package</button>
+        <button type="button" id="confirm-open">Open with its own scripts</button>
       </p>
 
       <section class="home" aria-labelledby="home-title">

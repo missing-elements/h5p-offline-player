@@ -30,6 +30,10 @@ An H5P package is JavaScript, and the player runs it on the origin that serves t
 Installed, you get the whole API and every package runs as your site. Embedded, a package never
 sees your cookies, storage or page, and you get results as relayed xAPI.
 
+In either setup, set `untrusted` on a package you did not make: it plays as data, with the
+library pack's code and none of its own. It does not yet check content against each library's
+field definitions, as the H5P CMS plugins do, so the table above still applies.
+
 Both need the page on `https://` or `localhost`, and CORS headers on the package host. `Range`
 support is optional: without it the archive is downloaded once and played from the cache.
 
@@ -103,6 +107,7 @@ allows one Service Worker, or must work offline, mounts the player in its own wo
 | `runtime` | property | The `runtime` export of `@missing-elements/h5p-runtime`. Set before `src` |
 | `assets-base` | attribute | Where the runtime's `dist/` is served. Default: `frame-assets/` beside the element |
 | `libraries` | attribute | Sources for a package without its libraries, tried in order: `pack` (the library pack on jsDelivr), a `.h5p` URL, or both — `libraries="/libraries.h5p pack"`. `hub` means `pack`. Default: such packages are refused |
+| `untrusted` | attribute, property | Plays a package you did not make as data: its own library folders are ignored and the libraries come from `libraries` (default `pack`), `content/` serves only H5P's own file types, and the frame's script policy names exact paths. A package that needs its own copy of a library is refused, with `missingLibraries.carried` set |
 | `allow-origins` | attribute | Extra origins for the frame's CSP, space separated |
 | `frame`, `copyright`, `export`, `icon`, `embed` | attribute | Show the H5P action bar and its buttons. `export` needs `download-url` or a package URL, `embed` needs `embed-code` |
 | `fullscreen` | attribute | `off` removes the fullscreen button |
@@ -155,7 +160,7 @@ is an example.
 
 - [Video that cannot stream](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/streaming-video.md) — `preload` and the normalizer
 - [Packages without libraries](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/libraries.md) — the library bundle and the hub
-- [The frame's CSP](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/frame-csp.md) — `allow-origins`
+- [The frame's CSP](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/frame-csp.md) — `allow-origins`, and what `untrusted` narrows
 - [Which build a learner completed](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/revision.md) — `revision`
 - [Resume](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/resume.md) — saved state on the device or with the host
 - [Privacy and data protection](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/privacy.md) — what is stored and sent, for a privacy notice or a GDPR review

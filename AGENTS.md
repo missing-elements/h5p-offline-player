@@ -445,6 +445,45 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   and shared by every package that uses it. Two consequences worth remembering: a job is always
   addressed at the archive that owns the entry, and a bundle registered with `role: 'libraries'`
   is never held to its own manifest.
+- **An untrusted package plays as data.** Built on 2026-10-12 as the first phase of matching what
+  lets the CMS plugins accept packages from authors: they install library code from an upload
+  only for a user who may update libraries, keep `content/` to a list of file types, and filter
+  every field against the library's `semantics.json`. `untrusted` on the element puts
+  `untrusted: true` in the record, and the worker opens the reader with it (`servedWhenUntrusted`):
+  the package serves `h5p.json` and, under `content/`, only `H5PCore::$defaultContentWhitelist`'s
+  types — images, audio, video, fonts, office documents, subtitles, JSON, no `.js`, `.css`, `.html`,
+  `.svg` or `.xml`. Everything else it carries is withheld, its library folders above all, so the
+  libraries come only from `libraries`, which defaults to `pack` in this mode, since nothing could
+  play it otherwise. The bundle is the host's choice and is exempt (`role: 'libraries'` is never
+  opened untrusted). The withheld names are kept so a refusal can say whether the package's own
+  copy would have supplied what the sources lack: `MissingLibraries.carried`, which is how the
+  demo pages know to ask before playing it trusted, and the one case in which they ask, beside an
+  embed site with no pack to play it with.
+  Two things the reader cannot do alone, both found by testing the first cut. Every entry
+  response for such a package carries `X-Content-Type-Options: nosniff` (`withNoSniff`, which
+  copies the response, since one read out of the Cache API has headers that cannot be changed):
+  without it a `content/notes.txt` holding JavaScript, injected as `<script src>` from the
+  package's own path, ran — measured, with the header off, the browser test failed with "ran".
+  And the frame's `script-src` drops `'self'` for exact paths (`untrustedScriptSources`): the
+  package's virtual root, the runtime's four files, the host's `custom-js`, and the YouTube, Vimeo
+  and Panopto APIs (`UNTRUSTED_SCRIPT_PATHS`, YouTube's `iframe_api` loading its widget script
+  from `/s/player/`). The frame shares the host's origin, so `'self'` let injected markup load any
+  script on the host's whole site, a JSONP endpoint or an old AngularJS among them, which
+  `'unsafe-eval'` makes worse; jsDelivr, cdnjs and Google's WebFont loader go too, since a CDN
+  serves any npm or GitHub file. H5P.MathDisplay has carried MathJax in its own folder since 1.0,
+  so formulas still render from a bundle that carries it; the pack does not. A source carries no
+  query, and `;` and `,` in a path are percent-encoded so a URL cannot end the policy
+  (`pathSource`); `base-uri` stays `'self'`, as H5P sets a `<base>`. The mode is the load's, read
+  from the record each time, so one package can play untrusted and then trusted under the same id.
+  On a host without `Range`, `bootReady` does not wait for a withheld folder to finish arriving:
+  the folder it resolved is the bundle's, which is whole, and a package laid out libraries-last
+  would otherwise boot only with its final byte.
+  Not done, the second phase: filtering the content against `semantics.json`, which the PHP
+  validator does completely and Lumi's port by its own account only in part; until then the setup
+  advice stands — packages a site did not make mean Embed — and `untrusted` is a layer on top.
+  `tests/browser/untrusted.test.ts` plays `untrusted.h5p`, whose own copy of the fixture content
+  type marks the frame, against the bundle and then trusted, checks each content type and the
+  header, injects scripts, reads the policy, and refuses `untrusted-newer.h5p` with `carried`.
 - **When a bundle is attached, `h5p.json` is synthesized, not served.** A content-only export
   strips `preloadedDependencies` down to the main library as well as dropping the folders, so the
   runtime would load Interactive Video and none of the interaction types inside it — "Unable to
@@ -1517,8 +1556,12 @@ SPA-fallback trap described above cannot happen there.
   was listed; `hub` now means `pack`, and a site without its own pack needs
   `https://cdn.jsdelivr.net` listed for it.) The page checks only the address it is
   given; `connect-src` also applies to every redirect, so a listed host that redirects off the
-  list fails as a plain network error — the README says to list every host on the way. With a list, a listed host skips the
-  ask-first gate: the host vouched for it when it wrote the site. `pack` resolves to the folder's
+  list fails as a plain network error — the README says to list every host on the way. With a list, a listed host plays as
+  it is, never untrusted: the host vouched for it when it wrote the site. Without one, a package
+  from another origin plays untrusted with the site's own sources — `--default-libraries` or the
+  pack — and never the address's `libraries=`, found in review on 2026-10-12: a bundle is exempt
+  from `untrusted`, so a link naming its own bundle would have run that bundle's code as the
+  host's; the address's bundle counts only once the click has trusted the package. `pack` resolves to the folder's
   `libraries.h5p`, or to the element's own `pack` on jsDelivr for a site built with
   `--no-libraries`, where allowed. The page is at the folder's root, not at
   `/embed`, because a static host's mapping of `/embed` to `embed.html` differs (S3 does not),
@@ -1697,18 +1740,22 @@ SPA-fallback trap described above cannot happen there.
   read all three and send them out through the frame's `img-src *`, and `connect-src 'self'`
   does not stop it. Found by the security review of 2026-10-04: a link to
   `/app/?src=<hostile package>` opened at once, in the installed app too. So the player page,
-  the app, the cmi5 page and `/embed` ask before opening a package from another origin, naming
-  the host, and open their own origin's packages and what the visitor typed or picked as before.
-  The app's list of recent files does not ask again for a link on it: the learner answered for
-  that host when the link first opened, and only code already running on the origin could have
-  written an entry, which could do whatever the entry would.
-  The cmi5 page gates both places a launch names the package, `?src=` and `launchParameters`,
-  since a link can carry cmi5 parameters pointing at an LMS of the link-writer's own; it passes
-  `src: false` and sets `src` itself on `initialized`. `/embed` in another origin's frame does
-  not ask: its storage is partitioned by the embedding site, so a page only reaches what was
-  played under its own embed; framed by this origin it asks like the rest. Every check fails
-  closed: a `data:` URL, with no host, waits too. The rule is now: any package played on an
-  origin can read every other package's data there.
+  the app, the cmi5 page and `/embed` asked before opening a package from another origin, naming
+  the host, until 2026-10-12; since then they play it `untrusted` (the invariant *An untrusted
+  package plays as data*), with the library pack — the site's own copy on the player page, the
+  app and `/embed`, jsDelivr's on the cmi5 page — and ask, naming the host, only when it is
+  refused for needing its own copy of a library (`missingLibraries.carried`); the click plays it
+  trusted. Their own origin's packages and what the visitor typed or picked play as before. The
+  app's list of recent files reopens a link the way it first opened, untrusted if it is on
+  another site, asking again if it needs its own code. The cmi5 page covers both places a launch
+  names the package, `?src=` and `launchParameters`, since a link can carry cmi5 parameters
+  pointing at an LMS of the link-writer's own; it passes `src: false` and sets `src` itself on
+  `initialized`. `/embed` in another origin's frame plays a package as it is: its storage is
+  partitioned by the embedding site, so a page only reaches what was played under its own embed;
+  framed by this origin, or opened on its own, it plays untrusted like the rest, and a page that
+  passes `askInOwnFrame: false` — Embed My's preview — plays as it is. Every check fails closed: a
+  `data:` URL, with no host, counts as another site's. The rule stays: any package whose own code
+  runs on an origin can read every other package's data there.
 - **Caching.** Hashed files under `/assets/` are immutable; `h5p-sw.js` is `no-cache`;
   `frame-assets/` and `fixtures/` revalidate hourly. Fixtures also carry permissive CORS with
   `Range` allowed and `Content-Range` exposed, so another player instance can be pointed at them.
@@ -1910,6 +1957,8 @@ deliberate additions to it, not drift:
   minors needs the step the platforms take when they install one.
 - The core's own strings follow the element's language, from translations the runtime carries.
   The design's frame is English throughout.
+- A package can be played `untrusted`, with library code only from the host's bundle and its
+  content as data. The design runs whatever a package carries.
 
 ## Not built yet
 
@@ -1957,6 +2006,14 @@ fix exists — `pnpm normalize` stores the video, after which the media element 
 and the same boot pulled 1.4 MB instead of 81 — and because it is not yet known how often the
 player is handed a deflated video nobody can normalize: the h5p.com export analysed above stored
 everything, while this one and the sodix.de one deflated everything.
+
+**Content checked against `semantics.json` — the second phase of `untrusted`.** The CMS plugins
+filter every field of a package's parameters against the library's field definitions before the
+runtime reads them (`H5PContentValidator` in h5p-php-library): text stripped to the tags a field
+allows, numbers held to their range, sub-content to the libraries a field names. Here it would run
+in the runtime package's boot script, before the content upgrade, on the pack's `semantics.json`
+files; GPL, like the core it ports. With it, `untrusted` would match what the plugins check and
+the setup advice for packages a site did not make could change.
 
 **Offline app shell (PWA) — built**, as `/app/` on the demo site, library pack included; see
 *The hosted demo*. The list of recent files it left open is built too (2026-10-12), with file

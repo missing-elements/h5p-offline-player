@@ -259,6 +259,66 @@ built.push([
   })
 ])
 
+// 6a. A package to play `untrusted`: its own copy of the fixture content type, rewritten to leave
+//     a mark when it runs and to say so on screen, which must never happen there — the bundle's
+//     copy plays instead — and a file of each kind under `content/`, only some of which may be
+//     served. A tiny PNG, so an image is among them.
+const PIXEL_PNG = Uint8Array.from(
+  atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='),
+  (character) => character.charCodeAt(0)
+)
+const OWN_LIBRARY_SCRIPT = `var H5P = H5P || {};
+window.ownLibraryRan = true;
+H5P.OfflineTest = function () {
+  this.attach = function ($container) {
+    $container.html('<p class="h5p-offline-test-message">The package\\'s own code ran.</p>');
+  };
+};
+`
+const UNTRUSTED_CONTENT = {
+  'content/content.json': JSON.stringify({ message: 'Content from an untrusted package.' }),
+  'content/data.json': JSON.stringify({ shown: true }),
+  'content/notes.txt': 'window.contentFileRan = true',
+  'content/script.js': 'window.contentFileRan = true',
+  'content/page.html': '<!doctype html><script>parent.contentFileRan = true</script>',
+  'content/drawing.svg': '<svg xmlns="http://www.w3.org/2000/svg"><script>window.contentFileRan = true</script></svg>',
+  'content/data.xml': '<data/>',
+  'loose.js': 'window.contentFileRan = true'
+}
+
+built.push([
+  'untrusted.h5p',
+  await writeArchive('untrusted.h5p', async (writer) => {
+    for (const { entryName, path } of baseFiles) {
+      if (entryName === 'content/content.json') continue
+      const contents = entryName.endsWith('/offline-test.js') ? new TextEncoder().encode(OWN_LIBRARY_SCRIPT) : new Uint8Array(await readFile(path))
+      await writer.add(entryName, new Uint8ArrayReader(contents))
+    }
+    for (const [entryName, text] of Object.entries(UNTRUSTED_CONTENT)) await writer.add(entryName, new TextReader(text))
+    await writer.add('content/images/pixel.png', new Uint8ArrayReader(PIXEL_PNG))
+  })
+])
+
+// 6a'. One that needs a version of the content type only it carries: refused `untrusted`, with
+//      the error saying its own copy would have played it.
+built.push([
+  'untrusted-newer.h5p',
+  await writeArchive('untrusted-newer.h5p', async (writer) => {
+    const manifest = JSON.parse(await readFile(resolve(sourceDir, 'h5p.json'), 'utf8'))
+    manifest.preloadedDependencies = [{ machineName: 'H5P.OfflineTest', majorVersion: 1, minorVersion: 3 }]
+    await writer.add('h5p.json', new TextReader(JSON.stringify(manifest)))
+    for (const { entryName, path } of baseFiles) {
+      if (entryName === 'h5p.json') continue
+      const renamed = entryName.replace(/^H5P\.OfflineTest-1\.0\//, 'H5P.OfflineTest-1.3/')
+      let contents = new Uint8Array(await readFile(path))
+      if (renamed === 'H5P.OfflineTest-1.3/library.json') {
+        contents = new TextEncoder().encode(JSON.stringify({ ...JSON.parse(new TextDecoder().decode(contents)), minorVersion: 3 }))
+      }
+      await writer.add(renamed, new Uint8ArrayReader(contents))
+    }
+  })
+])
+
 // 6b. Content written for older minors than a bundle serves. The bundle carries the fixture
 //     content type at 1.2 and a sub-content type at 1.1, each with an `upgrades.js`, and the
 //     exports name 1.0 and 1.1: the frame has to run the steps in between before the runtime reads

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { findMissingLibraries } from '../../src/sw/package-reader'
+import { explainMissingLibraries, findMissingLibraries, servedWhenUntrusted } from '../../src/sw/package-reader'
 
 /**
  * An export that carries content but not the libraries it names is the single most common broken
@@ -63,5 +63,38 @@ describe('findMissingLibraries', () => {
 
   it('has nothing to report when a manifest declares no dependencies', () => {
     expect(findMissingLibraries(entries('h5p.json'), { title: 'x' })).toEqual([])
+  })
+})
+
+describe('what an untrusted package serves of its own', () => {
+  it("serves h5p.json and content files of H5P's own types", () => {
+    for (const name of ['h5p.json', 'content/content.json', 'content/images/photo.JPG', 'content/videos/clip.mp4', 'content/captions.vtt', 'content/notes.txt']) {
+      expect(servedWhenUntrusted(name), name).toBe(true)
+    }
+  })
+
+  it('withholds library folders, anything outside content/, and what a browser would run', () => {
+    for (const name of [
+      'H5P.InteractiveVideo-1.27/library.json',
+      'H5P.InteractiveVideo-1.27/scripts/interactive-video.js',
+      'loose.js',
+      'content/script.js',
+      'content/style.css',
+      'content/page.html',
+      'content/page.htm',
+      'content/drawing.svg',
+      'content/data.xml',
+      'content/README',
+      'content/.json'
+    ]) {
+      expect(servedWhenUntrusted(name), name).toBe(false)
+    }
+  })
+
+  it('says when only its own code was refused', () => {
+    expect(explainMissingLibraries({ folders: ['H5P.OfflineTest-1.3'], all: false, carried: true })).toMatch(
+      /played untrusted, so its own copy of H5P\.OfflineTest-1\.3 does not run/
+    )
+    expect(explainMissingLibraries({ folders: ['H5P.OfflineTest-1.3'], all: false })).not.toContain('untrusted')
   })
 })

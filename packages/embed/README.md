@@ -69,8 +69,11 @@ It works at a domain's root or under a path, over https. Serve `h5p-sw.js` with
 | `lang=<tag>` | The language of H5P's own buttons and dialogs, such as `de` or `pt-BR`. Default: English |
 | `xapi=<origin>` | Relay statements to the embedding page |
 
-A custom script and a learner's name cannot be set on the address. Opened unframed, the page asks
-before playing a package from another origin unless `--packages` names it.
+A custom script and a learner's name cannot be set on the address. Opened unframed, the page plays
+a package from another origin `untrusted` unless `--packages` names it: none of the package's own
+code runs, its libraries come from this domain's pack or `--default-libraries` (never from the
+address's `libraries=`), and a button offers to play it with its own scripts only when it needs
+them.
 
 ## Messages
 
@@ -113,7 +116,7 @@ page's script, which reads the page's `<h5p-player>`, `#loader` and `#notice` (s
 `site/index.html` and `site/embed.css`). Its options: `librariesPack` (the URL `libraries=pack`
 names), `packages` (allowed origins, `null` for any), `defaultLibraries`, `runtime` (the
 `@missing-elements/h5p-runtime` export, for a bundled element) and `askInOwnFrame` (default
-`true`; `false` skips the click when a same-origin page frames it).
+`true`; `false` plays a package from another origin as it is when a same-origin page frames it).
 
 ```js
 import '@missing-elements/h5p-offline-player'

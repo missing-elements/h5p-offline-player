@@ -67,12 +67,13 @@
       </p>
 
       <p class="message" id="status" role="status" aria-live="polite"></p>
-      <!-- A package on another site waits for a click, whoever named it: see foreignHost in cmi5-page.js. -->
+      <!-- A package on another site plays untrusted, whoever named it, and asks only when it needs
+           its own code: see foreignHost in cmi5-page.js. -->
       <p class="message warning offer" id="confirm-src" hidden>
-        <span>This link opens a package from <strong class="host"></strong>. A package runs its own
-        scripts on this site, and they can read what other packages saved in this browser. Open it
+        <span>This package from <strong class="host"></strong> plays only with its own scripts. They
+        would run on this site and could read what other packages saved in this browser. Open it
         only if you trust that site.</span>
-        <button type="button" id="confirm-open">Open the package</button>
+        <button type="button" id="confirm-open">Open with its own scripts</button>
       </p>
 
       <h5p-player></h5p-player>

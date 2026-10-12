@@ -106,6 +106,58 @@ describe('buildContentSecurityPolicy', () => {
   })
 })
 
+describe('the policy for an untrusted package', () => {
+  const scriptSources = (csp: string) => csp.split('; ').find((directive) => directive.startsWith('script-src '))!.split(' ').slice(1)
+
+  it("names the package's own path and the runtime's files, not the origin", () => {
+    const sources = scriptSources(buildContentSecurityPolicy({ ...options, untrusted: true }))
+    expect(sources).not.toContain("'self'")
+    expect(sources).toContain(`${options.virtualRoot}/`)
+    expect(sources).toContain(options.assets.mainJs)
+    expect(sources).toContain(options.assets.frameJs)
+    expect(sources).toContain(options.assets.bootJs)
+    expect(sources).toContain("'nonce-deadbeef'")
+    expect(sources).toContain("'unsafe-eval'")
+  })
+
+  it('keeps the video player APIs by exact path, and none of the CDNs', () => {
+    const sources = scriptSources(buildContentSecurityPolicy({ ...options, untrusted: true }))
+    expect(sources).toEqual(expect.arrayContaining(['https://www.youtube.com/iframe_api', 'https://www.youtube.com/s/player/', 'https://player.vimeo.com/api/player.js']))
+    for (const host of ['cdn.jsdelivr.net', 'cdnjs.cloudflare.com', 'ajax.googleapis.com', 'www.youtube.com']) {
+      expect(sources).not.toContain(host)
+    }
+  })
+
+  it("names the host's own scripts by URL, and still what allow-origins vouches for", () => {
+    const sources = scriptSources(
+      buildContentSecurityPolicy({
+        ...options,
+        untrusted: true,
+        allowOrigins: ['tenant.panopto.example'],
+        frameOptions: { customJs: ['https://site.example/js/analytics.js?v=3'] }
+      })
+    )
+    // A source carries no query; the path still matches the file.
+    expect(sources).toContain('https://site.example/js/analytics.js')
+    expect(sources).toContain('tenant.panopto.example')
+  })
+
+  it('cannot be ended early by a URL with a semicolon or a comma in its path', () => {
+    const csp = buildContentSecurityPolicy({
+      ...options,
+      untrusted: true,
+      assets: { ...options.assets, frameJs: "https://cdn.example/a;script-src 'unsafe-inline',x/frame.bundle.js" }
+    })
+    expect(scriptSources(csp)).toContain("https://cdn.example/a%3Bscript-src%20'unsafe-inline'%2Cx/frame.bundle.js")
+    expect(csp.split('; ').filter((directive) => directive.startsWith('script-src'))).toHaveLength(1)
+  })
+
+  it("leaves a trusted package's policy as it was", () => {
+    expect(buildContentSecurityPolicy({ ...options, untrusted: false })).toBe(buildContentSecurityPolicy(options))
+    expect(scriptSources(buildContentSecurityPolicy(options))).toContain("'self'")
+  })
+})
+
 describe('buildFrameDocument', () => {
   const html = buildFrameDocument(options)
 

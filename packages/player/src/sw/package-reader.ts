@@ -62,6 +62,42 @@ export interface IndexedEntry {
 }
 
 /**
+ * The file types an `untrusted` package may serve from `content/`: H5P's own default list for
+ * content (`H5PCore::$defaultContentWhitelist` in h5p-php-library), the one the CMS plugins hold
+ * an author's upload to. No script, stylesheet, page, SVG or XML: nothing a browser would run.
+ */
+const CONTENT_FILE_TYPES = new Set(
+  (
+    'json png jpg jpeg gif bmp tif tiff eot ttf woff woff2 otf webm mp4 ogg mp3 m4a wav txt pdf ' +
+    'rtf doc docx xls xlsx ppt pptx odt ods odp csv diff patch swf md textile vtt webvtt gltf glb'
+  ).split(' ')
+)
+
+/**
+ * What an `untrusted` package serves of its own: `h5p.json`, and the files under `content/` of a
+ * type on that list. Its library folders, and anything else it carries, are withheld, so none of
+ * its own code can run; the libraries come from the attached bundle instead.
+ */
+export function servedWhenUntrusted(name: string): boolean {
+  if (name === 'h5p.json') return true
+  if (!name.startsWith('content/')) return false
+  const file = name.slice(name.lastIndexOf('/') + 1)
+  const dot = file.lastIndexOf('.')
+  return dot > 0 && CONTENT_FILE_TYPES.has(file.slice(dot + 1).toLowerCase())
+}
+
+/** Takes what an `untrusted` package may not serve out of its index, and returns the names. */
+function withholdCode(entries: Map<string, IndexedEntry>): Set<string> {
+  const withheld = new Set<string>()
+  for (const name of entries.keys()) {
+    if (servedWhenUntrusted(name)) continue
+    withheld.add(name)
+    entries.delete(name)
+  }
+  return withheld
+}
+
+/**
  * An entry together with the archive it lives in. A package may be served from more than one:
  * content from the one the user opened, libraries from a bundle attached to fill its gaps.
  */
@@ -94,6 +130,14 @@ export class PackageReader {
    */
   fingerprint: string | undefined
 
+  /**
+   * Played as data: what the archive carries beyond `h5p.json` and its content files is withheld
+   * (`servedWhenUntrusted`), so library code comes only from an attached bundle.
+   */
+  readonly untrusted: boolean
+  /** The names an untrusted reader withheld, kept to tell a host the package carries what it lacks. */
+  private readonly withheld: Set<string>
+
   /** Archives consulted, in order, for an entry this one does not have. */
   private readonly fallbacks: PackageReader[] = []
   /** Library folders reachable from here, built on first use and dropped when `use()` adds more. */
@@ -108,13 +152,17 @@ export class PackageReader {
     entries: Map<string, IndexedEntry>,
     rejected: string[],
     manifest: PackageManifest,
-    partial = false
+    partial = false,
+    /** For an untrusted reader, what was withheld so far; `null` for one that serves everything. */
+    withheld: Set<string> | null = null
   ) {
     this.pkgId = pkgId
     this.entries = entries
     this.rejected = rejected
     this.manifest = manifest
     this.partial = partial
+    this.untrusted = withheld !== null
+    this.withheld = withheld ?? new Set()
   }
 
   /** `h5p.json`'s title, when it is a string: the manifest is untrusted, and three things render it. */
@@ -131,7 +179,7 @@ export class PackageReader {
   static async open(
     pkgId: string,
     handle: SourceHandle,
-    options: { requireLibraries?: boolean } = {}
+    options: { requireLibraries?: boolean; untrusted?: boolean } = {}
   ): Promise<PackageReader> {
     let zipEntries: Entry[]
     try {
@@ -162,11 +210,12 @@ export class PackageReader {
     if (!entries.has('h5p.json')) {
       throw new PlayerError('bad-archive', 'Archive has no h5p.json, so it is not an H5P package')
     }
+    const withheld = options.untrusted ? withholdCode(entries) : null
 
     const bare = new PackageReader(pkgId, handle, entries, rejected, {})
     const manifest = await readManifest(bare)
 
-    const reader = new PackageReader(pkgId, handle, entries, rejected, manifest)
+    const reader = new PackageReader(pkgId, handle, entries, rejected, manifest, false, withheld)
     // Every record, directories and dropped names included: the fingerprint is of the archive
     // as published, not of what the player chose to serve from it.
     reader.fingerprint = await indexFingerprint(
@@ -191,9 +240,10 @@ export class PackageReader {
   static async fromForwardIndex(
     pkgId: string,
     handle: SourceHandle,
-    snapshot: ForwardIndexSnapshot
+    snapshot: ForwardIndexSnapshot,
+    options: { untrusted?: boolean } = {}
   ): Promise<PackageReader> {
-    const reader = new PackageReader(pkgId, handle, new Map(), [], {}, true)
+    const reader = new PackageReader(pkgId, handle, new Map(), [], {}, true, options.untrusted ? new Set() : null)
     await reader.absorb(snapshot)
     return reader
   }
@@ -215,12 +265,18 @@ export class PackageReader {
     for (const forward of fresh) {
       if (forward.directory) continue
       const name = normalizeEntryName(forward.name)
-      if (name === null || this.entries.has(name)) {
+      if (name === null || this.entries.has(name) || this.withheld.has(name)) {
         this.rejected.push(forward.name)
         continue
       }
-      this.entries.set(name, entryFromForward(name, forward))
+      // Withheld or not, it says how far the archive has got: a folder is finished once a later
+      // one begins.
       this.lastTopFolder = topFolderOf(name)
+      if (this.untrusted && !servedWhenUntrusted(name)) {
+        this.withheld.add(name)
+        continue
+      }
+      this.entries.set(name, entryFromForward(name, forward))
       if (name === 'h5p.json') manifestArrived = true
     }
 
@@ -253,7 +309,8 @@ export class PackageReader {
           major: Number(dependency.majorVersion),
           minor: Number(dependency.minorVersion)
         })
-      return folder !== undefined && this.folderComplete(folder)
+      // An untrusted archive's own folders never serve, so the one found is a bundle's, and whole.
+      return folder !== undefined && (this.untrusted || this.folderComplete(folder))
     })
   }
 
@@ -264,6 +321,8 @@ export class PackageReader {
    */
   provablyAbsent(name: string): boolean {
     if (!this.partial || this.forwardDone) return true
+    // An untrusted archive never serves this, however much of it arrives.
+    if (this.untrusted && !servedWhenUntrusted(name)) return true
     const top = topFolderOf(name)
     if (top === null) return false
 
@@ -387,9 +446,16 @@ export class PackageReader {
     return folders.sort()
   }
 
-  /** What `h5p.json` declares but nothing reachable from here provides. */
+  /**
+   * What `h5p.json` declares but nothing reachable from here provides. For an untrusted package
+   * that would have it all with its own folders, `carried` says so: only its code was refused.
+   */
   missingLibraries(): MissingLibraries | null {
-    return describeMissingLibraries(this.entryNames(), this.manifest)
+    const names = this.entryNames()
+    const missing = describeMissingLibraries(names, this.manifest)
+    if (!missing || missing.folders.length === 0 || this.withheld.size === 0) return missing
+    const withOwn = new Set([...names, ...this.withheld])
+    return findMissingLibraries(withOwn, this.manifest).length === 0 ? { ...missing, carried: true } : missing
   }
 
   /** True when another archive is supplying entries this one does not have. */
@@ -903,6 +969,14 @@ export function explainMissingLibraries(missing: MissingLibraries): string {
   }
 
   const names = missing.folders.join(', ')
+
+  if (missing.carried) {
+    return (
+      `This package is played untrusted, so its own copy of ${names} does not run, and the ` +
+      `library sources do not have ${missing.folders.length === 1 ? 'it' : 'them'}. Play it trusted only if you trust ` +
+      `where it came from.`
+    )
+  }
 
   return missing.all
     ? `This package contains no libraries, only content. Exports from h5p.com and h5p.org ` +

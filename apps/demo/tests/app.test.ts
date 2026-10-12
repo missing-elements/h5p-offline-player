@@ -1,4 +1,5 @@
-import { copyFile, mkdtemp, rm } from 'node:fs/promises'
+import { copyFile, mkdtemp, readFile, rm } from 'node:fs/promises'
+import { createServer as createHttpServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -15,20 +16,34 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 
 const rootDir = resolve(import.meta.dirname, '..')
 const QUIZ = resolve(rootDir, 'demo', 'content', 'quiz.h5p')
+/** Needs a version of the fixture content type only it carries, which the app's pack has not got. */
+const OWN_CODE_ONLY = resolve(rootDir, '..', '..', 'packages', 'player', 'public', 'fixtures', 'untrusted-newer.h5p')
 let vite: ViteDevServer
 let browser: Browser
 let origin: string
+/** Another site, `127.0.0.1` to the app's `localhost`, serving packages with CORS open. */
+let elsewhere: { origin: string; server: Server }
 
 beforeAll(async () => {
   vite = await createServer({ configFile: resolve(rootDir, 'vite.config.ts'), root: rootDir, server: { host: 'localhost', port: 0 }, logLevel: 'error' })
   await vite.listen()
   origin = `http://localhost:${(vite.httpServer!.address() as AddressInfo).port}`
   browser = await chromium.launch()
+  const files: Record<string, string> = { '/quiz.h5p': QUIZ, '/own-code-only.h5p': OWN_CODE_ONLY }
+  const server = createHttpServer(async (request, response) => {
+    const file = files[new URL(request.url ?? '/', 'http://x').pathname]
+    if (!file) return void response.writeHead(404).end()
+    const body = await readFile(file)
+    response.writeHead(200, { 'Content-Type': 'application/zip', 'Content-Length': body.length, 'Access-Control-Allow-Origin': '*' }).end(body)
+  })
+  await new Promise<void>((done) => server.listen(0, '127.0.0.1', done))
+  elsewhere = { origin: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, server }
 })
 
 afterAll(async () => {
   await browser?.close()
   await vite?.close()
+  await new Promise((done) => elsewhere?.server.close(done))
 })
 
 interface Seen {
@@ -393,6 +408,33 @@ it('keeps a copy in a tab even where the browser gives a handle, which a private
   await page.waitForFunction(() => !document.querySelector<HTMLElement>('#recent')!.hidden)
   expect(await recent(page)).toEqual([{ title: 'Do you know what just happened?', meta: expect.stringMatching(/^quiz\.h5p · Today · [\d.]+ MB on this device$/) }])
   expect(await copiesKept(page)).toBe(1)
+  expect(errors).toEqual([])
+  await page.close()
+})
+
+const untrusted = (page: Page) => page.evaluate(() => (document.querySelector('h5p-player') as HTMLElement & { untrusted: boolean }).untrusted)
+
+it('plays a link from another site untrusted, with the libraries it carries and no question', async () => {
+  const { page, errors } = await openApp(`/app/?src=${elsewhere.origin}/quiz.h5p`)
+  await playerIs(page, 'ready')
+  expect(await untrusted(page)).toBe(true)
+  // The quiz carries its own libraries, and played with the pack's instead.
+  expect(await page.evaluate(() => (document.querySelector('h5p-player') as HTMLElement & { libraryBundle: { url: string } | null }).libraryBundle?.url)).toMatch(/libraries.*\.h5p$/)
+  expect(await page.isVisible('#confirm-src')).toBe(false)
+  expect(errors).toEqual([])
+  await page.close()
+})
+
+it('asks before playing a link from another site with its own code, and only when it needs it', async () => {
+  const { page, errors } = await openApp(`/app/?src=${elsewhere.origin}/own-code-only.h5p`)
+  await page.waitForSelector('#confirm-src:not([hidden])')
+  expect(await page.textContent('#confirm-src .host')).toBe(new URL(elsewhere.origin).host)
+  expect((await seen(page)).message).toBe('')
+
+  await page.click('#confirm-open')
+  await playerIs(page, 'ready')
+  expect(await untrusted(page)).toBe(false)
+  expect(await page.isVisible('#confirm-src')).toBe(false)
   expect(errors).toEqual([])
   await page.close()
 })

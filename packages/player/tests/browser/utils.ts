@@ -40,6 +40,12 @@ export const FIXTURES = {
   needsLibraries: '/fixtures/needs-libraries.h5p',
   /** Library folders and nothing else, to fill the gap in the one above. */
   libraries: '/fixtures/libraries.h5p',
+  /** Its own copy of the content type marks the frame when it runs, and `content/` has a file of each kind. */
+  untrusted: '/fixtures/untrusted.h5p',
+  /** The same from a host that ignores `Range`: booted from the forward index, with the bundle's folders. */
+  noRangeUntrusted: '/no-range/untrusted.h5p',
+  /** Needs the content type at 1.3, which only it carries. */
+  untrustedNewer: '/fixtures/untrusted-newer.h5p',
   /** The fixture content type at 1.2 and a sub-content type at 1.1, each with an `upgrades.js`. */
   upgradeLibraries: '/fixtures/upgrade-libraries.h5p',
   /** Stripped exports written for 1.0 (with sub-content at 1.0), 1.1 and 1.2, and one whose first step throws. */

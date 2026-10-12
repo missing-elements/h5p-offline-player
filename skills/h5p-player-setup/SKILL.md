@@ -38,6 +38,11 @@ separate domain and take results by the xAPI relay, or install the player only o
 that holds no session (a separate origin for the course pages) — and install on the session
 origin only if the user confirms every package is their own team's.
 
+Whatever the setup, a package from elsewhere gets `untrusted` (`<h5p-player untrusted src="…">`):
+it plays as data, with the library pack's code and none of its own. It is a layer, not a reason to
+install where the table says Embed: content is not yet checked against each library's field
+definitions, as the H5P CMS plugins do.
+
 ## 2. Do it
 
 **Install with a bundler**

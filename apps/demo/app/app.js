@@ -361,6 +361,7 @@ async function open(file, { libraries = PACK, handle = null, title = null, repla
   await ready
   if (token !== opens) return
   player.setAttribute('libraries', libraries)
+  player.untrusted = false
   player.file = file
 }
 
@@ -377,9 +378,10 @@ function linkName(url) {
 /**
  * A package at a URL: `/app/?src=…`, the link a teacher sends. With the app installed, Chrome
  * opens such a link in the app's window — its "supported links" — and when that window is
- * already open, hands it the URL through `launchQueue` instead of loading the page again.
+ * already open, hands it the URL through `launchQueue` instead of loading the page again. One on
+ * another site plays untrusted unless the learner said otherwise: see `foreignHost`.
  */
-async function openUrl(src, { libraries = PACK, title = null } = {}) {
+async function openUrl(src, { libraries = PACK, title = null, trusted = !foreignHost(src) } = {}) {
   let url
   try {
     url = new URL(src, location.href)
@@ -390,10 +392,11 @@ async function openUrl(src, { libraries = PACK, title = null } = {}) {
   const token = ++opens
   lastUrl = url.href
   current = { kind: 'link', url: url.href }
-  opening(title ?? linkName(url), (source) => openUrl(url.href, { libraries: source, title }), `${location.pathname}?src=${encodeURIComponent(url.href)}`)
+  opening(title ?? linkName(url), (source) => openUrl(url.href, { libraries: source, title, trusted }), `${location.pathname}?src=${encodeURIComponent(url.href)}`)
   await ready
   if (token !== opens) return
   player.setAttribute('libraries', libraries)
+  player.untrusted = !trusted
   // Removed first, so opening the same link again still counts as a change.
   player.removeAttribute('src')
   player.setAttribute('src', url.href)
@@ -402,29 +405,35 @@ async function openUrl(src, { libraries = PACK, title = null } = {}) {
 /**
  * The host of a package on another site, or `null` for this site's own and for what is not a URL
  * (which `openUrl` then reports). A package's libraries are JavaScript and the frame is
- * same-origin by design, so a package runs with this origin's storage — with `resume` on, the
- * saved state of every file opened here, answers included, and the chunk store and the list of
- * what was played. A file the learner picked is their choice; a link is whoever wrote it, so a
- * link to another site waits for a click that names the host.
+ * same-origin by design, so a package's own code runs with this origin's storage — with `resume`
+ * on, the saved state of every file opened here, answers included, and the chunk store and the
+ * list of what was played. A file the learner picked is their choice; a link is whoever wrote it,
+ * so a link to another site plays `untrusted`, as data, with the libraries the app carries and
+ * none of its own, and asks for a click that names the host only when it cannot play without its
+ * own code.
  */
 const foreignHost = (src) => {
   try {
     const url = new URL(src, location.href)
-    // A `data:` URL has no host and an opaque origin: name its scheme, so it still waits.
+    // A `data:` URL has no host and an opaque origin: name its scheme, so it counts as another site's.
     return url.origin === location.origin ? null : url.host || url.protocol
   } catch {
     return null
   }
 }
 
-let confirmed = null
 function openLink(src) {
   confirmBox.hidden = true
-  const host = foreignHost(src)
-  if (!host) return void openUrl(src)
-  confirmBox.querySelector('.host').textContent = host
+  void openUrl(src)
+}
+
+/** Asks before playing an untrusted link with its own code, which it turned out to need. */
+let confirmed = null
+function askToTrust(url) {
+  show('')
+  confirmBox.querySelector('.host').textContent = foreignHost(url)
   confirmBox.hidden = false
-  confirmed = () => openUrl(src)
+  confirmed = () => openUrl(url, { trusted: true })
 }
 $('#confirm-open').addEventListener('click', () => {
   confirmBox.hidden = true
@@ -652,8 +661,8 @@ async function fileFrom(handle) {
 /** Opens an entry of the list again: from disk, from the copy kept, or from its link. */
 async function openRecent(entry) {
   if (entry.kind === 'link') {
-    // Not asked about again: the learner answered for that site when the link first opened, and
-    // only a package already running on this origin could have put an entry here.
+    // As when it first opened: untrusted if it is on another site, with the question only if it
+    // needs its own code.
     void openUrl(entry.url, { title: entry.title })
     return
   }
@@ -732,6 +741,13 @@ startOver.addEventListener('click', async () => {
 player.addEventListener('error', (event) => {
   const { code, message: detail, missingLibraries } = event.detail
   const late = code === 'runtime' && player.state === 'ready'
+
+  // Played untrusted, a link from another site turned out to need its own copy of a library: the
+  // learner decides, naming the host.
+  if (missingLibraries?.carried && current?.kind === 'link') {
+    askToTrust(current.url)
+    return
+  }
 
   // Missing even with the pack attached: the package needs a newer minor than the pack has, or a
   // content type added since. Only a newer version of the app, with a newer pack, can supply it.

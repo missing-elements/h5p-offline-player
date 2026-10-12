@@ -50,6 +50,11 @@ export interface MissingLibraries {
   folders: string[]
   /** True when the archive carries no libraries at all — the usual content-only export. */
   all: boolean
+  /**
+   * True when the package is played `untrusted` and carries these itself: its own copy would
+   * supply them, and only its own code is refused. A host can offer to play it trusted.
+   */
+  carried?: boolean
 }
 
 /** One row of the IndexedDB `packages` table. */
@@ -112,6 +117,12 @@ export interface PackageRecord {
   frameOptions?: FrameOptions
   /** The language tag the element was in when it loaded the package; absent when none was declared, and from a record an older element wrote. */
   language?: string
+  /**
+   * Played as data: none of the package's own code runs. Library folders come only from the
+   * attached bundle, `content/` serves only H5P's own list of file types, and the frame's policy
+   * names exact script paths. See the `untrusted` attribute.
+   */
+  untrusted?: boolean
   status: PackageStatus
   title?: string
   /** `h5p.json`'s licence, authors and the rest, for the frame's copyright dialog; absent from an older row. */

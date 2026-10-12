@@ -138,6 +138,15 @@ player.addEventListener('finished', (event) => {
 player.addEventListener('error', (event) => {
   const { code, message: detail, missingLibraries } = event.detail
   bar.hidden = true
+  // Played untrusted, a link from another site turned out to need its own copy of a library: the
+  // visitor decides, naming the host.
+  if (missingLibraries?.carried && player.untrusted && currentLink) {
+    const link = currentLink
+    show('')
+    write(`refused  its own code: ${missingLibraries.folders.join(', ')}`)
+    askBeforeOpening(foreignHost(link), () => loadUrl(link, { trusted: true }))
+    return
+  }
   // A runtime error once the content is up does not stop it — content types throw non-fatal
   // exceptions routinely — so it is shown as a note, not as the player failing.
   const late = code === 'runtime' && player.state === 'ready'
@@ -203,13 +212,23 @@ const embedCodeFor = (url) =>
 // to h5p.org, whose own `h5p-resizer.js` speaks the same protocol and would do too.
 player.setAttribute('resize-code', `<script src="${EMBED_ORIGIN}/resizer.js"></script>`)
 
-const loadUrl = (url) => {
+/** The link being played, for the question a refusal of its own code asks. */
+let currentLink = null
+
+/**
+ * Plays a package at a URL. `trusted: false` plays it as data, `untrusted`: none of its own code
+ * runs, and its libraries come from this site's bundle, which it cannot play without.
+ */
+const loadUrl = (url, { trusted = true } = {}) => {
   log.textContent = ''
   confirmBox.hidden = true
   offer.hidden = true
-  reload = () => loadUrl(url)
+  reload = () => loadUrl(url, { trusted })
+  currentLink = url
   applyLibrarySource()
-  write(`loading  ${url}`)
+  if (!trusted) player.setAttribute('libraries', librarySource ?? BUNDLE)
+  player.untrusted = !trusted
+  write(`loading  ${url}${trusted ? '' : '  (untrusted: none of its own code runs)'}`)
   startClock()
   // The embed code is read with the load, like `libraries`, so it goes on before `src`.
   player.setAttribute('embed-code', embedCodeFor(url))
@@ -223,7 +242,9 @@ const loadFile = (file) => {
   confirmBox.hidden = true
   offer.hidden = true
   reload = () => loadFile(file)
+  currentLink = null
   applyLibrarySource()
+  player.untrusted = false
   write(`loading  ${file.name} (${(file.size / 1024).toFixed(0)} kB, from disk)`)
   startClock()
   urlInput.value = ''
@@ -260,14 +281,15 @@ for (const button of document.querySelectorAll('.samples button')) {
 /**
  * The host of a package on another site, or `null` for this site's own and for what is not a URL
  * (which `loadUrl` then reports). A package's libraries are JavaScript and the frame is
- * same-origin by design, so a package runs with this origin's storage: the app's saved states,
- * the chunk store, the list of what was played. Typed into the field is the visitor's choice; a
- * link's `?src=` is whoever wrote the link's, so it waits for a click that names the host.
+ * same-origin by design, so a package's own code runs with this origin's storage: the app's saved
+ * states, the chunk store, the list of what was played. Typed into the field is the visitor's
+ * choice; a link's `?src=` is whoever wrote the link's, so one on another site plays `untrusted`,
+ * as data, and asks for a click that names the host only when it cannot play without its own code.
  */
 const foreignHost = (src) => {
   try {
     const url = new URL(src, location.href)
-    // A `data:` URL has no host and an opaque origin: name its scheme, so it still waits.
+    // A `data:` URL has no host and an opaque origin: name its scheme, so it counts as another site's.
     return url.origin === location.origin ? null : url.host || url.protocol
   } catch {
     return null
@@ -291,7 +313,5 @@ document.querySelector('#confirm-open').addEventListener('click', () => {
 const initial = new URLSearchParams(location.search).get('src')
 if (initial) {
   urlInput.value = initial
-  const host = foreignHost(initial)
-  if (host) askBeforeOpening(host, () => loadUrl(initial))
-  else loadUrl(initial)
+  loadUrl(initial, { trusted: !foreignHost(initial) })
 }

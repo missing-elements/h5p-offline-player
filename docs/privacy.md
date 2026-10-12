@@ -30,7 +30,8 @@ statement and nowhere else.
 
 Any package played on the same origin can read all three. With `resume` on, or with packages you
 did not make, that is a reason to use the Embed setup on a domain of its own; see *Which setup* in
-the [README](https://github.com/missing-elements/h5p-offline-player#which-setup).
+the [README](https://github.com/missing-elements/h5p-offline-player#which-setup). A package played
+`untrusted` runs none of its own code, which is what could read them.
 
 ## What is sent, and to whom
 

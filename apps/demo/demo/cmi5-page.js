@@ -29,9 +29,11 @@ const say = (text) => {
 /**
  * The package is named by whoever wrote the launch address (`?src=`) or runs the LMS it names
  * (`launchParameters`), and this page is public: anyone can link to it with cmi5 parameters of
- * their own. A package's scripts run on this origin, with its storage, so one from another site
- * waits for a click that names the host; the site's own play at once. `startCmi5` is therefore
- * told to leave `src` alone, and the page sets it once the launch has said what to play.
+ * their own. A package's own scripts would run on this origin, with its storage, so one from
+ * another site plays `untrusted`, as data with the library pack's code, and waits for a click that
+ * names the host only when it cannot play without its own; the site's own play as they are.
+ * `startCmi5` is therefore told to leave `src` alone, and the page sets it once the launch has
+ * said what to play.
  */
 const confirmBox = document.querySelector('#confirm-src')
 const urlSrc = new URLSearchParams(location.search).get('src')?.trim() || null
@@ -39,7 +41,7 @@ const urlSrc = new URLSearchParams(location.search).get('src')?.trim() || null
 const foreignHost = (src) => {
   try {
     const url = new URL(src, location.href)
-    // A `data:` URL has no host and an opaque origin: name its scheme, so it still waits.
+    // A `data:` URL has no host and an opaque origin: name its scheme, so it counts as another site's.
     return url.origin === location.origin ? null : url.host || url.protocol
   } catch {
     return null
@@ -51,17 +53,20 @@ const play = (src) => {
     say('No package to play: add ?src=<url of a .h5p> to the AU URL, or set launchParameters.')
     return
   }
-  const host = foreignHost(src)
-  if (!host) {
-    player.setAttribute('src', src)
-    return
-  }
-  confirmBox.querySelector('.host').textContent = host
+  player.untrusted = foreignHost(src) !== null
+  player.setAttribute('src', src)
+}
+
+/** Played untrusted, a package from another site needs its own code: the learner decides. */
+const askToTrust = (src) => {
+  confirmBox.querySelector('.host').textContent = foreignHost(src)
   confirmBox.hidden = false
   document.querySelector('#confirm-open').addEventListener(
     'click',
     () => {
       confirmBox.hidden = true
+      player.untrusted = false
+      player.removeAttribute('src')
       player.setAttribute('src', src)
     },
     { once: true }
@@ -75,6 +80,10 @@ const note = (line) => {
 
 player.addEventListener('error', (event) => {
   if (event.detail.code === 'runtime' && player.state === 'ready') return
+  if (event.detail.missingLibraries?.carried && player.untrusted) {
+    askToTrust(player.getAttribute('src'))
+    return
+  }
   say(event.detail.message || event.detail.code)
 })
 
