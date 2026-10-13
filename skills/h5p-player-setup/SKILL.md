@@ -165,10 +165,9 @@ addEventListener('message', ({ source, origin, data }) => {
 Those checks prove the sender, not the score: any package can post any statement, so relayed
 results are the learner's report, not proof for a grade.
 
-Do not embed from Embed My (embed-my.org) or from the demo site in production: Embed My is a
-test tool — every learner's browser would connect to a service the organisation has no data
-processing agreement with, which a GDPR or security review will not pass. It is fine for trying
-whether a package embeds before the domain is set up.
+Do not embed from the demo site, or from any public service, in production: every learner's
+browser would connect to an origin the organisation has no data processing agreement with, which
+a GDPR or security review will not pass.
 
 For the site's privacy notice, or a reviewer's questions about what is stored, what is sent and
 to whom: https://github.com/missing-elements/h5p-offline-player/blob/main/docs/privacy.md

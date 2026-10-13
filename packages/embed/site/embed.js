@@ -15,7 +15,7 @@
  * statements are relayed to the parent only when `xapi=` names the parent's origin, and they are
  * posted to that origin only. Once the content is up the page posts one `report` upward, and a
  * load that fails posts its `error` (see `report` below): what an embedding page that checks a
- * package — Embed My's preview — shows.
+ * package shows under its preview.
  */
 
 /** Where the element's `libraries="pack"` fetches the library pack from, for a site without its own copy. */
@@ -121,8 +121,8 @@ export function startEmbed({ librariesPack = null, packages = null, defaultLibra
    * and to any parent, like the heights: the parent named the package, and the manifest's strings
    * are the package's own to tell. A parent treats them as text. A load that fails before the
    * content is up posts `{ context: 'h5p-offline-player', action: 'error', code, message }`
-   * instead, a refusal by this page included (`code: 'refused'`). The shapes are Embed My's,
-   * whose preview is built from them.
+   * instead, a refusal by this page included (`code: 'refused'`). The shapes are an interface:
+   * a site that checks packages builds its preview from them, so they do not change.
    */
   let startedAt = 0
 

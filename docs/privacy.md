@@ -12,7 +12,7 @@ and the content you play have their own answers. This is not legal advice.
 - Results reach your page as `xapi` events. Where they go from there is your decision.
 - Self-hosted, the only processor in the learner's path is your own hosting. That stays true if
   you use [`@missing-elements/h5p-embed`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#readme)
-  on a player domain you run. It is not true for a public service such as Embed My.
+  on a player domain you run. It is not true for a public service in the learner's path.
 
 ## What is stored, on the learner's device
 

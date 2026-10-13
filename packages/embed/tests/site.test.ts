@@ -120,7 +120,7 @@ beforeAll(async () => {
   // The pack and nothing else: jsDelivr is off the list, so the default is the local copy alone.
   const fallbackDir = join(dir, 'fallback')
   await buildSite({ out: fallbackDir, packages: [embedding.origin], defaultLibraries: 'pack' })
-  // A site whose own preview frames the page, as Embed My's does: no click for the chosen package.
+  // A site whose own preview frames the page, as a package-checking site does: no click for the chosen package.
   const previewDir = join(dir, 'preview')
   await buildSite({ out: previewDir })
   await writeFile(join(previewDir, 'main.js'), "import { startEmbed } from './embed.js'\nstartEmbed({ askInOwnFrame: false })\n")

@@ -95,9 +95,6 @@ your site's cookies) and frame it:
 `microphone` and `camera` are for the content types that record or film: Audio Recorder, Speak the
 Words and AR Scavenger. A frame from another site gets neither unless the page allows it.
 
-[Embed My](https://embed-my.org/) runs the same page publicly for trying a package. It is a test
-tool: do not send learners to it.
-
 When something goes wrong, see [Troubleshooting](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/troubleshooting.md). A site that
 allows one Service Worker, or must work offline, mounts the player in its own worker:
 [single-worker hosts](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/single-worker.md).

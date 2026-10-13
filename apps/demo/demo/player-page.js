@@ -195,9 +195,8 @@ let reload = null
 
 /**
  * Where the embed snippets point: this site's own `/embed` and `/resizer.js`, the page a host
- * serves from a player domain of its own. Not Embed My, which runs the same page as a test tool:
- * a snippet offered here gets pasted into live pages, and those should not send learners to a
- * third-party service.
+ * serves from a player domain of its own, never a third-party service: a snippet offered here
+ * gets pasted into live pages, and those should send learners nowhere but the host's own domain.
  */
 const EMBED_ORIGIN = location.origin
 

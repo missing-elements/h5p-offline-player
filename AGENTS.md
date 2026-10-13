@@ -827,7 +827,7 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   `pack` on a site built with `--no-libraries` where jsDelivr is allowed. A source that fails
   outright is passed over while another remains; only the last one's failure is the load's.
 - **The element says what it is playing: `source`, `metadata`, `libraryBundle`.** Added on
-  2026-10-09 for Embed My's "package check" under its preview: the probe's classification and
+  2026-10-09 for the package check an embedding site shows under its preview: the probe's classification and
   size (`currentSource`, exposed as a copy), the manifest's metadata plus `mainLibrary` (new on
   the `indexed` reply, read off the reader), and which bundle supplied missing libraries with
   `fromCache` for the earlier-download fallback — the privacy line "nothing left this origin".
@@ -1637,26 +1637,26 @@ SPA-fallback trap described above cannot happen there.
   stays for those, and for an in-app browser. No document names a Safari or iOS version
   floor, decided on 2026-10-08: the player supports both, and a framed player that fails on an
   earlier release is a bug to fix, not a caveat to publish.
-- **Embed My is a test tool, and nothing here sends learners to it.** https://embed-my.org/
-  is the owner's separate project (github.com/embed-my: the site in `embed-my.github.io`, the
-  guides in `.github/docs/`): paste a package link, get a live preview, a package check and a
-  snippet. From 2026-10-08 the README, the setup guide, the skills, the demo's setup page and the
-  player page's embed dialog named its page as *the* Embed setup, and an `h5p-embed-my` skill
-  walked an agent through pasting its snippet into a live page. Repositioned on 2026-10-09 by the
-  owner: a public service cannot pass a GDPR, security or vendor review — every learner's browser
+- **No public service is in the learner's path, and nothing here names one.** The owner runs a
+  separate public site on the player — paste a package link, get a live preview, a package check
+  and a snippet — and from 2026-10-08 the README, the setup guide, the skills, the demo's setup
+  page and the player page's embed dialog named it as *the* Embed setup, with a skill that walked
+  an agent through pasting its snippet into a live page. Repositioned on 2026-10-09 by the owner:
+  a public service cannot pass a GDPR, security or vendor review — every learner's browser
   connects to an origin the host has no data processing agreement with, the package URL passes
-  through it, and that origin plays whatever anyone points it at. So the Embed setup is now the
+  through it, and that origin plays whatever anyone points it at. So the Embed setup is the
   `/embed` page served from a player domain the host runs (a separate registrable domain holding
   nothing else), written by `@missing-elements/h5p-embed` (next bullet); the docs use
-  `https://h5p-player.example.net/?src=` and `/resizer.js` in their snippets and mention Embed My only for trying a package first; the player page's embed dialog
-  (`EMBED_ORIGIN` in `player-page.js`) names this site's own `/embed`; the nav keeps a plain link;
-  the skill is deleted. Still true: `/embed`'s query parameters (`src`, the bare `frame`,
+  `https://h5p-player.example.net/?src=` and `/resizer.js` in their snippets; the player page's
+  embed dialog (`EMBED_ORIGIN` in `player-page.js`) names this site's own `/embed`; the skill is
+  deleted, and since 2026-10-13 the site is not named or linked anywhere in the repository, as
+  it is being reworked. Still true: `/embed`'s query parameters (`src`, the bare `frame`,
   `copyright` and `export`, `xapi`) and its two message shapes — the resizer protocol upward and
-  the `h5p-offline-player` xAPI relay — are an interface Embed My builds on
-  (`embed-my.github.io/src/snippet.ts` and its copy of the page), so a change to one means a
-  change there with it. `tests/embed.test.ts` drives this site's `/embed` through the dev server.
+  the `h5p-offline-player` xAPI relay — are an interface that site builds on (its snippets and
+  its copy of the page), so a change to one means a change there with it. `tests/embed.test.ts`
+  drives this site's `/embed` through the dev server.
 - **`@missing-elements/h5p-embed` is the Embed setup as a deployable folder.** Built on
-  2026-10-09, the day Embed My stopped being the production path: until then a host that wanted
+  2026-10-09, the day the public site stopped being the production path: until then a host that wanted
   its own player domain had to build the demo app. `npx @missing-elements/h5p-embed <folder>`
   copies the page, the player's `dist/`, the runtime as `frame-assets/` and the library pack from
   the installed packages (so the versions are the ones published together, and nothing is
@@ -1685,18 +1685,18 @@ SPA-fallback trap described above cannot happen there.
   `127.0.0.1` and frames it from `localhost` — two sites, as deployed — with no headers, as
   GitHub Pages would; `http://localhost` and `127.0.0.1` are accepted as origins for that reason.
   0.1.0 went out with `npm publish` and its dependencies as `workspace:^`, which npm cannot
-  install (`EUNSUPPORTEDPROTOCOL`); found by Embed My on 2026-10-09 when it tried to switch.
+  install (`EUNSUPPORTEDPROTOCOL`); found on 2026-10-09 by the first site that tried to install it.
   `prepublishOnly` now refuses unless `npm_config_user_agent` says pnpm, which rewrites those
   ranges in the tarball; the verifier, the other package with workspace dependencies, has the
-  same guard. 0.2.0, the same day, added what Embed My's own page did and this one did not, so
+  same guard. 0.2.0, the same day, added what the owner's public site's own page did and this one did not, so
   that it can call `startEmbed()` instead of keeping a copy: the `report` posted to any parent on
   `ready` (source, metadata, library bundle, elapsed time — the `ready` detail, trimmed) and the
-  `error` posted on a failed load or a refusal, in Embed My's exact shapes, since its preview's
-  checks are built from them; `defaultLibraries` and `--default-libraries`, with `libraries=none`
+  `error` posted on a failed load or a refusal, in the exact shapes that site's preview checks
+  are built from; `defaultLibraries` and `--default-libraries`, with `libraries=none`
   to turn it off per address, checked against `--packages` when the site is written so a default
   the page would refuse never ships; `runtime`, for a bundled element; and `askInOwnFrame:
   false`, for a site whose own preview frames the page for a package the visitor just chose.
-  Embed My runs on 0.2.0 since that day. 0.2.1, on 2026-10-10, changes nothing in the package:
+  That site runs on 0.2.0 since that day. 0.2.1, on 2026-10-10, changes nothing in the package:
   it is published to require player `^0.5.2`, the null-source straggler fix, because a site is
   written from whatever player is installed — a fix to the player reaches a player domain only
   through an embed release, and then only once the host writes and deploys the site again.
@@ -1871,7 +1871,7 @@ SPA-fallback trap described above cannot happen there.
   `initialized`. `/embed` in another origin's frame plays a package as it is: its storage is
   partitioned by the embedding site, so a page only reaches what was played under its own embed;
   framed by this origin, or opened on its own, it plays untrusted like the rest, and a page that
-  passes `askInOwnFrame: false` — Embed My's preview — plays as it is. Every check fails closed: a
+  passes `askInOwnFrame: false` — a site's own preview — plays as it is. Every check fails closed: a
   `data:` URL, with no host, counts as another site's. The rule stays: any package whose own code
   runs on an origin can read every other package's data there.
 - **Page views are counted by Vercel Web Analytics**, through `demo/analytics.js` in every
@@ -2023,12 +2023,12 @@ GPL dependency is what corporate policies and scanners refuse. MPL-2.0 remains t
 if closed forks ever matter.
 
 **The setups are named, both are self-hosting, and Install comes first.** Decided on
-2026-10-09, after Embed My was repositioned as a test tool: the player's main benefit is that a
+2026-10-09, after the owner's public site was repositioned as a test tool: the player's main benefit is that a
 host runs H5P on its own infrastructure — no H5P server, no backend, no third-party service in
 the learner's path — and the README, the demo's setup page ("Host it
 yourself"), the front page, the social card and the `h5p-player-setup` skill lead with that.
-Earlier the same day Embed had been put first, on the ground that Embed My made the safe setup
-the easy one; with Embed My out of production that ground is gone, so the documents present
+Earlier the same day Embed had been put first, on the ground that the public site made the safe
+setup the easy one; with it out of production that ground is gone, so the documents present
 **Install** (with a bundler, or without a build step) first and **Embed** — the `/embed` page on
 a separate player domain the host runs — second. The *Which setup* table still chooses by what
 is on the site's origin, and its safety rows still win: signed-in users, or packages the site
@@ -2036,8 +2036,8 @@ did not make, mean Embed, for the reason *What a public demo means* gives — a 
 JavaScript, and installed, it runs as the host site — or, since 2026-10-13, Install with those
 packages `untrusted` (every package, on a site with sessions), which runs none of their code and
 checks their content as the CMS plugins do. The letters are gone from the user docs,
-which say "formerly Setup A/B/C" under each heading; this file and Embed My's guides still say
-Setup A (bundler), B (no build step) and C (Embed).
+which say "formerly Setup A/B/C" under each heading; this file still says Setup A (bundler),
+B (no build step) and C (Embed).
 
 ## Where this differs from the original design
 
