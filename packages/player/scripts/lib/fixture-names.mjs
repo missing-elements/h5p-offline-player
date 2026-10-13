@@ -5,6 +5,7 @@
  */
 export const GENERATED_FIXTURES = [
   'basic.h5p',
+  'finished.h5p',
   'large-deflated.h5p',
   'large-stored.h5p',
   'segmented.h5p',

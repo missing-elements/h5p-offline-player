@@ -16,6 +16,7 @@
 
 import { checkContent, checkContentMetadata, libraryKey, librariesIn, parseLibrary, type LibraryName, type SemanticField } from './content-check'
 import { upgradeContent, type ServedLibrary, type UpgradeSource, type UpgradeTable } from './content-upgrade'
+import { isResult } from './finished'
 import { coreTranslations } from './l10n'
 
 interface BootConfig {
@@ -544,7 +545,8 @@ askForUserData()
         var statement = event && event.data ? event.data.statement : undefined;
         var verb = statement && statement.verb ? statement.verb.id : undefined;
         post({ type: 'xapi', statement: statement, verb: verb });
-        if (verb === 'http://adlnet.gov/expapi/verbs/completed') {
+        // H5P's own rule for a result: `completed` or `answered`, from the content itself.
+        if (isResult(statement)) {
           post({ type: 'finished', statement: statement });
         }
       });

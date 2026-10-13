@@ -94,6 +94,8 @@ packages/runtime/         @missing-elements/h5p-runtime — the H5P core runtime
   src/content-check.ts      an untrusted package's content checked against its libraries' semantics, a
                             port of h5p-php-library's H5PContentValidator; bundled into frame-boot.js,
                             unit-tested in tests/
+  src/finished.ts           which statement is the content's result, the `finished` event: H5P's own
+                            rule; bundled into frame-boot.js, unit-tested in tests/
   scripts/build.mjs         vendors h5p-standalone into dist/ (headers, the rebuilt stylesheet, the fonts,
                             LICENSE.txt, NOTICE.txt, MANIFEST.json), builds the boot script, writes
                             dist/l10n.js from l10n/, writes index.js
@@ -787,6 +789,21 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   with registrations tied to one, and 21 CFR Part 11 LMSs keep version history as a requirement. So
   that record is the organisation's — LRS, LMS or document control — and a major change served at a
   new URL gets a new Activity id under H5P's own scheme, whose id is the content URL.
+- **`finished` is the content's result, by H5P's own rule.** The core's `xAPICompletedListener`,
+  which the CMS plugins record a result through (`setFinished`), takes a `completed` or `answered`
+  statement with no `context.contextActivities.parent`: from the content itself, not from a part
+  inside it. Up to runtime 0.2.1 the boot script posted `finished` on any `completed`, parent or
+  not, and never on `answered`. Measured on 2026-10-13 with packages built from the demo quiz and
+  played against the pack: a single Multiple Choice says only `answered`, so it never finished; a
+  Question Set inside a Column finished twice, first for the inner set with its own score, then for
+  the Column. cmi5 records the first `finished` of a registration, so a single-question unit never
+  completed and a unit holding a quiz as a part completed on that part. `isResult` in the runtime's
+  `src/finished.ts` is the rule now, with the boot script as its one caller; the element only
+  relays, so an older player gets it with the runtime. A question checked again says `answered`
+  again, so `finished` can come more than once in a load; the last is the result, as with
+  `setFinished`. `finished.test.ts` plays `finished.h5p` — the fixture content type with an Answer
+  button, and a child of itself as a part — and fails on the old rule for the part and for the
+  answer.
 - **The saved state never leaves the page, and never meets the Service Worker.** `resume` is
   H5P's own save-and-resume — core asks each instance for `getCurrentState()` every `saveFreq`
   seconds, three seconds after a `completed` or `progressed` statement and as the document goes

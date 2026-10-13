@@ -10,6 +10,8 @@ import type { H5PPlayerElement, PlayerErrorDetail } from '../../src/h5p-offline-
 
 export const FIXTURES = {
   basic: '/fixtures/basic.h5p',
+  /** The content type with an Answer button, reporting `answered`, and a child of itself as a part. */
+  finished: '/fixtures/finished.h5p',
   largeDeflated: '/fixtures/large-deflated.h5p',
   largeStored: '/fixtures/large-stored.h5p',
   /** A large deflated entry that does not compress, so its span is fetched in segments over HTTP. */
