@@ -1,0 +1,20 @@
+{
+  "note": "One set of statements; the first is the true one, and the list is shuffled, so the step clicks it by its text.",
+  "params": {
+    "summaries": [
+      {
+        "summary": [
+          "<p>True statement</p>",
+          "<p>False statement</p>"
+        ]
+      }
+    ]
+  },
+  "steps": [
+    {
+      "click": "li:has-text('True statement')",
+      "pause": 1500
+    }
+  ],
+  "finished": "answered"
+}

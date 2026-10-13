@@ -1,0 +1,24 @@
+{
+  "note": "One question; the first answer is the right one, and the set shuffles them, so the step clicks the one marked correct.",
+  "params": {
+    "choices": [
+      {
+        "question": "<p>Which one is right?</p>",
+        "answers": [
+          "<p>Right</p>",
+          "<p>Wrong</p>"
+        ]
+      }
+    ]
+  },
+  "steps": [
+    {
+      "click": ".h5p-sc-alternative.h5p-sc-is-correct",
+      "pause": 3500
+    },
+    {
+      "walk": true
+    }
+  ],
+  "finished": "completed"
+}

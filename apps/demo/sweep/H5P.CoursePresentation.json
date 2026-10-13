@@ -1,0 +1,39 @@
+{
+  "note": "One slide with a question, which gives the presentation its summary slide.",
+  "params": {
+    "presentation": {
+      "slides": [
+        {
+          "elements": [
+            {
+              "x": 5,
+              "y": 5,
+              "width": 90,
+              "height": 80,
+              "action": {
+                "library": "H5P.MultiChoice 1.16",
+                "params": {
+                  "question": "<p>Which one is right?</p>",
+                  "answers": [
+                    {
+                      "text": "<div>Right</div>",
+                      "correct": true
+                    },
+                    {
+                      "text": "<div>Wrong</div>",
+                      "correct": false
+                    }
+                  ],
+                  "behaviour": {
+                    "randomAnswers": false
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "finished": "completed"
+}

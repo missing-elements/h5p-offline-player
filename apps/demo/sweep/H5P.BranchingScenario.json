@@ -1,0 +1,40 @@
+{
+  "note": "The generated nodes lead nowhere: a start screen, one page that proceeds to the end, and the end screen.",
+  "params": {
+    "branchingScenario": {
+      "title": "Sweep scenario",
+      "startScreen": {
+        "startScreenTitle": "<p>Start</p>"
+      },
+      "endScreens": [
+        {
+          "endScreenTitle": "<p>The end</p>",
+          "contentId": -1
+        }
+      ],
+      "content": [
+        {
+          "type": {
+            "library": "H5P.AdvancedText 1.1",
+            "params": {
+              "text": "<p>A page.</p>"
+            }
+          },
+          "showContentTitle": false,
+          "nextContentId": -1
+        }
+      ]
+    }
+  },
+  "steps": [
+    {
+      "click": ".h5p-start-button",
+      "pause": 1500
+    },
+    {
+      "click": "button:has-text('Proceed')",
+      "pause": 2000
+    }
+  ],
+  "finished": "completed"
+}

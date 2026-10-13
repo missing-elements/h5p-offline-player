@@ -51,6 +51,16 @@ jobs:
           # The player's libraries="pack" pins this version: stamp it in the same change.
           pnpm --filter @missing-elements/h5p-offline-player sync:assets
 
+          # Every content type played against the new pack, for the review: CI does not start on
+          # a pull request a workflow opened, so the result goes into its description.
+          pnpm build > /dev/null
+          if pnpm sweep --out "$RUNNER_TEMP/sweep" > "$RUNNER_TEMP/sweep.log" 2>&1; then
+            sweep="Every content type plays against the new pack, untrusted and trusted (\`pnpm sweep\`)."
+          else
+            sweep="**Some content types fail against the new pack** (\`pnpm sweep\`): see the report below."
+          fi
+          report=$(cat "$RUNNER_TEMP/sweep/report.md" 2>/dev/null || tail -n 30 "$RUNNER_TEMP/sweep.log")
+
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git switch -C "$branch"
@@ -70,7 +80,15 @@ jobs:
             "$version with pnpm, before the next player release: the player's \`libraries=\"pack\"\` now names it," \
             "and its prepublishOnly refuses a pack version that is not on npm." \
             "" \
-            '```diff' "$changes" '```')
+            '```diff' "$changes" '```' \
+            "" \
+            "$sweep" \
+            "" \
+            "<details><summary>The sweep's report</summary>" \
+            "" \
+            "$report" \
+            "" \
+            "</details>")
 
           if gh pr view "$branch" --json state --jq .state 2>/dev/null | grep -q OPEN; then
             gh pr edit "$branch" --title "Library pack $version" --body "$body"

@@ -1,0 +1,49 @@
+name: Content types
+
+# Plays every content type in the library pack — its content generated from its semantics and
+# apps/demo/sweep/ — untrusted and trusted, and fails when one does not boot or does not end with
+# the `finished` its file expects. On a change to what decides that, and every Monday after the
+# pack's refresh. The report is the run's summary; the packages and screenshots are an artifact.
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'packages/player/src/**'
+      - 'packages/runtime/**'
+      - 'packages/libraries/**'
+      - 'apps/demo/sweep/**'
+      - 'apps/demo/scripts/sweep-content-types.mjs'
+      - 'apps/demo/scripts/lib/sweep-content.mjs'
+      - '.github/workflows/content-types.yml'
+  schedule:
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # The sweep plays in the runner's Chrome, which decodes the H.264 clip Interactive Video
+      # plays; Playwright's Chromium is the fallback and does not.
+      - run: pnpm build
+      - run: pnpm sweep --out "$RUNNER_TEMP/sweep"
+      - if: always()
+        run: cat "$RUNNER_TEMP/sweep/report.md" >> "$GITHUB_STEP_SUMMARY" || true
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: content-type-sweep
+          path: ${{ runner.temp }}/sweep
+          if-no-files-found: ignore

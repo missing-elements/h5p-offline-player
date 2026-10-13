@@ -1,0 +1,66 @@
+{
+  "note": "Two cards, four tiles, all with the same sample image, so nothing on screen tells the pairs apart: the steps turn each of the three possible pairings in turn, which matches both pairs whichever way they were dealt. A turned tile that is matched ignores the next click.",
+  "steps": [
+    {
+      "click": ".h5p-memory-wrap >> nth=0",
+      "optional": true,
+      "pause": 200
+    },
+    {
+      "click": ".h5p-memory-wrap >> nth=1",
+      "optional": true,
+      "pause": 1800
+    },
+    {
+      "click": ".h5p-memory-wrap >> nth=2",
+      "optional": true,
+      "pause": 200
+    },
+    {
+      "click": ".h5p-memory-wrap >> nth=3",
+      "optional": true,
+      "pause": 1800
+    },
+    {
+      "click": ".h5p-memory-wrap >> nth=0",
+      "optional": true,
+      "pause": 200
+    },
+    {
+      "click": ".h5p-memory-wrap >> nth=2",
+      "optional": true,
+      "pause": 1800
+    },
+    {
+      "click": ".h5p-memory-wrap >> nth=1",
+      "optional": true,
+      "pause": 200
+    },
+    {
+      "click": ".h5p-memory-wrap >> nth=3",
+      "optional": true,
+      "pause": 1800
+    },
+    {
+      "click": ".h5p-memory-wrap >> nth=0",
+      "optional": true,
+      "pause": 200
+    },
+    {
+      "click": ".h5p-memory-wrap >> nth=3",
+      "optional": true,
+      "pause": 1800
+    },
+    {
+      "click": ".h5p-memory-wrap >> nth=1",
+      "optional": true,
+      "pause": 200
+    },
+    {
+      "click": ".h5p-memory-wrap >> nth=2",
+      "optional": true,
+      "pause": 2000
+    }
+  ],
+  "finished": "completed"
+}

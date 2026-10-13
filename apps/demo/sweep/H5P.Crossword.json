@@ -1,0 +1,17 @@
+{
+  "note": "Two words that cross: generated ones are the same word twice, and the grid cannot be built from them.",
+  "params": {
+    "taskDescription": "<p>Fill in the words.</p>",
+    "words": [
+      {
+        "clue": "A pet",
+        "answer": "cat"
+      },
+      {
+        "clue": "A drink",
+        "answer": "tea"
+      }
+    ]
+  },
+  "finished": "answered"
+}

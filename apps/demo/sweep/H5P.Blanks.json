@@ -1,0 +1,20 @@
+{
+  "note": "A blank to fill: generated text has none, and checked it scores 0 of 0.",
+  "params": {
+    "questions": [
+      "<p>The answer is *right*.</p>"
+    ]
+  },
+  "steps": [
+    {
+      "fill": [
+        "input.h5p-text-input",
+        "right"
+      ]
+    },
+    {
+      "walk": true
+    }
+  ],
+  "finished": "answered"
+}

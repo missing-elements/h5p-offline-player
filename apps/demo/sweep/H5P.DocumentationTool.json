@@ -1,0 +1,17 @@
+{
+  "note": "A page to fill in and the export page, with reporting on, which gives the export page its submit button.",
+  "attributes": {
+    "reporting": ""
+  },
+  "params": {
+    "pagesList": [
+      {
+        "library": "H5P.StandardPage 1.5"
+      },
+      {
+        "library": "H5P.DocumentExportPage 1.5"
+      }
+    ]
+  },
+  "finished": "completed"
+}

@@ -20,6 +20,7 @@
     "demo:icons": "pnpm --filter @missing-elements/h5p-demo demo:icons",
     "demo:screenshots": "pnpm --filter @missing-elements/h5p-demo demo:screenshots",
     "libraries": "pnpm --filter @missing-elements/h5p-demo libraries",
+    "sweep": "pnpm --filter @missing-elements/h5p-demo sweep",
     "l10n": "pnpm --filter @missing-elements/h5p-runtime l10n",
     "cmi5:catapult": "pnpm --filter @missing-elements/h5p-demo cmi5:catapult"
   },

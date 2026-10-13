@@ -1,0 +1,29 @@
+{
+  "note": "A question in a column. The question's answer names the column as its parent, so it is a part's and not the content's result.",
+  "params": {
+    "content": [
+      {
+        "content": {
+          "library": "H5P.MultiChoice 1.16",
+          "params": {
+            "question": "<p>Which one is right?</p>",
+            "answers": [
+              {
+                "text": "<div>Right</div>",
+                "correct": true
+              },
+              {
+                "text": "<div>Wrong</div>",
+                "correct": false
+              }
+            ],
+            "behaviour": {
+              "randomAnswers": false
+            }
+          }
+        }
+      }
+    ]
+  },
+  "finished": "completed"
+}

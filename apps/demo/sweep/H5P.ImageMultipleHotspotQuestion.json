@@ -1,0 +1,33 @@
+{
+  "note": "One hotspot to find, clicked.",
+  "params": {
+    "imageMultipleHotspotQuestion": {
+      "hotspotSettings": {
+        "taskDescription": "Find the hotspot",
+        "numberHotspots": 1,
+        "hotspot": [
+          {
+            "userSettings": {
+              "correct": true,
+              "feedbackText": "Found"
+            },
+            "computedSettings": {
+              "x": 10,
+              "y": 10,
+              "width": 30,
+              "height": 30,
+              "figure": "rectangle"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "steps": [
+    {
+      "click": ".image-hotspot",
+      "pause": 1000
+    }
+  ],
+  "finished": "answered"
+}

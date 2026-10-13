@@ -1,0 +1,63 @@
+{
+  "note": "The demo's clip with a question at the start, shown over the video, which pauses it. Started from its splash, answered, sent to its last second, and submitted from the end screen, the bubble the star in the control bar opens.",
+  "params": {
+    "interactiveVideo": {
+      "assets": {
+        "interactions": [
+          {
+            "duration": {
+              "from": 0,
+              "to": 5
+            },
+            "pause": true,
+            "displayType": "poster",
+            "x": 10,
+            "y": 10,
+            "width": 30,
+            "height": 30,
+            "action": {
+              "library": "H5P.MultiChoice 1.16",
+              "params": {
+                "question": "<p>Which one is right?</p>",
+                "answers": [
+                  {
+                    "text": "<div>Right</div>",
+                    "correct": true
+                  },
+                  {
+                    "text": "<div>Wrong</div>",
+                    "correct": false
+                  }
+                ],
+                "behaviour": {
+                  "randomAnswers": false
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "steps": [
+    {
+      "click": ".h5p-splash",
+      "pause": 2000
+    },
+    {
+      "walk": true
+    },
+    {
+      "evaluate": "H5P.instances[0].seek(9.5), H5P.instances[0].play()",
+      "pause": 3000
+    },
+    {
+      "click": ".h5p-control.h5p-star",
+      "pause": 1000
+    },
+    {
+      "walk": true
+    }
+  ],
+  "finished": "completed"
+}

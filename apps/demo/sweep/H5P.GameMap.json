@@ -1,0 +1,89 @@
+{
+  "note": "One stage holding a question, the start stage, on the generated background image. Generation leaves the stage's neighbours unset, which the content type maps over at once, and makes the special stage type a finish stage. The question inside a stage is created without a parent, so its answered counts as the map's result, in H5P's core too; the map's own completed, on finishing it, comes last.",
+  "params": {
+    "gamemapSteps": {
+      "backgroundImageSettings": {
+        "backgroundImage": {
+          "path": "images/sample.png",
+          "mime": "image/png",
+          "width": 640,
+          "height": 360
+        }
+      },
+      "gamemap": {
+        "elements": [
+          {
+            "id": "00000000-0000-4000-8000-0000000000aa",
+            "type": "stage",
+            "label": "Stage one",
+            "canBeStartStage": true,
+            "contentsList": [
+              {
+                "contentType": {
+                  "library": "H5P.MultiChoice 1.16",
+                  "params": {
+                    "question": "<p>Which one is right?</p>",
+                    "answers": [
+                      {
+                        "text": "<div>Right</div>",
+                        "correct": true
+                      },
+                      {
+                        "text": "<div>Wrong</div>",
+                        "correct": false
+                      }
+                    ],
+                    "behaviour": {
+                      "randomAnswers": false
+                    }
+                  }
+                }
+              }
+            ],
+            "specialStageType": null,
+            "neighbors": [],
+            "telemetry": {
+              "x": "40",
+              "y": "40",
+              "width": "8",
+              "height": "12"
+            }
+          }
+        ],
+        "paths": []
+      }
+    }
+  },
+  "steps": [
+    {
+      "click": ".h5p-game-map-stage",
+      "pause": 1500
+    },
+    {
+      "click": ".h5p-answer",
+      "pause": 300
+    },
+    {
+      "click": "button:has-text('Check')",
+      "pause": 1500
+    },
+    {
+      "click": "button:has-text('Continue')",
+      "pause": 1500
+    },
+    {
+      "click": ".h5p-core-button:has-text('OK')",
+      "optional": true,
+      "pause": 1000
+    },
+    {
+      "click": ".toolbar-button-finish",
+      "pause": 1000
+    },
+    {
+      "click": ".h5p-core-button:has-text('Yes')",
+      "pause": 2000
+    }
+  ],
+  "finished": "completed"
+}

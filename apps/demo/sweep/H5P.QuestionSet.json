@@ -1,0 +1,27 @@
+{
+  "note": "One question with a right answer. Its answered names the set as parent; the set's own completed is the result.",
+  "params": {
+    "questions": [
+      {
+        "library": "H5P.MultiChoice 1.16",
+        "params": {
+          "question": "<p>Which one is right?</p>",
+          "answers": [
+            {
+              "text": "<div>Right</div>",
+              "correct": true
+            },
+            {
+              "text": "<div>Wrong</div>",
+              "correct": false
+            }
+          ],
+          "behaviour": {
+            "randomAnswers": false
+          }
+        }
+      }
+    ]
+  },
+  "finished": "completed"
+}

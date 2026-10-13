@@ -105,7 +105,9 @@ address. With none, a top-level window closes and a framed page stays where it i
    `max` and `raw`, rides on `passed` or `failed` only. Each goes out once per registration: an
    earlier session's `completed` or `passed` is not sent again, nor `failed` after `passed`. If
    the LRS cannot be asked, the session counts for itself and reports `registration-unread`.
-   Nothing is sent in `Browse` or `Review` mode.
+   Nothing is sent in `Browse` or `Review` mode. Interactive Book and Game Map report a part's
+   result with no parent, as on any H5P site, so a unit holding one completes on the first part
+   finished — a book's first chapter, a map's first exercise — with that part's score.
 4. **`terminated`** from Exit. A closed tab sends nothing; the LMS records the session as
    `abandoned`.
 
