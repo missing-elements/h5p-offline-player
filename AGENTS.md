@@ -487,7 +487,17 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   with the pack. The element asks for it with `deep` on `index`: at once for a picked file or a
   downloaded archive, and on a host with `Range` only after the warm, reading each `library.json`
   from the cache, since before it each would be two ranged requests. `needs-dependency.h5p` is
-  the fixture.
+  the fixture, laid out as an export is: its library folder first, media last.
+  On a host without `Range` the deep check waits for the end of the download, and the frame can
+  boot before then from the forward index, so the same walk decides that too (`bootsEarly` in
+  `mount.ts`, on the partial reader): a dependency absent so far keeps the frame waiting for the
+  download, where the deep check attaches a bundle or refuses the package. Found on 2026-10-14,
+  when the merge of 0.9.1 failed once in WebKit on CI: `bootReady` checked only what `h5p.json`
+  declares, the frame booted while the media was arriving, and the runtime's request for the
+  missing `library.json` got its 404 before the bundle was attached. The fixture then ended with
+  its library folder, which left the race a few milliseconds wide; paced through `?throttle=`
+  with its media last, it failed every time in Chromium. While a dependency is absent, every
+  progress report walks the tree again, a few local reads each.
 - **What a load asked for is the load's, not the package's.** The `packages` row is keyed by
   `pkgId`, a hash of the source, and up to 2026-10-13 it also held what the last load asked for:
   `untrusted`, the language, the display options, the frame assets, `allow-origins` and the
