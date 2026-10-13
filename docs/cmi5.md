@@ -99,7 +99,8 @@ address. With none, a top-level window closes and a framed page stays where it i
    and dropped. One with the platform but no revision is sent: the player releases held
    statements without one, on a host without `Range`, when the load ends or the page is hidden
    before the archive's index answered. Each carries a UUID id.
-3. **On completion** (the `finished` event): `passed` or `failed`, then `completed`. A mastery
+3. **On the content's result** (the `finished` event: its own `completed` or `answered`, never a
+   part's): `passed` or `failed`, then `completed`. A mastery
    score in the launch decides; without one, H5P's own verdict does. The score, with `min: 0`,
    `max` and `raw`, rides on `passed` or `failed` only. Each goes out once per registration: an
    earlier session's `completed` or `passed` is not sent again, nor `failed` after `passed`. If

@@ -84,6 +84,26 @@ built.push([
   })
 ])
 
+// 1b. A result and a part: the content type with its Answer button, which reports `answered` as
+//     a single question does, and a child of itself run as sub-content, whose Complete reports
+//     `completed` with the parent named. Only the content's own statements are its result.
+built.push([
+  'finished.h5p',
+  await writeArchive('finished.h5p', async (writer) => {
+    await addBaseFiles(writer, { skip: ['content/content.json'] })
+    await writer.add(
+      'content/content.json',
+      new TextReader(
+        JSON.stringify({
+          message: 'A result, and a part inside it.',
+          answer: true,
+          child: { library: 'H5P.OfflineTest 1.0', subContentId: '9d3c1f0a-2b4e-4c6d-8e1f-3a5b7c9d1e2f', params: { message: 'A part.' } }
+        })
+      )
+    )
+  })
+])
+
 // 2. A large deflated entry: the Jobs worker inflates it into chunks and the virtual server
 //    serves the prefix that exists as a shorter 206.
 built.push([

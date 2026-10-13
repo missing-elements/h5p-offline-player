@@ -83,7 +83,7 @@
    and Choose a file is on the home screen. Its size is its content's whatever the insets, and
    its rows are packed at the top: on an iPhone, in Safari, the menu filled the screen's height
    and stretched its items to fill it (2026-10-13), which neither Playwright's WebKit nor
-   Chromium showed at any phone size. */
+   Chromium showed at any phone size; with these rules it does not, on the same iPhone. */
 .app .menu {
   display: none;
   inset: auto;

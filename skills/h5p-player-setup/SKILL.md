@@ -158,7 +158,7 @@ addEventListener('message', ({ source, origin, data }) => {
   if (source !== frame.contentWindow || origin !== 'https://h5p-player.example.net') return
   if (data?.context !== 'h5p-offline-player') return
   if (data.action === 'xapi') send(data.statement)      // every statement
-  if (data.action === 'finished') send(data.statement)  // the final one, with result.score
+  if (data.action === 'finished') send(data.statement)  // the result, with result.score; the last one counts
 })
 ```
 

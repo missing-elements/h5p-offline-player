@@ -41,6 +41,16 @@ H5P.OfflineTest = (function ($) {
 
     $container.append($message).append($button).append($count);
 
+    // An answer, reported the way a single question reports one: `answered`, scored, and never a
+    // `completed` after it. What the `finished` tests press beside a part's own Complete.
+    if (self.params.answer) {
+      var $answer = $('<button class="h5p-offline-test-answer" type="button">Answer</button>');
+      $answer.on('click', function () {
+        self.triggerXAPIScored(1, 2, 'answered');
+      });
+      $container.append($answer);
+    }
+
     // Formatted text, put in the way H5P's own content types put theirs: as HTML, through jQuery,
     // which runs a `<script>` it finds there. What the untrusted tests check the content for.
     if (self.params.html) {
