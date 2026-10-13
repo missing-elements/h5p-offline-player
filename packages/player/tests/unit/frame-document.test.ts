@@ -128,6 +128,16 @@ describe('the policy for an untrusted package', () => {
     }
   })
 
+  it("names the worker's own script, which Firefox checks a script the worker made up against", () => {
+    const sources = scriptSources(
+      buildContentSecurityPolicy({ ...options, untrusted: true, workerScript: 'https://site.example/h5p-sw.js?v=1' })
+    )
+    expect(sources).toContain('https://site.example/h5p-sw.js')
+    expect(scriptSources(buildContentSecurityPolicy({ ...options, workerScript: 'https://site.example/h5p-sw.js' }))).not.toContain(
+      'https://site.example/h5p-sw.js'
+    )
+  })
+
   it("names the host's own scripts by URL, and still what allow-origins vouches for", () => {
     const sources = scriptSources(
       buildContentSecurityPolicy({

@@ -234,6 +234,8 @@ pnpm dev               # vendors assets, builds fixtures, serves the demo on :51
 pnpm test              # every package: the player's unit + browser suites, the normalizer's and verifier's tests
 pnpm test:unit         # fast, no browser
 pnpm test:browser
+H5P_TEST_BROWSER=firefox pnpm test:engine   # the player's browser suite in Firefox, or webkit;
+                       # after `playwright install firefox webkit` in the player
 pnpm typecheck         # every package
 pnpm build             # the player: types, element, both workers; builds the runtime package on the way
 pnpm normalize course.h5p          # rewrite a package so it streams: media stored, mp4 index first
@@ -265,6 +267,18 @@ literal `--` reaches the script, which Vite then reads as the end of its options
 the tests that emulate a browser condition through CDP — a storage cap, a slow link. Those get a
 browser of their own, one file at a time, because the emulation is per browser profile and would
 otherwise land on whatever other file was running.
+
+The `browser` project runs in Chromium unless `H5P_TEST_BROWSER` names `firefox` or `webkit`, and
+`pnpm test:engine` runs it alone, which is what CI does for those two (the `engines` job, one
+engine per job; the `test` job covers Chromium). One engine per run, never a list: the dev
+server's switches — a host's outage, the worker version it serves — are shared, and two engines
+running one file at once flipped them under each other. `browser-emulated` stays on Chromium,
+since CDP is Chromium's. Added on 2026-10-13, after Safari had only ever been checked by hand;
+the first runs found the three engine differences under *A body that streams holds its fetch
+event open*, *An untrusted package plays as data* (the worker's own script in its policy) and *A
+downloaded archive is read back before it is reported done*. Playwright's WebKit is WebKit's
+desktop port and not iOS Safari: the app's menu filled an iPhone's screen in Safari on 2026-10-13
+and drew correctly in Playwright's WebKit at every phone size.
 
 `pnpm publish` in `packages/player` runs `prepublishOnly` — typecheck, the unit suite and the
 build — so a broken tree cannot ship; the browser suite is left out because it needs an installed
@@ -393,12 +407,30 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   shorter `206` a partly extracted entry gets, and played 22 s after the host came back; an
   errored body it never follows up. And a body that stays open for as long as the transfer takes
   is fine in Chromium — 6.5 minutes on one tail request at 50 kB/s, measured — so no wall clock
-  is needed there. `/stalling/<fixture>?rate=` on the dev server is a host with an outage switch;
+  is needed there; in Firefox it needs the next invariant. `/stalling/<fixture>?rate=` on the dev server is a host with an outage switch;
   `tests/browser/stalling-host.test.ts` runs an extraction across a silent link and across a
   reset one and expects the tail to arrive, and `tests/unit/resilient-stream.test.ts` pins the
   retry policy. Not covered: the archive download from a host without `Range`, which is a plain
   `GET` with nothing to resume by; a silent link there still ends in a 503 from `awaitEntry`.
   Left so on purpose (2026-10-10): plain-`GET` hosts are supported as they are, not invested in.
+- **A body that streams holds its fetch event open.** Firefox stops a Service Worker thirty
+  seconds after its last event, whatever it is still sending: measured on 2026-10-13, a request
+  for an entry's tail, waiting on an extraction across a silent host, ended at 30 s as a `206`
+  with none of its bytes, where Chromium delivered all of them once the host was back, at 49 s.
+  So every response the virtual server gives goes through `keptAlive` in `mount.ts`: its body is
+  passed through a stream that tells when it has ended, and `event.waitUntil` holds the event
+  until then — called inside the `respondWith` promise, while the event may still be extended.
+  Bounded by `STREAM_KEEPALIVE_MS` (four minutes), because Chromium ends an event that runs past
+  five and Firefox's extended limit is the same, while Chromium keeps a worker alive for a body
+  on its own — so a body that outlasts the bound has another thirty seconds in Firefox and goes
+  on in Chromium as before. This is not the long work the hard constraints keep out of the
+  worker: nothing runs, the event is only kept from being declared idle. Firefox differs in one
+  more way the tests had to learn: it hands the page a worker's response headers only with the
+  first bytes of the body, so a tail request past the watermark has no headers until the
+  extraction reaches it, where Chromium has them at once. Whether a media element in Firefox
+  waits that long without giving up is not measured. `stalling-host.test.ts` starts its outages
+  while the tail request is still pending for that reason, and fails in Firefox without the
+  keep-alive.
 - **Some video cannot be streamed at all, and `preload` is the only lever.** Progressive serving
   assumes the player can use the front of a file. Two package properties together break that: the
   mp4 is deflated in the zip, so no `Range` reaches a byte without the whole stream before it, and
@@ -507,7 +539,15 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   And the frame's `script-src` drops `'self'` for exact paths (`untrustedScriptSources`): the
   package's virtual root, the runtime's four files, the host's `custom-js`, and the YouTube, Vimeo
   and Panopto APIs (`UNTRUSTED_SCRIPT_PATHS`, YouTube's `iframe_api` loading its widget script
-  from `/s/player/`). The frame shares the host's origin, so `'self'` let injected markup load any
+  from `/s/player/`), and the worker's own script (`workerScript`, `self.location`). That last
+  one is Firefox's: it checks a script the worker made up — every entry is a `new Response` —
+  against the worker's URL rather than the request's, so without it every library refused to
+  load and every untrusted package failed with "Could not load …/extra.js" (found by the first
+  Firefox run of the suite, 2026-10-13; 0.9.0 and earlier shipped that way). In Firefox the exact
+  paths therefore narrow nothing among the worker's own answers: another load's entries on this
+  origin pass as well. What still holds there: the package's own folders are withheld, `nosniff`
+  keeps any other file type from running, and the worker's other answers are frame documents,
+  JSON and fixed error texts that echo nothing from the request. The frame shares the host's origin, so `'self'` let injected markup load any
   script on the host's whole site, a JSONP endpoint or an old AngularJS among them, which
   `'unsafe-eval'` makes worse; jsDelivr, cdnjs and Google's WebFont loader go too, since a CDN
   serves any npm or GitHub file. H5P.MathDisplay has carried MathJax in its own folder since 1.0,
@@ -986,6 +1026,21 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   recorded by the `publish` that followed its write; bytes still in the partial buffer were never
   stored. Publishing `written` on abort — which it once did — put the watermark past the data,
   and a reader that trusted it got a short body.
+- **A downloaded archive is read back before it is reported done.** WebKit can lose a cache's
+  writes when the only context holding the cache is terminated just after them: measured on
+  2026-10-13 in Playwright's WebKit, a package from a host without `Range` downloaded whole —
+  record written and read back as complete — its element removed a millisecond later, which
+  terminates the Jobs worker, and played again at once: the second worker found the cache empty,
+  downloaded every byte, and could not read back its own record a moment later. Nothing deleted
+  the cache, from any context; deleting it by name and downloading again kept everything, every
+  time. A check before the job did not help — the writes vanish during it — so `downloadArchive`
+  reads the record back at the end and, when it is not complete, starts the cache afresh
+  (`ChunkStore.destroy`) and downloads once more; a second loss is a `bad-archive` naming the
+  storage. The archive is all or nothing, so that is where the check pays. An extraction's or a
+  warm's writes lost the same way are not checked, and what the virtual server then serves for
+  them is not measured. It takes a replay within milliseconds of
+  removing the element, which the tests do and a learner rarely does; Safari itself is not
+  measured. `playback.test.ts` failed four tests in WebKit without it.
 - **An aborted job gives up its `inFlight` key at once, not when the abort finishes.** The
   teardown takes several tasks, and a second press of Play posts `abort` and `download` back to
   back; a key still held by the dying job made the new request look like a duplicate, and nothing
@@ -1918,7 +1973,8 @@ and not checked. The player's browser suite no longer has an `index.html` behind
 — the pages moved to the demo — so a missing file is a `404` there, not the SPA fallback's page;
 the "page instead of an archive" case is the generated `html-page.h5p` fixture.
 
-Browser tests drive the real element in chromium. They are the only place the interesting parts
+Browser tests drive the real element in Chromium, and in CI in Firefox and WebKit too (see
+*Commands*). They are the only place the interesting parts
 exist at all — a worker serving a `206` assembled out of cache chunks has no meaningful behaviour
 outside a browser. Two things to know when writing them:
 

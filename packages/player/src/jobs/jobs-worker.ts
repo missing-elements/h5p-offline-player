@@ -202,7 +202,8 @@ async function run(message: Exclude<ToJobsMessage, { type: 'abort' }>): Promise<
 async function downloadArchive(
   pkgId: string,
   source: SourceDescriptor,
-  signal: AbortSignal
+  signal: AbortSignal,
+  afresh = false
 ): Promise<void> {
   if (source.type !== 'chunked') {
     throw new PlayerError('network', 'Only a chunked source is downloaded ahead of play')
@@ -302,8 +303,18 @@ async function downloadArchive(
   }
   await publishIndex(true)
 
+  // Read back, because WebKit can lose it: measured on 2026-10-13 in Playwright's WebKit, a
+  // package downloaded whole, its element removed — which terminates this worker — and played
+  // again at once had the first download's entries gone and the second's never kept, the record
+  // missing straight after its own write. No context deleted the cache; deleting it by name and
+  // writing again kept everything, every time. Once, so a store that keeps nothing fails here.
   const meta = await store.getArchiveMeta()
-  send({ type: 'done', pkgId, size: meta?.size ?? meta?.available ?? 0 })
+  if (!meta?.complete && !afresh) {
+    await store.destroy()
+    return downloadArchive(pkgId, source, signal, true)
+  }
+  if (!meta?.complete) throw new PlayerError('bad-archive', 'The downloaded archive could not be kept in the browser storage')
+  send({ type: 'done', pkgId, size: meta.size ?? meta.available })
 }
 
 /* ------------------------------------------------------------------ warming */

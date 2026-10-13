@@ -147,6 +147,19 @@ export const READ_STALL_MS = 30_000
 export const READ_RETRIES = 6
 export const READ_RETRY_DELAY_MS = 1_000
 
+/**
+ * How long the Service Worker holds its fetch event open while a response body is still
+ * streaming. Firefox stops a worker thirty seconds after its last event, whatever it is still
+ * sending, and the page gets the body cut short — measured on 2026-10-13, a tail request waiting
+ * on an extraction across a silent host ended at 30 s with none of its bytes, where Chromium
+ * delivered them all once the host was back. `waitUntil` holds the event, and so the worker,
+ * until the body ends. Bounded, because Chromium ends an event that runs longer than five
+ * minutes and Firefox's extended limit is the same, and Chromium keeps a worker alive for a
+ * streaming body on its own: a body past four minutes has the next minute in Firefox and goes
+ * on in Chromium as it always did.
+ */
+export const STREAM_KEEPALIVE_MS = 240_000
+
 /** IndexedDB database and store names. */
 export const DB_NAME = 'h5p-player'
 export const DB_VERSION = 1

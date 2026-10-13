@@ -55,6 +55,7 @@
     "test": "pnpm prepare:dev && vitest run",
     "test:unit": "vitest run --project unit",
     "test:browser": "pnpm prepare:dev && vitest run --project browser --project browser-emulated",
+    "test:engine": "pnpm prepare:dev && vitest run --project browser",
     "test:watch": "pnpm prepare:dev && vitest",
     "typecheck": "tsc -b --force && tsc -p tsconfig.test.json",
     "prepack": "node scripts/prepack.mjs",

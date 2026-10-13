@@ -42,7 +42,7 @@ export default defineConfig({
         test: {
           name: 'browser',
           include: ['tests/browser/**/*.test.ts'],
-          browser: browserProject()
+          browser: browserProject(engine())
         }
       },
       {
@@ -54,22 +54,36 @@ export default defineConfig({
           name: 'browser-emulated',
           include: ['tests/browser-emulated/**/*.test.ts'],
           fileParallelism: false,
-          browser: browserProject()
+          browser: browserProject('chromium')
         }
       }
     ]
   }
 })
 
-function browserProject() {
+type Engine = 'chromium' | 'firefox' | 'webkit'
+
+/**
+ * The engine the suite runs in: Chromium, or the one `H5P_TEST_BROWSER` names, which CI sets to
+ * each of the three in turn. The paths this exercises, Service Worker registration on a nested
+ * scope and Range responses synthesized by a worker, are where engines differ most. One engine
+ * per run, not a list: the dev server's switches — a host's outage, the worker version it serves —
+ * are shared, and two engines running one file at once flip them under each other. Firefox and
+ * WebKit need `playwright install firefox webkit` first. The emulated project stays on Chromium:
+ * it drives the browser through CDP, which only Chromium speaks.
+ */
+function engine(): Engine {
+  const name = process.env.H5P_TEST_BROWSER?.trim() || 'chromium'
+  if (name !== 'chromium' && name !== 'firefox' && name !== 'webkit') throw new Error(`H5P_TEST_BROWSER: unknown browser "${name}"`)
+  return name
+}
+
+function browserProject(browser: Engine) {
   return {
     enabled: true,
     // From Vitest 4 on, a provider is a package rather than a name.
     provider: playwright(),
     headless: true,
-    // Chromium only: the paths this exercises — Service Worker registration on a nested scope,
-    // Range responses synthesized by a worker — are where browsers differ most, and a second
-    // engine belongs in CI rather than in the default run.
-    instances: [{ browser: 'chromium' as const }]
+    instances: [{ browser }]
   }
 }

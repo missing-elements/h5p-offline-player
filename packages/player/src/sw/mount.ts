@@ -3,6 +3,7 @@ import {
   COLD_ENTRY_WAIT_MS,
   FAILURE_BACKOFF_MS,
   JOB_REQUEST_DEDUPE_MS,
+  STREAM_KEEPALIVE_MS,
   VERSION,
   WATERMARK_POLL_MS
 } from '../shared/constants'
@@ -87,8 +88,43 @@ export function mountH5P(worker: ServiceWorkerGlobalScope, options: MountOptions
   worker.addEventListener('fetch', (event) => {
     const match = matchRoute(routes, event.request.url)
     if (match.kind === 'none') return // Not ours: YouTube, external media, the host's own assets.
-    event.respondWith(server.handleFetch(event, match))
+    event.respondWith(server.handleFetch(event, match).then((response) => keptAlive(event, response)))
   })
+}
+
+/**
+ * The response with its body passed through a stream that tells when it has ended, and the event
+ * held open until then, for at most `STREAM_KEEPALIVE_MS`: Firefox stops a worker thirty seconds
+ * after its last event even while a body it is sending is still streaming. Called before
+ * `respondWith`'s promise settles, while the event may still be extended.
+ */
+function keptAlive(event: FetchEvent, response: Response): Response {
+  if (!response.body) return response
+  let ended!: () => void
+  const finished = new Promise<void>((resolve) => (ended = resolve))
+  event.waitUntil(Promise.race([finished, new Promise<void>((resolve) => setTimeout(resolve, STREAM_KEEPALIVE_MS))]))
+  const reader = response.body.getReader()
+  const body = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        const { value, done } = await reader.read()
+        if (done) {
+          controller.close()
+          ended()
+        } else {
+          controller.enqueue(value)
+        }
+      } catch (error) {
+        controller.error(error)
+        ended()
+      }
+    },
+    cancel(reason) {
+      ended()
+      return reader.cancel(reason)
+    }
+  })
+  return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers })
 }
 
 /**
@@ -307,7 +343,8 @@ class VirtualServer {
       frameOptions: settings.frameOptions,
       upgrades,
       language: settings.language,
-      untrusted: settings.untrusted === true
+      untrusted: settings.untrusted === true,
+      workerScript: this.worker.location.href
     })
 
     return new Response(body, {
