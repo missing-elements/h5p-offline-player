@@ -122,22 +122,30 @@ describe('supplying missing libraries', () => {
     expect((frameWindow(player) as unknown as { h5pOfflineExtraLoaded?: boolean }).h5pOfflineExtraLoaded).toBe(true)
   })
 
+  // Paced, a host without `Range` is still sending the package's media when its libraries have
+  // arrived, and the frame boots early from the forward index if it may. Before the dependency
+  // walk was part of that decision it did, and the runtime asked for the missing library before
+  // the download ended and the bundle was attached: a 404, read as JSON.
+  const pacedNoRange = (tag: string) => `${FIXTURES.needsDependencyNoRange}?throttle=131072&case=${tag}`
+
   it("refuses a package whose libraries need one it does not carry, by name, rather than fail on a 404 read as JSON", async () => {
     // Everything h5p.json names is in the package; the content type's own library.json asks for
     // H5P.OfflineExtra, which is not. The runtime follows that list, and ended its boot on
     // "Unexpected end of JSON input".
-    const player = createPlayer()
-    const settled = waitForSettled(player)
-    player.setAttribute('src', FIXTURES.needsDependency)
+    for (const src of [FIXTURES.needsDependency, pacedNoRange('refused')]) {
+      const player = createPlayer()
+      const settled = waitForSettled(player)
+      player.setAttribute('src', src)
 
-    const result = await settled
-    if (result.ok) expect.fail('expected the package to be refused')
-    expect(result.detail).toMatchObject({ code: 'bad-archive', missingLibraries: { folders: ['H5P.OfflineExtra-1.0'], all: false } })
-    expect(result.detail.message).toContain('H5P.OfflineExtra-1.0')
+      const result = await settled
+      if (result.ok) expect.fail(`expected ${src} to be refused`)
+      expect(result.detail, src).toMatchObject({ code: 'bad-archive', missingLibraries: { folders: ['H5P.OfflineExtra-1.0'], all: false } })
+      expect(result.detail.message, src).toContain('H5P.OfflineExtra-1.0')
+    }
   })
 
   it("supplies a library's own dependency from the bundle, on a host with Range and on one without", async () => {
-    for (const src of [FIXTURES.needsDependency, FIXTURES.needsDependencyNoRange]) {
+    for (const src of [FIXTURES.needsDependency, FIXTURES.needsDependencyNoRange, pacedNoRange('supplied')]) {
       const player = await playWithLibraries(src, FIXTURES.libraries)
       expect((frameWindow(player) as unknown as { h5pOfflineExtraLoaded?: boolean }).h5pOfflineExtraLoaded, src).toBe(true)
       expect(player.libraryBundle?.url, src).toBe(new URL(FIXTURES.libraries, location.href).href)

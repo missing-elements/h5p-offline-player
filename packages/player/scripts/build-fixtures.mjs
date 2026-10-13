@@ -55,8 +55,8 @@ const addBaseFiles = async (writer, { skip = [] } = {}) => {
 const compressibleBytes = () => new Uint8Array(LARGE_ENTRY_SIZE)
 
 /** Incompressible filler: stored either way, and the stored path is what it is here to exercise. */
-const randomBytes = () => {
-  const bytes = new Uint8Array(LARGE_ENTRY_SIZE)
+const randomBytes = (size = LARGE_ENTRY_SIZE) => {
+  const bytes = new Uint8Array(size)
   // `crypto.getRandomValues` caps at 64 kB per call.
   for (let offset = 0; offset < bytes.length; offset += 65536) {
     crypto.getRandomValues(bytes.subarray(offset, Math.min(offset + 65536, bytes.length)))
@@ -282,13 +282,23 @@ built.push([
 // 6. A whole package whose content type asks, in its own library.json, for a library the package
 //    does not carry and h5p.json does not name: the top-level check passes, and the runtime, which
 //    follows every library's dependencies, would end its boot on the 404. The bundle has it.
+//    Laid out as an export is, the library folder first and media last, so on a host without
+//    `Range` the frame could boot from the forward index while the media is still arriving —
+//    before the download is done and the dependency is found missing.
+const NEEDS_DEPENDENCY_LIBRARY = 'H5P.OfflineTest-1.0/library.json'
+const libraryNeedingExtra = JSON.parse(await readFile(resolve(sourceDir, NEEDS_DEPENDENCY_LIBRARY), 'utf8'))
+libraryNeedingExtra.preloadedDependencies = [{ machineName: 'H5P.OfflineExtra', majorVersion: 1, minorVersion: 0 }]
 built.push([
   'needs-dependency.h5p',
   await writeArchive('needs-dependency.h5p', async (writer) => {
-    await addBaseFiles(writer, { skip: ['H5P.OfflineTest-1.0/library.json'] })
-    const library = JSON.parse(await readFile(resolve(sourceDir, 'H5P.OfflineTest-1.0', 'library.json'), 'utf8'))
-    library.preloadedDependencies = [{ machineName: 'H5P.OfflineExtra', majorVersion: 1, minorVersion: 0 }]
-    await writer.add('H5P.OfflineTest-1.0/library.json', new TextReader(JSON.stringify(library)))
+    for (const { entryName, path } of baseFiles) {
+      const contents =
+        entryName === NEEDS_DEPENDENCY_LIBRARY
+          ? new TextEncoder().encode(JSON.stringify(libraryNeedingExtra))
+          : new Uint8Array(await readFile(path))
+      await writer.add(entryName, new Uint8ArrayReader(contents))
+    }
+    await writer.add('content/media/tail.bin', new Uint8ArrayReader(randomBytes(256 * 1024)), { level: 0 })
   })
 ])
 

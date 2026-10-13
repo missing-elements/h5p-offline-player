@@ -212,7 +212,7 @@ class VirtualServer {
                 ? reader.warmSpans()
                 : undefined,
             partial: reader.partial || undefined,
-            ready: reader.partial ? reader.bootReady() : undefined,
+            ready: reader.partial ? await this.bootsEarly(reader) : undefined,
             revision: reader.revision(),
             metadata: reader.metadata,
             mainLibrary: typeof reader.manifest.mainLibrary === 'string' ? reader.manifest.mainLibrary : undefined
@@ -829,6 +829,18 @@ class VirtualServer {
   }
 
   /** An entry's JSON, from the cache when it is there, as every library's is after the warm. */
+  /**
+   * Whether a download still under way can boot the frame: `bootReady`, and no library the
+   * declared ones need in turn absent so far. One that is absent is waited for — it may still
+   * arrive — and if it never does, the deep check after the download attaches a bundle that has
+   * it or refuses the package by name. Booted before then, the runtime asked for its
+   * `library.json` while the bundle was not attached yet and ended on the 404, read as JSON.
+   */
+  private async bootsEarly(reader: PackageReader): Promise<boolean> {
+    if (!reader.bootReady()) return false
+    return (await reader.missingDependencies(reader.manifest, (located) => this.readJson(located))) === null
+  }
+
   private async readJson({ reader, entry }: LocatedEntry): Promise<unknown> {
     const cached = await new ChunkStore(reader.pkgId).getWhole(entry.name)
     return (cached ?? new Response(reader.inflate(entry))).json()
