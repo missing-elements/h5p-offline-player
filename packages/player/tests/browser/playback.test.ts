@@ -191,9 +191,12 @@ describe('playing a package', () => {
 
   it('leaves the page’s history alone, package after package and when emptied', async () => {
     // Setting the frame's `src` for every package added two Back steps per switch and one per
-    // clear, which walked the frame through old packages before the page itself.
-    const player = await play(FIXTURES.basic)
+    // clear, which walked the frame through old packages before the page itself. Counted from
+    // before the first package. WebKit added a step for that one too, from setting `src` — only in
+    // a top-level page, not in this runner's frame, so the demo app's tests are what catch it.
     const before = history.length
+    const player = await play(FIXTURES.basic)
+    expect(history.length).toBe(before)
 
     let settled = waitForEvent(player, 'ready')
     player.setAttribute('src', FIXTURES.noRangeBasic)

@@ -11,7 +11,7 @@
     "test": "pnpm -r --workspace-concurrency=1 test",
     "test:unit": "pnpm -r test:unit",
     "test:browser": "pnpm --filter @missing-elements/h5p-offline-player test:browser",
-    "test:engine": "pnpm --filter @missing-elements/h5p-offline-player test:engine",
+    "test:engine": "pnpm --filter @missing-elements/h5p-offline-player test:engine && pnpm --filter @missing-elements/h5p-demo test",
     "typecheck": "pnpm -r typecheck",
     "normalize": "node packages/normalize/bin/h5p-normalize.mjs",
     "verify": "node packages/verify/bin/h5p-verify.mjs",

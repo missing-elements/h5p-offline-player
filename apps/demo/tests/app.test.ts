@@ -3,7 +3,8 @@ import { createServer as createHttpServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { chromium, type Browser, type Page } from 'playwright'
+import { chromium, type Browser, type BrowserContext, type Page } from 'playwright'
+import { browserType, engine } from './engine'
 import { createServer, type ViteDevServer } from 'vite'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
@@ -28,7 +29,7 @@ beforeAll(async () => {
   vite = await createServer({ configFile: resolve(rootDir, 'vite.config.ts'), root: rootDir, server: { host: 'localhost', port: 0 }, logLevel: 'error' })
   await vite.listen()
   origin = `http://localhost:${(vite.httpServer!.address() as AddressInfo).port}`
-  browser = await chromium.launch()
+  browser = await browserType.launch()
   const files: Record<string, string> = { '/quiz.h5p': QUIZ, '/own-code-only.h5p': OWN_CODE_ONLY }
   const server = createHttpServer(async (request, response) => {
     const file = files[new URL(request.url ?? '/', 'http://x').pathname]
@@ -84,8 +85,8 @@ const playerIs = (page: Page, ...states: string[]) =>
  * unless a test brings its own: Playwright cannot answer it, and without it the app takes the path
  * Safari and Firefox take, the page's file input.
  */
-async function openApp(path = '/app/', { keepPicker = false } = {}) {
-  const page = await browser.newPage({ viewport: { width: 1000, height: 760 } })
+async function openApp(path = '/app/', { keepPicker = false, onDisk = false } = {}) {
+  const page = onDisk ? await profileOnDisk() : await browser.newPage({ viewport: { width: 1000, height: 760 } })
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   if (!keepPicker) {
@@ -97,6 +98,29 @@ async function openApp(path = '/app/', { keepPicker = false } = {}) {
   await page.goto(`${origin}${path}`)
   await whenReady(page)
   return { page, errors }
+}
+
+const profiles = new Map<Page, { context: BrowserContext; dir: string }>()
+
+/**
+ * A page in a browser profile on disk, as a browser window is: WebKit, as Safari in a private
+ * window, refuses a `File` in IndexedDB in the private profile Playwright gives a page, so the app
+ * keeps no copy there. Closed with `closePage`.
+ */
+async function profileOnDisk() {
+  const dir = await mkdtemp(join(tmpdir(), 'h5p-app-profile-'))
+  const context = await browserType.launchPersistentContext(dir, { viewport: { width: 1000, height: 760 } })
+  const page = context.pages()[0] ?? (await context.newPage())
+  profiles.set(page, { context, dir })
+  return page
+}
+
+async function closePage(page: Page) {
+  const profile = profiles.get(page)
+  if (!profile) return page.close()
+  profiles.delete(page)
+  await profile.context.close()
+  await rm(profile.dir, { recursive: true, force: true })
 }
 
 /**
@@ -139,6 +163,15 @@ const standInPicker = (page: Page) =>
       return [handle]
     }
   })
+
+/**
+ * The key that moves focus on: WebKit, as Safari does by default, passes over buttons and links on
+ * Tab alone, and reaches them on Option-Tab.
+ */
+const NEXT = engine === 'webkit' ? 'Alt+Tab' : 'Tab'
+
+/** Handles to files on disk are Chromium's: its picker, a drop, the file manager. */
+const noHandles = engine !== 'chromium'
 
 const whenReady = (page: Page) =>
   page.waitForFunction(() => document.querySelector<HTMLElement>('#offline')?.dataset.state !== 'preparing', null, { timeout: 30_000 })
@@ -187,7 +220,7 @@ it('opens a file from the keyboard, shows it under its own title, and closes it 
   // "Choose a file" is a button, so Tab reaches it and Enter opens the picker.
   let reached = false
   for (let i = 0; i < 12 && !reached; i++) {
-    await page.keyboard.press('Tab')
+    await page.keyboard.press(NEXT)
     reached = await page.evaluate(() => document.activeElement?.id === 'open')
   }
   expect(reached).toBe(true)
@@ -217,12 +250,14 @@ it('keeps a link in the address, and takes the browser’s Back and Forward as c
   await playerIs(page, 'ready')
   expect((await seen(page)).url).toContain('?src=')
 
-  await page.goBack()
+  // From script, as the bar's Back goes: Firefox's own Back passes over a step a page wrote before
+  // anyone interacted with it, which home is when a link opens the app, and leaves the app.
+  await page.evaluate(() => history.back())
   await page.waitForFunction(() => document.body.dataset.screen === 'home')
   expect((await seen(page)).url).toBe('/app/')
 
   // Possible only because the player navigates its frame without adding history of its own.
-  await page.goForward()
+  await page.evaluate(() => history.forward())
   await playerIs(page, 'ready')
   expect((await seen(page)).screen).toBe('player')
 
@@ -307,7 +342,7 @@ it('reopens a link where its content had got to after a reload, and still goes h
 })
 
 it('lists a file it played, keeps a copy where there is no handle, and opens it from the list after a reload', async () => {
-  const { page, errors } = await openApp()
+  const { page, errors } = await openApp('/app/', { onDisk: true })
   expect(await recent(page)).toEqual([])
   const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('#open')])
   await chooser.setFiles(QUIZ)
@@ -340,10 +375,12 @@ it('lists a file it played, keeps a copy where there is no handle, and opens it 
   expect(await copiesKept(page)).toBe(0)
   expect(await page.evaluate(() => document.activeElement?.id)).toBe('open')
   expect(errors).toEqual([])
-  await page.close()
+  await closePage(page)
 })
 
-it('asks for a file again when its copy cannot be read, and lists it afresh once chosen', async () => {
+// Chromium's private profile keeps a reference to a file rather than a copy of its bytes, which is
+// what lets deleting the file take the copy away; Firefox keeps the bytes, and WebKit keeps nothing.
+it.skipIf(engine !== 'chromium')('asks for a file again when its copy cannot be read, and lists it afresh once chosen', async () => {
   // The private profile Playwright gives a page keeps a reference to a file rather than a copy of
   // its bytes, as a private window may: deleting the file is what takes the copy away.
   const dir = await mkdtemp(join(tmpdir(), 'h5p-app-moved-'))
@@ -374,7 +411,7 @@ it('asks for a file again when its copy cannot be read, and lists it afresh once
   await page.close()
 })
 
-it('keeps a handle when installed, keeps no copy, and reads the file from it again', async () => {
+it.skipIf(noHandles)('keeps a handle when installed, keeps no copy, and reads the file from it again', async () => {
   const { page, errors, close } = await openInstalledApp()
   try {
     await standInPicker(page)
@@ -398,7 +435,7 @@ it('keeps a handle when installed, keeps no copy, and reads the file from it aga
   }
 })
 
-it('keeps a copy in a tab even where the browser gives a handle, which a private profile cannot store', async () => {
+it.skipIf(noHandles)('keeps a copy in a tab even where the browser gives a handle, which a private profile cannot store', async () => {
   const { page, errors } = await openApp('/app/', { keepPicker: true })
   await standInPicker(page)
   await page.click('#open')
@@ -532,7 +569,7 @@ it('lets the keyboard reach the player page’s file input, which a label alone 
   await page.goto(`${origin}/`)
   let reached = false
   for (let i = 0; i < 30 && !reached; i++) {
-    await page.keyboard.press('Tab')
+    await page.keyboard.press(NEXT)
     reached = await page.evaluate(() => (document.activeElement as HTMLInputElement | null)?.type === 'file')
   }
   expect(reached).toBe(true)

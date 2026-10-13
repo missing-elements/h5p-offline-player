@@ -240,8 +240,8 @@ pnpm dev               # vendors assets, builds fixtures, serves the demo on :51
 pnpm test              # every package: the player's unit + browser suites, the normalizer's and verifier's tests
 pnpm test:unit         # fast, no browser
 pnpm test:browser
-H5P_TEST_BROWSER=firefox pnpm test:engine   # the player's browser suite in Firefox, or webkit;
-                       # after `playwright install firefox webkit` in the player
+H5P_TEST_BROWSER=firefox pnpm test:engine   # the player's browser suite and the demo's tests in
+                       # Firefox, or webkit; after `playwright install firefox webkit` in the player
 pnpm typecheck         # every package
 pnpm build             # the player: types, element, both workers; builds the runtime package on the way
 pnpm normalize course.h5p          # rewrite a package so it streams: media stored, mp4 index first
@@ -287,6 +287,20 @@ event open*, *An untrusted package plays as data* (the worker's own script in it
 downloaded archive is read back before it is reported done*. Playwright's WebKit is WebKit's
 desktop port and not iOS Safari: the app's menu filled an iPhone's screen in Safari on 2026-10-13
 and drew correctly in Playwright's WebKit at every phone size.
+
+The demo's tests follow the same variable (`apps/demo/tests/engine.ts`), and `pnpm test:engine`
+runs them after the player's suite, so the `engines` job covers the app, the embed page and the
+cmi5 page too. Added on 2026-10-14; the first runs found one bug, under *The frame is navigated
+in place*, and four differences the tests now allow for: WebKit, as Safari does by default, passes
+over buttons on Tab and reaches them on Option-Tab; WebKit's private profile — the one Playwright
+gives a page, and a Safari private window — refuses a `File` in IndexedDB, so the app keeps no copy
+of a file there and asks for it again, and the test of the copy runs in a profile on disk; Firefox's
+own Back passes over a step a page wrote before anyone interacted with it, which is home when a
+link opens the app, so its Back leaves the app where the bar's Back, from script, goes home — the
+test goes back from script, as the bar does; and Firefox closes a top-level page Playwright opened
+when cmi5's Exit asks, which Chromium does not, so that test stands in for `close`. Three app
+tests are Chromium's alone: file handles, and the private profile that keeps a reference to a
+file rather than its bytes.
 
 `pnpm publish` in `packages/player` runs `prepublishOnly` — typecheck, the unit suite and the
 build — so a broken tree cannot ship; the browser suite is left out because it needs an installed
@@ -997,15 +1011,22 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   the first, one per clear. Measured on 2026-10-12 on a plain page, two switches and a clear took
   the history from 2 entries to 7, and Back walked the frame through the old packages, booting
   them again, before it left the page. Found by the installable app, whose Back closes a file and
-  whose Forward then had nothing to go to. `navigateFrame` sets `src` for the first navigation
-  only, which replaces the frame's initial `about:blank` by itself, and uses
-  `contentWindow.location.replace` from then on; `frameLocation` holds where the frame was sent,
-  since the attribute no longer says. The attribute is removed when the element leaves the
-  document, where that navigates nothing, so that putting the element back does not load what it
-  last named. A fresh iframe for each load would also have kept the history clean, but would
-  change where an old document's last messages come from, which the straggler rule depends on.
-  `playback.test.ts` counts the history across two switches and a clear; the app's test goes
-  Back and Forward over a link.
+  whose Forward then had nothing to go to. `navigateFrame` navigates with
+  `contentWindow.location.replace`, the first package included; `frameLocation` holds where the
+  frame was sent, since no attribute says. It once set `src` for the first navigation, taking that
+  to replace the frame's initial `about:blank` by itself, which Chromium and Firefox do; WebKit
+  adds a step when the frame's first document has loaded and the page is top-level, so in Safari
+  the first Back after opening a package emptied the frame and left the page showing it — found on
+  2026-10-14 by the demo app's tests in WebKit, where opening a file took the history from 2 to 4.
+  The player's own suite runs in a frame of the test runner's, where WebKit added no step, so
+  `playback.test.ts` passed there before the fix; the app's tests, top-level, failed four. Only a
+  frame out of the document, which has no window to navigate, still gets `src`, which loads as it
+  is inserted and adds no step; that attribute is removed when the element leaves the document, so
+  that putting the element back does not load what it last named. A fresh iframe for each load
+  would also have kept the history clean, but would change where an old document's last messages
+  come from, which the straggler rule depends on. `playback.test.ts` counts the history from
+  before the first package across two switches and a clear; the app's tests go Back and Forward
+  over a picked file and a link, in every engine.
 - **The frame's `<html>` carries `class="h5p-iframe"`.** Seven rules in the core stylesheet are
   keyed on `html.h5p-iframe`: the base sans-serif font, the content's 16px/1.5 type, full width,
   the fullscreen heights. In a normal install H5P writes that class onto the `<html>` of the

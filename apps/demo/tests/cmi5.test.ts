@@ -1,7 +1,8 @@
 import { createServer as createHttpServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { resolve } from 'node:path'
-import { chromium, type Browser } from 'playwright'
+import type { Browser } from 'playwright'
+import { browserType } from './engine'
 import { createServer, type ViteDevServer } from 'vite'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
@@ -112,7 +113,7 @@ beforeAll(async () => {
   lms = createHttpServer((req, res) => void handle(req, res))
   await new Promise<void>((done) => lms.listen(0, '127.0.0.1', done))
   lmsOrigin = `http://127.0.0.1:${(lms.address() as AddressInfo).port}`
-  browser = await chromium.launch()
+  browser = await browserType.launch()
 })
 
 afterAll(async () => {
@@ -259,6 +260,11 @@ it('does not send the learner to a returnURL that is not a web address', async (
   const registration = crypto.randomUUID()
   launchOverrides.set(registration, { returnURL: 'javascript:document.title="ran"' })
   const page = await browser.newPage()
+  // Without a returnURL to follow, Exit closes a top-level window. Firefox closes a page Playwright
+  // opened, as it would one an LMS opened; Chromium does not. A stand-in says it was asked.
+  await page.addInitScript(() => {
+    window.close = () => void ((window as unknown as { closeAsked: boolean }).closeAsked = true)
+  })
   await page.goto(launchUrl(registration))
   await page.waitForFunction(() => document.querySelector('#status')!.textContent!.startsWith('Launched'))
   const before = page.url()
@@ -268,6 +274,7 @@ it('does not send the learner to a returnURL that is not a web address', async (
   expect(page.url()).toBe(before)
   expect(await page.title()).not.toBe('ran')
   expect(await page.textContent('#log')).toContain('ignored a returnURL')
+  expect(await page.evaluate(() => (window as unknown as { closeAsked?: boolean }).closeAsked)).toBe(true)
   await page.close()
 })
 
