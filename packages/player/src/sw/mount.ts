@@ -102,7 +102,9 @@ function keptAlive(event: FetchEvent, response: Response): Response {
   if (!response.body) return response
   let ended!: () => void
   const finished = new Promise<void>((resolve) => (ended = resolve))
-  event.waitUntil(Promise.race([finished, new Promise<void>((resolve) => setTimeout(resolve, STREAM_KEEPALIVE_MS))]))
+  const bound = setTimeout(ended, STREAM_KEEPALIVE_MS)
+  void finished.then(() => clearTimeout(bound))
+  event.waitUntil(finished)
   const reader = response.body.getReader()
   const body = new ReadableStream<Uint8Array>({
     async pull(controller) {
