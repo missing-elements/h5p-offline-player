@@ -1,4 +1,4 @@
-// Written by scripts/sync-h5p-assets.mjs from @missing-elements/h5p-runtime 0.2.1's
+// Written by scripts/sync-h5p-assets.mjs from @missing-elements/h5p-runtime 0.2.2's
 // MANIFEST.json (h5p-standalone 3.8.2). Do not edit; run `pnpm sync:assets` in packages/player.
 
 /**
