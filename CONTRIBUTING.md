@@ -49,7 +49,16 @@ pnpm build
 
 `pnpm test:browser` exercises the player in Chromium, including its Service
 Worker and Jobs worker. Run it for changes to playback, storage, worker,
-network, or browser-facing behavior. Run the smallest relevant check first,
+network, or browser-facing behavior. CI also runs the suite in Firefox and
+WebKit; for a change to the Service Worker, the Jobs worker or storage, run
+it there too, one engine at a time, after installing them with
+`pnpm --filter @missing-elements/h5p-offline-player exec playwright install firefox webkit`:
+
+```bash
+H5P_TEST_BROWSER=firefox pnpm test:engine
+H5P_TEST_BROWSER=webkit pnpm test:engine
+```
+ Run the smallest relevant check first,
 then expand coverage when the change affects more than one package.
 
 Do not commit generated `dist`, `public/frame-assets`, the runtime's `index.js`,

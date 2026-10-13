@@ -28,3 +28,28 @@ jobs:
       - run: pnpm test
       - run: pnpm build
       - run: pnpm build:demo
+
+  # The player's browser suite in the other two engines; the job above runs it in Chromium. One
+  # engine per job: the dev server's switches are shared, and two engines would flip them under
+  # each other. Firefox stops a worker that has no event for thirty seconds and checks the scripts
+  # the worker makes up by the worker's URL; WebKit drops the cache writes of a worker terminated
+  # just after them — each found here first.
+  engines:
+    name: browser suite (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [firefox, webkit]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @missing-elements/h5p-offline-player exec playwright install --with-deps ${{ matrix.browser }}
+      - run: pnpm test:engine
+        env:
+          H5P_TEST_BROWSER: ${{ matrix.browser }}

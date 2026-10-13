@@ -21,8 +21,14 @@ const HOST = 'stalling-host'
 const outage = (ms: number, mode: 'silent' | 'reset') =>
   fetch(`/stalling/__outage?ms=${ms}&mode=${mode}&host=${HOST}`, { cache: 'no-store' })
 
-/** A request for the entry's last bytes: past the watermark, so its body follows the extraction. */
-async function tailOf(player: Awaited<ReturnType<typeof play>>, errors: string[]) {
+/**
+ * A request for the entry's last bytes: past the watermark, so its body follows the extraction.
+ * Returned pending: Chromium hands the page the headers at once, Firefox only with the first
+ * bytes of the body, which for the tail is once the extraction has reached it — so the outage has
+ * to start while the response is still pending, or in Firefox it would start after the transfer
+ * was over.
+ */
+async function tailOf(player: Awaited<ReturnType<typeof play>>, errors: string[]): Promise<() => Promise<ArrayBuffer>> {
   player.addEventListener('error', ((event: CustomEvent<PlayerErrorDetail>) => {
     errors.push(event.detail.message)
   }) as EventListener)
@@ -31,11 +37,14 @@ async function tailOf(player: Awaited<ReturnType<typeof play>>, errors: string[]
   await probe.arrayBuffer()
   expect(size).toBeGreaterThan(TAIL)
 
-  const tail = await frameFetch(player, virtualUrl(player, MEDIA), {
+  const tail = frameFetch(player, virtualUrl(player, MEDIA), {
     headers: { Range: `bytes=${size - TAIL}-` }
   })
-  expect(tail.status).toBe(206)
-  return tail
+  return async () => {
+    const response = await tail
+    expect(response.status).toBe(206)
+    return response.arrayBuffer()
+  }
 }
 
 describe('an extraction across an outage of the host', () => {
@@ -55,7 +64,7 @@ describe('an extraction across an outage of the host', () => {
     const started = performance.now()
     await outage(35_000, 'silent')
 
-    const body = await tail.arrayBuffer()
+    const body = await tail()
     expect(performance.now() - started).toBeGreaterThan(35_000)
     expect(body.byteLength).toBe(TAIL)
     expect(errors).toEqual([])
@@ -72,7 +81,7 @@ describe('an extraction across an outage of the host', () => {
     const started = performance.now()
     await outage(12_000, 'reset')
 
-    const body = await tail.arrayBuffer()
+    const body = await tail()
     expect(performance.now() - started).toBeGreaterThan(12_000)
     expect(body.byteLength).toBe(TAIL)
     expect(errors).toEqual([])

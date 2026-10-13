@@ -108,6 +108,8 @@ export interface FrameDocumentOptions {
   language?: string
   /** Played as data: scripts by exact path only. See `untrustedScriptSources`. */
   untrusted?: boolean
+  /** The URL of the worker serving the frame, which Firefox checks a script it made up against. */
+  workerScript?: string
 }
 
 function escapeHtml(value: string): string {
@@ -278,7 +280,8 @@ function untrustedScriptSources(options: FrameDocumentOptions): string[] {
     options.assets.frameJs,
     bootScriptUrl(options.assets),
     ...(strings ? [strings] : []),
-    ...customUrls(options.frameOptions?.customJs)
+    ...customUrls(options.frameOptions?.customJs),
+    ...(options.workerScript ? [options.workerScript] : [])
   ]
   return [pathSource(`${options.virtualRoot}/`, options.virtualRoot), ...files.map((url) => pathSource(url, options.virtualRoot)), ...UNTRUSTED_SCRIPT_PATHS].filter(
     (source): source is string => source !== null
