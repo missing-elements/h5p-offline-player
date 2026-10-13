@@ -80,13 +80,22 @@
 /* A popover; app.js puts it under its button, and these are the places it falls back to. Hidden
    by a rule of its own as well as the browser's, so that without the Popover API (Safari before
    17, Firefox before 125) it is not a block on the page: there it is left out, button and all,
-   and Choose a file is on the home screen. */
+   and Choose a file is on the home screen. Its size is its content's whatever the insets, and
+   its rows are packed at the top: on an iPhone, in Safari, the menu filled the screen's height
+   and stretched its items to fill it (2026-10-13), which neither Playwright's WebKit nor
+   Chromium showed at any phone size. */
 .app .menu {
   display: none;
   inset: auto;
   top: calc(3.5rem + env(safe-area-inset-top));
   right: max(var(--gutter), env(safe-area-inset-right));
+  bottom: auto;
+  left: auto;
+  width: max-content;
+  height: max-content;
   min-width: 12rem;
+  max-height: calc(100dvh - 5rem);
+  overflow-y: auto;
   margin: 0;
   padding: 0.35rem;
   border: 1px solid var(--line);
@@ -95,7 +104,7 @@
   color: var(--fg);
   box-shadow: var(--shadow);
 }
-.app .menu:popover-open { display: grid; gap: 0.15rem; }
+.app .menu:popover-open { display: grid; align-content: start; gap: 0.15rem; }
 @supports not selector(:popover-open) { .app #menu-button { display: none; } }
 .app .menu button { justify-content: flex-start; min-height: 2.5rem; border: 0; background: transparent; font-weight: 400; }
 .app .menu button:hover { background: var(--surface-2); }
