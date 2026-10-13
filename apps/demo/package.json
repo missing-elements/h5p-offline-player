@@ -13,6 +13,7 @@
     "demo:screenshots": "node scripts/build-app-screenshots.mjs",
     "typecheck": "tsc -p tsconfig.json",
     "libraries": "node scripts/build-libraries.mjs",
+    "sweep": "node scripts/sweep-content-types.mjs",
     "cmi5:catapult": "node scripts/cmi5-catapult.mjs"
   },
   "dependencies": {

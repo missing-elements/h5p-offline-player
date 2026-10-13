@@ -1,0 +1,19 @@
+{
+  "note": "A right answer, first and not shuffled, so the walk's click on the first answer gets it right.",
+  "params": {
+    "question": "<p>Which one is right?</p>",
+    "answers": [
+      {
+        "text": "<div>Right</div>",
+        "correct": true
+      },
+      {
+        "text": "<div>Wrong</div>",
+        "correct": false
+      }
+    ],
+    "behaviour": {
+      "randomAnswers": false
+    }
+  }
+}

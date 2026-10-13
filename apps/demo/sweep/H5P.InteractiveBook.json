@@ -1,0 +1,72 @@
+{
+  "note": "Two chapters with a question each, and reporting on, which gives the summary page its submit button. Interactive Book 1.15 creates chapters with parent: self, the window, so a chapter's completed has no parent and counts as the book's result, in H5P's core too; the book's own completed, on submitting, comes last.",
+  "attributes": {
+    "reporting": ""
+  },
+  "params": {
+    "chapters": [
+      {
+        "library": "H5P.Column 1.22",
+        "params": {
+          "content": [
+            {
+              "content": {
+                "library": "H5P.MultiChoice 1.16",
+                "params": {
+                  "question": "<p>Which one is right?</p>",
+                  "answers": [
+                    {
+                      "text": "<div>Right</div>",
+                      "correct": true
+                    },
+                    {
+                      "text": "<div>Wrong</div>",
+                      "correct": false
+                    }
+                  ],
+                  "behaviour": {
+                    "randomAnswers": false
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "metadata": {
+          "title": "Chapter one"
+        }
+      },
+      {
+        "library": "H5P.Column 1.22",
+        "params": {
+          "content": [
+            {
+              "content": {
+                "library": "H5P.MultiChoice 1.16",
+                "params": {
+                  "question": "<p>Which one is right?</p>",
+                  "answers": [
+                    {
+                      "text": "<div>Right</div>",
+                      "correct": true
+                    },
+                    {
+                      "text": "<div>Wrong</div>",
+                      "correct": false
+                    }
+                  ],
+                  "behaviour": {
+                    "randomAnswers": false
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "metadata": {
+          "title": "Chapter two"
+        }
+      }
+    ]
+  }
+}

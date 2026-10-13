@@ -8,7 +8,9 @@
     "strict": true,
     "noEmit": true,
     "allowSyntheticDefaultImports": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "allowJs": true,
+    "checkJs": false
   },
   "include": ["vite.config.ts", "vitest.config.ts", "tests/**/*.ts"]
 }

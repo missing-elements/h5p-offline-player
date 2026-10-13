@@ -169,6 +169,7 @@ apps/demo/                the demo app: the dev server for the whole repository,
   tests/embed.test.ts       /resizer.js (the embed package's, served by a dev middleware and
                             copied by the build) sizing the framed /embed
   tests/app.test.ts         the installable app's screens, history and keyboard, through the dev server
+  tests/sweep-content.test.ts  the sweep's content generator, in Node
   tests/                    cmi5.test.ts: the cmi5 page against a mock LMS and LRS on a second
                             origin, through the dev server and a real browser
   cmi5-catapult/            docker-compose.yml for ADL's CATAPULT player, MySQL and the SQL LRS;
@@ -184,7 +185,10 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             library pack it carries is packages/libraries, imported as a URL asset
   scripts/                  build-demo (the site into dist-demo/), build-demo-content, build-og-image,
                             build-app-icons, build-app-screenshots, build-libraries (the pack, into
-                            packages/libraries)
+                            packages/libraries), sweep-content-types (every content type in the pack
+                            played; see *The content-type sweep*), lib/sweep-content.mjs its generator
+  sweep/                    <machineName>.json for the content types the sweep cannot generate
+                            playable content for, and the element's attributes they need
   vite.config.ts            the dev server and the hosted demo: the pages plus dist/'s layout at the
                             site root -> dist-demo/
 
@@ -253,6 +257,8 @@ pnpm libraries         # rebuild packages/libraries from the H5P hub; before a r
 pnpm l10n              # take the core's translations from Moodle's language packs again, into
                        # packages/runtime/l10n/; every Monday by .github/workflows/l10n.yml, which
                        # opens a PR when a translation changed
+pnpm sweep             # play every content type in the pack, untrusted and trusted, and check
+                       # each boots; after pnpm build
 pnpm preview:demo      # serves dist-demo/ with the production headers and the /no-range route
 ```
 
@@ -814,6 +820,19 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   `setFinished`. `finished.test.ts` plays `finished.h5p` — the fixture content type with an Answer
   button, and a child of itself as a part — and fails on the old rule for the part and for the
   answer.
+  Measured across the pack on 2026-10-14 with the sweep's first cut, which worked each type
+  through by hand-written steps (*The content-type sweep* says why those went): 32 of the 55
+  content types end with a result of their own — `answered` from 19 question types,
+  `completed` from 13 sets, containers and games, Image Pair and Questionnaire among them — 19 send
+  none, and 4 cannot be worked through headless. Two create their parts without a parent, so a
+  part's result arrives as the content's, under H5P's rule and so in the core's `setFinished` as
+  well: Interactive Book 1.15 creates each chapter with `parent: self`, which in that scope is the
+  window, so a chapter's `completed` is parentless (twice, for a chapter holding one question); and
+  Game Map 1.5's exercise in a stage sends its `answered` with no parent. The content's own
+  `completed` comes after, on finishing — Interactive Book's only with `reporting`, which gives its
+  summary page the submit button; without it a book's last `finished` is its last chapter's. A host
+  that takes the last `finished` gets the content's result in both, with `reporting` for a book;
+  cmi5, which records the first, completes such a unit on its first part (`docs/cmi5.md` says so).
 - **The saved state never leaves the page, and never meets the Service Worker.** `resume` is
   H5P's own save-and-resume — core asks each instance for `getCurrentState()` every `saveFreq`
   seconds, three seconds after a `completed` or `progressed` statement and as the document goes
@@ -1378,6 +1397,55 @@ content digest for reviewing what was generated, and a check of library versions
 hub's catalogue — the last of which is the commonest reason a package that plays here is refused
 on upload, since h5p-cli builds from GitHub `master` and h5p.com carries the hub's versions.
 The tests need the player built (`pnpm build`); the package's `test` script does that first.
+The repository's own sweep does click through content and read its statements (next section),
+for packages it makes; the verifier, which is handed a stranger's, still does not.
+
+## The content-type sweep
+
+`pnpm sweep` (`apps/demo/scripts/sweep-content-types.mjs`) plays every runnable library in the
+library pack — 55 on 2026-10-14, the hub's 53 content types and two the pack carries as options of
+others — as a content-only export against the pack, untrusted and trusted, and fails on one that
+does not reach `ready` or throws while booting. Built on 2026-10-14, after the `finished` rule had
+been measured on four content types: the hub serves no example content, and h5p.org's examples
+carry licences of their own and old versions, so each package is made here. 110 plays take about
+three minutes locally, five on CI.
+
+- **Content is generated from the content type's own `semantics.json`**
+  (`lib/sweep-content.mjs`), as H5P's editor saves a form: every default, and for a required field
+  without one the smallest value the content check accepts — a label as text, the first sample a
+  pattern accepts, the minimum number, the first option, a list as long as its `min` or
+  `defaultNum`, the sample image, video or audio. A group's own default is its whole value; a group
+  of one field is saved as that field; an optional group nobody wrote holds its defaults only and
+  booleans false, as the editor saves one left closed — Personality Quiz reads `image.file` from an
+  optional group without looking, and the first cut, which filled such groups with samples, drew
+  every answer as an image. A library field takes the first option the pack has that is not one of
+  its own parents, filled the same way, or the content its default names (Interactive Video's
+  summary task). The media are a grey PNG, a second of silence and the demo's Big Buck Bunny clip.
+  `tests/sweep-content.test.ts` holds the rules.
+- **`apps/demo/sweep/<machineName>.json` says what generation cannot know**, and only that:
+  `params` is walked with the semantics, so every field it leaves out is filled in, sub-content it
+  names gets its own library's defaults, a list is as long as written and `null` removes a field.
+  Four content types need one to play at all — which drop zone an item belongs in, a crossword's
+  words that cross, a branching scenario whose nodes reach its end, a game map's stage — and six
+  containers and questions have one so that the report shows a real result. `attributes` are the
+  element's (`reporting`, which gives Interactive Book its submit button). `pnpm sweep --semantics
+  <machineName>` prints a content type's fields for writing one.
+- **What a content type sends is reported, not judged.** After `ready` the generic walk answers
+  what one click answers and presses check, submit, finish and next, each button at most three
+  times, and the report lists the statements and `finished` each type sent. The first cut also
+  had per-type steps (`click`, `drag`, `fill`, timed pauses — thirteen files on the libraries' own
+  selectors) and failed a play whose last `finished` was not the one its file named; Game Map's
+  seven-click finish passed four runs here and failed both modes on the first CI run, so that went
+  the same day. The measurements it made once are under *`finished` is the content's result*.
+- **It plays in Chrome where it can**: Playwright's Chromium cannot decode the H.264 clip. One
+  browser context, so the pack is downloaded once; four plays at a time.
+- **It runs in CI** (`.github/workflows/content-types.yml`) on a change to the player's source,
+  the runtime, the pack or the sweep, and every Monday, with the report as the run's summary and the
+  packages and screenshots as an artifact; and the pack's weekly refresh runs it against the new
+  pack and puts the report in its pull request, which CI does not start on.
+
+Not covered: any content a type can hold beyond the one generated or written, every engine but
+Chromium, and whether a type's result is right, which the report shows and nothing checks.
 
 ## The element's own box
 

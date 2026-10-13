@@ -1,0 +1,42 @@
+{
+  "note": "The demo's clip with a question at the start, shown over the video, which pauses it. The walk answers it; the end screen behind the star is not reached.",
+  "params": {
+    "interactiveVideo": {
+      "assets": {
+        "interactions": [
+          {
+            "duration": {
+              "from": 0,
+              "to": 5
+            },
+            "pause": true,
+            "displayType": "poster",
+            "x": 10,
+            "y": 10,
+            "width": 30,
+            "height": 30,
+            "action": {
+              "library": "H5P.MultiChoice 1.16",
+              "params": {
+                "question": "<p>Which one is right?</p>",
+                "answers": [
+                  {
+                    "text": "<div>Right</div>",
+                    "correct": true
+                  },
+                  {
+                    "text": "<div>Wrong</div>",
+                    "correct": false
+                  }
+                ],
+                "behaviour": {
+                  "randomAnswers": false
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
