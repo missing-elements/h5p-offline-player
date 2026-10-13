@@ -187,8 +187,8 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             build-app-icons, build-app-screenshots, build-libraries (the pack, into
                             packages/libraries), sweep-content-types (every content type in the pack
                             played; see *The content-type sweep*), lib/sweep-content.mjs its generator
-  sweep/                    one file per content type, <machineName>.json: what the sweep cannot
-                            generate for it, the steps that work through it, the `finished` expected
+  sweep/                    <machineName>.json for the content types the sweep cannot generate
+                            playable content for, and the element's attributes they need
   vite.config.ts            the dev server and the hosted demo: the pages plus dist/'s layout at the
                             site root -> dist-demo/
 
@@ -257,8 +257,8 @@ pnpm libraries         # rebuild packages/libraries from the H5P hub; before a r
 pnpm l10n              # take the core's translations from Moodle's language packs again, into
                        # packages/runtime/l10n/; every Monday by .github/workflows/l10n.yml, which
                        # opens a PR when a translation changed
-pnpm sweep             # play every content type in the pack, untrusted and trusted, and check each
-                       # boots and ends with the `finished` its file expects; after pnpm build
+pnpm sweep             # play every content type in the pack, untrusted and trusted, and check
+                       # each boots; after pnpm build
 pnpm preview:demo      # serves dist-demo/ with the production headers and the /no-range route
 ```
 
@@ -820,8 +820,9 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   `setFinished`. `finished.test.ts` plays `finished.h5p` — the fixture content type with an Answer
   button, and a child of itself as a part — and fails on the old rule for the part and for the
   answer.
-  Measured across the pack by the sweep on 2026-10-14 (*The content-type sweep*): worked through,
-  32 of the 55 content types end with a result of their own — `answered` from 19 question types,
+  Measured across the pack on 2026-10-14 with the sweep's first cut, which worked each type
+  through by hand-written steps (*The content-type sweep* says why those went): 32 of the 55
+  content types end with a result of their own — `answered` from 19 question types,
   `completed` from 13 sets, containers and games, Image Pair and Questionnaire among them — 19 send
   none, and 4 cannot be worked through headless. Two create their parts without a parent, so a
   part's result arrives as the content's, under H5P's rule and so in the core's `setFinished` as
@@ -1403,10 +1404,11 @@ for packages it makes; the verifier, which is handed a stranger's, still does no
 
 `pnpm sweep` (`apps/demo/scripts/sweep-content-types.mjs`) plays every runnable library in the
 library pack — 55 on 2026-10-14, the hub's 53 content types and two the pack carries as options of
-others — as a content-only export against the pack, untrusted and trusted, works through it, and
-reports what it sent. Built on 2026-10-14, after the `finished` rule had been measured on four
-content types: the hub serves no example content, and h5p.org's examples carry licences of their
-own and old versions, so each package is made here. 110 plays take about three minutes.
+others — as a content-only export against the pack, untrusted and trusted, and fails on one that
+does not reach `ready` or throws while booting. Built on 2026-10-14, after the `finished` rule had
+been measured on four content types: the hub serves no example content, and h5p.org's examples
+carry licences of their own and old versions, so each package is made here. 110 plays take about
+three minutes locally, five on CI.
 
 - **Content is generated from the content type's own `semantics.json`**
   (`lib/sweep-content.mjs`), as H5P's editor saves a form: every default, and for a required field
@@ -1419,30 +1421,31 @@ own and old versions, so each package is made here. 110 plays take about three m
   every answer as an image. A library field takes the first option the pack has that is not one of
   its own parents, filled the same way, or the content its default names (Interactive Video's
   summary task). The media are a grey PNG, a second of silence and the demo's Big Buck Bunny clip.
+  `tests/sweep-content.test.ts` holds the rules.
 - **`apps/demo/sweep/<machineName>.json` says what generation cannot know**, and only that:
   `params` is walked with the semantics, so every field it leaves out is filled in, sub-content it
-  names gets its own library's defaults, a list is as long as written and `null` removes a field —
-  a right answer first and unshuffled, which drop zone an item belongs in, a crossword's words that
-  cross, a branching scenario whose nodes reach its end. `steps` work through it (`click`, `drag`,
-  `fill`, `press`, `evaluate`, `wait`, `walk`); without them the generic walk answers what one
-  click answers and presses check, submit, finish and next, each button at most three times.
-  `attributes` are the element's (`reporting`, which Interactive Book and Documentation Tool need
-  for their submit buttons). `finished` is the verb of the last `finished` expected, or `false` for
-  none; a file without it is a boot check, which is how the four that need a microphone, speech
-  recognition or a camera stay. `pnpm sweep --semantics <machineName>` prints a content type's
-  fields for writing one.
-- **It plays in Chrome where it can**: Playwright's Chromium cannot decode the H.264 clip, and
-  Interactive Video's end screen needs it to play to the end. One browser context, so the pack is
-  downloaded once; four plays at a time.
+  names gets its own library's defaults, a list is as long as written and `null` removes a field.
+  Four content types need one to play at all — which drop zone an item belongs in, a crossword's
+  words that cross, a branching scenario whose nodes reach its end, a game map's stage — and six
+  containers and questions have one so that the report shows a real result. `attributes` are the
+  element's (`reporting`, which gives Interactive Book its submit button). `pnpm sweep --semantics
+  <machineName>` prints a content type's fields for writing one.
+- **What a content type sends is reported, not judged.** After `ready` the generic walk answers
+  what one click answers and presses check, submit, finish and next, each button at most three
+  times, and the report lists the statements and `finished` each type sent. The first cut also
+  had per-type steps (`click`, `drag`, `fill`, timed pauses — thirteen files on the libraries' own
+  selectors) and failed a play whose last `finished` was not the one its file named; Game Map's
+  seven-click finish passed four runs here and failed both modes on the first CI run, so that went
+  the same day. The measurements it made once are under *`finished` is the content's result*.
+- **It plays in Chrome where it can**: Playwright's Chromium cannot decode the H.264 clip. One
+  browser context, so the pack is downloaded once; four plays at a time.
 - **It runs in CI** (`.github/workflows/content-types.yml`) on a change to the player's source,
   the runtime, the pack or the sweep, and every Monday, with the report as the run's summary and the
   packages and screenshots as an artifact; and the pack's weekly refresh runs it against the new
   pack and puts the report in its pull request, which CI does not start on.
 
-What it found on its first full run is in the invariant on `finished`: every content type boots in
-both modes, every one that has a result sends it, and Interactive Book's chapters and Game Map's
-exercises are created without a parent, so their parts' results arrive as the content's. What it does not cover: content types whose steps are not written past booting, any
-content a type can hold beyond the one generated or written, and every engine but Chromium.
+Not covered: any content a type can hold beyond the one generated or written, every engine but
+Chromium, and whether a type's result is right, which the report shows and nothing checks.
 
 ## The element's own box
 

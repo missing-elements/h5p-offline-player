@@ -1,4 +1,0 @@
-{
-  "note": "Finds markers through the camera, which a headless browser does not have. Boots only.",
-  "steps": false
-}

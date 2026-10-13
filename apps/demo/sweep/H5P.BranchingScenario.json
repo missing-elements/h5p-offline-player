@@ -25,16 +25,5 @@
         }
       ]
     }
-  },
-  "steps": [
-    {
-      "click": ".h5p-start-button",
-      "pause": 1500
-    },
-    {
-      "click": "button:has-text('Proceed')",
-      "pause": 2000
-    }
-  ],
-  "finished": "completed"
+  }
 }

@@ -1,5 +1,5 @@
 {
-  "note": "Two words that cross: generated ones are the same word twice, and the grid cannot be built from them.",
+  "note": "Two words that cross: generated ones are the same word twice, and the grid cannot be built from them, which throws after ready.",
   "params": {
     "taskDescription": "<p>Fill in the words.</p>",
     "words": [
@@ -12,6 +12,5 @@
         "answer": "tea"
       }
     ]
-  },
-  "finished": "answered"
+  }
 }

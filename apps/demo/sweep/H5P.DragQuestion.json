@@ -1,5 +1,5 @@
 {
-  "note": "Which drop zone an item belongs in is a checkbox the editor fills from the zones drawn, so generation leaves it empty and the content type fails on it. One item and its zone, dragged there.",
+  "note": "Which drop zone an item belongs in is a checkbox the editor fills from the zones drawn, so generation leaves it empty and the content type fails on it. One item and its zone.",
   "params": {
     "question": {
       "task": {
@@ -35,17 +35,5 @@
         ]
       }
     }
-  },
-  "steps": [
-    {
-      "drag": [
-        ".h5p-draggable",
-        ".h5p-dropzone"
-      ]
-    },
-    {
-      "walk": true
-    }
-  ],
-  "finished": "answered"
+  }
 }
