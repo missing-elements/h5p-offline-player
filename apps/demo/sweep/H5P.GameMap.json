@@ -1,5 +1,5 @@
 {
-  "note": "One stage holding a question, the start stage, on the generated background image. Generation leaves the stage's neighbours unset, which the content type maps over at once, and makes the special stage type a finish stage. The question inside a stage is created without a parent, so its answered counts as the map's result, in H5P's core too; the map's own completed comes on finishing it.",
+  "note": "One stage holding a question, the start stage, on the generated background image. Generation leaves the stage's neighbours unset, which the content type maps over at once, and makes the special stage type a finish stage. The question inside a stage is created without a parent, so H5P's core takes its answered for the map's result; the element does not, by the sub-content mark on it. The map's own completed comes on finishing it.",
   "params": {
     "gamemapSteps": {
       "backgroundImageSettings": {

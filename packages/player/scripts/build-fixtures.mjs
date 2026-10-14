@@ -84,9 +84,10 @@ built.push([
   })
 ])
 
-// 1b. A result and a part: the content type with its Answer button, which reports `answered` as
-//     a single question does, and a child of itself run as sub-content, whose Complete reports
-//     `completed` with the parent named. Only the content's own statements are its result.
+// 1b. A result and its parts: the content type with its Answer button, which reports `answered`
+//     as a single question does, a child of itself run as sub-content, whose Complete reports
+//     `completed` with the parent named, and another run without a parent, as Interactive Book
+//     runs its chapters. Only the content's own statements are its result.
 built.push([
   'finished.h5p',
   await writeArchive('finished.h5p', async (writer) => {
@@ -97,7 +98,8 @@ built.push([
         JSON.stringify({
           message: 'A result, and a part inside it.',
           answer: true,
-          child: { library: 'H5P.OfflineTest 1.0', subContentId: '9d3c1f0a-2b4e-4c6d-8e1f-3a5b7c9d1e2f', params: { message: 'A part.' } }
+          child: { library: 'H5P.OfflineTest 1.0', subContentId: '9d3c1f0a-2b4e-4c6d-8e1f-3a5b7c9d1e2f', params: { message: 'A part.' } },
+          looseChild: { library: 'H5P.OfflineTest 1.0', subContentId: '4b8e2d6f-1a3c-4e5f-9b7d-2c4e6a8f0b1d', params: { message: 'A part without a parent.' } }
         })
       )
     )

@@ -4,16 +4,18 @@ import type { H5PPlayerElement } from '../../src/h5p-offline-player'
 import { FIXTURES, frameDocument, play, waitForEvent } from './utils'
 
 /**
- * `finished` is the content's result by H5P's own rule, the one the CMS plugins record through
- * `setFinished`: a `completed` or `answered` statement from the content itself, never one from a
- * part inside it. `finished.h5p` is the fixture content type with an Answer button, which reports
- * `answered` the way a single question does, and a child of itself run as sub-content, whose
- * Complete reports `completed` with the parent named.
+ * `finished` is the content's result: a `completed` or `answered` statement from the content
+ * itself, never one from a part inside it — H5P's own rule, the one the CMS plugins record through
+ * `setFinished`, and a part the core marks as sub-content without naming a parent besides.
+ * `finished.h5p` is the fixture content type with an Answer button, which reports `answered` the
+ * way a single question does, a child of itself run as sub-content, whose Complete reports
+ * `completed` with the parent named, and another child run without a parent.
  */
 
 type Detail = {
   statement: {
     verb: { id: string }
+    object?: { definition?: { extensions?: Record<string, unknown> } }
     context?: { contextActivities?: { parent?: unknown } }
     result?: { score?: { raw: number; max: number } }
   }
@@ -41,6 +43,23 @@ describe('the finished event', () => {
     expect(part.context?.contextActivities?.parent).toBeTruthy()
 
     // The frame posts `finished` straight after the statement it is about, so a moment is enough.
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    expect(finished).toEqual([])
+  })
+
+  it("is not raised for a part's completion when the part names no parent", async () => {
+    // Interactive Book's chapters and Game Map's exercises are run this way; H5P's own rule, the
+    // parent alone, took their results for the content's.
+    const player = await play(FIXTURES.finished)
+    const finished = recorded(player)
+
+    const xapi = waitForEvent<Detail>(player, 'xapi')
+    button(player, '.h5p-offline-test-loose .h5p-offline-test-complete').click()
+    const part = (await xapi).detail.statement
+    expect(part.verb.id).toBe(verb('completed'))
+    expect(part.context?.contextActivities?.parent).toBeUndefined()
+    expect(part.object?.definition?.extensions?.['http://h5p.org/x-api/h5p-subContentId']).toBe('4b8e2d6f-1a3c-4e5f-9b7d-2c4e6a8f0b1d')
+
     await new Promise((resolve) => setTimeout(resolve, 300))
     expect(finished).toEqual([])
   })

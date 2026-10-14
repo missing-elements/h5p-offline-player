@@ -95,7 +95,8 @@ packages/runtime/         @missing-elements/h5p-runtime — the H5P core runtime
                             port of h5p-php-library's H5PContentValidator; bundled into frame-boot.js,
                             unit-tested in tests/
   src/finished.ts           which statement is the content's result, the `finished` event: H5P's own
-                            rule; bundled into frame-boot.js, unit-tested in tests/
+                            rule, and the core's mark on sub-content; bundled into frame-boot.js,
+                            unit-tested in tests/
   scripts/build.mjs         vendors h5p-standalone into dist/ (headers, the rebuilt stylesheet, the fonts,
                             LICENSE.txt, NOTICE.txt, MANIFEST.json), builds the boot script, writes
                             dist/l10n.js from l10n/, writes index.js
@@ -819,7 +820,7 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   with registrations tied to one, and 21 CFR Part 11 LMSs keep version history as a requirement. So
   that record is the organisation's — LRS, LMS or document control — and a major change served at a
   new URL gets a new Activity id under H5P's own scheme, whose id is the content URL.
-- **`finished` is the content's result, by H5P's own rule.** The core's `xAPICompletedListener`,
+- **`finished` is the content's result: H5P's own rule, and the core's mark on sub-content.** The core's `xAPICompletedListener`,
   which the CMS plugins record a result through (`setFinished`), takes a `completed` or `answered`
   statement with no `context.contextActivities.parent`: from the content itself, not from a part
   inside it. Up to runtime 0.2.1 the boot script posted `finished` on any `completed`, parent or
@@ -832,21 +833,29 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   relays, so an older player gets it with the runtime. A question checked again says `answered`
   again, so `finished` can come more than once in a load; the last is the result, as with
   `setFinished`. `finished.test.ts` plays `finished.h5p` — the fixture content type with an Answer
-  button, and a child of itself as a part — and fails on the old rule for the part and for the
-  answer.
+  button, a child of itself as a part, and another child run without a parent — and fails on the
+  first rule for the part and for the answer, and on H5P's rule for the part without a parent.
   Measured across the pack on 2026-10-14 with the sweep's first cut, which worked each type
   through by hand-written steps (*The content-type sweep* says why those went): 32 of the 55
   content types end with a result of their own — `answered` from 19 question types,
   `completed` from 13 sets, containers and games, Image Pair and Questionnaire among them — 19 send
   none, and 4 cannot be worked through headless. Two create their parts without a parent, so a
-  part's result arrives as the content's, under H5P's rule and so in the core's `setFinished` as
-  well: Interactive Book 1.15 creates each chapter with `parent: self`, which in that scope is the
-  window, so a chapter's `completed` is parentless (twice, for a chapter holding one question); and
-  Game Map 1.5's exercise in a stage sends its `answered` with no parent. The content's own
-  `completed` comes after, on finishing — Interactive Book's only with `reporting`, which gives its
-  summary page the submit button; without it a book's last `finished` is its last chapter's. A host
-  that takes the last `finished` gets the content's result in both, with `reporting` for a book;
-  cmi5, which records the first, completes such a unit on its first part (`docs/cmi5.md` says so).
+  part's result passes H5P's rule, and the core's `setFinished` records it as the content's:
+  Interactive Book 1.15 creates each chapter with `parent: self`, which in that scope is the window,
+  so a chapter's `completed` is parentless (twice, for a chapter holding one question); and Game
+  Map 1.5's exercise in a stage sends its `answered` with no parent. Virtual Tour 0.5 runs its
+  interactions the same way, read in its code, since the sweep cannot open a scene. Up to runtime
+  0.2.2 the element did as the core does, and cmi5, which records the first `finished`, completed a
+  unit holding a book or a map on its first part. So `isResult` also refuses a statement whose
+  object carries `http://h5p.org/x-api/h5p-subContentId`, which the core's `setObject` writes for
+  every instance with a `subContentId` and never for the content's own, parent or not; measured the
+  same day, every chapter and exercise statement carries it, and so does every statement with a
+  parent that the sweep reached. A part saved without a `subContentId`, which only content from
+  before the editor wrote one can be, still counts as the content. The departure from
+  `setFinished` is deliberate: the parent stands in for "from the content itself", and the mark
+  says it. The content's own `completed` comes after, on finishing — Interactive Book's only with
+  `reporting`, which gives its summary page the submit button. A content type that reports nothing
+  of its own never finishes: a book without `reporting`, a Virtual Tour.
 - **The saved state never leaves the page, and never meets the Service Worker.** `resume` is
   H5P's own save-and-resume — core asks each instance for `getCurrentState()` every `saveFreq`
   seconds, three seconds after a `completed` or `progressed` statement and as the document goes

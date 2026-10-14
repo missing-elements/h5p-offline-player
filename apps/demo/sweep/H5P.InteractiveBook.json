@@ -1,5 +1,5 @@
 {
-  "note": "Two chapters with a question each, and reporting on, which gives the summary page its submit button. Interactive Book 1.15 creates chapters with parent: self, the window, so a chapter's completed has no parent and counts as the book's result, in H5P's core too; the book's own completed, on submitting, comes last.",
+  "note": "Two chapters with a question each, and reporting on, which gives the summary page its submit button. Interactive Book 1.15 creates chapters with parent: self, the window, so a chapter's completed has no parent, and H5P's core takes it for the book's result; the element does not, by the sub-content mark on it. The book's own completed comes on submitting.",
   "attributes": {
     "reporting": ""
   },
