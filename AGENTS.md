@@ -520,6 +520,16 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   its library folder, which left the race a few milliseconds wide; paced through `?throttle=`
   with its media last, it failed every time in Chromium. While a dependency is absent, every
   progress report walks the tree again, a few local reads each.
+  The element boots early only on `ready: true`, never on its absence. The last progress
+  report's `index` can reach the worker after the download is whole, and the worker then answers
+  from the central directory: no `ready`, since only a partial index has one, and no walk, since
+  that is the final `deep` index's. Up to 0.9.3 the element booted unless `ready` was `false`, so
+  on an unpaced download it booted on that answer every time, measured, and the runtime raced
+  the bundle's attachment for the missing `library.json`; WebKit lost the race in 1 or 2 plays of
+  30, Chromium in none, and CI caught it once more on 2026-10-14. A content-only export was never
+  exposed: the plain index refuses a package missing a library `h5p.json` declares, so there is no
+  answer to boot on. `libraries.test.ts` pins the states such a load goes through, `indexing`
+  between the package's download and the bundle's.
 - **What a load asked for is the load's, not the package's.** The `packages` row is keyed by
   `pkgId`, a hash of the source, and up to 2026-10-13 it also held what the last load asked for:
   `untrusted`, the language, the display options, the frame assets, `allow-origins` and the

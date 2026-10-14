@@ -748,7 +748,11 @@ export class H5PPlayerElement extends HTMLElement {
       attempt = this.send({ type: 'index', ...load })
         .then((reply) => {
           if (signal.aborted || booted) return
-          if (reply.ok && reply.type === 'indexed' && reply.ready !== false) {
+          // Only a partial index says `ready`, and only after the dependency walk. Once the
+          // download is whole the worker answers from the central directory with no `ready` and
+          // no walk, which is the final index's job below: booting on that answer let the runtime
+          // ask for a library before the bundle that supplies it was attached.
+          if (reply.ok && reply.type === 'indexed' && reply.ready === true) {
             booted = true
             this.iframe.title = frameTitle(reply.title)
             this.navigateFrame(frameUrl)
