@@ -282,6 +282,7 @@ function pageHtml() {
   const describe = (statement) => ({
     verb: (statement?.verb?.id ?? '').split('/').pop(),
     parent: Boolean(statement?.context?.contextActivities?.parent),
+    sub: Boolean(statement?.object?.definition?.extensions?.['http://h5p.org/x-api/h5p-subContentId']),
     score: statement?.result?.score ? [statement.result.score.raw, statement.result.score.max] : null,
     object: statement?.object?.definition?.name?.['en-US'] ?? null,
     at: Math.round(performance.now() - record.started)
@@ -484,7 +485,7 @@ function markdownReport(results) {
   }
   const rows = [...byType].map(([machineName, plays]) => {
     const played = plays.find((play) => play.state === 'ready') ?? plays[0]
-    const verbs = [...new Set(played.statements.map(({ verb, parent }) => (parent ? `${verb}*` : verb)))].join(', ') || '—'
+    const verbs = [...new Set(played.statements.map(({ verb, parent, sub }) => (parent || sub ? `${verb}*` : verb)))].join(', ') || '—'
     const finished = played.finished.map(describeFinished).join(', ') || '—'
     const byMode = (mode) => cell(plays.find((play) => play.mode === mode))
     return `| ${machineName} ${played.version} | ${byMode('untrusted')} | ${byMode('trusted')} | ${verbs} | ${finished} |`
@@ -495,7 +496,7 @@ function markdownReport(results) {
   return [
     '# Content type sweep',
     '',
-    `${results.filter((result) => result.problems.length === 0).length} of ${results.length} plays passed. Each content type's package is generated from its semantics and \`apps/demo/sweep/\`, played as a content-only export against the pack, and worked through by the generic walk. The statements are what it reached, not a judgement; a verb with \`*\` came from a part of the content (a statement with a parent).`,
+    `${results.filter((result) => result.problems.length === 0).length} of ${results.length} plays passed. Each content type's package is generated from its semantics and \`apps/demo/sweep/\`, played as a content-only export against the pack, and worked through by the generic walk. The statements are what it reached, not a judgement; a verb with \`*\` came from a part of the content (a statement with a parent, or one H5P marks as sub-content's).`,
     '',
     '| Content type | Untrusted | Trusted | Statements | `finished` |',
     '|---|---|---|---|---|',

@@ -65,6 +65,14 @@ H5P.OfflineTest = (function ($) {
       self.child = H5P.newRunnable(self.params.child, self.contentId, $child, true, { parent: self });
     }
 
+    // Sub-content run without a parent, as Interactive Book 1.15 runs its chapters and Game Map 1.5
+    // its exercises: its statements name none, and only the core's mark on them says it is a part.
+    if (self.params.looseChild) {
+      var $loose = $('<div class="h5p-offline-test-loose"></div>');
+      $container.append($loose);
+      self.looseChild = H5P.newRunnable(self.params.looseChild, self.contentId, $loose, true);
+    }
+
     if (self.params.media && self.params.media.path) {
       var source = H5P.getPath(self.params.media.path, self.contentId);
       $container.append(

@@ -140,7 +140,7 @@ Events are `CustomEvent`s:
 |---|---|---|
 | `ready` | `{ pkgId, source, metadata, revision, libraryBundle }` | The content is visible |
 | `xapi` | `{ statement, verb }` | Any xAPI statement; nothing is stored |
-| `finished` | `{ statement }` | The content reported its result: a `completed` or `answered` statement from the content itself, not from a part inside it, as H5P's own `setFinished` counts it. It can come more than once, for a question checked again; the last is the result. Interactive Book and Game Map send a part's result this way as well, as on any H5P site; the content's own comes last, for a book only with `reporting` |
+| `finished` | `{ statement }` | The content reported its result: a `completed` or `answered` statement from the content itself, not from a part inside it. That is H5P's own `setFinished` rule, except that a part created without a parent counts as a part too, which H5P's rule misses for Interactive Book's chapters and Game Map's exercises. It can come more than once, for a question checked again; the last is the result. Content that reports no result of its own never raises it, and Interactive Book reports one only with `reporting` |
 | `userdata` | `{ pkgId, dataType, subContentId, data, revision }` | With `resume`: the content saved its state; `data: null` means delete it |
 | `progress` | `{ phase, fraction, loaded, total, entry? }` | `download`, `libraries`, `warm` or `extract`; `fraction` is 0–1, or `null` while the total is unknown |
 | `resize` | `{ height }` | The content's height changed |
