@@ -25,7 +25,7 @@ WordPress and Drupal treat an author's upload:
 
 Before the runtime reads the content, it checks every field against the `semantics.json` of the
 library the field belongs to. This is a port of `H5PContentValidator`, the check the H5P plugins
-run on every save:
+run before they show content:
 
 - text keeps only the tags its field allows, with their attributes written anew;
 - plain text is escaped;
@@ -48,8 +48,7 @@ The port was run side by side with the PHP original on 98 cases:
 
 96 came out identical. The other two are edge cases where the port keeps a cleaner shape: a
 multi-select with an invalid option removed, and a number clamped to a maximum the semantics
-write as a string. Real content came
-through unchanged, apart from empty lists and one unknown translation key, which the PHP original
+write as a string. Real content came through unchanged, apart from empty lists and one unknown translation key, which the PHP original
 removes too.
 
 The check fails closed. The Service Worker hands an untrusted package's content only to a runtime

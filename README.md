@@ -33,8 +33,9 @@ no extraction step, no third-party service between your learners and your conten
   [cmi5](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/cmi5.md) launches it from an LMS, and [resume](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/resume.md) keeps the
   learner's place.
 - **Works offline, in the learner's language.** The installable app plays with no network, on iOS
-  too, and H5P's own buttons follow `lang` in more than fifty languages. The player sends nothing
-  anywhere; [privacy](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/privacy.md) lists what it keeps on the device.
+  too, and H5P's own buttons follow `lang` in more than fifty languages. Results stay on your page
+  unless your code sends them; [privacy](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/privacy.md)
+  lists what the player fetches, and what it keeps on the device.
 - **Comes with tools for pipelines.** [`h5p-verify`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/verify.md) plays a package headless
   and says whether it works, [`h5p-normalize`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/streaming-video.md) rewrites one so its
   video streams, and [`h5p-embed`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#readme)
