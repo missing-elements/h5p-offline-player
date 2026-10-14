@@ -27,6 +27,7 @@
     <script src="/demo/theme.js" vite-ignore></script>
     <link rel="stylesheet" href="/demo/player-page.css" />
     <script type="module" src="/demo/analytics.js"></script>
+    <script type="module" src="/demo/code-blocks.js"></script>
 </head>
 
   <body>
@@ -200,7 +201,7 @@
         Any zip tool shows how each file is packed. On macOS or Linux, list the archive and look at
         the <em>Method</em> column for your video and audio files:
       </p>
-      <pre class="code">unzip -v course.h5p
+      <pre class="code" data-lang="text" data-title="Terminal">unzip -v course.h5p
 
  Length   Method    Size  Cmpr    Date    Time   CRC-32   Name
 --------  ------  ------- ---- ---------- ----- --------  ----
@@ -219,7 +220,7 @@
         streams. Run it once, wherever the package is published from, and every learner after that
         gets the fast path. It needs Node 20 or later and nothing else.
       </p>
-      <pre class="code">npx @missing-elements/h5p-normalize course.h5p --dry-run   # report only, write nothing
+      <pre class="code" data-lang="sh">npx @missing-elements/h5p-normalize course.h5p --dry-run   # report only, write nothing
 npx @missing-elements/h5p-normalize course.h5p             # writes course.normalized.h5p
 npx @missing-elements/h5p-normalize https://host.example/course.h5p -o course.h5p</pre>
       <p>What it changes, all of it in the zip container:</p>

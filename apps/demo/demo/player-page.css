@@ -13,6 +13,21 @@
   --line-strong: #c9d0d9;
   --surface: #f6f8fa;
   --surface-2: #eef1f5;
+  /* Code blocks are an ink panel in both themes, so code never reads as prose; the role colours
+     are the panel's and do not change with the page. */
+  --code-bg: #141a23;
+  --code-head: #1a212c;
+  --code-border: #141a23;
+  --code-line: #283141;
+  --tk-plain: #e2e7ef;
+  --tk-punct: #8f9aab;
+  --tk-comment: #8793a7;
+  --tk-string: #9ad6a8;
+  --tk-keyword: #d0a8ff;
+  --tk-function: #8db6ff;
+  --tk-tag: #7fd1e3;
+  --tk-attr: #f2c97d;
+  --tk-constant: #f5a97f;
   --accent: #2f6df6;
   --accent-ink: #ffffff;
   --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
@@ -45,6 +60,10 @@
     --line-strong: #363d47;
     --surface: #171a1f;
     --surface-2: #1e2229;
+    --code-bg: #090c11;
+    --code-head: #0e1218;
+    --code-border: #2a313c;
+    --code-line: #222935;
     --accent: #7aa2ff;
     --accent-ink: #0b1a3a;
     --danger: #ff8f8f;
@@ -65,6 +84,10 @@
   --line-strong: #363d47;
   --surface: #171a1f;
   --surface-2: #1e2229;
+  --code-bg: #090c11;
+  --code-head: #0e1218;
+  --code-border: #2a313c;
+  --code-line: #222935;
   --accent: #7aa2ff;
   --accent-ink: #0b1a3a;
   --danger: #ff8f8f;
@@ -459,7 +482,87 @@ h5p-player:not([state="ready"]) {
 
 /* ---------------------------------------------------------------- code and logs */
 
-.code,
+/* A page writes `<pre class="code" data-lang>`; scripts/lib/code-blocks.mjs turns it into this
+   figure when the page is served or built, highlighted with classes rather than `style`
+   attributes, which the site's CSP refuses. demo/code-blocks.js works the tabs and Copy. */
+.code-block {
+  margin: 1.25rem 0;
+  border: 1px solid var(--code-border);
+  border-radius: var(--radius);
+  background: var(--code-bg);
+  color: var(--tk-plain);
+  overflow: hidden;
+}
+
+.code-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  min-height: 2.5rem;
+  padding: 0.25rem 0.375rem 0.25rem 1rem;
+  border-bottom: 1px solid var(--code-line);
+  background: var(--code-head);
+}
+
+.code-label {
+  color: var(--tk-punct);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.code-file {
+  font: 500 0.8125rem / 1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.code-tablist { display: flex; gap: 0.125rem; }
+
+/* The page's own button rule draws a large bordered button; these sit in the head, quietly. */
+.code-head button {
+  min-height: 1.875rem;
+  padding: 0.25rem 0.625rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--tk-punct);
+  font: 500 0.8125rem / 1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.code-head button:hover { background: rgb(255 255 255 / 0.06); color: var(--tk-plain); }
+.code-head [role="tab"][aria-selected="true"] { background: rgb(255 255 255 / 0.1); color: var(--tk-plain); }
+.code-head .code-copy { margin-left: auto; font-family: inherit; font-size: 0.8125rem; }
+
+.code-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.code-body {
+  margin: 0;
+  padding: 0.875rem 1rem;
+  overflow-x: auto;
+  font: 0.84rem / 1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre;
+}
+.code-body:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 0; }
+.code-body code { font: inherit; }
+
+.tk-punct { color: var(--tk-punct); }
+.tk-comment { color: var(--tk-comment); font-style: italic; }
+.tk-string { color: var(--tk-string); }
+.tk-keyword { color: var(--tk-keyword); }
+.tk-function { color: var(--tk-function); }
+.tk-tag { color: var(--tk-tag); }
+.tk-attr { color: var(--tk-attr); }
+.tk-constant { color: var(--tk-constant); }
+
 .log {
   margin: 0;
   padding: 0.875rem 1rem;
@@ -469,7 +572,6 @@ h5p-player:not([state="ready"]) {
   font: 0.8125rem / 1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-.code { overflow-x: auto; white-space: pre; }
 .log { max-height: 18rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
 .log:empty::after { content: "No events yet."; color: var(--muted); }
 

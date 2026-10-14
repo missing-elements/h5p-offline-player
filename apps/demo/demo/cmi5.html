@@ -29,6 +29,7 @@
     <script type="module" src="/demo/element.js"></script>
     <script type="module" src="/demo/cmi5-page.js"></script>
     <script type="module" src="/demo/analytics.js"></script>
+    <script type="module" src="/demo/code-blocks.js"></script>
 </head>
 
   <body>
@@ -99,7 +100,7 @@
           Add <code>launchMethod="OwnWindow"</code> to have it opened in a window of its own, for
           an LMS on plain <code>http</code>.
         </p>
-        <pre class="code">&lt;?xml version="1.0" encoding="utf-8"?&gt;
+        <pre class="code" data-lang="xml" data-title="cmi5.xml">&lt;?xml version="1.0" encoding="utf-8"?&gt;
 &lt;courseStructure xmlns="https://w3id.org/xapi/profiles/cmi5/v1/CourseStructure.xsd"&gt;
   &lt;course id="%SITE_URL%/courses/demo-quiz"&gt;
     &lt;title&gt;&lt;langstring lang="en-US"&gt;h5p-offline-player: quiz&lt;/langstring&gt;&lt;/title&gt;

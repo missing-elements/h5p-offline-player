@@ -27,6 +27,7 @@
     <script src="/demo/theme.js" vite-ignore></script>
     <link rel="stylesheet" href="/demo/player-page.css" />
     <script type="module" src="/demo/analytics.js"></script>
+    <script type="module" src="/demo/code-blocks.js"></script>
 </head>
 
   <body>
@@ -69,7 +70,7 @@
       <iframe id="embed" title="H5P player" class="embed-frame" frameBorder="0" allow="fullscreen; microphone; camera"></iframe>
 
       <h2>Markup</h2>
-      <pre class="code">&lt;!-- This site's copy of the page. Your own player domain, from npx @missing-elements/h5p-embed,
+      <pre class="code" data-lang="html">&lt;!-- This site's copy of the page. Your own player domain, from npx @missing-elements/h5p-embed,
      serves it at its root: https://h5p-player.example.net/?src=… --&gt;
 &lt;iframe src="%SITE_URL%/embed?src=%SITE_URL%/demo/content/quiz.h5p&amp;xapi=https://your-site.example"
         allow="fullscreen; microphone; camera" style="width: 100%; border: 0"&gt;&lt;/iframe&gt;
