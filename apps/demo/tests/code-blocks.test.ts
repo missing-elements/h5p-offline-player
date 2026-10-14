@@ -28,9 +28,11 @@ const decode = (text: string) =>
 /** What each block says, as the page wrote it. */
 const written = (html: string) => [...html.matchAll(/<pre class="code"[^>]*>([\s\S]*?)<\/pre>/g)].map((match) => decode(match[1]))
 
-/** What each highlighted block says: the text a visitor copies. */
+/** What each highlighted block says: the text a visitor copies, the text between its tags. */
 const shown = (html: string) =>
-  [...html.matchAll(/<pre class="code-body"[^>]*>([\s\S]*?)<\/pre>/g)].map((match) => decode(match[1].replace(/<[^>]+>/g, '')))
+  [...html.matchAll(/<pre class="code-body"[^>]*>([\s\S]*?)<\/pre>/g)].map((match) =>
+    decode([...`>${match[1]}<`.matchAll(/>([^<]*)(?=<)/g)].map((text) => text[1]).join(''))
+  )
 
 describe('highlighting', () => {
   it('turns a block into a labelled figure, coloured by classes, with no style attribute', async () => {

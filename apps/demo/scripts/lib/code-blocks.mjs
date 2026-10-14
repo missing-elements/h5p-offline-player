@@ -56,7 +56,9 @@ const THEME = {
 let highlighter
 
 const BLOCK = /<pre class="code"([^>]*)>([\s\S]*?)<\/pre>/g
-const GROUP = /<div class="code-tabs">\s*((?:<pre class="code"[^>]*>[\s\S]*?<\/pre>\s*)+)<\/div>/g
+// Up to the first `</div>`: a group holds blocks and nothing else, and a block's code is escaped,
+// so a `</div>` in it is `&lt;/div&gt;`. No nested repetition, so no backtracking to speak of.
+const GROUP = /<div class="code-tabs">([\s\S]*?)<\/div>/g
 
 /**
  * Every code block in a page, highlighted. Ids are numbered per page, so a page's tabs and
