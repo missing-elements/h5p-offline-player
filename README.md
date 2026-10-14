@@ -17,6 +17,31 @@ no extraction step, no third-party service between your learners and your conten
 <h5p-player src="https://host.example/course.h5p"></h5p-player>
 ```
 
+## What it does
+
+- **Plays the packages people have.** Large ones stream: a video starts before the archive has
+  arrived, and a host without `Range` support still gets an early start. An export without its
+  libraries, as h5p.com and h5p.org make them, plays against a
+  [library pack](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/libraries.md) of every content type the H5P hub serves, and content
+  written for an older library version is upgraded first.
+- **Validates what it plays.** With `untrusted`, none of a package's own code runs, and its content
+  is checked field by field against each library's definitions by a port of H5P's own validator.
+  Every package's entry names and libraries are checked before it starts. See
+  [Packages you did not make](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/untrusted.md).
+- **Gives results you can audit.** Every xAPI statement names the
+  [build it came from](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/revision.md), `finished` is the content's own result,
+  [cmi5](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/cmi5.md) launches it from an LMS, and [resume](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/resume.md) keeps the
+  learner's place.
+- **Works offline, in the learner's language.** The installable app plays with no network, on iOS
+  too, and H5P's own buttons follow `lang` in more than fifty languages. The player sends nothing
+  anywhere; [privacy](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/privacy.md) lists what it keeps on the device.
+- **Comes with tools for pipelines.** [`h5p-verify`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/verify.md) plays a package headless
+  and says whether it works, [`h5p-normalize`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/streaming-video.md) rewrites one so its
+  video streams, and [`h5p-embed`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#readme)
+  writes the embed site. The [agent skills](#agent-skills) cover all three.
+- **Is tested where it runs.** CI runs the browser tests in Chromium, Firefox and WebKit, and plays
+  every content type in the library pack, untrusted and trusted, on each change and every week.
+
 ## Which setup
 
 An H5P package is JavaScript, and the player runs it on the origin that serves the frame.
@@ -36,6 +61,7 @@ library pack, and its content is checked against each library's field definition
 shown, as the H5P CMS plugins check an author's upload. Installed with `untrusted`, a package is
 as contained as in an H5P plugin on the same site, and Embed adds a separate origin on top. A
 package that needs a newer library than the pack has is refused until the pack catches up.
+[Packages you did not make](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/untrusted.md) has the details.
 
 Both need the page on `https://` or `localhost`, and CORS headers on the package host. `Range`
 support is optional: without it the archive is downloaded once and played from the cache.
@@ -162,6 +188,7 @@ is an example.
 
 ## Guides
 
+- [Packages you did not make](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/untrusted.md) — `untrusted` and the content check
 - [Video that cannot stream](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/streaming-video.md) — `preload` and the normalizer
 - [Packages without libraries](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/libraries.md) — the library bundle and the hub
 - [The frame's CSP](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/frame-csp.md) — `allow-origins`, and what `untrusted` narrows
