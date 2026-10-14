@@ -197,7 +197,8 @@ README.md                 what npm shows; ACCESSIBILITY.md, SECURITY.md, CONTRIB
                           CODE_OF_CONDUCT.md beside it
 
 docs/                     the README's longer sections, one file each: streaming video, libraries, the
-                          frame's CSP, the revision on statements, resume, the verifier, cmi5, development,
+                          frame's CSP, packages you did not make (`untrusted` and the content check), the
+                          revision on statements, resume, the verifier, cmi5, development,
                           troubleshooting, single-worker hosts and upgrades, coming from h5p-standalone,
                           privacy (what is stored and sent, for a host's notice); the README links
                           them by absolute URL because npm renders the same file; suggestions-review.md
