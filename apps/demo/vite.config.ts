@@ -8,6 +8,7 @@ import {
   noRangeFixturesPlugin
 } from '../../packages/player/vite.plugins'
 import { bundleHostWorker } from '../../packages/player/scripts/lib/worker-bundle.mjs'
+import { codeBlocksPlugin } from './scripts/lib/code-blocks.mjs'
 
 /**
  * The demo app: the dev server for the whole repository, and the hosted demo — the player page
@@ -112,7 +113,9 @@ export default defineConfig(({ command }) => ({
     // The demo content first, then the player's fixtures: the pages use the former, and the
     // latter stay reachable for trying a fixture against the dev server.
     noRangeFixturesPlugin([resolve(rootDir, 'demo', 'content'), PLAYER_FIXTURES]),
-    siteUrlPlugin(process.env.SITE_URL ?? (command === 'serve' ? 'http://localhost:5173' : 'http://localhost:4173'))
+    siteUrlPlugin(process.env.SITE_URL ?? (command === 'serve' ? 'http://localhost:5173' : 'http://localhost:4173')),
+    // After the site URL, so a snippet shows the real address.
+    codeBlocksPlugin()
   ],
 
   resolve: {

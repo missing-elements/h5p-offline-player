@@ -27,6 +27,7 @@
     <script src="/demo/theme.js" vite-ignore></script>
     <link rel="stylesheet" href="/demo/player-page.css" />
     <script type="module" src="/demo/analytics.js"></script>
+    <script type="module" src="/demo/code-blocks.js"></script>
 </head>
 
   <body>
@@ -130,12 +131,16 @@
 
       <h2 id="bundler">Install with a bundler</h2>
       <p>Vite, webpack 5 and Rollup. Install it, import it once, use the element.</p>
-      <pre class="code">npm i @missing-elements/h5p-offline-player @missing-elements/h5p-runtime</pre>
-      <pre class="code">import '@missing-elements/h5p-offline-player'
+      <div class="code-tabs">
+        <pre class="code" data-lang="sh" data-tab="npm">npm i @missing-elements/h5p-offline-player @missing-elements/h5p-runtime</pre>
+        <pre class="code" data-lang="sh" data-tab="pnpm">pnpm add @missing-elements/h5p-offline-player @missing-elements/h5p-runtime</pre>
+        <pre class="code" data-lang="sh" data-tab="yarn">yarn add @missing-elements/h5p-offline-player @missing-elements/h5p-runtime</pre>
+      </div>
+      <pre class="code" data-lang="js">import '@missing-elements/h5p-offline-player'
 import { runtime } from '@missing-elements/h5p-runtime'
 
 document.querySelector('h5p-player').runtime = runtime</pre>
-      <pre class="code">&lt;h5p-player src="https://host.example/course.h5p"&gt;&lt;/h5p-player&gt;</pre>
+      <pre class="code" data-lang="html">&lt;h5p-player src="https://host.example/course.h5p"&gt;&lt;/h5p-player&gt;</pre>
       <p>
         That is the whole setup. Both packages name their files with
         <code>new URL('./file', import.meta.url)</code>, which these bundlers recognise: they copy
@@ -147,7 +152,7 @@ document.querySelector('h5p-player').runtime = runtime</pre>
         A bundler that does not follow that pattern, esbuild among them, leaves the files behind.
         Then serve both packages' <code>dist/</code> folders from static paths and say where they are:
       </p>
-      <pre class="code">&lt;h5p-player src="…"
+      <pre class="code" data-lang="html">&lt;h5p-player src="…"
             sw="/vendor/h5p-player/h5p-sw.js"
             assets-base="/vendor/h5p-runtime/"&gt;&lt;/h5p-player&gt;</pre>
 
@@ -155,7 +160,7 @@ document.querySelector('h5p-player').runtime = runtime</pre>
       <p>
         Load the element from the CDN, and copy the one file that has to be yours onto the site.
       </p>
-      <pre class="code">&lt;script type="module"
+      <pre class="code" data-lang="html">&lt;script type="module"
   src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@0.9.3/dist/h5p-player.js"&gt;&lt;/script&gt;
 
 &lt;h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js"
@@ -175,7 +180,7 @@ document.querySelector('h5p-player').runtime = runtime</pre>
         <code>h5p-player.example.net</code>, not a subdomain of your site, which would receive its
         cookies — and keep nothing else on it.
       </p>
-      <pre class="code">npx @missing-elements/h5p-embed h5p-player</pre>
+      <pre class="code" data-lang="sh">npx @missing-elements/h5p-embed h5p-player</pre>
       <p>
         The folder holds the page, the player, the H5P runtime and the library pack, with the
         headers Netlify, Cloudflare Pages and Vercel read beside it. <code>--packages</code> limits
@@ -183,7 +188,7 @@ document.querySelector('h5p-player').runtime = runtime</pre>
         the <a href="https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#readme" rel="noopener">package's README</a>
         has the rest. Then, on your site:
       </p>
-      <pre class="code">&lt;iframe src="https://h5p-player.example.net/?src=%SITE_URL%/demo/content/quiz.h5p&amp;xapi=https://your-site.example"
+      <pre class="code" data-lang="html">&lt;iframe src="https://h5p-player.example.net/?src=%SITE_URL%/demo/content/quiz.h5p&amp;xapi=https://your-site.example"
         allow="fullscreen; microphone; camera" style="width: 100%; border: 0"&gt;&lt;/iframe&gt;
 &lt;script src="https://h5p-player.example.net/resizer.js"&gt;&lt;/script&gt;</pre>
       <p>
@@ -217,7 +222,7 @@ document.querySelector('h5p-player').runtime = runtime</pre>
         came from, and <code>context.platform</code>, the player's version, so a completion can be
         matched to the build the learner played; <code>player.revision</code> holds the same value.
       </p>
-      <pre class="code">const player = document.querySelector('h5p-player')
+      <pre class="code" data-lang="js">const player = document.querySelector('h5p-player')
 
 player.addEventListener('xapi', (event) =&gt; send(event.detail.statement))
 player.addEventListener('finished', (event) =&gt; console.log(event.detail.statement.result))

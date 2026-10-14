@@ -166,11 +166,13 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             demo/theme.js the light/dark switch, a classic script every page
                             loads in its head before the stylesheet, since the CSP allows no
                             inline script and a pinned theme has to be on <html> before the
-                            first paint
+                            first paint; demo/code-blocks.js the code blocks' tabs and Copy
   tests/embed.test.ts       /resizer.js (the embed package's, served by a dev middleware and
                             copied by the build) sizing the framed /embed
   tests/app.test.ts         the installable app's screens, history and keyboard, through the dev server
   tests/sweep-content.test.ts  the sweep's content generator, in Node
+  tests/code-blocks.test.ts    the pages' code blocks: every snippet kept as written, and the tabs
+                               and Copy in a browser
   tests/                    cmi5.test.ts: the cmi5 page against a mock LMS and LRS on a second
                             origin, through the dev server and a real browser
   cmi5-catapult/            docker-compose.yml for ADL's CATAPULT player, MySQL and the SQL LRS;
@@ -187,7 +189,8 @@ apps/demo/                the demo app: the dev server for the whole repository,
   scripts/                  build-demo (the site into dist-demo/), build-demo-content, build-og-image,
                             build-app-icons, build-app-screenshots, build-libraries (the pack, into
                             packages/libraries), sweep-content-types (every content type in the pack
-                            played; see *The content-type sweep*), lib/sweep-content.mjs its generator
+                            played; see *The content-type sweep*), lib/sweep-content.mjs its generator,
+                            lib/code-blocks.mjs the Vite plugin that highlights the pages' code
   sweep/                    <machineName>.json for the content types the sweep cannot generate
                             playable content for, and the element's attributes they need
   vite.config.ts            the dev server and the hosted demo: the pages plus dist/'s layout at the
@@ -1668,6 +1671,18 @@ SPA-fallback trap described above cannot happen there.
   driving the built demo under the production CSP. `CSSStyleSheet.replaceSync` is CSSOM and is
   not subject to it; the `<style>` element remains only as the fallback for a browser without
   `adoptedStyleSheets`.
+- **The pages' code is highlighted when they are served or built, with classes.** A page writes
+  `<pre class="code" data-lang="sh|js|html|xml|text">`, with `data-title` for a file name and
+  `<div class="code-tabs">` around blocks that each carry `data-tab` for alternatives (npm, pnpm,
+  yarn); `scripts/lib/code-blocks.mjs`, a `transformIndexHtml` hook after the site URL's, turns
+  each into a figure with a label, tabs and Copy, highlighted by Shiki. Shiki's own themes, and
+  every highlighter's default output, put a `style` attribute on each token, which `style-src
+  'self'` refuses, so the theme there is our own and names roles (`var(--tk-string)`) that leave
+  the output as classes, coloured in `player-page.css`. Nothing of Shiki reaches a visitor:
+  `demo/code-blocks.js`, 1.6 kB, only works the tabs, one choice for the whole site kept in
+  `localStorage`, and Copy. Added on 2026-10-14, after the owner found the snippets hard to tell
+  from the text: they were the page's pale surface colour, and three in a row touched. Checked
+  under the production headers: no violation on any page.
 - **cmi5 is `@missing-elements/h5p-cmi5`, `/demo/cmi5.html` is a page on it, and the element
   knows nothing about either.** The wiring was the demo page's until 2026-10-01, when it moved
   into the package so a host installs it instead of copying it; the demo aliases the package's
