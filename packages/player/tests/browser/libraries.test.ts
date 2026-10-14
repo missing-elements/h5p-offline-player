@@ -152,6 +152,26 @@ describe('supplying missing libraries', () => {
     }
   })
 
+  // Unpaced, the download is whole before the frame could boot from the forward index, and the
+  // last progress report's index is answered from the central directory: no `ready`, and no
+  // dependency walk, which is the final index's. The element once booted on that answer, every
+  // time, so the runtime raced the bundle's attachment for the missing library and in WebKit
+  // sometimes lost: a 404 read as JSON. Now it stops when the download ends (`indexing`), the
+  // bundle is downloaded (`downloading` again) and attached, and only then does the frame boot.
+  // Booted early, the bundle's `downloading` ran on from the package's, with no `indexing` between.
+  it('boots a whole download only after the final index has supplied what its libraries need', async () => {
+    const player = createPlayer({ libraries: FIXTURES.libraries })
+    const states: string[] = []
+    player.addEventListener('statechange', (event) => states.push((event as CustomEvent<{ state: string }>).detail.state))
+    const settled = waitForSettled(player)
+    player.setAttribute('src', `${FIXTURES.needsDependencyNoRange}?case=whole-${Date.now()}`)
+
+    const result = await settled
+    if (!result.ok) expect.fail(`${result.detail.code} — ${result.detail.message}`)
+    expect(states).toEqual(['probing', 'downloading', 'indexing', 'downloading', 'indexing', 'ready'])
+    expect((frameWindow(player) as unknown as { h5pOfflineExtraLoaded?: boolean }).h5pOfflineExtraLoaded).toBe(true)
+  })
+
   it('names the bundle in the revision, after the package', async () => {
     const player = await playWithLibraries(FIXTURES.needsLibraries, FIXTURES.libraries)
     expect(player.revision).toMatch(/^sha256:[0-9a-f]{64}; libraries sha256:[0-9a-f]{64}$/)
