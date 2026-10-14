@@ -10,7 +10,7 @@ pnpm --filter @missing-elements/h5p-offline-player exec playwright install chrom
 
 pnpm dev          # the demo player page on http://localhost:5173
 pnpm test         # every package's tests, the player's browser suite included
-H5P_TEST_BROWSER=webkit pnpm test:engine   # the player's browser suite in webkit or firefox;
+H5P_TEST_BROWSER=webkit pnpm test:engine   # the player's browser suite and the demo's tests in webkit or firefox;
                                            # `playwright install webkit firefox` in the player first
 pnpm build        # the player package, building the runtime package on the way
 pnpm normalize course.h5p   # rewrite a package so it streams (docs/streaming-video.md)

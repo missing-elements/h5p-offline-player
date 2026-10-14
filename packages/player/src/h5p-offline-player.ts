@@ -321,7 +321,7 @@ export class H5PPlayerElement extends HTMLElement {
   private prefetching: string | null = null
   /**
    * Where this element sent its frame, or `null` while the frame shows nothing. Not the frame's
-   * `src`, which is set for the first package only and then left alone: see `navigateFrame`.
+   * `src`, which is set only for a frame out of the document: see `navigateFrame`.
    */
   private frameLocation: string | null = null
 
@@ -604,11 +604,11 @@ export class H5PPlayerElement extends HTMLElement {
   private navigateFrame(url: string | null): void {
     if (url === this.frameLocation) return
     this.frameLocation = url
-    if (!this.iframe.hasAttribute('src')) {
-      if (url !== null) this.iframe.src = url
-      return
-    }
-    this.iframe.contentWindow?.location.replace(url ?? 'about:blank')
+    // Replaced, the first navigation too: setting `src` on a frame whose first document has
+    // loaded adds a step to the page's history in WebKit, and Back then empties the frame.
+    const frame = this.iframe.contentWindow
+    if (frame) frame.location.replace(url ?? 'about:blank')
+    else if (url !== null) this.iframe.src = url
   }
 
   /** Empties the player without an error: what removing `src`, or setting `file` to null, means. */

@@ -2,7 +2,8 @@ import { readFile } from 'node:fs/promises'
 import { createServer as createHttpServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { resolve } from 'node:path'
-import { chromium, type Browser } from 'playwright'
+import type { Browser } from 'playwright'
+import { browserType } from './engine'
 import { createServer, type ViteDevServer } from 'vite'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
@@ -23,7 +24,7 @@ beforeAll(async () => {
   vite = await createServer({ configFile: resolve(rootDir, 'vite.config.ts'), root: rootDir, server: { host: 'localhost', port: 0 }, logLevel: 'error' })
   await vite.listen()
   origin = `http://localhost:${(vite.httpServer!.address() as AddressInfo).port}`
-  browser = await chromium.launch()
+  browser = await browserType.launch()
   const files: Record<string, string> = {
     '/quiz.h5p': resolve(rootDir, 'demo', 'content', 'quiz.h5p'),
     // Needs a version of the fixture content type only it carries, which the pack has not got.
