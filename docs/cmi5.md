@@ -107,7 +107,8 @@ address. With none, a top-level window closes and a framed page stays where it i
    the LRS cannot be asked, the session counts for itself and reports `registration-unread`.
    Nothing is sent in `Browse` or `Review` mode. A unit holding Interactive Book completes only
    when the book's report is submitted, which needs `reporting` on the element; without it the
-   book reports no result of its own and the unit never completes.
+   book reports no result of its own and the unit never completes. Nor does a unit holding a
+   Virtual Tour, which reports none.
 4. **`terminated`** from Exit. A closed tab sends nothing; the LMS records the session as
    `abandoned`.
 

@@ -850,8 +850,9 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   object carries `http://h5p.org/x-api/h5p-subContentId`, which the core's `setObject` writes for
   every instance with a `subContentId` and never for the content's own, parent or not; measured the
   same day, every chapter and exercise statement carries it, and so does every statement with a
-  parent that the sweep reached. A part saved without a `subContentId`, which only content from
-  before the editor wrote one can be, still counts as the content. The departure from
+  parent that the sweep reached. A part saved without a `subContentId` — content from before H5P's
+  editor wrote one, or written by hand or by a tool that writes none — carries no mark and still
+  counts as the content, as under H5P's rule. The departure from
   `setFinished` is deliberate: the parent stands in for "from the content itself", and the mark
   says it. The content's own `completed` comes after, on finishing — Interactive Book's only with
   `reporting`, which gives its summary page the submit button. A content type that reports nothing
