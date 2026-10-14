@@ -127,7 +127,7 @@
         <li><strong>Your site already runs Moodle.</strong> Its built-in H5P plays and edits content, records scores in the gradebook, and plays offline in the Moodle app. Use it.</li>
         <li><strong>You want it managed for you.</strong> h5p.com hosts, edits, reports and integrates with LMSs, with support, for a subscription. This player needs someone to deploy and update it.</li>
         <li><strong>You want scores stored per learner with no code.</strong> The H5P plugins for WordPress, Drupal and Moodle keep results per user out of the box. Here results are events: your page, an LRS or cmi5 decides where they go.</li>
-        <li><strong>Your users upload packages that others play.</strong> The H5P plugins check each upload before any of it runs, and this player does not; <em>Data and trust</em>, below, has the difference.</li>
+        <li><strong>Your users upload content types the library pack lacks.</strong> The H5P plugins install new library code from an administrator&rsquo;s upload; here a package played <code>untrusted</code> gets its libraries from a pack pinned per release, and one that needs a newer library waits for the next pack. <em>Data and trust</em>, below, has what the check covers.</li>
         <li><strong>You have a few packages and are happy to unzip them.</strong> h5p-standalone is smaller and has been around longer; served from static files, media streams from the host directly.</li>
       </ul>
 
@@ -152,10 +152,15 @@
         The H5P plugins answer that by checking what is uploaded. An upload adds library code only
         if the uploader may install libraries, every field of the content is filtered against what
         its content type allows, and by default the content folder may hold only listed file types,
-        none of them scripts, stylesheets, SVG or HTML. The code that passes then runs on the
-        site&rsquo;s own origin, beside its logins. This player checks none of that and keeps packages
-        apart instead: the Embed setup runs them on a domain of their own, where a hostile package
-        cannot touch your site, though it can read what other packages stored on that domain.
+        none of them scripts, stylesheets, SVG or HTML. This player does the same for a package
+        played <code>untrusted</code>: none of the package&rsquo;s own code runs, its libraries come
+        from the pack you chose, its content folder serves the plugins&rsquo; list of file types and
+        nothing else, and its content is checked against each library&rsquo;s field definitions by a
+        port of the plugins&rsquo; own validator, compared with the original on 98 cases.
+        <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/docs/untrusted.md" rel="noopener">Packages you did not make</a>
+        has the details. Embed adds a domain on top: a package then runs apart from your site
+        altogether, where a hostile one cannot touch your logins, though it can read what other
+        packages stored on that domain.
       </p>
 
       <p>
