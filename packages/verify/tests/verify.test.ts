@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { BlobReader, BlobWriter, TextReader, Uint8ArrayReader, Uint8ArrayWriter, ZipReader, ZipWriter } from '@zip.js/zip.js'
+import { BlobReader, BlobWriter, type Entry, TextReader, Uint8ArrayReader, Uint8ArrayWriter, ZipReader, ZipWriter } from '@zip.js/zip.js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { summarize, verifyPackage } from '../lib/verify.mjs'
 
@@ -22,45 +22,52 @@ afterAll(async () => {
   await rm(dir, { recursive: true, force: true })
 })
 
-/** The quiz as h5p.com would export it: `h5p.json` and `content/`, no library folders. */
-async function strippedQuiz(): Promise<string> {
-  const reader = new ZipReader(new BlobReader(new Blob([await readFile(quiz)])))
-  const writer = new ZipWriter(new BlobWriter('application/zip'))
-  for (const entry of await reader.getEntries()) {
-    if (entry.directory || !(entry.filename === 'h5p.json' || entry.filename.startsWith('content/'))) continue
-    await writer.add(entry.filename, new Uint8ArrayReader(await entry.getData!(new Uint8ArrayWriter())))
-  }
-  await reader.close()
-  const path = join(dir, 'stripped.h5p')
-  await writeFile(path, new Uint8Array(await (await writer.close()).arrayBuffer()))
-  return path
-}
-
-/** The quiz plus a dependency whose script throws as it loads: the content still comes up. */
-async function quizWithBrokenLibrary(): Promise<string> {
+/**
+ * The quiz written again as `name` under `dir`, each file entry through `each`, which writes what
+ * it keeps, as it is or changed; `then` adds what else the archive should carry.
+ */
+async function rewrittenQuiz(
+  name: string,
+  each: (entry: Entry, bytes: Uint8Array, writer: ZipWriter<Blob>) => Promise<void>,
+  then: (writer: ZipWriter<Blob>) => Promise<void> = async () => {}
+): Promise<string> {
   const reader = new ZipReader(new BlobReader(new Blob([await readFile(quiz)])))
   const writer = new ZipWriter(new BlobWriter('application/zip'))
   for (const entry of await reader.getEntries()) {
     if (entry.directory) continue
-    const bytes = await entry.getData!(new Uint8ArrayWriter())
-    if (entry.filename !== 'h5p.json') {
-      await writer.add(entry.filename, new Uint8ArrayReader(bytes))
-      continue
-    }
-    const info = JSON.parse(new TextDecoder().decode(bytes))
-    info.preloadedDependencies.push({ machineName: 'H5P.Broken', majorVersion: 1, minorVersion: 0 })
-    await writer.add('h5p.json', new TextReader(JSON.stringify(info)))
+    await each(entry, await entry.getData!(new Uint8ArrayWriter()), writer)
   }
   await reader.close()
+  await then(writer)
+  const path = join(dir, name)
+  await writeFile(path, new Uint8Array(await (await writer.close()).arrayBuffer()))
+  return path
+}
+
+/** The quiz as h5p.com would export it: `h5p.json` and `content/`, no library folders. */
+const strippedQuiz = () =>
+  rewrittenQuiz('stripped.h5p', async (entry, bytes, writer) => {
+    if (entry.filename === 'h5p.json' || entry.filename.startsWith('content/')) await writer.add(entry.filename, new Uint8ArrayReader(bytes))
+  })
+
+/** The quiz plus a dependency whose script throws as it loads: the content still comes up. */
+const quizWithBrokenLibrary = () =>
+  rewrittenQuiz(
+    'broken-library.h5p',
+    async (entry, bytes, writer) => {
+      if (entry.filename !== 'h5p.json') return void (await writer.add(entry.filename, new Uint8ArrayReader(bytes)))
+      const info = JSON.parse(new TextDecoder().decode(bytes))
+      info.preloadedDependencies.push({ machineName: 'H5P.Broken', majorVersion: 1, minorVersion: 0 })
+      await writer.add('h5p.json', new TextReader(JSON.stringify(info)))
+    },
+    async (writer) => {
   await writer.add(
     'H5P.Broken-1.0/library.json',
     new TextReader(JSON.stringify({ machineName: 'H5P.Broken', majorVersion: 1, minorVersion: 0, patchVersion: 0, runnable: 0, preloadedJs: [{ path: 'broken.js' }] }))
   )
   await writer.add('H5P.Broken-1.0/broken.js', new TextReader("throw new ReferenceError('H5PEditor is not defined')\n"))
-  const path = join(dir, 'broken-library.h5p')
-  await writeFile(path, new Uint8Array(await (await writer.close()).arrayBuffer()))
-  return path
-}
+    }
+  )
 
 describe('h5p-verify', () => {
   it('fails a package whose library throws while booting, even though the content comes up', async () => {

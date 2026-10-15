@@ -25,29 +25,32 @@ function sourceOf(served: Record<string, string>, tables: Record<string, Upgrade
   return { source, asked }
 }
 
+/** A table of steps as a library's `upgrades.js` leaves it, typed loosely so a test can write it by hand. */
+const stepsOf = (steps: Record<number, Record<number, unknown>>) => steps as unknown as UpgradeTable
+
 describe('runSteps', () => {
   it('runs the steps after the version written up to the one served, lowest first', async () => {
     // "10" sorts before "2" as text; the steps are ordered as numbers.
-    const table = { 1: { 1: step('1.1'), 2: step('1.2'), 3: step('1.3'), 10: step('1.10'), 11: step('1.11') } } as unknown as UpgradeTable
+    const table = stepsOf({ 1: { 1: step('1.1'), 2: step('1.2'), 3: step('1.3'), 10: step('1.10'), 11: step('1.11') } })
     const { params } = await runSteps(table, { major: 1, minor: 1 }, { major: 1, minor: 10 }, {}, undefined)
     expect(params).toEqual({ log: ['1.2', '1.3', '1.10'] })
   })
 
   it('takes no step of another major', async () => {
-    const table = { 1: { 1: step('1.1') }, 2: { 1: step('2.1') } } as unknown as UpgradeTable
+    const table = stepsOf({ 1: { 1: step('1.1') }, 2: { 1: step('2.1') } })
     const { params } = await runSteps(table, { major: 1, minor: 0 }, { major: 1, minor: 2 }, {}, undefined)
     expect(params).toEqual({ log: ['1.1'] })
   })
 
   it('accepts a step in the object form some libraries write', async () => {
-    const table = { 1: { 1: { contentUpgrade: step('wrapped') } } } as unknown as UpgradeTable
+    const table = stepsOf({ 1: { 1: { contentUpgrade: step('wrapped') } } })
     const { params } = await runSteps(table, { major: 1, minor: 0 }, { major: 1, minor: 1 }, {}, undefined)
     expect(params).toEqual({ log: ['wrapped'] })
   })
 
   it('hands each step the metadata, and keeps what a step hands back', async () => {
     const seen: unknown[] = []
-    const table = {
+    const table = stepsOf({
       1: {
         1: (params: unknown, finished: (...args: unknown[]) => void, extras: { metadata?: { title?: string } }) => {
           seen.push(extras.metadata)
@@ -58,24 +61,24 @@ describe('runSteps', () => {
           finished(null, params)
         }
       }
-    } as unknown as UpgradeTable
+    })
     const { metadata } = await runSteps(table, { major: 1, minor: 0 }, { major: 1, minor: 2 }, {}, { title: 'Original', license: 'U' })
     expect(seen).toEqual([{ title: 'Original', license: 'U' }, { title: 'Renamed', license: 'U' }])
     expect(metadata).toEqual({ title: 'Renamed', license: 'U' })
   })
 
   it('waits for a step that calls back later', async () => {
-    const table = {
+    const table = stepsOf({
       1: { 1: (params: object, finished: (...args: unknown[]) => void) => setTimeout(() => finished(null, { ...params, late: true }), 5) }
-    } as unknown as UpgradeTable
+    })
     const { params } = await runSteps(table, { major: 1, minor: 0 }, { major: 1, minor: 1 }, {}, undefined)
     expect(params).toEqual({ late: true })
   })
 
   it('takes the first answer of a step that calls back twice', async () => {
-    const table = {
+    const table = stepsOf({
       1: { 1: (_params: unknown, finished: (...args: unknown[]) => void) => { finished(null, { first: true }); finished(null, { second: true }) } }
-    } as unknown as UpgradeTable
+    })
     const { params } = await runSteps(table, { major: 1, minor: 0 }, { major: 1, minor: 1 }, {}, undefined)
     expect(params).toEqual({ first: true })
   })
@@ -87,14 +90,14 @@ describe('runSteps', () => {
     ['no callback at all', () => {}, /did not finish in 20 ms/],
     ['a step that is not a function', 'not a step', /is not a function/]
   ])('fails on %s', async (_case, entry, message) => {
-    const table = { 1: { 1: entry } } as unknown as UpgradeTable
+    const table = stepsOf({ 1: { 1: entry } })
     await expect(runSteps(table, { major: 1, minor: 0 }, { major: 1, minor: 1 }, {}, undefined, 20)).rejects.toThrow(message)
   })
 })
 
 describe('upgradeContent', () => {
   it('upgrades the main content to the version served, and names that version', async () => {
-    const { source } = sourceOf({ 'H5P.Main': '1.2' }, { 'H5P.Main': { 1: { 1: step('1.1'), 2: step('1.2') } } as unknown as UpgradeTable })
+    const { source } = sourceOf({ 'H5P.Main': '1.2' }, { 'H5P.Main': stepsOf({ 1: { 1: step('1.1'), 2: step('1.2') } }) })
     const result = await upgradeContent({ machineName: 'H5P.Main', version: { major: 1, minor: 0 } }, {}, undefined, source)
     expect(result).toEqual({ params: { log: ['1.1', '1.2'] }, metadata: undefined, library: 'H5P.Main 1.2', changed: true })
   })
@@ -102,7 +105,7 @@ describe('upgradeContent', () => {
   it('upgrades sub-content wherever it sits, and renames it to the version served', async () => {
     const { source } = sourceOf(
       { 'H5P.Main': '1.0', 'H5P.Child': '1.1' },
-      { 'H5P.Child': { 1: { 1: step('child 1.1') } } as unknown as UpgradeTable }
+      { 'H5P.Child': stepsOf({ 1: { 1: step('child 1.1') } }) }
     )
     const params = {
       questions: [{ library: 'H5P.Child 1.0', params: {}, subContentId: 'a' }],
@@ -121,7 +124,7 @@ describe('upgradeContent', () => {
       finished(null, { ...params, created: { library: 'H5P.Child 1.0', params: {} } })
     const { source } = sourceOf(
       { 'H5P.Main': '1.1', 'H5P.Child': '1.1' },
-      { 'H5P.Main': { 1: { 1: parent } } as unknown as UpgradeTable, 'H5P.Child': { 1: { 1: step('child 1.1') } } as unknown as UpgradeTable }
+      { 'H5P.Main': stepsOf({ 1: { 1: parent } }), 'H5P.Child': stepsOf({ 1: { 1: step('child 1.1') } }) }
     )
     const result = await upgradeContent({ machineName: 'H5P.Main', version: { major: 1, minor: 0 } }, {}, undefined, source)
     expect(result.params).toEqual({ created: { library: 'H5P.Child 1.1', params: { log: ['child 1.1'] } } })
@@ -177,8 +180,8 @@ describe('upgradeContent', () => {
     const { source } = sourceOf(
       { 'H5P.Main': '1.1', 'H5P.Child': '1.1' },
       {
-        'H5P.Main': { 1: { 1: step('main 1.1') } } as unknown as UpgradeTable,
-        'H5P.Child': { 1: { 1: () => { throw new Error('child step broke') } } } as unknown as UpgradeTable
+        'H5P.Main': stepsOf({ 1: { 1: step('main 1.1') } }),
+        'H5P.Child': stepsOf({ 1: { 1: () => { throw new Error('child step broke') } } })
       }
     )
     await expect(

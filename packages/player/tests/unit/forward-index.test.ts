@@ -1,31 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { BlobWriter, TextReader, Uint8ArrayReader, ZipWriter, configure } from '@zip.js/zip.js'
 import { LocalHeaderScanner } from '../../src/shared/forward-index'
-
-configure({ useWebWorkers: false })
-
-type Files = Record<string, string | Uint8Array<ArrayBuffer>>
-
-/**
- * Real archives from zip.js. `descriptors: true` adds every entry from a stream, which is how a
- * writer that cannot seek ends up putting the sizes after the data — the h5p.com layout.
- */
-async function zipOf(files: Files, options: { descriptors?: boolean; stored?: string[] } = {}) {
-  const writer = new ZipWriter(new BlobWriter('application/zip'))
-  for (const [name, content] of Object.entries(files)) {
-    const bytes = typeof content === 'string' ? new TextEncoder().encode(content) : content
-    const reader = options.descriptors
-      ? new Blob([bytes]).stream()
-      : typeof content === 'string'
-        ? new TextReader(content)
-        : new Uint8ArrayReader(content)
-    await writer.add(name, reader, {
-      dataDescriptor: options.descriptors ?? false,
-      level: options.stored?.includes(name) ? 0 : undefined
-    })
-  }
-  return new Uint8Array(await (await writer.close()).arrayBuffer())
-}
+import { zipOf, type Files } from './helpers/archives'
 
 const bytesOf = (files: Files) =>
   Object.fromEntries(

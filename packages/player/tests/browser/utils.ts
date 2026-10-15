@@ -1,4 +1,4 @@
-import { expect } from 'vitest'
+import { expect, vi } from 'vitest'
 import type { H5PPlayerElement, PlayerErrorDetail } from '../../src/h5p-offline-player'
 
 /**
@@ -66,10 +66,15 @@ export const FIXTURES = {
   unversioned: '/fixtures/unversioned.h5p'
 } as const
 
+/**
+ * The next `name` event on `target` — with `accept`, the next one whose detail it accepts, so a
+ * test waits on the event it means rather than polling a list a listener fills.
+ */
 export function waitForEvent<T = unknown>(
   target: EventTarget,
   name: string,
-  timeoutMs = 30_000
+  timeoutMs = 30_000,
+  accept: (detail: T) => boolean = () => true
 ): Promise<CustomEvent<T>> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -78,6 +83,7 @@ export function waitForEvent<T = unknown>(
     }, timeoutMs)
 
     const onEvent = (event: Event) => {
+      if (!accept((event as CustomEvent<T>).detail)) return
       clearTimeout(timer)
       target.removeEventListener(name, onEvent)
       resolve(event as CustomEvent<T>)
@@ -126,18 +132,58 @@ export function createPlayer(attributes: Record<string, string> = {}): H5PPlayer
   return player
 }
 
+/**
+ * Mounts a player, gives it `src` and waits for the load to settle either way: the player and
+ * the outcome, for a test about a load that is expected to fail or to be looked at before it is
+ * judged. `prepare` runs between the mount and the `src`, for a listener that has to be in place
+ * before the load starts.
+ */
+export async function settle(src: string, attributes: Record<string, string> = {}, prepare?: (player: H5PPlayerElement) => void, timeoutMs = 30_000) {
+  const player = createPlayer(attributes)
+  prepare?.(player)
+  const settled = waitForSettled(player, timeoutMs)
+  player.setAttribute('src', src)
+  return { player, result: await settled }
+}
+
 /** Mounts a player, waits for it to play, and fails the test with the player's own error if not. */
 export async function play(src: string, attributes: Record<string, string> = {}) {
-  const player = createPlayer(attributes)
-  const settled = waitForSettled(player)
-  player.setAttribute('src', src)
-
-  const result = await settled
+  const { player, result } = await settle(src, attributes)
   if (!result.ok) {
     expect.fail(`${src} failed to play: ${result.detail.code} — ${result.detail.message}`)
   }
-
   return player
+}
+
+/** What the fixture content type wrote on screen: which package, or which copy of the type, drew it. */
+export const messageOf = (player: H5PPlayerElement) => frameDocument(player).querySelector('.h5p-offline-test-message')?.textContent
+
+/** Presses the fixture content type's Complete button, which sends a `completed` statement. */
+export const pressComplete = (player: H5PPlayerElement) =>
+  frameDocument(player).querySelector<HTMLButtonElement>('.h5p-offline-test-complete')!.click()
+
+/**
+ * Adds a script to the frame's document and says what became of it: `ran`, `refused` by the
+ * browser (a type it will not run, a 404), or `blocked by the policy`. Every listener is taken
+ * off on the first answer, so a violation for another URI in the meantime does not use up the
+ * one for this script.
+ */
+export function inject(doc: Document, src: string): Promise<'ran' | 'refused' | 'blocked by the policy'> {
+  return new Promise((resolve) => {
+    const script = doc.createElement('script')
+    const done = (outcome: 'ran' | 'refused' | 'blocked by the policy') => {
+      doc.removeEventListener('securitypolicyviolation', onViolation)
+      resolve(outcome)
+    }
+    const onViolation = (event: Event) => {
+      if ((event as SecurityPolicyViolationEvent).blockedURI === src) done('blocked by the policy')
+    }
+    script.src = src
+    script.onload = () => done('ran')
+    script.onerror = () => done('refused')
+    doc.addEventListener('securitypolicyviolation', onViolation)
+    doc.body.append(script)
+  })
 }
 
 /** The document the runtime actually runs in, once the frame has booted. */
@@ -171,17 +217,14 @@ export async function clearPackageCaches(): Promise<void> {
   await Promise.all(names.filter((name) => name.startsWith('h5p-pkg-')).map((name) => caches.delete(name)))
 }
 
-export async function waitFor(
-  predicate: () => boolean | Promise<boolean>,
-  timeoutMs = 10_000
-): Promise<void> {
-  const deadline = Date.now() + timeoutMs
-  for (;;) {
-    if (await predicate()) return
-    if (Date.now() >= deadline) throw new Error('Timed out waiting for a condition')
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  }
+/** Polls `predicate` until it holds: for a condition no event announces, such as a cache's contents. */
+export async function waitFor(predicate: () => boolean | Promise<boolean>, timeoutMs = 10_000): Promise<void> {
+  await vi.waitUntil(predicate, { timeout: timeoutMs, interval: 50 })
 }
+
+/** The URLs a spied `fetch` was asked for, as strings, whatever form each request came in. */
+export const requestedUrls = (spy: { mock: { calls: unknown[][] } }): string[] =>
+  spy.mock.calls.map(([input]) => String(input instanceof Request ? input.url : input))
 
 /**
  * Fetches through the frame, which is the client the Service Worker actually controls. The test

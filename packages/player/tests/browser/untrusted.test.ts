@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import '../../src/h5p-offline-player'
-import type { H5PPlayerElement } from '../../src/h5p-offline-player'
-import { FIXTURES, createPlayer, frameDocument, frameFetch, frameWindow, play, virtualUrl, waitForSettled } from './utils'
+import { FIXTURES, createPlayer, frameDocument, frameFetch, frameWindow, inject, messageOf, play, settle, virtualUrl, waitForSettled } from './utils'
 
 /**
  * `untrusted`: a package played as data. Its own library folders never run — the bundle's copy
@@ -26,7 +25,7 @@ const playUntrusted = async (src: string) => {
   return { player, result: await settled }
 }
 
-const message = (player: H5PPlayerElement) => frameDocument(player).querySelector('.h5p-offline-test-message')?.textContent
+const message = messageOf
 
 describe('an untrusted package', () => {
   it("plays with the bundle's copy of its libraries, never its own, and with its own once trusted", async () => {
@@ -115,10 +114,7 @@ describe('an untrusted package', () => {
   })
 
   it('does not play content it cannot check: a bundle without the main library\'s semantics', async () => {
-    const player = createPlayer({ untrusted: '', libraries: FIXTURES.librariesWithoutSemantics })
-    const settled = waitForSettled(player)
-    player.setAttribute('src', FIXTURES.untrustedMarkup)
-    const result = await settled
+    const { player, result } = await settle(FIXTURES.untrustedMarkup, { untrusted: '', libraries: FIXTURES.librariesWithoutSemantics })
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.detail.message).toMatch(/could not be checked.*semantics\.json for H5P\.OfflineTest 1\.0/)
@@ -130,20 +126,10 @@ describe('an untrusted package', () => {
     expect(result).toEqual({ ok: true })
     const doc = frameDocument(player)
 
-    const inject = (src: string) =>
-      new Promise<string>((resolve) => {
-        const script = doc.createElement('script')
-        script.src = src
-        script.onload = () => resolve('ran')
-        script.onerror = () => resolve('refused')
-        doc.addEventListener('securitypolicyviolation', (event) => event.blockedURI === src && resolve('blocked by the policy'), { once: true })
-        doc.body.append(script)
-      })
-
     // Under the package's own path, so the policy lets it through: `nosniff` and its type stop it.
-    expect(await inject(virtualUrl(player, 'content/notes.txt'))).toBe('refused')
+    expect(await inject(doc, virtualUrl(player, 'content/notes.txt'))).toBe('refused')
     // On the same origin, but outside the package's path and the runtime's files.
-    expect(await inject(`${location.origin}/not-a-runtime-file.js`)).toBe('blocked by the policy')
+    expect(await inject(doc, `${location.origin}/not-a-runtime-file.js`)).toBe('blocked by the policy')
     expect((frameWindow(player) as Marked).contentFileRan).toBeUndefined()
   })
 
@@ -174,10 +160,7 @@ describe('an untrusted package', () => {
 
   it('does not say "carried" when the package does not have the library either', async () => {
     // A stripped export: nothing of its own was refused, so playing it trusted would not help.
-    const player = createPlayer({ untrusted: '', libraries: FIXTURES.contentOnly })
-    const settled = waitForSettled(player)
-    player.setAttribute('src', FIXTURES.needsLibraries)
-    const result = await settled
+    const { result } = await settle(FIXTURES.needsLibraries, { untrusted: '', libraries: FIXTURES.contentOnly })
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.detail.missingLibraries?.carried).toBeUndefined()

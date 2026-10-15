@@ -1,27 +1,8 @@
+import { fakeCaches } from './helpers/fake-caches'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ChunkStore, announceQueued, announceRunning } from '../../src/shared/chunk-store'
 import { waitForWatermark } from '../../src/sw/watermark-wait'
 
-/** The Cache API reduced to a map, enough for meta records to be written and read back. */
-function fakeCaches() {
-  const stored = new Map<string, Uint8Array<ArrayBuffer>>()
-  const cache = {
-    async put(key: string, response: Response) {
-      stored.set(key, new Uint8Array(await response.arrayBuffer()))
-    },
-    async match(key: string) {
-      const body = stored.get(key)
-      return body ? new Response(body) : undefined
-    },
-    async keys() {
-      return [...stored.keys()].map((key) => new Request(key))
-    },
-    async delete(request: Request | string) {
-      return stored.delete(typeof request === 'string' ? request : request.url)
-    }
-  }
-  return { open: async () => cache, has: async () => true, delete: async () => true, keys: async () => [] }
-}
 
 const ENTRY = 'content/videos/a.mp4'
 const every = (ms: number, tick: (n: number) => void) => {

@@ -159,6 +159,16 @@ const playerFrame = async (page: Page, origin: string) => {
   return frame
 }
 
+/** A page, or the player's frame in one: where the element can be read. */
+type Document = Pick<Page, 'evaluate' | 'waitForFunction'>
+/** Whether the element in `where` plays its package as data. */
+const untrusted = (where: Document) => where.evaluate(() => (document.querySelector('h5p-player') as unknown as { untrusted: boolean }).untrusted)
+/** Resolves once the element in `where` has been given the embedding site's quiz to play. */
+const started = (where: Document) =>
+  where.waitForFunction((src) => document.querySelector('h5p-player')!.getAttribute('src') === src, `${embedding.origin}/quiz.h5p`)
+/** The element's `libraries` attribute in `where`. */
+const librariesOf = (where: Document) => where.evaluate(() => document.querySelector('h5p-player')!.getAttribute('libraries'))
+
 /** Waits for the content to be up in the frame, then for the iframe to have taken its height. */
 const playsSized = async (page: Page, origin: string) => {
   const frame = await playerFrame(page, origin)
@@ -279,10 +289,6 @@ describe('a written site, framed from another site', () => {
   })
 
   it('plays untrusted in a frame of its own origin by default, and as it is when the page says so', async () => {
-    const untrusted = (frame: Awaited<ReturnType<typeof playerFrame>>) =>
-      frame.evaluate(() => (document.querySelector('h5p-player') as unknown as { untrusted: boolean }).untrusted)
-    const started = (frame: Awaited<ReturnType<typeof playerFrame>>) =>
-      frame.waitForFunction((src) => document.querySelector('h5p-player')!.getAttribute('src') === src, `${embedding.origin}/quiz.h5p`)
     const page = await browser.newPage()
     await page.goto(`${open.origin}/preview.html`)
     const shared = await playerFrame(page, open.origin)
@@ -302,9 +308,9 @@ describe('a written site, framed from another site', () => {
     // Started at once, as data: the question comes only for a package that needs its own code.
     // Whether it then plays is the policy's call: this site allows any https host, and the test's
     // package is on plain http.
-    await page.waitForFunction((src) => document.querySelector('h5p-player')!.getAttribute('src') === src, `${embedding.origin}/quiz.h5p`)
-    expect(await page.evaluate(() => (document.querySelector('h5p-player') as unknown as { untrusted: boolean }).untrusted)).toBe(true)
-    expect(await page.evaluate(() => document.querySelector('h5p-player')!.getAttribute('libraries'))).toMatch(/libraries\.h5p$/)
+    await started(page)
+    expect(await untrusted(page)).toBe(true)
+    expect(await librariesOf(page)).toMatch(/libraries\.h5p$/)
     expect(await page.evaluate(() => document.querySelector('#notice button'))).toBeNull()
     await page.close()
   })
@@ -314,9 +320,9 @@ describe('a written site, framed from another site', () => {
     // what `untrusted` withholds. The address's bundle counts only once the click has trusted it.
     const page = await browser.newPage()
     await page.goto(`${open.origin}/?src=${embedding.origin}/quiz.h5p&libraries=${embedding.origin}/stripped.h5p`)
-    await page.waitForFunction((src) => document.querySelector('h5p-player')!.getAttribute('src') === src, `${embedding.origin}/quiz.h5p`)
-    expect(await page.evaluate(() => (document.querySelector('h5p-player') as unknown as { untrusted: boolean }).untrusted)).toBe(true)
-    expect(await page.evaluate(() => document.querySelector('h5p-player')!.getAttribute('libraries'))).toMatch(/libraries\.h5p$/)
+    await started(page)
+    expect(await untrusted(page)).toBe(true)
+    expect(await librariesOf(page)).toMatch(/libraries\.h5p$/)
     await page.close()
   })
 })

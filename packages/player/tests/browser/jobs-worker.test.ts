@@ -1,3 +1,4 @@
+import { FIXTURES } from './utils'
 import { afterAll, describe, expect, it } from 'vitest'
 import jobsWorkerSource from 'virtual:h5p-jobs-worker'
 import { cacheNameFor } from '../../src/shared/chunk-store'
@@ -14,7 +15,7 @@ import { PackageReader, locationOf } from '../../src/sw/package-reader'
 const PKG = 'jobs-worker-race-test'
 const source = {
   type: 'chunked',
-  url: new URL('/no-range/large-stored.h5p', location.href).href,
+  url: new URL(FIXTURES.noRangeLargeStored, location.href).href,
   size: null
 } as const
 
@@ -40,6 +41,12 @@ function spawn() {
   return {
     post: (message: ToJobsMessage) => worker.postMessage(message),
     next,
+    /** Hears every message until the returned function is called. */
+    listen: (onMessage: (message: FromJobsMessage) => void) => {
+      const handler = (event: MessageEvent<FromJobsMessage>) => onMessage(event.data)
+      worker.addEventListener('message', handler)
+      return () => worker.removeEventListener('message', handler)
+    },
     dispose: () => {
       worker.terminate()
       URL.revokeObjectURL(url)
@@ -79,24 +86,29 @@ describe('the Jobs worker', () => {
     const two = 'jobs-worker-queue-two'
     await caches.delete(cacheNameFor(one))
     await caches.delete(cacheNameFor(two))
-    const first = await rangeSource('/fixtures/large-deflated.h5p')
-    const second = await rangeSource('/fixtures/segmented.h5p')
+    const first = await rangeSource(FIXTURES.largeDeflated)
+    const second = await rangeSource(FIXTURES.segmented)
     const jobs = spawn()
     const finished: string[] = []
     const started = new Set<string>()
     let overlap = false
 
     try {
-      const watch = (message: FromJobsMessage) => {
+      let allDone = () => {}
+      const finishedAll = new Promise<void>((resolve) => {
+        allDone = resolve
+      })
+      const unlisten = jobs.listen((message) => {
         if (message.type === 'progress' && message.entry) {
           started.add(`${message.pkgId}:${message.entry}`)
           // Progress from a second entry while the first is still going would be two inflates at once.
           if (started.size > finished.length + 1) overlap = true
         }
-        if (message.type === 'done' && message.entry) finished.push(`${message.pkgId}:${message.entry}`)
-        return false
-      }
-      const all = jobs.next(watch, 55_000).catch(() => {})
+        if (message.type === 'done' && message.entry) {
+          finished.push(`${message.pkgId}:${message.entry}`)
+          if (finished.length === 3) allDone()
+        }
+      })
 
       // A demand, then two prefetches, then demand for the last one: it goes ahead of the other prefetch.
       const inOne = await locate(one, first, ['content/media/big.bin', 'content/media/unused.bin'])
@@ -108,17 +120,11 @@ describe('the Jobs worker', () => {
       jobs.post({ type: 'extract', pkgId: two, entry: big, location: inTwo[big], source: second, prefetch: true })
       jobs.post({ type: 'extract', pkgId: two, entry: big, location: inTwo[big], source: second })
 
-      await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error(`only ${finished.length} extractions finished`)), 50_000)
-        const tick = setInterval(() => {
-          if (finished.length === 3) {
-            clearInterval(tick)
-            clearTimeout(timer)
-            resolve()
-          }
-        }, 100)
-      })
-      void all
+      await Promise.race([
+        finishedAll,
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`only ${finished.length} extractions finished`)), 50_000))
+      ])
+      unlisten()
 
       expect(finished).toEqual([`${one}:content/media/big.bin`, `${two}:content/media/big.bin`, `${one}:content/media/unused.bin`])
       expect(overlap).toBe(false)

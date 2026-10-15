@@ -12,6 +12,9 @@ import { FIXTURES, clearPackageCaches, createPlayer, frameDocument, frameWindow,
  * seconds after a `completed` statement, which is what the tests wait on.
  */
 
+/** How long after a `completed` statement H5P core saves the content's state. */
+const CORE_SAVE_DELAY_MS = 3000
+
 const count = (player: H5PPlayerElement) =>
   frameDocument(player).querySelector('.h5p-offline-test-count')?.textContent
 
@@ -80,7 +83,8 @@ describe('resume', () => {
     expect(frame.location.href).not.toContain('resume')
 
     complete(player)
-    await new Promise((resolve) => setTimeout(resolve, 3500))
+    // Nothing announces a save that does not happen: the core's delay, and a margin.
+    await new Promise((resolve) => setTimeout(resolve, CORE_SAVE_DELAY_MS + 500))
     expect(await readUserData(player.pkgId!)).toEqual([])
   })
 

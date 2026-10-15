@@ -79,8 +79,11 @@ packages/player/          @missing-elements/h5p-offline-player — the published
   vite.config.ts            the library build and the test runner
   vite.plugins.ts           the plugins it uses, which the demo's config imports too: the Jobs worker,
                             the dev Service Worker and the fixture hosts
-  tests/unit/               pure logic, node environment
-  tests/browser/            the real element against the real worker, chromium via vitest browser mode
+  tests/unit/               pure logic, node environment; helpers/ the in-memory archive, handle and
+                            fake-cache helpers the files share (2026-10-15: five files kept copies)
+  tests/browser/            the real element against the real worker, chromium via vitest browser mode;
+                            utils.ts its helpers — play and settle, waitForEvent with a filter, inject,
+                            the fixture's message and button — which a test uses rather than retyping
   tests/fixtures/src/       the source of the generated .h5p archives
   public/                   generated, not in git: the runtime's dist/ as frame-assets/, and the test fixtures
   NOTICE.md                 zip.js's notice, and where the runtime went; shipped with the package
@@ -304,7 +307,9 @@ downloaded archive is read back before it is reported done*. Playwright's WebKit
 desktop port and not iOS Safari: the app's menu filled an iPhone's screen in Safari on 2026-10-13
 and drew correctly in Playwright's WebKit at every phone size.
 
-The demo's tests follow the same variable (`apps/demo/tests/engine.ts`), and `pnpm test:engine`
+The demo's tests follow the same variable (`apps/demo/tests/engine.ts`; `tests/harness.ts`
+starts the dev server and the second-origin package host and waits on the element for all of
+them, since 2026-10-15), and `pnpm test:engine`
 runs them after the player's suite, so the `engines` job covers the app, the embed page and the
 cmi5 page too. Added on 2026-10-14; the first runs found one bug, under *The frame is navigated
 in place*, and four differences the tests now allow for: WebKit, as Safari does by default, passes

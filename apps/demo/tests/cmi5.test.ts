@@ -1,9 +1,10 @@
 import { createServer as createHttpServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { resolve } from 'node:path'
-import type { Browser } from 'playwright'
+import type { Browser, Page } from 'playwright'
 import { browserType } from './engine'
-import { createServer, type ViteDevServer } from 'vite'
+import { playerIs, startSite } from './harness'
+import type { ViteDevServer } from 'vite'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
 /**
@@ -95,6 +96,7 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     const parsed = JSON.parse(await body(req))
     const statements: Statement[] = Array.isArray(parsed) ? parsed : [parsed]
     for (const statement of statements) received.push({ ...statement, id: statement.id ?? url.searchParams.get('statementId') ?? crypto.randomUUID() })
+    for (const waiting of [...waiters]) waiting()
     return json(res, 200, statements.map((s) => s.id))
   }
   if (url.pathname === '/returned') {
@@ -107,10 +109,14 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
 }
 
 beforeAll(async () => {
-  vite = await createServer({ configFile: resolve(rootDir, 'vite.config.ts'), root: rootDir, server: { host: 'localhost', port: 0 }, logLevel: 'error' })
-  await vite.listen()
-  playerOrigin = `http://localhost:${(vite.httpServer!.address() as AddressInfo).port}`
-  lms = createHttpServer((req, res) => void handle(req, res))
+  ;({ vite, origin: playerOrigin } = await startSite())
+  // Answered on a throw — a body that is not JSON — so a test fails with the reason, not by a timeout.
+  lms = createHttpServer((req, res) =>
+    handle(req, res).catch((error: unknown) => {
+      res.statusCode = 500
+      res.end(String(error))
+    })
+  )
   await new Promise<void>((done) => lms.listen(0, '127.0.0.1', done))
   lmsOrigin = `http://127.0.0.1:${(lms.address() as AddressInfo).port}`
   browser = await browserType.launch()
@@ -126,15 +132,27 @@ const CMI5_CATEGORY = 'https://w3id.org/xapi/cmi5/context/categories/cmi5'
 const verbOf = (s: Statement) => String(s.verb?.id ?? '').split('/').pop()
 const isDefined = (s: Statement) => (s.context?.contextActivities?.category ?? []).some((c: Statement) => c.id === CMI5_CATEGORY)
 /** The first statement with this verb; `defined` narrows it to a cmi5-defined one, with the cmi5 category. */
-const waitForVerb = async (verb: string, defined = false, registration = REGISTRATION) => {
+const waitForVerb = (verb: string, defined = false, registration = REGISTRATION) => {
   const match = (s: Statement) => verbOf(s) === verb && (!defined || isDefined(s)) && s.context?.registration === registration
-  const started = Date.now()
-  while (!received.some(match)) {
-    if (Date.now() - started > 20_000) throw new Error(`no ${verb} statement arrived; got ${received.map(verbOf).join(', ')}`)
-    await new Promise((r) => setTimeout(r, 50))
-  }
-  return received.find(match)!
+  const found = received.find(match)
+  if (found) return Promise.resolve(found)
+  return new Promise<Statement>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      waiters.delete(check)
+      reject(new Error(`no ${verb} statement arrived; got ${received.map(verbOf).join(', ')}`))
+    }, 20_000)
+    const check = () => {
+      const now = received.find(match)
+      if (!now) return
+      clearTimeout(timer)
+      waiters.delete(check)
+      resolve(now)
+    }
+    waiters.add(check)
+  })
 }
+/** Who is waiting on `received`; the LRS handler calls each as a statement lands. */
+const waiters = new Set<() => void>()
 
 /** The address an LMS would open: the AU URL with the five launch parameters, the token endpoint told which launch it is for. */
 const launchUrl = (registration: string, { slow = false, launch = 1 } = {}) =>
@@ -162,7 +180,7 @@ it('runs a package as a cmi5 assignable unit', async () => {
   expect(initialized.context.extensions[SESSION_EXT]).toBe('session-1')
   expect(initialized.context.contextActivities.category).toEqual([{ id: 'https://w3id.org/xapi/cmi5/context/categories/cmi5' }])
   await page.waitForFunction(() => document.querySelector('#status')!.textContent!.startsWith('Launched'))
-  await page.waitForFunction(() => (document.querySelector('h5p-player') as any).state === 'ready')
+  await playerIs(page, 'ready')
 
   // A statement from the content, as the element dispatches it: H5P's actor and category, the
   // player's revision. Relayed as a cmi5 allowed statement.
@@ -280,7 +298,7 @@ it('does not send the learner to a returnURL that is not a web address', async (
 
 it('sends no second passed or completed in a later launch of the same registration', async () => {
   const registration = 'a7c3e1f0-5b2d-4e8a-9c6f-1d0b3a2e4f5c'
-  const finish = (page: import('playwright').Page) =>
+  const finish = (page: Page) =>
     page.evaluate(() => {
       const statement = { actor: { name: 'H5P user' }, verb: { id: 'http://adlnet.gov/expapi/verbs/completed' }, object: { id: 'https://x/content', objectType: 'Activity' }, result: { score: { raw: 2, max: 2 }, completion: true }, context: { revision: 'sha256:abc' } }
       document.querySelector('h5p-player')!.dispatchEvent(new CustomEvent('finished', { detail: { statement } }))

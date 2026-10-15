@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import '../../src/h5p-offline-player'
-import { FIXTURES, createPlayer, waitForSettled } from './utils'
+import { FIXTURES, createPlayer, requestedUrls, settle, waitForSettled } from './utils'
 
 /**
  * Failure paths. The element reports a code and stops; it never renders an explanation of its
@@ -8,11 +8,7 @@ import { FIXTURES, createPlayer, waitForSettled } from './utils'
  */
 describe('reporting failures', () => {
   const failureFor = async (src: string) => {
-    const player = createPlayer()
-    const settled = waitForSettled(player)
-    player.setAttribute('src', src)
-
-    const result = await settled
+    const { player, result } = await settle(src)
     if (result.ok) throw new Error(`${src} unexpectedly played`)
     return { player, detail: result.detail }
   }
@@ -46,22 +42,16 @@ describe('reporting failures', () => {
 
   it('fails before the frame boots, so no request is made for a library that is not there', async () => {
     const player = createPlayer()
-    const requested: string[] = []
-    const original = window.fetch
-    window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
-      requested.push(String(input instanceof Request ? input.url : input))
-      return original.call(window, input as RequestInfo, init)
-    }) as typeof window.fetch
-
+    const fetched = vi.spyOn(window, 'fetch')
     try {
       const settled = waitForSettled(player)
       player.setAttribute('src', FIXTURES.contentOnly)
       expect((await settled).ok).toBe(false)
     } finally {
-      window.fetch = original
+      fetched.mockRestore()
     }
 
-    expect(requested.some((url) => url.includes('library.json'))).toBe(false)
+    expect(requestedUrls(fetched).some((url) => url.includes('library.json'))).toBe(false)
   })
 
   it('reports a URL that answers with a page instead of an archive', async () => {

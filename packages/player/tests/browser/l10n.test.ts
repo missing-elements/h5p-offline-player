@@ -1,3 +1,4 @@
+import { type H5PPlayerElement } from '../../src/h5p-offline-player'
 import { afterEach, describe, expect, it } from 'vitest'
 import '../../src/h5p-offline-player'
 import { FIXTURES, createPlayer, frameDocument, frameWindow, play, waitForSettled } from './utils'
@@ -17,9 +18,9 @@ interface Core {
   }
 }
 
-const core = (player: HTMLElement) => (frameWindow(player as never) as unknown as Core).H5P
-const strings = (player: HTMLElement) =>
-  [...frameDocument(player as never).querySelectorAll('script[src]')].map((script) => script.getAttribute('src') ?? '').filter((src) => src.includes('l10n.js'))
+const core = (player: H5PPlayerElement) => (frameWindow(player) as unknown as Core).H5P
+const strings = (player: H5PPlayerElement) =>
+  [...frameDocument(player).querySelectorAll('script[src]')].map((script) => script.getAttribute('src') ?? '').filter((src) => src.includes('l10n.js'))
 const l10nJs = new URL('/frame-assets/l10n.js', location.href).href
 
 const pageLanguage = document.documentElement.getAttribute('lang')

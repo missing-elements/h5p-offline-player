@@ -1,49 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { BlobWriter, TextReader, Uint8ArrayReader, ZipWriter, configure } from '@zip.js/zip.js'
 import { PackageReader } from '../../src/sw/package-reader'
-import type { SourceHandle } from '../../src/shared/source'
-import type { ByteRange } from '../../src/shared/range'
-
-configure({ useWebWorkers: false })
-
-/** A real zip, in memory, over a handle that counts what is read from it. */
-async function zipOf(files: Record<string, string | Uint8Array>, stored: string[] = []) {
-  const writer = new ZipWriter(new BlobWriter('application/zip'))
-  for (const [name, content] of Object.entries(files)) {
-    const reader = typeof content === 'string' ? new TextReader(content) : new Uint8ArrayReader(content)
-    await writer.add(name, reader, stored.includes(name) ? { level: 0 } : undefined)
-  }
-  return new Uint8Array(await (await writer.close()).arrayBuffer())
-}
-
-function memoryHandle(bytes: Uint8Array<ArrayBuffer>) {
-  const reads: ByteRange[] = []
-  const streams: ByteRange[] = []
-  const handle: SourceHandle = {
-    descriptor: { type: 'file', name: 'a.h5p', size: bytes.length, lastModified: 0 },
-    size: bytes.length,
-    async read(range) {
-      reads.push(range)
-      return bytes.subarray(range.start, range.end + 1)
-    },
-    async stream(range) {
-      streams.push(range)
-      return new Blob([bytes.subarray(range.start, range.end + 1)]).stream()
-    }
-  }
-  return { handle, reads, streams }
-}
-
-const manifest = (mainLibrary: string, deps: Array<[string, number, number]>) =>
-  JSON.stringify({
-    title: 'test',
-    mainLibrary,
-    preloadedDependencies: deps.map(([machineName, majorVersion, minorVersion]) => ({
-      machineName,
-      majorVersion,
-      minorVersion
-    }))
-  })
+import { manifest, memoryHandle, zipOf } from './helpers/archives'
 
 describe('PackageReader.dataRange', () => {
   it('reads a stored entry’s local header once, however many ranges are sliced from it', async () => {
@@ -55,7 +12,7 @@ describe('PackageReader.dataRange', () => {
         'content/content.json': '{}',
         'content/media/a.bin': media
       },
-      ['content/media/a.bin']
+      { stored: ['content/media/a.bin'] }
     )
     const { handle, reads, streams } = memoryHandle(bytes)
     const reader = await PackageReader.open('pkg', handle)

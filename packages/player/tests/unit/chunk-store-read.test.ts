@@ -1,24 +1,9 @@
+import { collect } from './helpers/archives'
+import { fakeCaches } from './helpers/fake-caches'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ChunkStore } from '../../src/shared/chunk-store'
 import { CHUNK_SIZE } from '../../src/shared/constants'
 
-/** The Cache API reduced to what a read touches: what was put comes back as a streaming Response. */
-function fakeCaches() {
-  const stored = new Map<string, Uint8Array<ArrayBuffer>>()
-  const cache = {
-    async put(key: string, response: Response) {
-      stored.set(key, new Uint8Array(await response.arrayBuffer()))
-    },
-    async match(key: string) {
-      const bytes = stored.get(key)
-      return bytes ? new Response(bytes) : undefined
-    }
-  }
-  return { open: async () => cache, delete: async () => true, keys: async () => [] }
-}
-
-const collect = async (stream: ReadableStream<Uint8Array>) =>
-  new Uint8Array(await new Response(stream).arrayBuffer())
 
 describe('ChunkStore.readRange', () => {
   afterEach(() => vi.unstubAllGlobals())

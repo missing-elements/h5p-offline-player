@@ -1,17 +1,8 @@
+import { LARGE_ENTRY_SIZE } from '../../scripts/lib/fixture-names.mjs'
 import { describe, expect, it } from 'vitest'
 import '../../src/h5p-offline-player'
 import type { H5PPlayerElement, PlayerProgressDetail } from '../../src/h5p-offline-player'
-import {
-  FIXTURES,
-  clearPackageCaches,
-  createPlayer,
-  frameDocument,
-  frameFetch,
-  play,
-  virtualUrl,
-  waitFor,
-  waitForSettled
-} from './utils'
+import { FIXTURES, clearPackageCaches, createPlayer, frameFetch, play, pressComplete, virtualUrl, waitForEvent, waitForSettled } from './utils'
 
 /**
  * A host that ignores `Range` forces the whole archive down before its central directory can be
@@ -45,7 +36,7 @@ describe('a host that ignores Range', () => {
     player.addEventListener('xapi', (event) => {
       statements.push((event as unknown as CustomEvent<{ statement: (typeof statements)[number] }>).detail.statement)
     })
-    frameDocument(player).querySelector<HTMLButtonElement>('.h5p-offline-test-complete')!.click()
+    pressComplete(player)
     await new Promise((resolve) => setTimeout(resolve, 200))
     expect(statements).toHaveLength(0)
 
@@ -73,9 +64,9 @@ describe('a host that ignores Range', () => {
       const { statement } = (event as unknown as CustomEvent<{ statement: { context?: { revision?: string } } }>).detail
       statements.push({ revision: statement.context?.revision, downloaded: downloaded() })
     })
-    frameDocument(player).querySelector<HTMLButtonElement>('.h5p-offline-test-complete')!.click()
-
-    await waitFor(() => statements.length > 0, 30_000)
+    const arrived = waitForEvent(player, 'xapi', 30_000)
+    pressComplete(player)
+    await arrived
     // Released only once the archive was whole, and with the revision the element now reports.
     expect(statements[0].downloaded).toBe(1)
     expect(statements[0].revision).toMatch(/^sha256:[0-9a-f]{64}$/)
@@ -102,9 +93,9 @@ describe('a host that ignores Range', () => {
     // The media is waited for, not refused: the answer comes when it has arrived.
     const media = await frameFetch(player, virtualUrl(player, 'content/media/big.bin'))
     expect(media.status).toBe(200)
-    expect(Number(media.headers.get('content-length'))).toBe(20 * 1024 * 1024)
+    expect(Number(media.headers.get('content-length'))).toBe(LARGE_ENTRY_SIZE)
 
-    await waitFor(() => downloaded() === 1, 30_000)
+    if (downloaded() < 1) await waitForEvent<PlayerProgressDetail>(player, 'progress', 30_000, (detail) => detail.phase === 'download' && detail.fraction === 1)
     // The real index has taken over by now; everything still answers.
     expect((await frameFetch(player, virtualUrl(player, 'h5p.json'))).status).toBe(200)
   })

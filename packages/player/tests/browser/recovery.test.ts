@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import '../../src/h5p-offline-player'
 import { DB_NAME } from '../../src/shared/constants'
-import { FIXTURES, frameDocument, play } from './utils'
+import { FIXTURES, frameDocument, messageOf, play } from './utils'
 
 /**
  * Surviving the storage going away underneath the player.
@@ -45,7 +45,7 @@ describe('recovering from cleared storage', () => {
     // render the host page inside itself, with no error anywhere, rather than the content.
     const player = await play(FIXTURES.basic)
     expect(player.state).toBe('ready')
-    expect(frameDocument(player).querySelector('.h5p-offline-test-message')?.textContent).toBe(
+    expect(messageOf(player)).toBe(
       'Served from the archive, never extracted to disk.'
     )
   })

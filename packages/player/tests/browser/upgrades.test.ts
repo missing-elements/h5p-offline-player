@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import '../../src/h5p-offline-player'
 import type { H5PPlayerElement } from '../../src/h5p-offline-player'
-import { FIXTURES, createPlayer, frameDocument, frameWindow, play, waitForSettled } from './utils'
+import { FIXTURES, frameDocument, frameWindow, play } from './utils'
 
 /**
  * Content written for an older minor than the one served. The library pack keeps one minor per
@@ -16,14 +16,7 @@ describe('content written for an older minor', () => {
     child?: Instance
   }
 
-  const playWith = async (src: string) => {
-    const player = createPlayer({ libraries: FIXTURES.upgradeLibraries })
-    const settled = waitForSettled(player)
-    player.setAttribute('src', src)
-    const result = await settled
-    if (!result.ok) expect.fail(`${src} failed: ${result.detail.code} — ${result.detail.message}`)
-    return player
-  }
+  const playWith = (src: string) => play(src, { libraries: FIXTURES.upgradeLibraries })
 
   const text = (player: H5PPlayerElement, selector: string) => frameDocument(player).querySelector(selector)?.textContent
   const content = (player: H5PPlayerElement) =>

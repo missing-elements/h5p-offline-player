@@ -1,3 +1,4 @@
+import { fakeCaches } from './helpers/fake-caches'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { WARM_ENTRY, WARM_GAP } from '../../src/shared/constants'
 import { ChunkStore } from '../../src/shared/chunk-store'
@@ -10,26 +11,6 @@ import { manifest, memoryHandle, zipOf } from './helpers/archives'
  * archive from zip.js, with a stored video between two library folders wide enough to split them.
  */
 
-/** The Cache API reduced to a map, enough for whole entries and meta records. */
-function fakeCaches() {
-  const stored = new Map<string, { body: Uint8Array<ArrayBuffer>; headers: Headers }>()
-  const cache = {
-    async put(key: string, response: Response) {
-      stored.set(key, { body: new Uint8Array(await response.arrayBuffer()), headers: response.headers })
-    },
-    async match(key: string) {
-      const hit = stored.get(key)
-      return hit ? new Response(hit.body, { headers: hit.headers }) : undefined
-    },
-    async keys() {
-      return [...stored.keys()].map((key) => new Request(key))
-    },
-    async delete(request: Request | string) {
-      return stored.delete(typeof request === 'string' ? request : request.url)
-    }
-  }
-  return { open: async () => cache, has: async () => true, delete: async () => true, keys: async () => [] }
-}
 
 const script = 'H5P.OfflineTest = function () { return 42 }\n'.repeat(40)
 const video = new Uint8Array(WARM_GAP * 2)
