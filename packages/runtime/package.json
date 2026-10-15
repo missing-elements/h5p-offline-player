@@ -50,7 +50,7 @@
     "h5p-standalone": "^3.8.2"
   },
   "devDependencies": {
-    "@types/node": "^26.6.4",
+    "@types/node": "^26.6.5",
     "@zip.js/zip.js": "^2.23.0",
     "esbuild": "^0.28.2",
     "typescript": "^7.0.2",
