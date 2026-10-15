@@ -80,6 +80,10 @@ const seen = (page: Page) =>
 const playerIs = (page: Page, ...states: string[]) =>
   page.waitForFunction((states) => states.includes((document.querySelector('h5p-player') as HTMLElement & { state: string }).state), states, { timeout: 60_000 })
 
+/** The player's next `ready` event: the load after this one, where `playerIs` would see this one's state. */
+const nextReady = (page: Page) =>
+  page.evaluate(() => new Promise<void>((done) => document.querySelector('h5p-player')!.addEventListener('ready', () => done(), { once: true })))
+
 /**
  * The app in a fresh browser profile. Chromium's own picker, `showOpenFilePicker`, is taken away
  * unless a test brings its own: Playwright cannot answer it, and without it the app takes the path
@@ -261,10 +265,12 @@ it('keeps a link in the address, and takes the browser’s Back and Forward as c
   await playerIs(page, 'ready')
   expect((await seen(page)).screen).toBe('player')
 
-  // Start over opens it again in place, without another step.
+  // Start over opens it again in place, without another step. The player still says `ready` while
+  // the app clears the saved state, before it opens the file again, so the wait is for the next
+  // `ready`: going on before it, the reopen's first request started under the reload below, which
+  // WebKit refuses and logs as a page error ("due to access control checks", CI 2026-10-15).
   const steps = await page.evaluate(() => history.length)
-  await page.click('#start-over')
-  await playerIs(page, 'ready')
+  await Promise.all([nextReady(page), page.click('#start-over')])
   expect(await page.evaluate(() => history.length)).toBe(steps)
 
   // A reload keeps the step it was at: the link opens into it again, with no step added.
