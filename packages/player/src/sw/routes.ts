@@ -4,6 +4,8 @@
  * `…/h5p/virtual/…` and `…/h5p/frame/…` — so everything downstream works off one base.
  */
 
+import { LOAD_KEY_BYTES, PKG_ID_LENGTH } from '../shared/pkg-id'
+
 export interface Routes {
   /** Absolute URL prefix, always ending in `h5p/`. */
   base: string
@@ -39,8 +41,8 @@ export type RouteMatch =
   | ({ kind: 'entry'; path: string } & LoadRef)
   | { kind: 'none' }
 
-/** The 32 hex characters of a package id, and the 16 of a load key after a hyphen. */
-const LOAD_ID = /^([0-9a-f]{32})(?:-([0-9a-f]{16}))?$/
+/** The hex characters of a package id, and those of a load key after a hyphen. */
+const LOAD_ID = new RegExp(`^([0-9a-f]{${PKG_ID_LENGTH}})(?:-([0-9a-f]{${LOAD_KEY_BYTES * 2}}))?$`)
 
 /** The path segment the routes name a load by: `<pkgId>` or `<pkgId>-<view>`. */
 export function loadSegment({ pkgId, view }: LoadRef): string {

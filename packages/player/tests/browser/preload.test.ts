@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import '../../src/h5p-offline-player'
 import type { H5PPlayerElement, PlayerProgressDetail } from '../../src/h5p-offline-player'
-import { FIXTURES, clearPackageCaches, createPlayer, waitFor, waitForSettled } from './utils'
+import { FIXTURES, clearPackageCaches, createPlayer, waitForEvent, waitForSettled } from './utils'
 
 /**
  * Pulling large deflated media before the content asks for it.
@@ -38,7 +38,7 @@ describe('preload', () => {
     player.setAttribute('src', FIXTURES.largeDeflated)
 
     expect(await settled).toEqual({ ok: true })
-    await waitFor(() => extracting.has(UNREFERENCED))
+    if (!extracting.has(UNREFERENCED)) await waitForEvent<PlayerProgressDetail>(player, 'progress', 10_000, (detail) => detail.phase === 'extract' && detail.entry === UNREFERENCED)
   })
 
   it('leaves it alone by default, so a host decides whether to spend the bandwidth', async () => {

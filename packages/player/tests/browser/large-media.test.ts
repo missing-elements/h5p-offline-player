@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import '../../src/h5p-offline-player'
 import { CHUNK_SIZE, INLINE_MAX_SIZE } from '../../src/shared/constants'
+import { cacheNameFor } from '../../src/shared/chunk-store'
+import { LARGE_ENTRY_SIZE } from '../../scripts/lib/fixture-names.mjs'
 import { FIXTURES, clearPackageCaches, frameFetch, play, virtualUrl, waitFor } from './utils'
 
 const MEDIA = 'content/media/big.bin'
-const MEDIA_SIZE = 20 * 1024 * 1024
+const MEDIA_SIZE = LARGE_ENTRY_SIZE
 
 /**
  * The two large-entry strategies. Both exist so that a package with a video in it does not have
@@ -51,7 +53,7 @@ describe('a large stored entry', () => {
     const player = await play(FIXTURES.largeStored)
     await frameFetch(player, virtualUrl(player, MEDIA), { headers: { Range: 'bytes=0-1023' } })
 
-    const cache = await caches.open(`h5p-pkg-v0-${player.pkgId}`)
+    const cache = await caches.open(cacheNameFor(player.pkgId!))
     const keys = await cache.keys()
     expect(keys.some((request) => request.url.includes(encodeURIComponent('big.bin')))).toBe(false)
   })
@@ -76,7 +78,7 @@ describe('a large deflated entry', () => {
     expect([200, 206]).toContain(response.status)
     expect(response.headers.get('content-range')).toMatch(new RegExp(`/${MEDIA_SIZE}$`))
 
-    const cache = await caches.open(`h5p-pkg-v0-${player.pkgId}`)
+    const cache = await caches.open(cacheNameFor(player.pkgId!))
     await waitFor(async () => {
       const keys = await cache.keys()
       return keys.some((request) => request.url.includes('/chunk/'))
@@ -141,16 +143,13 @@ describe('a large deflated entry', () => {
 
     await frameFetch(player, url, { headers: { Range: 'bytes=0-1023' } })
 
-    // The fixture's filler is a run of zero bytes, so any misplacement of a chunk shows up.
-    await waitFor(async () => {
-      const response = await frameFetch(player, url, { headers: { Range: `bytes=${MEDIA_SIZE - 16}-` } })
-      return response.status === 206 && response.headers.get('content-range') ===
-        `bytes ${MEDIA_SIZE - 16}-${MEDIA_SIZE - 1}/${MEDIA_SIZE}`
-    }, 60_000)
-
-    const tail = new Uint8Array(
-      await (await frameFetch(player, url, { headers: { Range: `bytes=${MEDIA_SIZE - 16}-` } })).arrayBuffer()
-    )
+    // The fixture's filler is a run of zero bytes, so any misplacement of a chunk shows up. One
+    // request: a range past the watermark is answered in full with a body that follows the
+    // extraction, so there is nothing to retry.
+    const response = await frameFetch(player, url, { headers: { Range: `bytes=${MEDIA_SIZE - 16}-` } })
+    expect(response.status).toBe(206)
+    expect(response.headers.get('content-range')).toBe(`bytes ${MEDIA_SIZE - 16}-${MEDIA_SIZE - 1}/${MEDIA_SIZE}`)
+    const tail = new Uint8Array(await response.arrayBuffer())
     expect(Array.from(tail)).toEqual(Array.from(new Uint8Array(16)))
   })
 })
@@ -160,7 +159,7 @@ describe('the inline threshold', () => {
     const player = await play(FIXTURES.basic)
     await frameFetch(player, virtualUrl(player, 'h5p.json'))
 
-    const cache = await caches.open(`h5p-pkg-v0-${player.pkgId}`)
+    const cache = await caches.open(cacheNameFor(player.pkgId!))
     const keys = await cache.keys()
 
     expect(keys.some((request) => request.url.includes('/whole/'))).toBe(true)

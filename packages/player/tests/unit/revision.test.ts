@@ -1,13 +1,12 @@
+import { memoryHandle, zipOf } from './helpers/archives'
 import { describe, expect, it } from 'vitest'
-import { BlobWriter, TextReader, Uint8ArrayReader, ZipReader, ZipWriter, configure } from '@zip.js/zip.js'
+import { Uint8ArrayReader, ZipReader } from '@zip.js/zip.js'
 import { indexFingerprint, platformOf, revisionOf, withProvenance } from '../../src/shared/revision'
 import { PackageReader } from '../../src/sw/package-reader'
 import { VERSION } from '../../src/shared/constants'
 import type { SourceHandle } from '../../src/shared/source'
 // The normalizer's copy of the recipe, which a publisher runs at release. The two must agree.
 import { indexFingerprint as nodeFingerprint } from '../../../normalize/lib/fingerprint.mjs'
-
-configure({ useWebWorkers: false })
 
 const encode = (text: string) => new TextEncoder().encode(text)
 
@@ -19,24 +18,7 @@ const VECTOR = [
 ]
 const VECTOR_FINGERPRINT = 'sha256:500da1583cedb6224e3dacfb14afc0fba8e944a5f48268c1d696b34b700f9915'
 
-async function zipOf(files: Record<string, string>) {
-  const writer = new ZipWriter(new BlobWriter('application/zip'))
-  for (const [name, content] of Object.entries(files)) await writer.add(name, new TextReader(content))
-  return new Uint8Array(await (await writer.close()).arrayBuffer())
-}
-
-function handleOf(bytes: Uint8Array<ArrayBuffer>): SourceHandle {
-  return {
-    descriptor: { type: 'file', name: 'a.h5p', size: bytes.length, lastModified: 0 },
-    size: bytes.length,
-    async read(range) {
-      return bytes.subarray(range.start, range.end + 1)
-    },
-    async stream(range) {
-      return new Blob([bytes.subarray(range.start, range.end + 1)]).stream()
-    }
-  }
-}
+const handleOf = (bytes: Uint8Array<ArrayBuffer>): SourceHandle => memoryHandle(bytes).handle
 
 const PACKAGE = {
   'h5p.json': JSON.stringify({ title: 't', mainLibrary: 'H5P.A', preloadedDependencies: [] }),

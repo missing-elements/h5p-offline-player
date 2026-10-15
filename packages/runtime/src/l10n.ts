@@ -6,16 +6,11 @@
  * tag gets which, is this package's alone, so a language added is a release of this package only.
  */
 
-/** What `dist/l10n.js` leaves on `window`, written by `scripts/build.mjs` from `l10n/`. */
-export interface L10nTable {
-  /** The core's strings by key, for each language by its tag. */
-  languages: Record<string, Record<string, string>>
-  /** Tags that take another tag's strings: `nb` and `nn` Norwegian's, `zh-Hant` `zh-TW`'s. */
-  aliases: Record<string, string>
-}
-
-/** A language tag, as the player's `shared/language.ts` accepts one — keep the two in step. */
-const LANGUAGE_TAG = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/
+/**
+ * A language tag, as the player's `shared/language.ts` accepts one — keep the two in step, and
+ * `scripts/build.mjs`'s copy, which cannot import this file.
+ */
+export const LANGUAGE_TAG = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/
 
 /**
  * The language for a declared tag, by the lookup of RFC 4647: the tag as given, then with its

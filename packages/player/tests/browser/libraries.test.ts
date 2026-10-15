@@ -1,16 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import '../../src/h5p-offline-player'
-import {
-  FIXTURES,
-  clearPackageCaches,
-  createPlayer,
-  frameDocument,
-  frameFetch,
-  frameWindow,
-  play,
-  virtualUrl,
-  waitForSettled
-} from './utils'
+import { FIXTURES, clearPackageCaches, createPlayer, frameFetch, frameWindow, messageOf, play, settle, virtualUrl, waitForSettled } from './utils'
 
 /**
  * Filling in the libraries an export left behind.
@@ -22,23 +12,13 @@ import {
  * interaction types the content actually uses.
  */
 describe('supplying missing libraries', () => {
-  const playWithLibraries = async (src: string, libraries: string) => {
-    const player = createPlayer({ libraries })
-    const settled = waitForSettled(player)
-    player.setAttribute('src', src)
-
-    const result = await settled
-    if (!result.ok) {
-      expect.fail(`${src} failed: ${result.detail.code} — ${result.detail.message}`)
-    }
-    return player
-  }
+  const playWithLibraries = (src: string, libraries: string) => play(src, { libraries })
 
   it('plays a stripped export when a bundle supplies what it is missing', async () => {
     const player = await playWithLibraries(FIXTURES.needsLibraries, FIXTURES.libraries)
 
     expect(player.state).toBe('ready')
-    expect(frameDocument(player).querySelector('.h5p-offline-test-message')?.textContent).toBe(
+    expect(messageOf(player)).toBe(
       'Libraries came from somewhere else.'
     )
     // Which bundle answered, for a page's "where did the libraries come from" line.
@@ -52,7 +32,7 @@ describe('supplying missing libraries', () => {
     const player = await playWithLibraries(FIXTURES.needsLibraries, `${FIXTURES.contentOnly} ${FIXTURES.libraries}`)
 
     expect(player.state).toBe('ready')
-    expect(frameDocument(player).querySelector('.h5p-offline-test-message')?.textContent).toBe(
+    expect(messageOf(player)).toBe(
       'Libraries came from somewhere else.'
     )
   })
@@ -65,29 +45,17 @@ describe('supplying missing libraries', () => {
   })
 
   it('reports the last source when none of them could supply the libraries', async () => {
-    const player = createPlayer({ libraries: `${FIXTURES.missing} ${FIXTURES.contentOnly}` })
-    const settled = waitForSettled(player)
-    player.setAttribute('src', FIXTURES.needsLibraries)
-
-    const result = await settled
+    const { result } = await settle(FIXTURES.needsLibraries, { libraries: `${FIXTURES.missing} ${FIXTURES.contentOnly}` })
     expect(result).toMatchObject({ ok: false, detail: { code: 'bad-archive' } })
   })
 
   it('still refuses it without a libraries attribute', async () => {
-    const player = createPlayer()
-    const settled = waitForSettled(player)
-    player.setAttribute('src', FIXTURES.needsLibraries)
-
-    const result = await settled
+    const { result } = await settle(FIXTURES.needsLibraries)
     expect(result).toMatchObject({ ok: false, detail: { code: 'bad-archive' } })
   })
 
   it('reports which libraries are missing, in a form a host can act on', async () => {
-    const player = createPlayer()
-    const settled = waitForSettled(player)
-    player.setAttribute('src', FIXTURES.needsLibraries)
-
-    const result = await settled
+    const { result } = await settle(FIXTURES.needsLibraries)
     if (result.ok) expect.fail('expected the package to be refused')
 
     expect(result.detail.missingLibraries).toMatchObject({
@@ -133,11 +101,7 @@ describe('supplying missing libraries', () => {
     // H5P.OfflineExtra, which is not. The runtime follows that list, and ended its boot on
     // "Unexpected end of JSON input".
     for (const src of [FIXTURES.needsDependency, pacedNoRange('refused')]) {
-      const player = createPlayer()
-      const settled = waitForSettled(player)
-      player.setAttribute('src', src)
-
-      const result = await settled
+      const { result } = await settle(src)
       if (result.ok) expect.fail(`expected ${src} to be refused`)
       expect(result.detail, src).toMatchObject({ code: 'bad-archive', missingLibraries: { folders: ['H5P.OfflineExtra-1.0'], all: false } })
       expect(result.detail.message, src).toContain('H5P.OfflineExtra-1.0')
@@ -186,11 +150,7 @@ describe('supplying missing libraries', () => {
   })
 
   it('reports a library source that cannot be read, naming what is still missing', async () => {
-    const player = createPlayer({ libraries: '/fixtures/no-such-bundle.h5p' })
-    const settled = waitForSettled(player)
-    player.setAttribute('src', FIXTURES.needsLibraries)
-
-    const result = await settled
+    const { result } = await settle(FIXTURES.needsLibraries, { libraries: '/fixtures/no-such-bundle.h5p' })
     if (result.ok) expect.fail('expected the package to be refused')
     expect(result.detail.code).toBe('bad-archive')
     expect(result.detail.message).toContain('H5P.OfflineTest-1.0')
@@ -228,7 +188,7 @@ describe('a library source that cannot be reached', () => {
     await outage(30_000)
     const { player, result } = await settle(content('offline'), libraries)
     if (!result.ok) expect.fail(`${result.detail.code} — ${result.detail.message}`)
-    expect(frameDocument(player).querySelector('.h5p-offline-test-message')?.textContent).toBe(
+    expect(messageOf(player)).toBe(
       'Libraries came from somewhere else.'
     )
     // Served from the copy downloaded before: no request reached the bundle's host this time.

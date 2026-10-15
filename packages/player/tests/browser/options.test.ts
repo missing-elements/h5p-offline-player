@@ -1,3 +1,4 @@
+import { type H5PPlayerElement } from '../../src/h5p-offline-player'
 import { describe, expect, it, vi } from 'vitest'
 import '../../src/h5p-offline-player'
 import { FIXTURES, createPlayer, frameDocument, frameWindow, play, waitForEvent } from './utils'
@@ -36,9 +37,9 @@ interface Statement {
 }
 
 /** Presses the fixture's Complete button and returns the statement it sends. */
-async function complete(player: HTMLElement): Promise<Statement> {
+async function complete(player: H5PPlayerElement): Promise<Statement> {
   const xapi = waitForEvent<{ statement: Statement }>(player, 'xapi')
-  frameDocument(player as never).querySelector<HTMLButtonElement>('.h5p-offline-test-complete')!.click()
+  frameDocument(player).querySelector<HTMLButtonElement>('.h5p-offline-test-complete')!.click()
   return (await xapi).detail.statement
 }
 

@@ -1,7 +1,7 @@
 import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
-import { resolve, relative, sep } from 'node:path'
+import { resolve } from 'node:path'
 import { BlobWriter, TextReader, Uint8ArrayReader, Uint8ArrayWriter, ZipReader, ZipWriter } from '@zip.js/zip.js'
-import { GENERATED_FIXTURES } from './lib/fixture-names.mjs'
+import { GENERATED_FIXTURES, LARGE_ENTRY_SIZE } from './lib/fixture-names.mjs'
 
 /**
  * Builds the `.h5p` archives the browser tests play. They are generated rather than committed
@@ -16,7 +16,6 @@ const extraLibDir = resolve(rootDir, 'tests', 'fixtures', 'src', 'extra')
 const outDir = resolve(rootDir, 'public', 'fixtures')
 
 /** Comfortably past the 16 MB inline threshold, so these take the large-entry paths. */
-const LARGE_ENTRY_SIZE = 20 * 1024 * 1024
 
 async function collectFiles(dir, prefix = '') {
   const found = []
@@ -67,10 +66,9 @@ const randomBytes = (size = LARGE_ENTRY_SIZE) => {
 // Only the archives this script owns are cleared. `public/fixtures/` is where a real `.h5p`
 // gets dropped to try against the demo, and wiping the directory would delete it on the next
 // `pnpm dev`.
-const GENERATED = GENERATED_FIXTURES
 
 await mkdir(outDir, { recursive: true })
-for (const name of GENERATED) {
+for (const name of GENERATED_FIXTURES) {
   await rm(resolve(outDir, name), { force: true })
 }
 
@@ -506,6 +504,16 @@ built.push(['corrupt.h5p', garbage.length])
 const page = new TextEncoder().encode('<!doctype html>\n<html><head><title>Sign in</title></head><body><form>…</form></body></html>\n')
 await writeFile(resolve(outDir, 'html-page.h5p'), page)
 built.push(['html-page.h5p', page.length])
+
+// The list in `fixture-names.mjs` is what the next run clears and the demo build ships: an
+// archive written here and not listed there would be neither, silently.
+const written = new Set(built.map(([name]) => name))
+const listed = new Set(GENERATED_FIXTURES)
+const unlisted = [...written].filter((name) => !listed.has(name))
+const unbuilt = [...listed].filter((name) => !written.has(name))
+if (unlisted.length > 0 || unbuilt.length > 0) {
+  throw new Error(`fixture-names.mjs and build-fixtures.mjs disagree: not listed: ${unlisted.join(', ') || 'none'}; not built: ${unbuilt.join(', ') || 'none'}`)
+}
 
 for (const [name, size] of built) {
   console.log(`[fixtures] ${name.padEnd(22)} ${(size / 1024).toFixed(1)} kB`)

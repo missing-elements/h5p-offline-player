@@ -23,7 +23,7 @@ const SW_ENTRY = resolve(rootDir, 'src/sw/sw-entry.ts')
 const JOBS_ENTRY = resolve(rootDir, 'src/jobs/jobs-worker.ts')
 
 /** A standalone classic script: no imports, no `import.meta`, runnable from a blob or a URL. */
-export async function bundleWorker(entry: string, minify: boolean): Promise<string> {
+async function bundleWorker(entry: string, minify: boolean): Promise<string> {
   const result = await esbuild({
     entryPoints: [entry],
     bundle: true,
@@ -128,12 +128,45 @@ export function devServiceWorkerPlugin(): Plugin {
  */
 async function sendThrottled(res: ServerResponse, body: Buffer, bytesPerSecond: number): Promise<void> {
   const slice = 64 * 1024
-  for (let at = 0; at < body.length; at += slice) {
+  for (let at = 0; at < body.length && !res.destroyed; at += slice) {
     const piece = body.subarray(at, Math.min(at + slice, body.length))
-    if (!res.write(piece)) await new Promise((resolve) => res.once('drain', resolve))
+    // A client that went away mid-body closes the response; waiting on `drain` alone would park
+    // this loop for ever.
+    if (!res.write(piece)) await drainedOrClosed(res)
     await new Promise((resolve) => setTimeout(resolve, (piece.length / bytesPerSecond) * 1000))
   }
   res.end()
+}
+
+/** Resolves when the response can take more, or when there is no one left to take it. */
+function drainedOrClosed(res: ServerResponse): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const done = () => {
+      res.off('drain', done)
+      res.off('close', done)
+      resolve()
+    }
+    res.once('drain', done)
+    res.once('close', done)
+  })
+}
+
+/** The fixture hosts' answer for an archive none of their directories has. */
+function noSuchFixture(res: ServerResponse): void {
+  res.statusCode = 404
+  res.end('no such fixture')
+}
+
+/**
+ * A `Range` header against a body of `size` bytes: the inclusive range it asks for, `null` when
+ * it asks for none, or `'unsatisfiable'` when it starts past the end.
+ */
+function parseRangeHeader(header: string | undefined, size: number): { start: number; end: number } | 'unsatisfiable' | null {
+  const range = /^bytes=(\d+)-(\d*)$/.exec(header ?? '')
+  if (!range) return null
+  const start = Number(range[1])
+  if (start >= size) return 'unsatisfiable'
+  return { start, end: range[2] ? Math.min(Number(range[2]), size - 1) : size - 1 }
 }
 
 /** Where the fixture hosts look for an archive by name, in order. */
@@ -184,10 +217,7 @@ function noRangeHandler(dirs: readonly string[]): Connect.NextHandleFunction {
         if (throttle > 0) void sendThrottled(res, body, throttle)
         else res.end(body)
       },
-      () => {
-        res.statusCode = 404
-        res.end('no such fixture')
-      }
+      () => noSuchFixture(res)
     )
   }
 }
@@ -235,29 +265,24 @@ function compressingHostHandler(dirs: readonly string[]): Connect.NextHandleFunc
         res.setHeader('vary', 'Accept-Encoding')
         if (gzip) res.setHeader('content-encoding', 'gzip')
 
-        const range = /^bytes=(\d+)-(\d*)$/.exec(req.headers.range ?? '')
-        if (!range) {
+        const range = parseRangeHeader(req.headers.range, body.length)
+        if (range === null) {
           res.setHeader('content-length', String(body.length))
           res.statusCode = 200
           return res.end(body)
         }
-        const start = Number(range[1])
-        const end = range[2] ? Math.min(Number(range[2]), body.length - 1) : body.length - 1
-        if (start >= body.length) {
+        if (range === 'unsatisfiable') {
           res.setHeader('content-range', `bytes */${body.length}`)
           res.statusCode = 416
           return res.end()
         }
-        const piece = body.subarray(start, end + 1)
+        const piece = body.subarray(range.start, range.end + 1)
         res.setHeader('content-length', String(piece.length))
-        res.setHeader('content-range', `bytes ${start}-${end}/${body.length}`)
+        res.setHeader('content-range', `bytes ${range.start}-${range.end}/${body.length}`)
         res.statusCode = 206
         res.end(piece)
       },
-      () => {
-        res.statusCode = 404
-        res.end('no such fixture')
-      }
+      () => noSuchFixture(res)
     )
   }
 }
@@ -286,16 +311,7 @@ function stallingHostHandler(dirs: readonly string[]): Connect.NextHandleFunctio
   const waitOut = async (host: string) => {
     while (inOutage(host)) await sleep(50)
   }
-  const drained = (res: ServerResponse) =>
-    new Promise<void>((resolve) => {
-      const done = () => {
-        res.off('drain', done)
-        res.off('close', done)
-        resolve()
-      }
-      res.once('drain', done)
-      res.once('close', done)
-    })
+  const drained = drainedOrClosed
 
   const serve = async (req: Connect.IncomingMessage, res: ServerResponse, name: string, rate: number, host: string) => {
     res.setHeader('access-control-allow-origin', '*')
@@ -310,25 +326,22 @@ function stallingHostHandler(dirs: readonly string[]): Connect.NextHandleFunctio
     try {
       body = await readFile(await archivePath(dirs, name))
     } catch {
-      res.statusCode = 404
-      return res.end('no such fixture')
+      return noSuchFixture(res)
     }
 
     res.setHeader('content-type', 'application/octet-stream')
     res.setHeader('accept-ranges', 'bytes')
     let piece = body
     res.statusCode = 200
-    const range = /^bytes=(\d+)-(\d*)$/.exec(req.headers.range ?? '')
+    const range = parseRangeHeader(req.headers.range, body.length)
+    if (range === 'unsatisfiable') {
+      res.setHeader('content-range', `bytes */${body.length}`)
+      res.statusCode = 416
+      return res.end()
+    }
     if (range) {
-      const start = Number(range[1])
-      const end = range[2] ? Math.min(Number(range[2]), body.length - 1) : body.length - 1
-      if (start >= body.length) {
-        res.setHeader('content-range', `bytes */${body.length}`)
-        res.statusCode = 416
-        return res.end()
-      }
-      piece = body.subarray(start, end + 1)
-      res.setHeader('content-range', `bytes ${start}-${end}/${body.length}`)
+      piece = body.subarray(range.start, range.end + 1)
+      res.setHeader('content-range', `bytes ${range.start}-${range.end}/${body.length}`)
       res.statusCode = 206
     }
     res.setHeader('content-length', String(piece.length))
@@ -378,18 +391,16 @@ function stallingHostHandler(dirs: readonly string[]): Connect.NextHandleFunctio
 export function noRangeFixturesPlugin(dirs: readonly string[] = [PLAYER_FIXTURES]): Plugin {
   return {
     name: 'h5p-no-range-fixtures',
-    configureServer(server) {
-      server.middlewares.use(noRangeHandler(dirs))
-      server.middlewares.use(compressingHostHandler(dirs))
-      server.middlewares.use(stallingHostHandler(dirs))
-    },
+    configureServer: mount,
     // `vite preview` of the demo build as well, so the built site can be checked end to end
     // before it is deployed — the deployment gets the route from `vercel.json` instead.
-    configurePreviewServer(server) {
-      server.middlewares.use(noRangeHandler(dirs))
-      server.middlewares.use(compressingHostHandler(dirs))
-      server.middlewares.use(stallingHostHandler(dirs))
-    }
+    configurePreviewServer: mount
+  }
+
+  function mount(server: { middlewares: Connect.Server }): void {
+    server.middlewares.use(noRangeHandler(dirs))
+    server.middlewares.use(compressingHostHandler(dirs))
+    server.middlewares.use(stallingHostHandler(dirs))
   }
 }
 

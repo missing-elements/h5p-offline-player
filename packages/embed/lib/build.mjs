@@ -52,7 +52,7 @@ export function parseOrigin(value) {
 }
 
 /** Where the element's `libraries="pack"` fetches from when a site carries no copy of its own. */
-export const PACK_CDN_ORIGIN = 'https://cdn.jsdelivr.net'
+const PACK_CDN_ORIGIN = 'https://cdn.jsdelivr.net'
 
 /**
  * A `libraries` value for addresses that name none, checked against the site it goes into: the

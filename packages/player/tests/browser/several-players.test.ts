@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import '../../src/h5p-offline-player'
 import type { H5PPlayerElement } from '../../src/h5p-offline-player'
-import { FIXTURES, frameDocument, frameFetch, frameWindow, virtualUrl, waitForSettled } from './utils'
+import { FIXTURES, frameDocument, frameFetch, frameWindow, messageOf, virtualUrl, waitForSettled } from './utils'
 
 /**
  * Several players showing one package at once. The bytes are the same, so the package's row and
@@ -34,7 +34,7 @@ async function playTogether(src: string, ...attributeSets: Array<Record<string, 
   return players
 }
 
-const message = (player: H5PPlayerElement) => frameDocument(player).querySelector('.h5p-offline-test-message')?.textContent
+const message = messageOf
 
 describe('several players of one package', () => {
   it('play it each in the mode asked for, untrusted beside trusted', async () => {

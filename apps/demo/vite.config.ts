@@ -9,6 +9,7 @@ import {
 } from '../../packages/player/vite.plugins'
 import { bundleHostWorker } from '../../packages/player/scripts/lib/worker-bundle.mjs'
 import { codeBlocksPlugin } from './scripts/lib/code-blocks.mjs'
+import { PAGES } from './scripts/lib/pages.mjs'
 
 /**
  * The demo app: the dev server for the whole repository, and the hosted demo — the player page
@@ -141,18 +142,7 @@ export default defineConfig(({ command }) => ({
     rollupOptions: {
       input: {
         'h5p-player': ELEMENT,
-        index: resolve(rootDir, 'index.html'),
-        embed: resolve(rootDir, 'embed.html'),
-        demo: resolve(rootDir, 'demo/index.html'),
-        setup: resolve(rootDir, 'demo/setup.html'),
-        compare: resolve(rootDir, 'demo/compare.html'),
-        normalize: resolve(rootDir, 'demo/normalize.html'),
-        xapi: resolve(rootDir, 'demo/xapi.html'),
-        cmi5: resolve(rootDir, 'demo/cmi5.html'),
-        'local-file': resolve(rootDir, 'demo/local-file.html'),
-        'demo-embed': resolve(rootDir, 'demo/embed.html'),
-        'two-players': resolve(rootDir, 'demo/two-players.html'),
-        app: resolve(rootDir, 'app/index.html')
+        ...Object.fromEntries(PAGES.map((page) => [page.name, resolve(rootDir, page.file)]))
       },
       output: {
         entryFileNames: (chunk) => (chunk.facadeModuleId === ELEMENT ? 'h5p-player.js' : 'assets/[name]-[hash].js'),

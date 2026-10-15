@@ -12,6 +12,7 @@
  * browser's or Android's, closes the file rather than leaving the app.
  */
 
+import { foreignHost, messageIn, trustPrompt } from '../demo/page-common.js'
 import librariesPack from '@missing-elements/h5p-libraries/libraries.h5p?url'
 import librariesNotice from '@missing-elements/h5p-libraries/libraries.txt?url'
 import { copyOf, fileKey, forget, forgetAll, linkKey, recentFiles, remember } from './recent.js'
@@ -47,11 +48,9 @@ const recentList = $('#recent-list')
 /** Install, on the home screen and in the menu: each shown only while the browser offers it. */
 const installButtons = [installButton, $('#menu-install')]
 
-const show = (text, kind = 'hint') => {
-  message.textContent = text
-  message.className = `message ${kind}`
-  message.hidden = !text
-}
+const show = messageIn(message)
+/** The question before a link from another site plays with its own code. */
+const trust = trustPrompt(confirmBox, $('#confirm-open'))
 
 /* ---------------------------------------------------------------- the window */
 
@@ -108,6 +107,10 @@ function setTitle(name) {
 
 /** The home screen's step in the window's history. */
 const HOME = { screen: 'home' }
+/** How long Back in the bar waits for the history to reach home before it closes the file where it is. */
+const HOME_WAIT_MS = 1000
+/** How long a first visit waits for the worker to claim the page after it has activated. */
+const CLAIM_WAIT_MS = 3000
 
 /**
  * How many steps the current one lies above home while a file is open: 1 for the file's own, and
@@ -166,7 +169,7 @@ backButton.addEventListener('click', () => {
     homeward = null
     closePlayer()
     history.replaceState(HOME, '', location.pathname)
-  }, 1000)
+  }, HOME_WAIT_MS)
 })
 
 addEventListener('popstate', (event) => {
@@ -190,7 +193,7 @@ addEventListener('popstate', (event) => {
   // Forward again, onto a file that was closed: a link opens once more; a picked file has gone.
   if (screen === 'player') return
   const src = srcOf(location.href)
-  if (src) openLink(src)
+  if (src) void openUrl(src)
   else history.replaceState(HOME, '', location.pathname)
 })
 
@@ -260,7 +263,7 @@ async function controlled() {
   })
   await activated(registration)
   // Claiming follows activation at once; a page it never claims was loaded with a hard reload.
-  return Promise.race([claimed, new Promise((resolve) => setTimeout(() => resolve(false), 3000))])
+  return Promise.race([claimed, new Promise((resolve) => setTimeout(() => resolve(false), CLAIM_WAIT_MS))])
 }
 
 function activated(registration) {
@@ -274,7 +277,7 @@ function activated(registration) {
   })
 }
 
-const ready = controlled().then(
+const workerChecked = controlled().then(
   (isControlled) => {
     if (isControlled) {
       setOffline('ready', 'Works offline')
@@ -355,10 +358,10 @@ async function open(file, { libraries = PACK, handle = null, title = null, repla
   const token = ++opens
   lastUrl = null
   // A file the learner chose answers a pending link's question: they went with the file.
-  confirmBox.hidden = true
+  trust.dismiss()
   current = { kind: 'file', file, handle, replaces }
   opening(title ?? file.name, (source) => open(file, { libraries: source, handle, title, replaces }), location.pathname)
-  await ready
+  await workerChecked
   if (token !== opens) return
   player.setAttribute('libraries', libraries)
   player.untrusted = false
@@ -390,10 +393,11 @@ async function openUrl(src, { libraries = PACK, title = null, trusted = !foreign
     return
   }
   const token = ++opens
+  trust.dismiss()
   lastUrl = url.href
   current = { kind: 'link', url: url.href }
   opening(title ?? linkName(url), (source) => openUrl(url.href, { libraries: source, title, trusted }), `${location.pathname}?src=${encodeURIComponent(url.href)}`)
-  await ready
+  await workerChecked
   if (token !== opens) return
   player.setAttribute('libraries', libraries)
   player.untrusted = !trusted
@@ -402,43 +406,12 @@ async function openUrl(src, { libraries = PACK, title = null, trusted = !foreign
   player.setAttribute('src', url.href)
 }
 
-/**
- * The host of a package on another site, or `null` for this site's own and for what is not a URL
- * (which `openUrl` then reports). A package's libraries are JavaScript and the frame is
- * same-origin by design, so a package's own code runs with this origin's storage — with `resume`
- * on, the saved state of every file opened here, answers included, and the chunk store and the
- * list of what was played. A file the learner picked is their choice; a link is whoever wrote it,
- * so a link to another site plays `untrusted`, as data, with the libraries the app carries and
- * none of its own, and asks for a click that names the host only when it cannot play without its
- * own code.
- */
-const foreignHost = (src) => {
-  try {
-    const url = new URL(src, location.href)
-    // A `data:` URL has no host and an opaque origin: name its scheme, so it counts as another site's.
-    return url.origin === location.origin ? null : url.host || url.protocol
-  } catch {
-    return null
-  }
-}
-
-function openLink(src) {
-  confirmBox.hidden = true
-  void openUrl(src)
-}
 
 /** Asks before playing an untrusted link with its own code, which it turned out to need. */
-let confirmed = null
 function askToTrust(url) {
   show('')
-  confirmBox.querySelector('.host').textContent = foreignHost(url)
-  confirmBox.hidden = false
-  confirmed = () => openUrl(url, { trusted: true })
+  trust.ask(foreignHost(url), () => openUrl(url, { trusted: true }))
 }
-$('#confirm-open').addEventListener('click', () => {
-  confirmBox.hidden = true
-  void confirmed?.()
-})
 
 function srcOf(href) {
   try {
@@ -468,14 +441,17 @@ async function choose() {
     return
   }
   let handle
+  let file
   try {
     ;[handle] = await window.showOpenFilePicker({ id: 'h5p', types: [{ description: 'H5P content', accept: { 'application/zip': ['.h5p'] } }] })
+    file = await handle.getFile()
   } catch (error) {
-    // Closed without a choice. Refused for another reason, the page's own input is the way in.
+    // Closed without a choice. Refused for another reason, or a file that went between the
+    // choice and the read, the page's own input is the way in.
     if (error?.name !== 'AbortError') fileInput.click()
     return
   }
-  void open(await handle.getFile(), { handle })
+  void open(file, { handle })
 }
 openButton.addEventListener('click', choose)
 // The whole drop area opens the picker too, a larger target than its button.
@@ -499,7 +475,7 @@ fileInput.addEventListener('change', () => {
 const initial = srcOf(location.href)
 if (initial && history.state?.screen === 'player') depth = history.state.depth ?? 1
 else history.replaceState(HOME, '', location.pathname)
-if (initial) openLink(initial)
+if (initial) void openUrl(initial)
 
 // How an installed app is handed what it was launched with. A `.h5p` opened from the file
 // manager arrives as a file handle (the manifest's `file_handlers`); a link to `/app/?src=…`
@@ -510,11 +486,15 @@ if ('launchQueue' in window) {
   window.launchQueue.setConsumer(async (params) => {
     const [handle] = params.files ?? []
     if (handle) {
-      void open(await handle.getFile(), { handle })
+      try {
+        void open(await handle.getFile(), { handle })
+      } catch (error) {
+        show(`The file could not be read: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      }
       return
     }
     const src = params.targetURL ? srcOf(params.targetURL) : null
-    if (src && !isOpen(src)) openLink(src)
+    if (src && !isOpen(src)) void openUrl(src)
   })
 }
 
@@ -542,7 +522,8 @@ document.addEventListener('drop', (event) => {
     return
   }
   // Chrome and Edge hand over a handle for a dropped file too. It has to be asked for while the
-  // drop is being handled, and it arrives after; the list of recent files waits for it.
+  // drop is being handled, and it arrives after; the list of recent files waits for it. One the
+  // browser cannot give is no handle, and the file is listed without one, as elsewhere.
   const handle = item.getAsFileSystemHandle?.().catch(() => null) ?? null
   void open(item.getAsFile(), { handle })
 })
@@ -734,7 +715,13 @@ player.addEventListener('progress', (event) => {
 // The element keeps the content's saved state on this device (`resume`); this forgets it for
 // the open file and opens the file again, from the start.
 startOver.addEventListener('click', async () => {
-  await player.clearUserData()
+  try {
+    await player.clearUserData()
+  } catch (error) {
+    // Opened again now, the file would come back where it was, which is not what was pressed.
+    show(`The saved state could not be cleared: ${error instanceof Error ? error.message : String(error)}`, 'error')
+    return
+  }
   void reopen?.(player.getAttribute('libraries'))
 })
 
@@ -825,6 +812,7 @@ $('#menu-install').addEventListener('click', fromMenu(install))
  * app without a prompt. Asked once
  * installed, not on every visit to the page, because a site in a tab has not earned it.
  */
+// Refused, or not asked for by this browser, reads as not persisted; there is nothing to do about it here.
 const persist = () => navigator.storage?.persist?.().catch(() => false)
 
 window.addEventListener('appinstalled', () => {

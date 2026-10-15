@@ -144,7 +144,8 @@ for (const key of keys) {
   else console.warn(`[h5p-l10n] Moodle has no string for "${english[key]}" (${key}); it stays English`)
 }
 // One reworded string is news; most of them is a map or a core that changed shape.
-if (Object.keys(idOf).length < keys.length * 0.9) {
+const MIN_MAPPED_SHARE = 0.9
+if (Object.keys(idOf).length < keys.length * MIN_MAPPED_SHARE) {
   fail(`only ${Object.keys(idOf).length} of the core's ${keys.length} strings have a Moodle id in ${MAP_URL}`)
 }
 
@@ -156,7 +157,9 @@ const codes = (await listResponse.text())
   .split('\n')
   .map((line) => line.split(',')[0].trim())
   .filter((code) => /^[a-z]{2,3}(?:_[a-z0-9]+)*$/.test(code))
-if (!codes.includes('en') || codes.length < 100) fail(`${listUrl} lists ${codes.length} packs, which is not Moodle's list`)
+// Moodle has well over a hundred packs; fewer is a page that is not the list.
+const MIN_PACKS = 100
+if (!codes.includes('en') || codes.length < MIN_PACKS) fail(`${listUrl} lists ${codes.length} packs, which is not Moodle's list`)
 
 const packs = {}
 let next = 0
@@ -190,10 +193,12 @@ function packStrings(code, seen = new Set()) {
 // bracket, since the Chinese and Japanese packs write their own.
 const moodleEnglish = packStrings('en')
 const suffixOf = {}
+/** A bracketed abbreviation Moodle's English added to a licence name, "Attribution (CC BY)". */
+const BRACKETED_SUFFIX = /\s*[(（][^()（）]*[)）]\s*$/
 for (const [key, id] of Object.entries(idOf)) {
   const theirs = moodleEnglish[id]
   if (typeof theirs === 'string' && theirs.startsWith(`${english[key]} (`) && theirs.endsWith(')')) {
-    suffixOf[key] = /\s*[(（][^()（）]*[)）]\s*$/
+    suffixOf[key] = BRACKETED_SUFFIX
   }
 }
 
@@ -256,15 +261,19 @@ const sortedAliases = Object.fromEntries(
     .map((tag) => [tag, aliases[tag]])
 )
 
+// No index yet is a first run, with nothing to lose.
 const previous = JSON.parse((await readFile(INDEX_PATH, 'utf8').catch(() => null)) ?? 'null')
 const lost = Object.keys(previous?.languages ?? {}).filter((tag) => !written[tag])
-if (lost.length > 3 && !process.argv.includes('--allow-loss')) {
+// A language or two can go when Moodle drops a pack; more at once wants a look before anything is deleted.
+const MAX_LOST = 3
+if (lost.length > MAX_LOST && !process.argv.includes('--allow-loss')) {
   fail(`this run would drop ${lost.length} languages at once (${lost.join(', ')}); find out why, then run it with --allow-loss`)
 }
 
 await mkdir(L10N_DIR, { recursive: true })
 let changed = false
 const writeIfChanged = async (path, text) => {
+  // A file not there yet reads as different, and is written.
   if ((await readFile(path, 'utf8').catch(() => null)) === text) return
   await writeFile(path, text, 'utf8')
   changed = true

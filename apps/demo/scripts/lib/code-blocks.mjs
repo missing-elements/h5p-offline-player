@@ -107,7 +107,7 @@ function renderTabs(shiki, blocks, id) {
   const tabs = blocks
     .map((block, index) => {
       const selected = index === 0
-      return `<button type="button" role="tab" id="${id}-tab-${index}" aria-controls="${id}-panel-${index}" aria-selected="${selected}" tabindex="${selected ? 0 : -1}" data-tab="${escape(block.tab)}">${escape(block.tab)}</button>`
+      return `<button type="button" role="tab" id="${id}-tab-${index}" aria-controls="${id}-panel-${index}" aria-selected="${selected}" tabindex="${selected ? 0 : -1}" data-tab="${escapeHtml(block.tab)}">${escapeHtml(block.tab)}</button>`
     })
     .join('')
   const panels = blocks
@@ -121,7 +121,7 @@ function renderTabs(shiki, blocks, id) {
       })
     )
     .join('')
-  return figure(title, `<div class="code-tablist" role="tablist" aria-label="${escape(title || 'Variants')}">${tabs}</div>`, panels, true)
+  return figure(title, `<div class="code-tablist" role="tablist" aria-label="${escapeHtml(title || 'Variants')}">${tabs}</div>`, panels, true)
 }
 
 /**
@@ -132,7 +132,7 @@ function renderTabs(shiki, blocks, id) {
  */
 function figure(title, tabs, body, tabbed = false) {
   // A title with a dot is a file name, shown as it is written; a language is a label.
-  const label = title ? `<span class="code-label${title.includes('.') ? ' code-file' : ''}">${escape(title)}</span>` : ''
+  const label = title ? `<span class="code-label${title.includes('.') ? ' code-file' : ''}">${escapeHtml(title)}</span>` : ''
   return (
     `<figure class="code-block"${tabbed ? ' data-tabs' : ''}>` +
     `<div class="code-head">${label}${tabs}<button type="button" class="code-copy">Copy</button><span class="code-status" role="status"></span></div>` +
@@ -177,7 +177,7 @@ function decode(text) {
 }
 
 /** @param {string} text */
-function escape(text) {
+function escapeHtml(text) {
   return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')
 }
 

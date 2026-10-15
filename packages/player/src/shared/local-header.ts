@@ -1,3 +1,5 @@
+import { PlayerError } from './protocol'
+import type { SourceHandle } from './source'
 /**
  * The zip local header, the thirty bytes in front of every entry's data. Three places read it —
  * the virtual server before slicing a stored entry, the warm as it walks a span, the Jobs worker
@@ -25,4 +27,16 @@ export function localHeaderDataStart(offset: number, header: Uint8Array): number
   const nameLength = view.getUint16(26, true)
   const extraLength = view.getUint16(28, true)
   return offset + LOCAL_HEADER_FIXED_SIZE + nameLength + extraLength
+}
+
+/**
+ * Where an entry's data begins: the local header at `offset` read off the handle, its variable
+ * part stepped over. The virtual server and the Jobs worker both take this step before reading
+ * an entry's bytes.
+ */
+export async function readDataStart(handle: SourceHandle, offset: number, entryName: string): Promise<number> {
+  const header = await handle.read({ start: offset, end: offset + LOCAL_HEADER_FIXED_SIZE - 1 })
+  const start = localHeaderDataStart(offset, header)
+  if (start === null) throw new PlayerError('bad-archive', `${entryName} has a malformed local header`)
+  return start
 }

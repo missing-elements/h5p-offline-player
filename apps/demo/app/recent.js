@@ -20,7 +20,7 @@ const ENTRIES = 'recent'
 /** The copies, by the same key, apart from the list so that reading the list reads no file. */
 const COPIES = 'copies'
 /** How many the list keeps; the oldest goes, with its copy, when one more is opened. */
-export const RECENT_LIMIT = 20
+const RECENT_LIMIT = 20
 
 /** A picked file's key: what the player knows a file by, so its saved place comes back with it. */
 export const fileKey = (file) => `file:${file.name}:${file.size}:${file.lastModified}`

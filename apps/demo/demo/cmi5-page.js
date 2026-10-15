@@ -11,6 +11,7 @@
  * lands in the log instead.
  */
 
+import { foreignHost, logInto, trustPrompt } from './page-common.js'
 import { createCmi5Client, isCmi5Launch, startCmi5 } from '@missing-elements/h5p-cmi5'
 
 const player = document.querySelector('h5p-player')
@@ -38,15 +39,8 @@ const say = (text) => {
 const confirmBox = document.querySelector('#confirm-src')
 const urlSrc = new URLSearchParams(location.search).get('src')?.trim() || null
 
-const foreignHost = (src) => {
-  try {
-    const url = new URL(src, location.href)
-    // A `data:` URL has no host and an opaque origin: name its scheme, so it counts as another site's.
-    return url.origin === location.origin ? null : url.host || url.protocol
-  } catch {
-    return null
-  }
-}
+/** The question before a package from another site plays with its own code. */
+const trust = trustPrompt(confirmBox, document.querySelector('#confirm-open'))
 
 const play = (src) => {
   if (!src) {
@@ -58,25 +52,14 @@ const play = (src) => {
 }
 
 /** Played untrusted, a package from another site needs its own code: the learner decides. */
-const askToTrust = (src) => {
-  confirmBox.querySelector('.host').textContent = foreignHost(src)
-  confirmBox.hidden = false
-  document.querySelector('#confirm-open').addEventListener(
-    'click',
-    () => {
-      confirmBox.hidden = true
-      player.untrusted = false
-      player.removeAttribute('src')
-      player.setAttribute('src', src)
-    },
-    { once: true }
-  )
-}
+const askToTrust = (src) =>
+  trust.ask(foreignHost(src), () => {
+    player.untrusted = false
+    player.removeAttribute('src')
+    player.setAttribute('src', src)
+  })
 
-const note = (line) => {
-  const stamp = new Date().toLocaleTimeString([], { hour12: false })
-  log.textContent = `${stamp}  ${line}\n${log.textContent}`.slice(0, 20000)
-}
+const note = logInto(log)
 
 player.addEventListener('error', (event) => {
   if (event.detail.code === 'runtime' && player.state === 'ready') return

@@ -1,3 +1,6 @@
+import { readFile } from 'node:fs/promises'
+import { resolve } from 'node:path'
+import { LIBRARY_PACK_URL, LIBRARY_PACK_VERSION } from '../../src/shared/constants'
 import { describe, expect, it, vi } from 'vitest'
 import { parseLibrarySources } from '../../src/shared/library-sources'
 
@@ -19,9 +22,6 @@ describe('the libraries attribute', () => {
 
 describe('the pack the element names', () => {
   it('is the version in this checkout, on jsDelivr', async () => {
-    const { readFile } = await import('node:fs/promises')
-    const { resolve } = await import('node:path')
-    const { LIBRARY_PACK_URL, LIBRARY_PACK_VERSION } = await import('../../src/shared/constants')
     const libraries = JSON.parse(await readFile(resolve(import.meta.dirname, '../../../libraries/package.json'), 'utf8'))
     // Stamped by scripts/sync-h5p-assets.mjs; a mismatch means the stamp did not run.
     expect(LIBRARY_PACK_VERSION).toBe(libraries.version)

@@ -196,3 +196,17 @@ export const SAVE_INTERVAL_S = 10
  * that is running, as it did before the check existed.
  */
 export const WORKER_UPDATE_TIMEOUT_MS = 3_000
+
+/** How long the element waits for the Service Worker to answer on the control channel. */
+export const CONTROL_TIMEOUT_MS = 30_000
+/**
+ * How long the element waits for an answer a worker older than the question never gives — a
+ * `find-downloaded-libraries` to an `h5p-sw.js` copied before it was added — where silence is a no.
+ */
+export const SILENT_ANSWER_TIMEOUT_MS = 3_000
+
+/**
+ * How long the virtual server waits for the page to hand over a picked `File` it asked for
+ * (`need-file`) before the request for the entry is answered as unavailable.
+ */
+export const FILE_HANDOVER_TIMEOUT_MS = 15_000

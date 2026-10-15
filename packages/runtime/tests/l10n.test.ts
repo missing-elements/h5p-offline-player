@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { coreStrings, packTag, translationProblem } from '../scripts/l10n-rules.mjs'
-import { coreTranslations, matchLanguage } from '../src/l10n'
+import { LANGUAGE_TAG, coreTranslations, matchLanguage } from '../src/l10n'
 
 /**
  * The committed translations in `l10n/`, held to what `scripts/build-l10n.mjs` promises, so that a
@@ -23,7 +23,6 @@ const tags = readdirSync(dir)
 
 const read = (tag: string) => JSON.parse(readFileSync(resolve(dir, `${tag}.json`), 'utf8')) as { H5P: Record<string, unknown> }
 
-const LANGUAGE_TAG = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/
 
 describe('the core strings', () => {
   it('are read from the installed h5p-standalone, keys and English alike', () => {

@@ -7,6 +7,8 @@
  * Activity. *When* a build was the current one is not the statement's to say: that is the
  * publishing organisation's version record, which an audit compares these against.
  */
+import { hex } from './pkg-id'
+
 
 /** One central-directory record, as much of it as the fingerprint covers. */
 export interface FingerprintEntry {
@@ -61,8 +63,7 @@ export async function indexFingerprint(entries: Iterable<FingerprintEntry>): Pro
     offset += part.length
   }
 
-  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', all))
-  return `sha256:${Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('')}`
+  return `sha256:${hex(new Uint8Array(await crypto.subtle.digest('SHA-256', all)))}`
 }
 
 /**

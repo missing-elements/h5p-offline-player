@@ -6,16 +6,27 @@
 
 const encoder = new TextEncoder()
 
+/** Bytes as lower-case hex, two characters each. */
+export function hex(bytes: Uint8Array): string {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+/** `count` random bytes as hex: a nonce, a token, a key nothing outside its holder can guess. */
+export function randomHex(count: number): string {
+  return hex(crypto.getRandomValues(new Uint8Array(count)))
+}
+
 async function sha256Hex(input: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', encoder.encode(input))
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('')
+  return hex(new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(input))))
 }
 
 /** 32 hex characters: 128 bits, short enough to read in a URL and far past collision risk here. */
+export const PKG_ID_LENGTH = 32
+/** The bytes of randomness in a load key: 16 hex characters in a route. */
+export const LOAD_KEY_BYTES = 8
+
 async function shortHash(input: string): Promise<string> {
-  return (await sha256Hex(input)).slice(0, 32)
+  return (await sha256Hex(input)).slice(0, PKG_ID_LENGTH)
 }
 
 /**
@@ -42,5 +53,5 @@ export function filePkgId(file: { name: string; size: number; lastModified: numb
  * nothing outside the frame that carries it in its URLs can name it.
  */
 export function loadKey(): string {
-  return Array.from(crypto.getRandomValues(new Uint8Array(8)), (byte) => byte.toString(16).padStart(2, '0')).join('')
+  return randomHex(LOAD_KEY_BYTES)
 }

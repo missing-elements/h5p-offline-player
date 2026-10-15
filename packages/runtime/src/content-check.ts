@@ -35,6 +35,8 @@
  * - The step check uses whole steps of at least one, as PHP's integer `%` does; a fractional step,
  *   which PHP 8 divides by zero on, is not checked.
  */
+import { libraryKey, parseLibrary } from './library-names'
+
 
 /** One field of a library's `semantics.json`, as far as the check reads it. */
 export interface SemanticField {
@@ -58,11 +60,6 @@ export interface SemanticField {
 }
 
 /** A library as content names it: `"H5P.MultiChoice 1.16"`. */
-export interface LibraryName {
-  machineName: string
-  major: number
-  minor: number
-}
 
 /** The semantics loaded for the content, by the library string `libraryKey` gives; `null` for a library with none. */
 export type SemanticsTable = Map<string, SemanticField[] | null>
@@ -82,35 +79,7 @@ const isScalar = (value: Json): value is string | number | boolean =>
 
 /* ------------------------------------------------------------------ libraries */
 
-/** `H5PCore::libraryFromString`. */
-export function parseLibrary(value: unknown): LibraryName | null {
-  if (typeof value !== 'string') return null
-  const match = /^([\w\-.]{1,255})[- ]([0-9]{1,5})\.([0-9]{1,5})$/i.exec(value)
-  return match ? { machineName: match[1], major: Number(match[2]), minor: Number(match[3]) } : null
-}
-
-export const libraryKey = (library: LibraryName): string => `${library.machineName} ${library.major}.${library.minor}`
-
-/**
- * Every library the content could name, found by shape — an object whose `library` is a library
- * string — so its semantics can be loaded before the check. A superset of what the check reaches:
- * it looks in every field, not only in the ones the semantics call a library.
- */
-export function librariesIn(params: Json): LibraryName[] {
-  const found = new Map<string, LibraryName>()
-  const walk = (value: Json): void => {
-    if (Array.isArray(value)) {
-      for (const item of value) walk(item)
-      return
-    }
-    if (!isObject(value)) return
-    const library = parseLibrary(value.library)
-    if (library) found.set(libraryKey(library), library)
-    for (const key of Object.keys(value)) walk(value[key])
-  }
-  walk(params)
-  return [...found.values()]
-}
+export { librariesIn, libraryKey, parseLibrary, type LibraryName } from './library-names'
 
 /* ------------------------------------------------------------------ escaping */
 
@@ -146,8 +115,7 @@ const HTML4_ENTITIES = new Map(
     'or:2228 cap:2229 cup:222a int:222b there4:2234 sim:223c cong:2245 asymp:2248 ne:2260 ' +
     'equiv:2261 le:2264 ge:2265 sub:2282 sup:2283 nsub:2284 sube:2286 supe:2287 oplus:2295 ' +
     'otimes:2297 perp:22a5 sdot:22c5 lceil:2308 rceil:2309 lfloor:230a rfloor:230b lang:2329 ' +
-    'rang:232a loz:25ca spades:2660 clubs:2663 hearts:2665 diams:2666 ' +
-    ''
+    'rang:232a loz:25ca spades:2660 clubs:2663 hearts:2665 diams:2666'
   )
     .trim()
     .split(' ')
@@ -195,17 +163,17 @@ function entityLength(rest: string): number {
 }
 
 /**
- * PHP's `htmlspecialchars($text, ENT_QUOTES, 'UTF-8', $doubleEncode)`: `&`, `"`, `'`, `<` and `>`
- * written as references — `'` as `&#039;` — and, without double encoding, a reference already
- * there kept. Invalid UTF-8, a lone surrogate here, gives an empty string, as PHP does.
+ * PHP's `htmlspecialchars($text, ENT_QUOTES, 'UTF-8', false)`: `&`, `"`, `'`, `<` and `>`
+ * written as references — `'` as `&#039;` — and a reference already there kept, as every call
+ * upstream makes asks. Invalid UTF-8, a lone surrogate here, gives an empty string, as PHP does.
  */
-export function escapeHtml(text: string, doubleEncode = false): string {
+export function escapeHtml(text: string): string {
   if (hasLoneSurrogate(text)) return ''
   let out = ''
   for (let i = 0; i < text.length; i++) {
     const char = text[i]
     if (char === '&') {
-      const length = doubleEncode ? 0 : entityLength(text.slice(i + 1))
+      const length = entityLength(text.slice(i + 1))
       if (length) {
         out += text.slice(i, i + 1 + length)
         i += length

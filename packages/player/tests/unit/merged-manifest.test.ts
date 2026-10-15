@@ -1,9 +1,7 @@
+import { memoryHandle, zipOf } from './helpers/archives'
 import { describe, expect, it } from 'vitest'
-import { BlobWriter, TextReader, ZipWriter, configure } from '@zip.js/zip.js'
 import { PackageReader, addonPatterns, librariesNamedIn, textMatches } from '../../src/sw/package-reader'
 import type { SourceHandle } from '../../src/shared/source'
-
-configure({ useWebWorkers: false })
 
 /**
  * What the runtime is told to load when a bundle fills in for a stripped export. The export's
@@ -11,24 +9,7 @@ configure({ useWebWorkers: false })
  * `content.json`, and the bundle — the app's pack in particular — may carry a newer minor.
  */
 
-async function zipOf(files: Record<string, string>) {
-  const writer = new ZipWriter(new BlobWriter('application/zip'))
-  for (const [name, content] of Object.entries(files)) await writer.add(name, new TextReader(content))
-  return new Uint8Array(await (await writer.close()).arrayBuffer())
-}
-
-function handleOf(bytes: Uint8Array<ArrayBuffer>): SourceHandle {
-  return {
-    descriptor: { type: 'file', name: 'a.h5p', size: bytes.length, lastModified: 0 },
-    size: bytes.length,
-    async read(range) {
-      return bytes.subarray(range.start, range.end + 1)
-    },
-    async stream(range) {
-      return new Blob([bytes.subarray(range.start, range.end + 1)]).stream()
-    }
-  }
-}
+const handleOf = (bytes: Uint8Array<ArrayBuffer>): SourceHandle => memoryHandle(bytes).handle
 
 const library = (machineName: string, major: number, minor: number) =>
   JSON.stringify({ machineName, majorVersion: major, minorVersion: minor, patchVersion: 0, runnable: 1 })

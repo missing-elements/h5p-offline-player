@@ -3,6 +3,9 @@
  * the demo build ships. `public/fixtures/` may hold real packages dropped in to try against the
  * dev server; those are neither wiped nor deployed.
  */
+/** The size of the large media entry in the large fixtures: enough to take the slice and chunk paths. */
+export const LARGE_ENTRY_SIZE = 20 * 1024 * 1024
+
 export const GENERATED_FIXTURES = [
   'basic.h5p',
   'finished.h5p',

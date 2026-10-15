@@ -1,11 +1,9 @@
-import { createWriteStream, openAsBlob } from 'node:fs'
-import { mkdir, stat, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { openAsBlob } from 'node:fs'
+import { writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { Readable } from 'node:stream'
-import { pipeline } from 'node:stream/promises'
 import { BlobReader, BlobWriter, TextReader, Uint8ArrayReader, Uint8ArrayWriter, ZipReader, ZipWriter, configure } from '@zip.js/zip.js'
 import { formatBytes } from '@missing-elements/h5p-normalize'
+import { download as cachedDownload, hubBundle as cachedBundle } from './lib/hub.mjs'
 
 /**
  * Builds the library pack, `packages/libraries/libraries.h5p` (`@missing-elements/h5p-libraries`,
@@ -27,10 +25,6 @@ import { formatBytes } from '@missing-elements/h5p-normalize'
  */
 
 configure({ useWebWorkers: false })
-
-// The hub moved to this host in 2026; see the same constant in build-demo-content.mjs for why
-// the element itself has not followed yet.
-const HUB = 'https://hub-api.h5p.org/v1/content-types/'
 
 /**
  * Every content type the hub serves, as of 2026-10-13. One that is gone is reported and skipped.
@@ -93,10 +87,7 @@ const UNDECLARED = {
 
 const rootDir = resolve(import.meta.dirname, '..')
 const outDir = resolve(rootDir, '..', '..', 'packages', 'libraries')
-const cacheDir = join(tmpdir(), 'h5p-hub-cache')
 const refresh = process.argv.includes('--refresh')
-
-await mkdir(cacheDir, { recursive: true })
 
 /** folder -> { library, files: Map<name, Uint8Array> }, keeping the newest minor per major. */
 const kept = new Map()
@@ -195,20 +186,13 @@ function newer(a, b) {
   return a.minorVersion !== b.minorVersion ? a.minorVersion > b.minorVersion : (a.patchVersion ?? 0) > (b.patchVersion ?? 0)
 }
 
-/** The hub bundle for a content type, cached; `null` when the hub no longer has it. */
-function hubBundle(machineName) {
-  return download(`${HUB}${encodeURIComponent(machineName)}`, `${machineName}.h5p`, true)
-}
+const LOG = '[libraries]'
 
-/** A file, cached under `name`; with `optional`, `null` when its host says there is no such file. */
-async function download(url, name, optional = false) {
-  const path = join(cacheDir, name)
-  if (!refresh && (await stat(path).then(() => true, () => false))) return path
-  console.log(`[libraries] fetching ${url}`)
-  const response = await fetch(url)
-  // Not a content type. The old host said 404; S3 behind the new one says 403 for a missing key.
-  if (optional && (response.status === 404 || response.status === 403)) return null
-  if (!response.ok || !response.body) throw new Error(`${url} returned ${response.status}`)
-  await pipeline(Readable.fromWeb(/** @type {any} */ (response.body)), createWriteStream(path))
-  return path
-}
+/** The hub bundle for a content type, cached; `null` when the hub no longer has it. */
+const hubBundle = (machineName) => cachedBundle(machineName, { refresh, optional: true, log: LOG })
+
+/**
+ * A file, cached under `name`; with `optional`, `null` when its host says there is no such file.
+ * @param {string} url @param {string} name @param {boolean} [optional]
+ */
+const download = (url, name, optional = false) => cachedDownload(url, name, { refresh, optional, log: LOG })

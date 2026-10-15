@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs'
-import type { AddressInfo } from 'node:net'
 import { resolve } from 'node:path'
-import type { Browser } from 'playwright'
-import { createServer, type ViteDevServer } from 'vite'
+import type { Browser, Page } from 'playwright'
+import { type ViteDevServer } from 'vite'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { highlightCodeBlocks } from '../scripts/lib/code-blocks.mjs'
 import { browserType, engine } from './engine'
+import { startSite } from './harness'
 
 /**
  * The demo pages' code blocks: highlighted by `scripts/lib/code-blocks.mjs` when a page is
@@ -107,9 +107,7 @@ describe('on the page', () => {
   let origin: string
 
   beforeAll(async () => {
-    vite = await createServer({ configFile: resolve(rootDir, 'vite.config.ts'), root: rootDir, server: { host: 'localhost', port: 0 }, logLevel: 'error' })
-    await vite.listen()
-    origin = `http://localhost:${(vite.httpServer!.address() as AddressInfo).port}`
+    ;({ vite, origin } = await startSite())
     browser = await browserType.launch()
   })
 
@@ -118,7 +116,7 @@ describe('on the page', () => {
     await vite?.close()
   })
 
-  const visible = (page: import('playwright').Page) =>
+  const visible = (page: Page) =>
     page.evaluate(() =>
       [...document.querySelectorAll<HTMLElement>('.code-block[data-tabs] .code-body')].filter((panel) => !panel.hidden).map((panel) => panel.dataset.tab)
     )

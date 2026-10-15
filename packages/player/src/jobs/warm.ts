@@ -1,3 +1,4 @@
+import { inflated } from '../shared/stream-utils'
 import { WARM_ENTRY, WARM_STALL_MS } from '../shared/constants'
 import { QuotaError, type ChunkStore } from '../shared/chunk-store'
 import { DEFLATE, LOCAL_HEADER_FIXED_SIZE, STORED, localHeaderDataStart } from '../shared/local-header'
@@ -97,11 +98,7 @@ export async function warmPackage(
 }
 
 function bodyOf(compressed: Uint8Array<ArrayBuffer>, method: number): ReadableStream<Uint8Array> {
-  const raw = new Blob([compressed]).stream()
-  if (method === STORED || compressed.length === 0) return raw
-  // The lib types the codec's input as `BufferSource`, stricter than the plain views it gets.
-  const inflate = new DecompressionStream('deflate-raw') as unknown as ReadableWritablePair<Uint8Array, Uint8Array>
-  return raw.pipeThrough(inflate)
+  return inflated(new Blob([compressed]).stream(), method, compressed.length)
 }
 
 /**
@@ -112,6 +109,7 @@ function bodyOf(compressed: Uint8Array<ArrayBuffer>, method: number): ReadableSt
 class ByteCursor {
   private readonly reader: ReadableStreamDefaultReader<Uint8Array>
   private pending: Uint8Array | null = null
+  // A cancel that errors is a stream that has already ended, which is what was wanted.
   private readonly onAbort = () => void this.reader.cancel().catch(() => {})
 
   constructor(

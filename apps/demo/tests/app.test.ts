@@ -1,11 +1,10 @@
-import { copyFile, mkdtemp, readFile, rm } from 'node:fs/promises'
-import { createServer as createHttpServer, type Server } from 'node:http'
-import type { AddressInfo } from 'node:net'
+import { copyFile, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { chromium, type Browser, type BrowserContext, type Page } from 'playwright'
+import { type Browser, type BrowserContext, type Page } from 'playwright'
 import { browserType, engine } from './engine'
-import { createServer, type ViteDevServer } from 'vite'
+import { OWN_CODE_ONLY, QUIZ, packageHost, playerIs, startSite } from './harness'
+import { type ViteDevServer } from 'vite'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
 /**
@@ -15,37 +14,25 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
  * the title bar — Chromium cannot emulate, and is checked by hand.
  */
 
-const rootDir = resolve(import.meta.dirname, '..')
-const QUIZ = resolve(rootDir, 'demo', 'content', 'quiz.h5p')
-/** Needs a version of the fixture content type only it carries, which the app's pack has not got. */
-const OWN_CODE_ONLY = resolve(rootDir, '..', '..', 'packages', 'player', 'public', 'fixtures', 'untrusted-newer.h5p')
 let vite: ViteDevServer
 let browser: Browser
 let origin: string
-/** Another site, `127.0.0.1` to the app's `localhost`, serving packages with CORS open. */
-let elsewhere: { origin: string; server: Server }
+/** Another site, serving the quiz and a package that needs its own code. */
+let elsewhere: Awaited<ReturnType<typeof packageHost>>
 
 beforeAll(async () => {
-  vite = await createServer({ configFile: resolve(rootDir, 'vite.config.ts'), root: rootDir, server: { host: 'localhost', port: 0 }, logLevel: 'error' })
-  await vite.listen()
-  origin = `http://localhost:${(vite.httpServer!.address() as AddressInfo).port}`
+  ;({ vite, origin } = await startSite())
   browser = await browserType.launch()
-  const files: Record<string, string> = { '/quiz.h5p': QUIZ, '/own-code-only.h5p': OWN_CODE_ONLY }
-  const server = createHttpServer(async (request, response) => {
-    const file = files[new URL(request.url ?? '/', 'http://x').pathname]
-    if (!file) return void response.writeHead(404).end()
-    const body = await readFile(file)
-    response.writeHead(200, { 'Content-Type': 'application/zip', 'Content-Length': body.length, 'Access-Control-Allow-Origin': '*' }).end(body)
-  })
-  await new Promise<void>((done) => server.listen(0, '127.0.0.1', done))
-  elsewhere = { origin: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, server }
+  elsewhere = await packageHost({ '/quiz.h5p': QUIZ, '/own-code-only.h5p': OWN_CODE_ONLY })
 })
 
 afterAll(async () => {
   await browser?.close()
   await vite?.close()
-  await new Promise((done) => elsewhere?.server.close(done))
+  await elsewhere?.close()
 })
+
+const VIEWPORT = { width: 1000, height: 760 }
 
 interface Seen {
   screen: string | undefined
@@ -77,9 +64,6 @@ const seen = (page: Page) =>
     }
   })
 
-const playerIs = (page: Page, ...states: string[]) =>
-  page.waitForFunction((states) => states.includes((document.querySelector('h5p-player') as HTMLElement & { state: string }).state), states, { timeout: 60_000 })
-
 /** The player's next `ready` event: the load after this one, where `playerIs` would see this one's state. */
 const nextReady = (page: Page) =>
   page.evaluate(() => new Promise<void>((done) => document.querySelector('h5p-player')!.addEventListener('ready', () => done(), { once: true })))
@@ -87,10 +71,12 @@ const nextReady = (page: Page) =>
 /**
  * The app in a fresh browser profile. Chromium's own picker, `showOpenFilePicker`, is taken away
  * unless a test brings its own: Playwright cannot answer it, and without it the app takes the path
- * Safari and Firefox take, the page's file input.
+ * Safari and Firefox take, the page's file input. `onDisk` opens it in a profile on disk, as a
+ * browser window is (closed with `closePage`), and `installed` answers `display-mode` as an
+ * installed window would; see `profileOnDisk`.
  */
-async function openApp(path = '/app/', { keepPicker = false, onDisk = false } = {}) {
-  const page = onDisk ? await profileOnDisk() : await browser.newPage({ viewport: { width: 1000, height: 760 } })
+async function openApp(path = '/app/', { keepPicker = false, onDisk = false, installed = false } = {}) {
+  const page = onDisk ? await profileOnDisk({ installed }) : await browser.newPage({ viewport: VIEWPORT })
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   if (!keepPicker) {
@@ -100,7 +86,7 @@ async function openApp(path = '/app/', { keepPicker = false, onDisk = false } = 
     })
   }
   await page.goto(`${origin}${path}`)
-  await whenReady(page)
+  await workerChecked(page)
   return { page, errors }
 }
 
@@ -109,11 +95,20 @@ const profiles = new Map<Page, { context: BrowserContext; dir: string }>()
 /**
  * A page in a browser profile on disk, as a browser window is: WebKit, as Safari in a private
  * window, refuses a `File` in IndexedDB in the private profile Playwright gives a page, so the app
- * keeps no copy there. Closed with `closePage`.
+ * keeps no copy there. Closed with `closePage`. With `installed`, the app is as installed as far
+ * as its script can tell: `display-mode` answered as matching, which Chromium will not emulate —
+ * on disk because storing a file handle in the private profile takes Chromium down, the reason the
+ * app keeps handles only when installed, which a private profile never is.
  */
-async function profileOnDisk() {
+async function profileOnDisk({ installed = false } = {}) {
   const dir = await mkdtemp(join(tmpdir(), 'h5p-app-profile-'))
-  const context = await browserType.launchPersistentContext(dir, { viewport: { width: 1000, height: 760 } })
+  const context = await browserType.launchPersistentContext(dir, { viewport: VIEWPORT })
+  if (installed) {
+    await context.addInitScript(() => {
+      const match = window.matchMedia.bind(window)
+      window.matchMedia = (query) => match(query.includes('display-mode') ? 'all' : query)
+    })
+  }
   const page = context.pages()[0] ?? (await context.newPage())
   profiles.set(page, { context, dir })
   return page
@@ -127,30 +122,6 @@ async function closePage(page: Page) {
   await rm(profile.dir, { recursive: true, force: true })
 }
 
-/**
- * The app as installed, as far as its script can tell: `display-mode` answered as matching, which
- * Chromium will not emulate. In a profile on disk rather than the private one Playwright gives a
- * page, in which storing a file handle takes Chromium down — the reason the app keeps handles only
- * when installed, which a private profile never is.
- */
-async function openInstalledApp() {
-  const dir = await mkdtemp(join(tmpdir(), 'h5p-app-test-'))
-  const context = await chromium.launchPersistentContext(dir, { viewport: { width: 1000, height: 760 } })
-  await context.addInitScript(() => {
-    const match = window.matchMedia.bind(window)
-    window.matchMedia = (query) => match(query.includes('display-mode') ? 'all' : query)
-  })
-  const page = context.pages()[0] ?? (await context.newPage())
-  const errors: string[] = []
-  page.on('pageerror', (error) => errors.push(error.message))
-  await page.goto(`${origin}/app/`)
-  await whenReady(page)
-  const close = async () => {
-    await context.close()
-    await rm(dir, { recursive: true, force: true })
-  }
-  return { page, errors, close }
-}
 
 /**
  * Chrome's picker, standing in: it answers with a real handle, to a copy of the quiz in the
@@ -177,10 +148,15 @@ const NEXT = engine === 'webkit' ? 'Alt+Tab' : 'Tab'
 /** Handles to files on disk are Chromium's: its picker, a drop, the file manager. */
 const noHandles = engine !== 'chromium'
 
-const whenReady = (page: Page) =>
+/** Resolves once the page has found out whether its worker controls it, which is when it opens files. */
+const workerChecked = (page: Page) =>
   page.waitForFunction(() => document.querySelector<HTMLElement>('#offline')?.dataset.state !== 'preparing', null, { timeout: 30_000 })
 
-const goneHome = (page: Page) => page.waitForFunction(() => document.body.dataset.screen === 'home')
+const goneHome = (page: Page) => page.waitForFunction(() => document.body?.dataset.screen === 'home')
+const recentShown = (page: Page) => page.waitForFunction(() => !document.querySelector<HTMLElement>('#recent')!.hidden)
+const recentGone = (page: Page) => page.waitForFunction(() => document.querySelector<HTMLElement>('#recent')!.hidden)
+/** Resolves once the app has marked the current step as `depth` steps above home. */
+const atDepth = (page: Page, depth: number) => page.waitForFunction((depth) => history.state?.depth === depth, depth)
 
 /** The list of recent files as it reads, once it has drawn what it holds. */
 const recent = (page: Page) =>
@@ -242,7 +218,7 @@ it('opens a file from the keyboard, shows it under its own title, and closes it 
   expect(await page.evaluate(() => document.activeElement?.id)).toBe('back')
 
   await page.click('#back')
-  await page.waitForFunction(() => document.body.dataset.screen === 'home')
+  await goneHome(page)
   await playerIs(page, 'idle')
   expect(await seen(page)).toMatchObject({ screen: 'home', startOver: false, back: false, url: '/app/' })
   expect(errors).toEqual([])
@@ -257,7 +233,7 @@ it('keeps a link in the address, and takes the browser’s Back and Forward as c
   // From script, as the bar's Back goes: Firefox's own Back passes over a step a page wrote before
   // anyone interacted with it, which home is when a link opens the app, and leaves the app.
   await page.evaluate(() => history.back())
-  await page.waitForFunction(() => document.body.dataset.screen === 'home')
+  await goneHome(page)
   expect((await seen(page)).url).toBe('/app/')
 
   // Possible only because the player navigates its frame without adding history of its own.
@@ -279,7 +255,7 @@ it('keeps a link in the address, and takes the browser’s Back and Forward as c
   expect(await page.evaluate(() => history.length)).toBe(steps)
   expect((await seen(page)).url).toContain('?src=')
   await page.goBack()
-  await page.waitForFunction(() => document.body.dataset.screen === 'home')
+  await goneHome(page)
   expect((await seen(page)).url).toBe('/app/')
   expect(errors).toEqual([])
   await page.close()
@@ -307,7 +283,7 @@ it('keeps a file open while its content writes to the address, and closes it wit
 
   await turnPage(page, 'one')
   await turnPage(page, 'two')
-  await page.waitForTimeout(100)
+  await atDepth(page, 3)
   expect(await seen(page)).toMatchObject({ screen: 'player', player: 'ready' })
   expect(await page.evaluate(() => history.length)).toBe(steps + 3)
 
@@ -318,7 +294,7 @@ it('keeps a file open while its content writes to the address, and closes it wit
 
   // Back in the bar goes home past the content's steps, in one press.
   await page.click('#back')
-  await page.waitForFunction(() => document.body.dataset.screen === 'home')
+  await goneHome(page)
   await playerIs(page, 'idle')
   expect(await seen(page)).toMatchObject({ url: '/app/', back: false })
   expect(await page.evaluate(() => location.hash)).toBe('')
@@ -330,7 +306,7 @@ it('reopens a link where its content had got to after a reload, and still goes h
   const { page, errors } = await openApp('/app/?src=/demo/content/quiz.h5p')
   await playerIs(page, 'ready')
   await turnPage(page, 'one')
-  await page.waitForTimeout(100)
+  await atDepth(page, 2)
   const steps = await page.evaluate(() => history.length)
 
   await page.reload()
@@ -341,7 +317,7 @@ it('reopens a link where its content had got to after a reload, and still goes h
   // Home was written by the page before the reload, so going there loads the page again.
   await page.click('#back')
   await page.waitForURL(`${origin}/app/`)
-  await page.waitForFunction(() => document.body?.dataset.screen === 'home')
+  await goneHome(page)
   expect(await seen(page)).toMatchObject({ screen: 'home', url: '/app/' })
   expect(errors).toEqual([])
   await page.close()
@@ -356,15 +332,15 @@ it('lists a file it played, keeps a copy where there is no handle, and opens it 
   const pkgId = await page.evaluate(() => (document.querySelector('h5p-player') as HTMLElement & { pkgId: string }).pkgId)
   await page.click('#back')
   await goneHome(page)
-  await page.waitForFunction(() => !document.querySelector<HTMLElement>('#recent')!.hidden)
+  await recentShown(page)
   expect(await recent(page)).toEqual([{ title: 'Do you know what just happened?', meta: expect.stringMatching(/^quiz\.h5p · Today · [\d.]+ (kB|MB) on this device$/) }])
   expect(await copiesKept(page)).toBe(1)
 
   // A new visit: the file opens from the copy, as the same file to the player, so its saved place
   // comes back with it, and no picker opens.
   await page.reload()
-  await whenReady(page)
-  await page.waitForFunction(() => !document.querySelector<HTMLElement>('#recent')!.hidden)
+  await workerChecked(page)
+  await recentShown(page)
   let picked = false
   page.on('filechooser', () => (picked = true))
   await page.click('.recent-open')
@@ -377,7 +353,7 @@ it('lists a file it played, keeps a copy where there is no handle, and opens it 
   await page.click('#back')
   await goneHome(page)
   await page.click('.recent-remove')
-  await page.waitForFunction(() => document.querySelector<HTMLElement>('#recent')!.hidden)
+  await recentGone(page)
   expect(await copiesKept(page)).toBe(0)
   expect(await page.evaluate(() => document.activeElement?.id)).toBe('open')
   expect(errors).toEqual([])
@@ -398,19 +374,19 @@ it.skipIf(engine !== 'chromium')('asks for a file again when its copy cannot be 
   await playerIs(page, 'ready')
   await page.click('#back')
   await goneHome(page)
-  await page.waitForFunction(() => !document.querySelector<HTMLElement>('#recent')!.hidden)
+  await recentShown(page)
   await rm(dir, { recursive: true, force: true })
 
   // Not "Could not read the archive index": the picker, and the entry gone until it is chosen.
   const [again] = await Promise.all([page.waitForEvent('filechooser'), page.click('.recent-open')])
-  await page.waitForFunction(() => document.querySelector<HTMLElement>('#recent')!.hidden)
+  await recentGone(page)
   expect(await seen(page)).toMatchObject({ screen: 'home', player: 'idle', message: 'quiz.h5p could not be opened from the list. Choose it again.' })
   expect(await copiesKept(page)).toBe(0)
   await again.setFiles(QUIZ)
   await playerIs(page, 'ready')
   await page.click('#back')
   await goneHome(page)
-  await page.waitForFunction(() => !document.querySelector<HTMLElement>('#recent')!.hidden)
+  await recentShown(page)
   expect((await recent(page)).length).toBe(1)
   expect(await copiesKept(page)).toBe(1)
   expect(errors).toEqual([])
@@ -418,26 +394,26 @@ it.skipIf(engine !== 'chromium')('asks for a file again when its copy cannot be 
 })
 
 it.skipIf(noHandles)('keeps a handle when installed, keeps no copy, and reads the file from it again', async () => {
-  const { page, errors, close } = await openInstalledApp()
+  const { page, errors } = await openApp('/app/', { onDisk: true, installed: true })
   try {
     await standInPicker(page)
     await page.click('#open')
     await playerIs(page, 'ready')
     await page.click('#back')
     await goneHome(page)
-    await page.waitForFunction(() => !document.querySelector<HTMLElement>('#recent')!.hidden)
+    await recentShown(page)
     expect(await recent(page)).toEqual([{ title: 'Do you know what just happened?', meta: 'quiz.h5p · Today' }])
     expect(await copiesKept(page)).toBe(0)
 
     await page.reload()
-    await whenReady(page)
-    await page.waitForFunction(() => !document.querySelector<HTMLElement>('#recent')!.hidden)
+    await workerChecked(page)
+    await recentShown(page)
     await page.click('.recent-open')
     await playerIs(page, 'ready')
     expect((await seen(page)).bar).toBe('Do you know what just happened?')
     expect(errors).toEqual([])
   } finally {
-    await close()
+    await closePage(page)
   }
 })
 
@@ -448,7 +424,7 @@ it.skipIf(noHandles)('keeps a copy in a tab even where the browser gives a handl
   await playerIs(page, 'ready')
   await page.click('#back')
   await goneHome(page)
-  await page.waitForFunction(() => !document.querySelector<HTMLElement>('#recent')!.hidden)
+  await recentShown(page)
   expect(await recent(page)).toEqual([{ title: 'Do you know what just happened?', meta: expect.stringMatching(/^quiz\.h5p · Today · [\d.]+ MB on this device$/) }])
   expect(await copiesKept(page)).toBe(1)
   expect(errors).toEqual([])
@@ -487,7 +463,7 @@ it('lists a link by its host, and opens it from the list', async () => {
   await playerIs(page, 'ready')
   await page.click('#back')
   await goneHome(page)
-  await page.waitForFunction(() => !document.querySelector<HTMLElement>('#recent')!.hidden)
+  await recentShown(page)
   expect(await recent(page)).toEqual([{ title: 'Words this player uses', meta: `${new URL(origin).host} · Today` }])
 
   await page.click('.recent-open')

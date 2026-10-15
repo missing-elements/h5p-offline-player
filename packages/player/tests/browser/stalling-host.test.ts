@@ -1,7 +1,8 @@
+import { type H5PPlayerElement, type PlayerProgressDetail } from '../../src/h5p-offline-player'
 import { afterEach, describe, expect, it } from 'vitest'
 import '../../src/h5p-offline-player'
 import type { PlayerErrorDetail } from '../../src/h5p-offline-player'
-import { FIXTURES, clearPackageCaches, frameFetch, play, virtualUrl } from './utils'
+import { FIXTURES, clearPackageCaches, frameFetch, play, virtualUrl, waitForEvent } from './utils'
 
 /**
  * An extraction that loses its link in the middle. What must hold: the virtual server keeps
@@ -47,6 +48,10 @@ async function tailOf(player: Awaited<ReturnType<typeof play>>, errors: string[]
   }
 }
 
+/** Resolves on the next extraction progress with bytes landed: the transfer is under way. */
+const underWay = (player: H5PPlayerElement) =>
+  waitForEvent<PlayerProgressDetail>(player, 'progress', 30_000, (detail) => detail.phase === 'extract' && detail.loaded > 0)
+
 describe('an extraction across an outage of the host', () => {
   afterEach(async () => {
     await outage(0, 'silent')
@@ -59,8 +64,9 @@ describe('an extraction across an outage of the host', () => {
     const errors: string[] = []
     const tail = await tailOf(player, errors)
 
-    // The transfer is under way. Now nothing arrives for longer than the server would once wait.
-    await new Promise((resolve) => setTimeout(resolve, 1_000))
+    // The transfer is under way: bytes of the tail's extraction have landed. Now nothing arrives
+    // for longer than the server would once wait.
+    await underWay(player)
     const started = performance.now()
     await outage(35_000, 'silent')
 
@@ -76,8 +82,8 @@ describe('an extraction across an outage of the host', () => {
     const errors: string[] = []
     const tail = await tailOf(player, errors)
 
-    // Every request in flight is cut, and new ones are refused, for a while.
-    await new Promise((resolve) => setTimeout(resolve, 1_000))
+    // The transfer is under way; then every request in flight is cut, and new ones are refused, for a while.
+    await underWay(player)
     const started = performance.now()
     await outage(12_000, 'reset')
 

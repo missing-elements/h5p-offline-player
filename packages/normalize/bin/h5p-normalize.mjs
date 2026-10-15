@@ -42,15 +42,26 @@ Options:
   -h, --help
 `
 
-const { values, positionals } = parseArgs({
-  options: {
-    output: { type: 'string', short: 'o' },
-    'dry-run': { type: 'boolean', short: 'n', default: false },
-    quiet: { type: 'boolean', short: 'q', default: false },
-    help: { type: 'boolean', short: 'h', default: false }
-  },
-  allowPositionals: true
-})
+/** @returns {ReturnType<typeof parseArgs>} */
+function parse() {
+  try {
+    return parseArgs({
+      options: {
+        output: { type: 'string', short: 'o' },
+        'dry-run': { type: 'boolean', short: 'n', default: false },
+        quiet: { type: 'boolean', short: 'q', default: false },
+        help: { type: 'boolean', short: 'h', default: false }
+      },
+      allowPositionals: true
+    })
+  } catch (error) {
+    // An unknown option or a missing value: the message and the usage, not a stack trace.
+    process.stderr.write(`h5p-normalize: ${error instanceof Error ? error.message : String(error)}\n\n${HELP}`)
+    process.exit(2)
+  }
+}
+
+const { values, positionals } = parse()
 
 if (values.help) {
   process.stdout.write(HELP)
@@ -65,6 +76,7 @@ async function main() {
   const [given] = positionals
   const dryRun = values['dry-run']
   const quiet = values.quiet
+  if (dryRun && values.output) process.stderr.write('note: --output is ignored with --dry-run; nothing is written\n')
 
   /** @type {string | null} */
   let downloadDir = null

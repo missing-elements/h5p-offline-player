@@ -5,16 +5,7 @@ import '../../src/h5p-offline-player'
 import type { PlayerErrorDetail } from '../../src/h5p-offline-player'
 import { FAILURE_BACKOFF_MS } from '../../src/shared/constants'
 import { busyPackages } from '../../src/shared/locks'
-import {
-  FIXTURES,
-  clearPackageCaches,
-  createPlayer,
-  frameFetch,
-  play,
-  virtualUrl,
-  waitFor,
-  waitForSettled
-} from '../browser/utils'
+import { FIXTURES, clearPackageCaches, createPlayer, frameFetch, play, settle, virtualUrl, waitFor, waitForEvent, waitForSettled } from '../browser/utils'
 
 /**
  * The player against a browser that has no room left. The quota is the real one, capped through
@@ -73,7 +64,7 @@ describe('a browser with no storage to spare', () => {
 
     // The runtime asks for the media on its own; the extraction fails and is reported without
     // taking the player down.
-    await waitFor(() => errors.some((detail) => detail.code === 'quota'), 30_000)
+    if (!errors.some((detail) => detail.code === 'quota')) await waitForEvent<PlayerErrorDetail>(player, 'error', 30_000, (detail) => detail.code === 'quota')
     await waitFor(() => player.state === 'ready')
     const failure = errors.find((detail) => detail.code === 'quota')!
     expect(failure.message).toContain(MEDIA)
@@ -100,10 +91,7 @@ describe('a browser with no storage to spare', () => {
     await clearPackageCaches()
     await setQuota((await usage()) + 512 * 1024)
 
-    const player = createPlayer()
-    const settled = waitForSettled(player)
-    player.setAttribute('src', FIXTURES.noRangeLargeStored)
-    const result = await settled
+    const { player, result } = await settle(FIXTURES.noRangeLargeStored)
 
     expect(result.ok).toBe(false)
     if (result.ok) return

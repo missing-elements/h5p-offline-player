@@ -4,6 +4,7 @@ import { relative, resolve, sep } from 'node:path'
 import { build as viteBuild } from 'vite'
 import { buildJobsWorker, buildServiceWorker, bundleHostWorker } from '../../../packages/player/scripts/lib/worker-bundle.mjs'
 import { DIST_DIR as RUNTIME_DIST } from '../../../packages/runtime/scripts/build.mjs'
+import { PAGES } from './lib/pages.mjs'
 
 const RESIZER = resolve(import.meta.dirname, '../../../packages/embed/site/resizer.js')
 
@@ -113,7 +114,7 @@ await writeFile(
 await cp(resolve(rootDir, 'demo', 'og-image.png'), resolve(outDir, 'demo', 'og-image.png'))
 // The course structure the cmi5 page offers for importing into an LMS, zipped as LMSs want it.
 await cp(resolve(rootDir, 'demo', 'cmi5-course.zip'), resolve(outDir, 'demo', 'cmi5-course.zip'))
-const pages = ['/', '/app/', '/demo/', '/demo/setup.html', '/demo/compare.html', '/demo/normalize.html', '/demo/xapi.html', '/demo/cmi5.html', '/demo/local-file.html', '/demo/two-players.html', '/demo/embed.html']
+const pages = PAGES.filter((page) => page.indexed !== false).map((page) => page.path)
 const today = new Date().toISOString().slice(0, 10)
 await writeFile(
   resolve(outDir, 'sitemap.xml'),

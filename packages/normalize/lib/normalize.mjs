@@ -99,7 +99,7 @@ export function targetFormOf(name) {
 }
 
 /** @param {string} name */
-export function extensionOf(name) {
+function extensionOf(name) {
   const base = name.slice(name.lastIndexOf('/') + 1)
   const dot = base.lastIndexOf('.')
   return dot <= 0 ? '' : base.slice(dot + 1).toLowerCase()
@@ -231,6 +231,9 @@ export async function normalizeArchive({ input, output, onEntry }) {
       try {
         result = await processEntry(item, { source, tempDir, writer, index: index++ })
       } catch (error) {
+        // The output is released here, not left to the collector: the command removes the
+        // `.part` file next, which a still-open descriptor refuses on Windows.
+        await writer?.abort(error)
         const reason = error instanceof Error ? error.message : String(error)
         throw new Error(`${item.name}: ${reason}`, { cause: error })
       }
@@ -279,6 +282,9 @@ async function processEntry({ entry, name, target }, { source, tempDir, writer, 
   const base = { name, size, target, from }
 
   /** @param {string} [warning] */
+  /** The header of this entry stored as it is, byte for byte: the source's own size and CRC. */
+  const storedMeta = { name, method: STORE, crc32: entry.signature ?? 0, compressedSize: size, uncompressedSize: size, dosDateTime }
+
   const copyRaw = async (warning) => {
     await writer?.add(
       {
@@ -322,7 +328,7 @@ async function processEntry({ entry, name, target }, { source, tempDir, writer, 
     // Inflated straight into the output: the size and CRC are the source's own, and zip.js
     // compares the inflated bytes with that CRC as it goes (`checkSignature` above).
     await writer?.add(
-      { name, method: STORE, crc32: entry.signature ?? 0, compressedSize: size, uncompressedSize: size, dosDateTime },
+      storedMeta,
       (sink) => entry.getData(sink)
     )
     return { ...base, action: 'store', to: stored }
@@ -346,10 +352,7 @@ async function processEntry({ entry, name, target }, { source, tempDir, writer, 
     const plan = await planFaststart(file, offset, size)
     if (plan.status !== 'moved') {
       if (method === STORE) return { ...(await copyRaw()), detail: plan.detail }
-      await writer?.add(
-        { name, method: STORE, crc32: entry.signature ?? 0, compressedSize: size, uncompressedSize: size, dosDateTime },
-        (sink) => pump(readPieces(file, plan.pieces), sink)
-      )
+      await writer?.add(storedMeta, (sink) => pump(readPieces(file, plan.pieces), sink))
       return { ...base, action: 'store', to: stored, detail: plan.detail }
     }
 
@@ -404,6 +407,7 @@ async function pump(chunks, sink) {
     for await (const chunk of chunks) await out.write(chunk)
     await out.close()
   } catch (error) {
+    // The failure is the write's own, rethrown below; a sink that will not abort adds nothing.
     await out.abort(error).catch(() => {})
     throw error
   }

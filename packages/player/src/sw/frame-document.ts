@@ -1,3 +1,4 @@
+import { randomHex } from '../shared/pkg-id'
 import type { FrameAssets, FrameFont, FrameOptions } from '../shared/protocol'
 import { contentMetadata, type ContentMetadata } from '../shared/metadata'
 import { isEnglish, LANGUAGE_TAG } from '../shared/language'
@@ -133,6 +134,8 @@ export function bootScriptUrl(assets: FrameAssets): string {
   try {
     return new URL('frame-boot.js', assets.mainJs).href
   } catch {
+    // A `mainJs` that is not a URL has no sibling to resolve; the bare name is left to the frame's
+    // own base, as a record from before 0.5 would have resolved it.
     return 'frame-boot.js'
   }
 }
@@ -422,8 +425,5 @@ ${strings}<script type="application/json" id="h5p-boot-config">${bootConfig}</sc
 
 /** A fresh nonce per response: reusing one across responses would defeat the point of having it. */
 export function createNonce(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(16))
-  return Array.from(bytes)
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('')
+  return randomHex(16)
 }

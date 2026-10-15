@@ -151,6 +151,8 @@ export class ChunkStore {
     try {
       return (await response.json()) as ChunkMeta
     } catch {
+      // A record that is not JSON is read as none: the next write replaces it, and nothing it
+      // could have said is worth failing the read for.
       return undefined
     }
   }
@@ -317,6 +319,7 @@ export class ChunkStore {
     try {
       return (await response.json()) as ForwardIndexSnapshot
     } catch {
+      // As for a chunk's meta: not JSON, so none, and the next snapshot replaces it.
       return undefined
     }
   }
@@ -331,10 +334,6 @@ export class ChunkStore {
       entry: FORWARD_INDEX_ENTRY,
       meta: { size: null, available: snapshot.parsedTo, complete: snapshot.done }
     })
-  }
-
-  readArchiveRange(range: ByteRange): Promise<Uint8Array> {
-    return this.readRangeBytes(ARCHIVE_ENTRY, range)
   }
 
   /* ---------------------------------------------------------------- writing and eviction */

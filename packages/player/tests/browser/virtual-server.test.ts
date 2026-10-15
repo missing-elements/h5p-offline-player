@@ -1,15 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import '../../src/h5p-offline-player'
-import {
-  FIXTURES,
-  clearPackageCaches,
-  createPlayer,
-  frameDocument,
-  frameFetch,
-  play,
-  virtualUrl,
-  waitForSettled
-} from './utils'
+import { FIXTURES, clearPackageCaches, frameDocument, frameFetch, inject, play, requestedUrls, virtualUrl } from './utils'
 
 /**
  * The virtual file server, addressed directly. Everything here is what the H5P runtime sees when
@@ -153,59 +144,23 @@ describe('the version check', () => {
     // The `_ping` route only answers a client the worker controls, and the host page is not one:
     // our scope is a sub-directory the page does not sit under. The element asks over the
     // control channel instead, and must not regress to a fetch that would silently never answer.
-    const original = window.fetch
-    const asked: string[] = []
-    window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
-      asked.push(String(input instanceof Request ? input.url : input))
-      return original.call(window, input as RequestInfo, init)
-    }) as typeof window.fetch
-
+    const fetched = vi.spyOn(window, 'fetch')
     try {
       await play(FIXTURES.basic)
     } finally {
-      window.fetch = original
+      fetched.mockRestore()
     }
 
-    expect(asked.some((url) => url.includes('/virtual/_ping'))).toBe(false)
+    expect(requestedUrls(fetched).some((url) => url.includes('/virtual/_ping'))).toBe(false)
   })
 })
 
 describe('the frame policy', () => {
-  /** Collects what the frame's CSP refuses while `run` does its thing. */
-  const violationsDuring = async (
-    document: Document,
-    run: () => void,
-    settleMs = 400
-  ): Promise<string[]> => {
-    const blocked: string[] = []
-    const onViolation = (event: Event) =>
-      blocked.push((event as SecurityPolicyViolationEvent).blockedURI)
-
-    document.addEventListener('securitypolicyviolation', onViolation)
-    try {
-      run()
-      await new Promise((resolve) => setTimeout(resolve, settleMs))
-    } finally {
-      document.removeEventListener('securitypolicyviolation', onViolation)
-    }
-    return blocked
-  }
-
-  const addScript = (document: Document, src: string) => () => {
-    const script = document.createElement('script')
-    script.src = src
-    document.body.append(script)
-  }
-
   it('refuses a script from an origin no content type needs', async () => {
     const player = await play(FIXTURES.basic)
     const document = frameDocument(player)
 
-    const blocked = await violationsDuring(
-      document,
-      addScript(document, 'https://unrelated.example/tracker.js')
-    )
-    expect(blocked.some((uri) => uri.includes('unrelated.example'))).toBe(true)
+    expect(await inject(document, 'https://unrelated.example/tracker.js')).toBe('blocked by the policy')
   })
 
   it('allows the video player APIs H5P.Video loads', async () => {
@@ -219,32 +174,20 @@ describe('the frame policy', () => {
       'https://player.vimeo.com/api/player.js',
       'https://developers.panopto.com/scripts/embedapi.min.js'
     ]) {
-      const blocked = await violationsDuring(document, addScript(document, src), 150)
-      expect(blocked, `${src} was blocked`).toEqual([])
+      // Allowed is not the same as loaded: the test page is offline from those hosts, so the
+      // browser may refuse the script, but the policy does not.
+      expect(await inject(document, src), src).not.toBe('blocked by the policy')
     }
   })
 
   it('allows an origin the host vouches for with allow-origins', async () => {
-    const player = createPlayer({ 'allow-origins': 'https://tenant.panopto.example' })
-    const settled = waitForSettled(player)
-    player.setAttribute('src', FIXTURES.basic)
-    expect((await settled).ok).toBe(true)
-
+    const player = await play(FIXTURES.basic, { 'allow-origins': 'https://tenant.panopto.example' })
     const document = frameDocument(player)
 
-    const vouched = await violationsDuring(
-      document,
-      addScript(document, 'https://tenant.panopto.example/Panopto/Pages/embedapi.js'),
-      150
-    )
-    expect(vouched).toEqual([])
+    expect(await inject(document, 'https://tenant.panopto.example/Panopto/Pages/embedapi.js')).not.toBe('blocked by the policy')
 
     // Everything else is still refused: the attribute adds hosts, it does not open the policy.
-    const other = await violationsDuring(
-      document,
-      addScript(document, 'https://unvouched.example/x.js')
-    )
-    expect(other.some((uri) => uri.includes('unvouched.example'))).toBe(true)
+    expect(await inject(document, 'https://unvouched.example/x.js')).toBe('blocked by the policy')
   })
 
   it('allows the WebFont loader at the page\'s own scheme', async () => {
@@ -254,10 +197,6 @@ describe('the frame policy', () => {
     // The URL H5P.ArithmeticQuiz builds, scheme and all. Whether it then loads depends on the
     // network; what is asserted here is that the policy does not stop it, which is the part
     // that was broken. A scheme-qualified allowlist entry cannot match this on an http page.
-    const blocked = await violationsDuring(
-      document,
-      addScript(document, `${location.protocol}//ajax.googleapis.com/ajax/libs/webfont/1/webfont.js`)
-    )
-    expect(blocked).toEqual([])
+    expect(await inject(document, `${location.protocol}//ajax.googleapis.com/ajax/libs/webfont/1/webfont.js`)).not.toBe('blocked by the policy')
   })
 })

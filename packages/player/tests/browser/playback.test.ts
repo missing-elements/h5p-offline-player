@@ -1,17 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import '../../src/h5p-offline-player'
 import type { ReadyDetail } from '../../src/h5p-offline-player'
-import {
-  FIXTURES,
-  clearPackageCaches,
-  createPlayer,
-  frameDocument,
-  frameFetch,
-  frameWindow,
-  play,
-  virtualUrl,
-  waitForEvent
-} from './utils'
+import { FIXTURES, clearPackageCaches, createPlayer, frameDocument, frameFetch, frameWindow, messageOf, play, pressComplete, virtualUrl, waitForEvent } from './utils'
 
 /**
  * The whole pipeline, end to end: probe, index, synthesize a frame, serve every file the H5P
@@ -23,7 +13,7 @@ describe('playing a package', () => {
 
     expect(player.state).toBe('ready')
     expect(player.pkgId).toMatch(/^[0-9a-f]{32}$/)
-    expect(frameDocument(player).querySelector('.h5p-offline-test-message')?.textContent).toBe(
+    expect(messageOf(player)).toBe(
       'Served from the archive, never extracted to disk.'
     )
   })
@@ -64,7 +54,7 @@ describe('playing a package', () => {
     const xapi = waitForEvent<{ statement: { verb: { id: string } } }>(player, 'xapi')
     const finished = waitForEvent(player, 'finished')
 
-    frameDocument(player).querySelector<HTMLButtonElement>('.h5p-offline-test-complete')!.click()
+    pressComplete(player)
 
     const event = await xapi
     expect(event.detail.statement.verb.id).toBe('http://adlnet.gov/expapi/verbs/completed')
@@ -78,7 +68,7 @@ describe('playing a package', () => {
     type Stamped = { statement: { context: { revision: string; platform: string } } }
     const xapi = waitForEvent<Stamped>(player, 'xapi')
     const finished = waitForEvent<Stamped>(player, 'finished')
-    frameDocument(player).querySelector<HTMLButtonElement>('.h5p-offline-test-complete')!.click()
+    pressComplete(player)
 
     for (const event of [await xapi, await finished]) {
       expect(event.detail.statement.context.revision).toBe(player.revision)
@@ -204,8 +194,10 @@ describe('playing a package', () => {
     settled = waitForEvent(player, 'ready')
     player.setAttribute('src', FIXTURES.basic)
     await settled
+    // Emptying the frame navigates it to `about:blank`, which the iframe reports as a load.
+    const emptied = waitForEvent(player.shadowRoot!.querySelector('iframe')!, 'load')
     player.removeAttribute('src')
-    await new Promise((resolve) => setTimeout(resolve, 300))
+    await emptied
 
     expect(history.length).toBe(before)
     expect(frameWindow(player).location.href).toBe('about:blank')
@@ -296,6 +288,9 @@ describe('playing a package', () => {
 
   it('completes the resizer handshake, which is what frees the content to size itself', async () => {
     const player = await play(FIXTURES.basic)
+    // The core sends `prepareResize` only after the element's `hello` reply, and the boot script
+    // posts `ready` right after `H5P.init()`, so the first `resize` always follows `ready`; a
+    // handshake that broke would show below as a document still at full height.
     await waitForEvent(player, 'resize').catch(() => undefined)
 
     // H5P sets these on its document only once the embedder has answered its `hello`.
@@ -310,9 +305,8 @@ describe('playing a package', () => {
 
     const resized = waitForEvent<{ height: number }>(player, 'resize')
     player.setAttribute('src', FIXTURES.basic)
+    // The element writes its height on the line after it dispatches `resize`, so there is nothing to wait for.
     const { height } = (await resized).detail
-
-    await new Promise((resolve) => setTimeout(resolve, 100))
     expect(Math.round(player.getBoundingClientRect().height)).toBe(height)
   })
 
@@ -326,7 +320,6 @@ describe('playing a package', () => {
     expect(height).toBeLessThan(600)
 
     // The host's own inline height is not the element's to remove; only one it wrote is.
-    await new Promise((resolve) => setTimeout(resolve, 100))
     expect(player.style.height).toBe('600px')
     expect(Math.round(player.getBoundingClientRect().height)).toBe(600)
 
@@ -335,7 +328,6 @@ describe('playing a package', () => {
     const followed = waitForEvent<{ height: number }>(player, 'resize')
     window.dispatchEvent(new Event('resize'))
     await followed
-    await new Promise((resolve) => setTimeout(resolve, 100))
     expect(Math.round(player.getBoundingClientRect().height)).toBe(height)
   })
 

@@ -5,7 +5,15 @@ import { languageTag } from './shared/language'
 import type { ContentMetadata } from './shared/metadata'
 import { JobsWorkerHandle, type JobsScript } from './jobs-worker-handle'
 import { parseLibrarySources } from './shared/library-sources'
-import { LIBRARY_PACK_URL, SAVE_INTERVAL_S, VERSION, WARM_ENTRY, WORKER_UPDATE_TIMEOUT_MS } from './shared/constants'
+import {
+  CONTROL_TIMEOUT_MS,
+  LIBRARY_PACK_URL,
+  SAVE_INTERVAL_S,
+  SILENT_ANSWER_TIMEOUT_MS,
+  VERSION,
+  WARM_ENTRY,
+  WORKER_UPDATE_TIMEOUT_MS
+} from './shared/constants'
 import {
   PlayerError,
   type ErrorCode,
@@ -30,7 +38,7 @@ import {
   type WorkerReply
 } from './shared/protocol'
 import { packageLockName } from './shared/locks'
-import { filePkgId, loadKey, remotePkgId } from './shared/pkg-id'
+import { filePkgId, loadKey, randomHex, remotePkgId } from './shared/pkg-id'
 import { platformOf, withProvenance } from './shared/revision'
 import { probeSource } from './shared/source'
 import { loadSegment, routesFor, type LoadRef, type Routes } from './sw/routes'
@@ -211,6 +219,16 @@ export interface UserDataDetail extends UserDataEntry {
   revision: string | null
 }
 
+/** `resize`: the content's height, which the element follows unless `auto-resize="off"`. */
+export interface PlayerResizeDetail {
+  height: number
+}
+
+/** `statechange`: the state the element has just moved to, the same as its `state` property. */
+export interface PlayerStateChangeDetail {
+  state: PlayerState
+}
+
 export interface PlayerProgressDetail {
   /** 0–1, or `null` while the total is unknown (a host that exposes no length). */
   fraction: number | null
@@ -247,13 +265,14 @@ function adoptShadowStyles(root: ShadowRoot): void {
 }
 
 export class H5PPlayerElement extends HTMLElement {
+  /**
+   * The two attributes a change of which does something at once. Every other one — `sw`,
+   * `assets-base`, `jobs`, `libraries`, `preload`, `resume`, the frame options — is read when a
+   * load starts or when the package is registered, so a change takes effect on the next load
+   * and needs no callback.
+   */
   static get observedAttributes(): string[] {
-    return [
-      'src', 'sw', 'assets-base', 'auto-resize', 'libraries', 'allow-origins', 'preload', 'resume', 'save-interval', 'untrusted',
-      // h5p-standalone's display and loading options, by its names; read when a package is registered.
-      'frame', 'copyright', 'export', 'icon', 'embed', 'fullscreen', 'download-url', 'embed-code', 'resize-code',
-      'custom-css', 'custom-js', 'reporting', 'activity-id'
-    ]
+    return ['src', 'auto-resize']
   }
 
   private iframe: HTMLIFrameElement
@@ -281,11 +300,11 @@ export class H5PPlayerElement extends HTMLElement {
   private internalLibraryBundle: LibraryBundle | null = null
   private heldStatements: HeldStatement[] = []
   /**
-   * The package this element played before the current load, and its revision. Removing the
-   * iframe's `src` does not unload the document in it, so until the frame navigates to the new
-   * package the old one can still send statements — and while the new load is probing,
-   * `internalPkgId` is null and the message filter lets them through. They are stamped with the
-   * build they came from, not held and released under the next one's.
+   * The package this element played before the current load, and its revision. Emptying the
+   * frame navigates it to `about:blank`, and a statement the old document sent just before it
+   * left arrives after that — while the new load is probing, `internalPkgId` is null and the
+   * message filter lets it through. Such a statement is stamped with the build it came from, not
+   * held and released under the next one's.
    */
   private previousStamp: { pkgId: string; revision: string | null } | null = null
   /** Large deflated entries, in archive order, waiting to be pulled before the content asks. */
@@ -537,9 +556,6 @@ export class H5PPlayerElement extends HTMLElement {
       return
     }
 
-    // `sw`, `assets-base` and the frame options (`frame`, `custom-css`, `activity-id`, …) only
-    // take effect on the next load; a running package keeps the worker, assets and frame it was
-    // loaded with.
     // Handing the height back to the host: the inline height this element wrote would otherwise
     // outlive the choice, since an inline style beats any rule in the host's stylesheet.
     if (name === 'auto-resize' && next === 'off') this.style.removeProperty('height')
@@ -598,8 +614,9 @@ export class H5PPlayerElement extends HTMLElement {
    * one loading the next, and emptying it added one, so a learner's Back walked the frame through
    * old packages before it left the page, and a page's own history steps lost what lay ahead of
    * them. Found on 2026-10-12 by the installable app, whose Back closes a file. `location.replace`
-   * navigates the frame in place; the first navigation, away from the frame's initial
-   * `about:blank`, replaces by itself, and goes through `src`.
+   * navigates the frame in place, the first navigation included; only a frame out of the
+   * document, which has no window to navigate, gets `src`, which loads as the frame is inserted
+   * and adds no step.
    */
   private navigateFrame(url: string | null): void {
     if (url === this.frameLocation) return
@@ -627,6 +644,7 @@ export class H5PPlayerElement extends HTMLElement {
     this.internalRevision = null
     this.internalMetadata = null
     this.internalLibraryBundle = null
+    this.currentSource = null
   }
 
   private async startLoad(): Promise<void> {
@@ -654,8 +672,6 @@ export class H5PPlayerElement extends HTMLElement {
 
       this.currentSource = descriptor
       this.internalPkgId = pkgId
-      this.internalMetadata = null
-      this.internalLibraryBundle = null
       this.holdPackage(pkgId, signal)
 
       // Under a key of this load's own: another player on the origin may be showing the same
@@ -710,7 +726,9 @@ export class H5PPlayerElement extends HTMLElement {
       this.revisionSettled = true
       this.releaseStatements()
       // A state saved before this answer — by a frame booted early on a host without `Range` —
-      // is stamped with the build now that it is known, so the next load can check it.
+      // is stamped with the build now that it is known, so the next load can check it. A stamp
+      // that cannot be written leaves the row one the next load hands over unchecked, as it would
+      // have anyway while the build was unknown; that is not worth failing a load that is up.
       if (this.loadResumeMode === 'device' && this.internalRevision) {
         adoptRevision(pkgId, this.internalRevision).catch(() => {})
       }
@@ -841,7 +859,7 @@ export class H5PPlayerElement extends HTMLElement {
         // installed app play a stripped export offline once it has played one online.
         // Briefly, and a silence is a no: a worker older than 0.1.7 — an `h5p-sw.js` copied
         // before the element was updated — does not know the question and never answers it.
-        const reply = await this.send({ type: 'find-downloaded-libraries', url }, 3_000).catch(() => null)
+        const reply = await this.send({ type: 'find-downloaded-libraries', url }, SILENT_ANSWER_TIMEOUT_MS).catch(() => null)
         const earlier = reply?.ok && reply.type === 'downloaded-libraries' ? reply.pkgId : null
         if (!earlier) throw error
 
@@ -976,6 +994,7 @@ export class H5PPlayerElement extends HTMLElement {
       try {
         return new URL(value, location.href).href
       } catch {
+        // Not a URL: left out here, as the worker's sanitising of the record would drop it.
         return undefined
       }
     }
@@ -1057,31 +1076,49 @@ export class H5PPlayerElement extends HTMLElement {
     pkgId: string,
     source: SourceDescriptor,
     signal: AbortSignal,
-    phase: 'download' | 'libraries' = 'download',
+    phase: 'download' | 'libraries',
     onProgress?: () => void
+  ): Promise<void> {
+    return this.awaitJob({ type: 'download', pkgId, source }, undefined, phase, signal, { onProgress, failureRejects: true })
+  }
+
+  /**
+   * Has the Jobs worker pull the archive's library spans into the cache, and waits for it. The
+   * job answers `done` however it went — a full store or a host that stopped answering only
+   * shorten what landed — so this resolves and never rejects; an abort resolves it too.
+   */
+  private runWarm(pkgId: string, source: SourceDescriptor, spans: WarmSpan[], signal: AbortSignal): Promise<void> {
+    return this.awaitJob({ type: 'warm', pkgId, source, spans }, WARM_ENTRY, 'warm', signal, { failureRejects: false })
+  }
+
+  /**
+   * Posts a job to the Jobs worker and waits for its end, relaying its progress as `phase`. The
+   * job's messages are the package's with `entry` — none for a download, `WARM_ENTRY` for the
+   * warm. `done` resolves; `failed` rejects with the job's error, or resolves where a shortened
+   * job is as good as a whole one; an abort of the load resolves and stops listening.
+   */
+  private awaitJob(
+    job: Extract<ToJobsMessage, { type: 'download' | 'warm' }>,
+    entry: string | undefined,
+    phase: PlayerProgressDetail['phase'],
+    signal: AbortSignal,
+    { onProgress, failureRejects }: { onProgress?: () => void; failureRejects: boolean }
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       const jobs = this.ensureJobs()
 
       const onMessage = (event: MessageEvent<FromJobsMessage>) => {
         const message = event.data
-        if (message.pkgId !== pkgId || message.entry) return
+        if (message.pkgId !== job.pkgId || (message.entry || undefined) !== entry) return
 
         if (message.type === 'progress') {
-          this.emitProgress({
-            phase,
-            loaded: message.loaded,
-            total: message.total,
-            // Capped: the total is the probe's, and jsDelivr answers a ranged request with the
-            // length of its compressed copy, so the whole file arrives past it.
-            fraction: message.total ? Math.min(1, message.loaded / message.total) : null
-          })
+          this.emitProgress({ phase, loaded: message.loaded, total: message.total, fraction: fractionOf(message) })
           onProgress?.()
           return
         }
 
         jobs.removeEventListener('message', onMessage)
-        if (message.type === 'done') resolve()
+        if (message.type === 'done' || !failureRejects) resolve()
         else reject(new PlayerError(message.code, message.message))
       }
 
@@ -1091,44 +1128,7 @@ export class H5PPlayerElement extends HTMLElement {
         resolve()
       })
 
-      this.postToJobs({ type: 'download', pkgId, source })
-    })
-  }
-
-  /**
-   * Has the Jobs worker pull the archive's library spans into the cache, and waits for it. The
-   * job answers `done` however it went — a full store or a host that stopped answering only
-   * shorten what landed — so this resolves and never rejects; an abort resolves it too.
-   */
-  private runWarm(pkgId: string, source: SourceDescriptor, spans: WarmSpan[], signal: AbortSignal): Promise<void> {
-    return new Promise((resolve) => {
-      const jobs = this.ensureJobs()
-
-      const onMessage = (event: MessageEvent<FromJobsMessage>) => {
-        const message = event.data
-        if (message.pkgId !== pkgId || message.entry !== WARM_ENTRY) return
-
-        if (message.type === 'progress') {
-          this.emitProgress({
-            phase: 'warm',
-            loaded: message.loaded,
-            total: message.total,
-            fraction: message.total ? Math.min(1, message.loaded / message.total) : null
-          })
-          return
-        }
-
-        jobs.removeEventListener('message', onMessage)
-        resolve()
-      }
-
-      jobs.addEventListener('message', onMessage)
-      signal.addEventListener('abort', () => {
-        jobs.removeEventListener('message', onMessage)
-        resolve()
-      })
-
-      this.postToJobs({ type: 'warm', pkgId, source, spans })
+      this.postToJobs(job)
     })
   }
 
@@ -1207,6 +1207,8 @@ export class H5PPlayerElement extends HTMLElement {
       warnIfDifferent(body.version)
       return { routes, registration }
     } catch {
+      // No worker controls the page, or what controls it does not answer the ping as the mounted
+      // handlers do: not the single-worker setup, and the element registers a worker of its own.
       return null
     }
   }
@@ -1248,10 +1250,12 @@ export class H5PPlayerElement extends HTMLElement {
   }
 
   /** Sends a control message to the worker and waits for its reply on a private port. */
-  private async send(message: ToWorkerMessage, timeoutMs = 30_000): Promise<WorkerReply> {
+  private async send(message: ToWorkerMessage, timeoutMs = CONTROL_TIMEOUT_MS): Promise<WorkerReply> {
     const worker = this.registration?.active
     if (!worker) throw new PlayerError('no-worker', 'The Service Worker is not active')
 
+    // A timer of its own rather than `withTimeout`: the port has to be closed when the time is
+    // up, or it stays entangled for the GC to find.
     const reply = await new Promise<WorkerReply>((resolve, reject) => {
       const channel = new MessageChannel()
       const timer = setTimeout(() => {
@@ -1288,8 +1292,8 @@ export class H5PPlayerElement extends HTMLElement {
     if (this.jobs) return this.jobs
 
     const named = this.getAttribute('jobs')?.trim()
-    const file = (href: string): JobsScript => ({ label: href, url: () => new URL(href, location.href).href })
-    this.jobs = new JobsWorkerHandle(named ? [file(named), BLOB_JOBS_SCRIPT] : [BLOB_JOBS_SCRIPT, file(DEFAULT_JOBS_URL)])
+    const scriptAt = (href: string): JobsScript => ({ label: href, url: () => new URL(href, location.href).href })
+    this.jobs = new JobsWorkerHandle(named ? [scriptAt(named), BLOB_JOBS_SCRIPT] : [BLOB_JOBS_SCRIPT, scriptAt(DEFAULT_JOBS_URL)])
 
     this.jobs.addEventListener('message', (event: MessageEvent<FromJobsMessage>) => {
       const message = event.data
@@ -1302,7 +1306,7 @@ export class H5PPlayerElement extends HTMLElement {
           entry: message.entry,
           loaded: message.loaded,
           total: message.total,
-          fraction: message.total ? Math.min(1, message.loaded / message.total) : null
+          fraction: fractionOf(message)
         })
       }
       if ((message.type === 'done' || message.type === 'failed') && message.entry) {
@@ -1391,11 +1395,7 @@ export class H5PPlayerElement extends HTMLElement {
       data.pkgId !== this.internalPkgId &&
       data.pkgId === this.previousStamp?.pkgId
     ) {
-      this.emitStatement(
-        data.type === 'xapi'
-          ? { type: 'xapi', pkgId: data.pkgId, statement: data.statement, verb: data.verb }
-          : { type: 'finished', pkgId: data.pkgId, statement: data.statement }
-      )
+      this.emitStatement(heldStatement(data))
       return
     }
 
@@ -1433,11 +1433,8 @@ export class H5PPlayerElement extends HTMLElement {
         return
 
       case 'xapi':
-        this.emitStatement({ type: 'xapi', pkgId: data.pkgId, statement: data.statement, verb: data.verb })
-        return
-
       case 'finished':
-        this.emitStatement({ type: 'finished', pkgId: data.pkgId, statement: data.statement })
+        this.emitStatement(heldStatement(data))
         return
 
       case 'error':
@@ -1609,7 +1606,7 @@ export class H5PPlayerElement extends HTMLElement {
         const height = message.scrollHeight ?? 0
         if (height <= 0) return
 
-        this.dispatchEvent(new CustomEvent('resize', { detail: { height } }))
+        this.dispatchEvent(new CustomEvent<PlayerResizeDetail>('resize', { detail: { height } }))
         if (this.autoResizes) this.style.height = `${height}px`
         return
       }
@@ -1627,7 +1624,7 @@ export class H5PPlayerElement extends HTMLElement {
     if (this.internalState === state) return
     this.internalState = state
     this.setAttribute('state', state)
-    this.dispatchEvent(new CustomEvent('statechange', { detail: { state } }))
+    this.dispatchEvent(new CustomEvent<PlayerStateChangeDetail>('statechange', { detail: { state } }))
   }
 
   /** Dispatches a statement from the content, or holds it until the revision is known. */
@@ -1748,10 +1745,25 @@ function libraryBundleUrl(source: LibrarySource): string {
 /** Whether the `hub` note has been logged on this page; once is enough. */
 let hubNoticeShown = false
 
+/** A statement from the frame in the shape `emitStatement` holds it. */
+function heldStatement(data: Extract<FromFrameMessage, { type: 'xapi' | 'finished' }>): HeldStatement {
+  return data.type === 'xapi'
+    ? { type: 'xapi', pkgId: data.pkgId, statement: data.statement, verb: data.verb }
+    : { type: 'finished', pkgId: data.pkgId, statement: data.statement }
+}
+
+/**
+ * How far a job has got, for a progress event. Capped: a download's total is the probe's, and
+ * jsDelivr answers a ranged request with the length of its compressed copy, so the whole file
+ * arrives past it.
+ */
+function fractionOf(message: { loaded: number; total: number | null }): number | null {
+  return message.total ? Math.min(1, message.loaded / message.total) : null
+}
+
 /** A token the frame cannot guess: which document's saves the element accepts. */
 function createNonce(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(16))
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+  return randomHex(16)
 }
 
 /** False once a registration has been torn down, which clearing site data does silently. */
@@ -1760,6 +1772,7 @@ async function stillRegistered(registration: ServiceWorkerRegistration): Promise
     const current = await navigator.serviceWorker.getRegistration(registration.scope)
     return current?.active != null
   } catch {
+    // A registration that cannot be asked about is as good as gone: the load registers again.
     return false
   }
 }

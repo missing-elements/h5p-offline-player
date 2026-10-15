@@ -70,7 +70,9 @@ async function waitFor(url, label, { headers = {}, timeoutMs = 240_000 } = {}) {
     try {
       const response = await fetch(url, { headers })
       if (response.status < 500) return
-    } catch {}
+    } catch {
+      // Not up yet: a refused connection is what this polls for.
+    }
     if (Date.now() - started > timeoutMs) throw new Error(`${label} did not come up at ${url}`)
     await sleep(1000)
   }
@@ -231,11 +233,10 @@ async function main() {
   /** How many cmi5-defined statements with this verb the registration holds. */
   const defined = (verb) => (statements.statements ?? []).filter((s) => isDefined(s) && s.verb.id.endsWith(`/${verb}`)).length
   const sessions = again ? 2 : 1
-  const realStatements = (statements.statements ?? []).filter((s) => s.context?.revision && !(s.context?.contextActivities?.category ?? []).some((c) => c.id === 'https://w3id.org/xapi/cmi5/context/categories/cmi5'))
+  const realStatements = (statements.statements ?? []).filter((s) => s.context?.revision && !isDefined(s))
   const verbs = (statements.statements ?? []).map((s) => {
     const verb = s.verb.id.slice(s.verb.id.lastIndexOf('/') + 1)
-    const defined = (s.context?.contextActivities?.category ?? []).some((c) => c.id === 'https://w3id.org/xapi/cmi5/context/categories/cmi5')
-    return `${verb}${defined ? ' (cmi5 defined)' : ''}${s.context?.revision ? ` revision ${s.context.revision}` : ''}`
+    return `${verb}${isDefined(s) ? ' (cmi5 defined)' : ''}${s.context?.revision ? ` revision ${s.context.revision}` : ''}`
   })
 
   const has = (name) => sessionFlag(session, name)

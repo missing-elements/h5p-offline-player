@@ -55,7 +55,9 @@ packages/player/          @missing-elements/h5p-offline-player — the published
       revision.ts           `withProvenance` and `indexFingerprint`: the build every statement names
       metadata.ts           `h5p.json`'s metadata in the shape the runtime reads, held to the core's licence table
       language.ts           the element's language tag, and that English needs none of the runtime's translations
-      range.ts, mime.ts, pkg-id.ts, stream-utils.ts
+      range.ts, mime.ts, pkg-id.ts (ids, keys and the hex they are written in)
+      stream-utils.ts       sliceStream, the stream opened only when read, and the native inflate: the server,
+                            the Jobs worker and the warm all take them from here, since 2026-10-15
     sw/
       sw-entry.ts           standalone worker  -> dist/h5p-sw.js
       mount.ts              mountH5P(self)     -> dist/h5p-sw-mount.js; the virtual file server
@@ -77,8 +79,11 @@ packages/player/          @missing-elements/h5p-offline-player — the published
   vite.config.ts            the library build and the test runner
   vite.plugins.ts           the plugins it uses, which the demo's config imports too: the Jobs worker,
                             the dev Service Worker and the fixture hosts
-  tests/unit/               pure logic, node environment
-  tests/browser/            the real element against the real worker, chromium via vitest browser mode
+  tests/unit/               pure logic, node environment; helpers/ the in-memory archive, handle and
+                            fake-cache helpers the files share (2026-10-15: five files kept copies)
+  tests/browser/            the real element against the real worker, chromium via vitest browser mode;
+                            utils.ts its helpers — play and settle, waitForEvent with a filter, inject,
+                            the fixture's message and button — which a test uses rather than retyping
   tests/fixtures/src/       the source of the generated .h5p archives
   public/                   generated, not in git: the runtime's dist/ as frame-assets/, and the test fixtures
   NOTICE.md                 zip.js's notice, and where the runtime went; shipped with the package
@@ -97,6 +102,9 @@ packages/runtime/         @missing-elements/h5p-runtime — the H5P core runtime
   src/finished.ts           which statement is the content's result, the `finished` event: H5P's own
                             rule, and the core's mark on sub-content; bundled into frame-boot.js,
                             unit-tested in tests/
+  src/library-names.ts      how content names a library and how the libraries it names are found: the
+                            check and the upgrade both parse through it (2026-10-15; until then each had
+                            its own parser, one taking `H5P.Foo-1.0` and the other only `H5P.Foo 1.0`)
   scripts/build.mjs         vendors h5p-standalone into dist/ (headers, the rebuilt stylesheet, the fonts,
                             LICENSE.txt, NOTICE.txt, MANIFEST.json), builds the boot script, writes
                             dist/l10n.js from l10n/, writes index.js
@@ -163,6 +171,9 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             the element, on @missing-elements/h5p-cmi5, and demo/cmi5-course.zip the
                             course structure for importing it into an LMS, naming the hosted page;
                             demo/element.js is the one import of the element every page loads;
+                            demo/page-common.js what the player page, the cmi5 page and the app share:
+                            the message box, the log, `foreignHost` (whether a package is another
+                            site's) and the trust prompt, one copy since 2026-10-15;
                             demo/theme.js the light/dark switch, a classic script every page
                             loads in its head before the stylesheet, since the CSP allows no
                             inline script and a pinned theme has to be on <html> before the
@@ -190,7 +201,10 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             build-app-icons, build-app-screenshots, build-libraries (the pack, into
                             packages/libraries), sweep-content-types (every content type in the pack
                             played; see *The content-type sweep*), lib/sweep-content.mjs its generator,
-                            lib/code-blocks.mjs the Vite plugin that highlights the pages' code
+                            lib/code-blocks.mjs the Vite plugin that highlights the pages' code,
+                            lib/hub.mjs the hub host, the cache and the download the two hub-reading
+                            scripts share, lib/pages.mjs the one list of the site's pages, for the
+                            build and the sitemap
   sweep/                    <machineName>.json for the content types the sweep cannot generate
                             playable content for, and the element's attributes they need
   vite.config.ts            the dev server and the hosted demo: the pages plus dist/'s layout at the
@@ -293,7 +307,9 @@ downloaded archive is read back before it is reported done*. Playwright's WebKit
 desktop port and not iOS Safari: the app's menu filled an iPhone's screen in Safari on 2026-10-13
 and drew correctly in Playwright's WebKit at every phone size.
 
-The demo's tests follow the same variable (`apps/demo/tests/engine.ts`), and `pnpm test:engine`
+The demo's tests follow the same variable (`apps/demo/tests/engine.ts`; `tests/harness.ts`
+starts the dev server and the second-origin package host and waits on the element for all of
+them, since 2026-10-15), and `pnpm test:engine`
 runs them after the player's suite, so the `engines` job covers the app, the embed page and the
 cmi5 page too. Added on 2026-10-14; the first runs found one bug, under *The frame is navigated
 in place*, and four differences the tests now allow for: WebKit, as Safari does by default, passes
