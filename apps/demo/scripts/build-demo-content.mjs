@@ -1,11 +1,10 @@
-import { createWriteStream, openAsBlob } from 'node:fs'
-import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { openAsBlob } from 'node:fs'
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join, relative, resolve } from 'node:path'
-import { Readable } from 'node:stream'
-import { pipeline } from 'node:stream/promises'
 import { BlobReader, BlobWriter, TextReader, Uint8ArrayReader, Uint8ArrayWriter, ZipReader, ZipWriter, configure } from '@zip.js/zip.js'
 import { formatBytes, normalizeArchive } from '@missing-elements/h5p-normalize'
+import { download, hubBundle as cachedBundle } from './lib/hub.mjs'
 
 /**
  * Builds the packages the hosted demo plays, from `demo/content/src/<name>/` into
@@ -27,15 +26,9 @@ import { formatBytes, normalizeArchive } from '@missing-elements/h5p-normalize'
 
 configure({ useWebWorkers: false })
 
-// The hub moved to this host in 2026 (the old one still answers for now, with an older catalogue).
-// The element's own `HUB_CONTENT_TYPE_URL` stays on the old host until this one sends CORS
-// headers, which it did not on 2026-10-07; a Node fetch needs none, so the build can move first.
-const HUB = 'https://hub-api.h5p.org/v1/content-types/'
-
 const rootDir = resolve(import.meta.dirname, '..')
 const sourceRoot = resolve(rootDir, 'demo', 'content', 'src')
 const outDir = resolve(rootDir, 'demo', 'content')
-const cacheDir = join(tmpdir(), 'h5p-hub-cache')
 
 const args = process.argv.slice(2)
 const refresh = args.includes('--refresh')
@@ -51,7 +44,6 @@ if (names.length === 0) {
   process.exit(1)
 }
 
-await mkdir(cacheDir, { recursive: true })
 const work = await mkdtemp(join(tmpdir(), 'h5p-demo-content-'))
 
 try {
@@ -163,29 +155,13 @@ async function buildPackage(name) {
   )
 }
 
+const LOG = '[demo-content]'
+
 /** The hub's bundle for a content type, from the cache when it is there. */
-async function hubBundle(machineName) {
-  const path = join(cacheDir, `${machineName}.h5p`)
-  if (!refresh && (await exists(path))) return path
-  const url = `${HUB}${encodeURIComponent(machineName)}`
-  console.log(`[demo-content] fetching ${url}`)
-  const response = await fetch(url)
-  if (!response.ok || !response.body) throw new Error(`${url} returned ${response.status}`)
-  await pipeline(Readable.fromWeb(/** @type {any} */ (response.body)), createWriteStream(path))
-  return path
-}
+const hubBundle = (machineName) => cachedBundle(machineName, { refresh, log: LOG })
 
 /** Media by URL, cached the same way, keyed on the file name. */
-async function fetched(url) {
-  const path = join(cacheDir, basename(new URL(url).pathname))
-  if (refresh || !(await exists(path))) {
-    console.log(`[demo-content] fetching ${url}`)
-    const response = await fetch(url)
-    if (!response.ok || !response.body) throw new Error(`${url} returned ${response.status}`)
-    await pipeline(Readable.fromWeb(/** @type {any} */ (response.body)), createWriteStream(path))
-  }
-  return readFile(path)
-}
+const fetched = async (url) => readFile(/** @type {string} */ (await download(url, basename(new URL(url).pathname), { refresh, log: LOG })))
 
 async function listFiles(dir, prefix = '') {
   const found = []
@@ -197,11 +173,3 @@ async function listFiles(dir, prefix = '') {
   return found
 }
 
-async function exists(path) {
-  try {
-    await stat(path)
-    return true
-  } catch {
-    return false
-  }
-}

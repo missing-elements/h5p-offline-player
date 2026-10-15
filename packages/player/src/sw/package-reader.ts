@@ -1,8 +1,8 @@
 import { ZipReader, type Entry, type FileEntry } from '@zip.js/zip.js'
 import { INLINE_MAX_SIZE, MEDIA_INLINE_MAX_SIZE, WARM_ENTRY_MAX_SIZE, WARM_GAP, WARM_MAX_BYTES } from '../shared/constants'
 import { indexEntryNames, normalizeEntryName } from '../shared/entry-names'
-import { isMediaEntry, isTextEntry } from '../shared/mime'
-import { DEFLATE, LOCAL_HEADER_FIXED_SIZE, STORED, localHeaderDataStart } from '../shared/local-header'
+import { extensionOf, isMediaEntry, isTextEntry } from '../shared/mime'
+import { DEFLATE, LOCAL_HEADER_FIXED_SIZE, STORED, readDataStart } from '../shared/local-header'
 import {
   PlayerError,
   type EntryLocation,
@@ -14,6 +14,7 @@ import {
 import type { SourceHandle } from '../shared/source'
 import { SourceReader } from '../shared/source-reader'
 import type { ByteRange } from '../shared/range'
+import { deferredStream, inflated } from '../shared/stream-utils'
 import type { ForwardEntry, ForwardIndexSnapshot } from '../shared/forward-index'
 import { indexFingerprint, revisionOf } from '../shared/revision'
 import { contentMetadata, type ContentMetadata } from '../shared/metadata'
@@ -31,8 +32,6 @@ export type Strategy =
   | { kind: 'slice' }
   /** Large and deflated (method 8): the Jobs worker inflates into chunks, served progressively. */
   | { kind: 'chunked' }
-
-export { DEFLATE, STORED }
 
 /** The parts of `h5p.json` the player needs. Everything in it comes from an untrusted archive. */
 export interface PackageManifest {
@@ -86,9 +85,7 @@ const CONTENT_FILE_TYPES = new Set(
 export function servedWhenUntrusted(name: string): boolean {
   if (name === 'h5p.json') return true
   if (!name.startsWith('content/')) return false
-  const file = name.slice(name.lastIndexOf('/') + 1)
-  const dot = file.lastIndexOf('.')
-  return dot > 0 && CONTENT_FILE_TYPES.has(file.slice(dot + 1).toLowerCase())
+  return CONTENT_FILE_TYPES.has(extensionOf(name))
 }
 
 /** Takes what an `untrusted` package may not serve out of its index, and returns the names. */
@@ -114,7 +111,6 @@ export interface LocatedEntry {
 export class PackageReader {
   readonly pkgId: string
   readonly entries: Map<string, IndexedEntry>
-  readonly rejected: string[]
   manifest: PackageManifest
   /**
    * Built from the forward index of an archive still downloading. Entries arrive as the download
@@ -155,7 +151,6 @@ export class PackageReader {
     /** The archive this reader reads. Exposed for the Jobs worker's liveness reports. */
     readonly handle: SourceHandle,
     entries: Map<string, IndexedEntry>,
-    rejected: string[],
     manifest: PackageManifest,
     partial = false,
     /** For an untrusted reader, what was withheld so far; `null` for one that serves everything. */
@@ -163,7 +158,6 @@ export class PackageReader {
   ) {
     this.pkgId = pkgId
     this.entries = entries
-    this.rejected = rejected
     this.manifest = manifest
     this.partial = partial
     this.untrusted = withheld !== null
@@ -197,7 +191,7 @@ export class PackageReader {
       throw new PlayerError('bad-archive', 'Could not read the archive index', { cause: error })
     }
 
-    const { index, rejected } = indexEntryNames(zipEntries)
+    const { index } = indexEntryNames(zipEntries)
     const entries = new Map<string, IndexedEntry>()
 
     for (const [name, zip] of index) {
@@ -217,10 +211,10 @@ export class PackageReader {
     }
     const withheld = options.untrusted ? withholdCode(entries) : null
 
-    const bare = new PackageReader(pkgId, handle, entries, rejected, {})
+    const bare = new PackageReader(pkgId, handle, entries, {})
     const manifest = await readManifest(bare)
 
-    const reader = new PackageReader(pkgId, handle, entries, rejected, manifest, false, withheld)
+    const reader = new PackageReader(pkgId, handle, entries, manifest, false, withheld)
     // Every record, directories and dropped names included: the fingerprint is of the archive
     // as published, not of what the player chose to serve from it.
     reader.fingerprint = await indexFingerprint(
@@ -248,7 +242,7 @@ export class PackageReader {
     snapshot: ForwardIndexSnapshot,
     options: { untrusted?: boolean } = {}
   ): Promise<PackageReader> {
-    const reader = new PackageReader(pkgId, handle, new Map(), [], {}, true, options.untrusted ? new Set() : null)
+    const reader = new PackageReader(pkgId, handle, new Map(), {}, true, options.untrusted ? new Set() : null)
     await reader.absorb(snapshot)
     return reader
   }
@@ -270,10 +264,7 @@ export class PackageReader {
     for (const forward of fresh) {
       if (forward.directory) continue
       const name = normalizeEntryName(forward.name)
-      if (name === null || this.entries.has(name) || this.withheld.has(name)) {
-        this.rejected.push(forward.name)
-        continue
-      }
+      if (name === null || this.entries.has(name) || this.withheld.has(name)) continue
       // Withheld or not, it says how far the archive has got: a folder is finished once a later
       // one begins.
       this.lastTopFolder = topFolderOf(name)
@@ -307,13 +298,7 @@ export class PackageReader {
     const names = this.entryNames()
     const available = this.availableLibraries()
     return dependencies.every((dependency) => {
-      const folder =
-        libraryFolderNames(dependency).find((each) => names.has(`${each}/library.json`)) ??
-        resolveLibraryFolder(available, {
-          machineName: dependency.machineName,
-          major: Number(dependency.majorVersion),
-          minor: Number(dependency.minorVersion)
-        })
+      const folder = reachableFolder(dependency, names, available)
       // An untrusted archive's own folders never serve, so the one found is a bundle's, and whole.
       return folder !== undefined && (this.untrusted || this.folderComplete(folder))
     })
@@ -493,7 +478,16 @@ export class PackageReader {
             missing.push(folders[0])
             return
           }
-          next.push(...dependenciesIn(await read(located).catch(() => null)))
+          let library: unknown
+          try {
+            library = await read(located)
+          } catch (error) {
+            // Counted as having no dependencies, the walk would pass a tree it did not see, and the
+            // runtime would die on the same file with "Unexpected end of JSON input" and no name.
+            const reason = error instanceof Error ? error.message : String(error)
+            throw new PlayerError('bad-archive', `${folders[0]}/library.json could not be read: ${reason}`, { cause: error })
+          }
+          next.push(...dependenciesIn(library))
         })
       )
       level = next
@@ -528,13 +522,7 @@ export class PackageReader {
     // library files by, so a 1.20 kept here is answered from the bundle's 1.21 folder.
     const consider = (dependency: LibraryDependency) => {
       if (kept.has(dependency.machineName)) return
-      const exact = libraryFolderNames(dependency).some((folder) => names.has(`${folder}/library.json`))
-      const compatible = resolveLibraryFolder(available, {
-        machineName: dependency.machineName,
-        major: Number(dependency.majorVersion),
-        minor: Number(dependency.minorVersion)
-      })
-      if (!exact && !compatible) return
+      if (reachableFolder(dependency, names, available) === undefined) return
       kept.set(dependency.machineName, dependency)
     }
 
@@ -626,7 +614,7 @@ export class PackageReader {
   prefetchable(): PrefetchEntry[] {
     return [...this.entries.values()]
       .filter((entry) => entry.strategy.kind === 'chunked')
-      .map((entry) => ({ entry: entry.name, size: entry.size, location: locationOf(entry) }))
+      .map((entry) => ({ entry: entry.name, location: locationOf(entry) }))
   }
 
   /**
@@ -769,10 +757,7 @@ export class PackageReader {
     if (entry.compressedSize === 0) return new Blob([]).stream()
 
     const raw = deferredStream(() => this.sliceStream(entry, { start: 0, end: entry.compressedSize - 1 }))
-    if (entry.method === STORED) return raw
-    // The lib types the codec's input as `BufferSource`, stricter than the plain views it gets.
-    const inflate = new DecompressionStream('deflate-raw') as unknown as ReadableWritablePair<Uint8Array, Uint8Array>
-    return raw.pipeThrough(inflate)
+    return inflated(raw, entry.method, entry.compressedSize)
   }
 
   private async readDataRange(entry: IndexedEntry): Promise<ByteRange> {
@@ -781,13 +766,7 @@ export class PackageReader {
     }
     if (!entry.zip) throw new PlayerError('bad-archive', `${entry.name} has no known location`)
 
-    const header = await this.handle.read({
-      start: entry.zip.offset,
-      end: entry.zip.offset + LOCAL_HEADER_FIXED_SIZE - 1
-    })
-
-    const start = localHeaderDataStart(entry.zip.offset, header)
-    if (start === null) throw new PlayerError('bad-archive', `${entry.name} has a malformed local header`)
+    const start = await readDataStart(this.handle, entry.zip.offset, entry.name)
 
     return { start, end: start + entry.compressedSize - 1 }
   }
@@ -859,24 +838,6 @@ function topFolderOf(name: string): string | null {
 }
 
 /** A stream that opens its source on the first pull, so building it costs nothing until it is read. */
-function deferredStream(open: () => Promise<ReadableStream<Uint8Array>>): ReadableStream<Uint8Array> {
-  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
-  return new ReadableStream<Uint8Array>(
-    {
-      async pull(controller) {
-        reader ??= (await open()).getReader()
-        const { done, value } = await reader.read()
-        if (done) controller.close()
-        else controller.enqueue(value)
-      },
-      async cancel(reason) {
-        await reader?.cancel(reason)
-      }
-    },
-    { highWaterMark: 0 }
-  )
-}
-
 async function readManifest(reader: PackageReader): Promise<PackageManifest> {
   const { entry } = reader.get('h5p.json')!
 
@@ -979,6 +940,28 @@ function libraryFolderNames(dependency: LibraryDependency): string[] {
   ]
 }
 
+/**
+ * The folder a dependency is served from: its name as written, or the bare machine name
+ * h5p-standalone falls back to, when that folder's `library.json` is among `names`; else a
+ * compatible newer minor of the same major from `available`, the rule `get()` serves library
+ * files by. `bootReady`, `mergedManifest` and `findMissingLibraries` all decide by this, so it
+ * lives once.
+ */
+function reachableFolder(
+  dependency: LibraryDependency,
+  names: ReadonlySet<string>,
+  available: Map<string, LibraryFolder[]>
+): string | undefined {
+  return (
+    libraryFolderNames(dependency).find((folder) => names.has(`${folder}/library.json`)) ??
+    resolveLibraryFolder(available, {
+      machineName: dependency.machineName,
+      major: Number(dependency.majorVersion),
+      minor: Number(dependency.minorVersion)
+    })
+  )
+}
+
 export interface LibraryFolder {
   machineName: string
   major: number
@@ -1054,19 +1037,7 @@ export function findMissingLibraries(
 
   const available = indexLibraryFolders(entryNames)
 
-  return dependencies.filter((dependency) => {
-    // The name as written, or the bare machine name h5p-standalone falls back to.
-    if (libraryFolderNames(dependency).some((folder) => entryNames.has(`${folder}/library.json`))) {
-      return false
-    }
-
-    // Otherwise anything compatible will serve, the same way the reader resolves it.
-    return !resolveLibraryFolder(available, {
-      machineName: dependency.machineName,
-      major: Number(dependency.majorVersion),
-      minor: Number(dependency.minorVersion)
-    })
-  })
+  return dependencies.filter((dependency) => reachableFolder(dependency, entryNames, available) === undefined)
 }
 
 /**

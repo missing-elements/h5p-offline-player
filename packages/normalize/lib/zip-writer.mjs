@@ -130,6 +130,19 @@ export class StreamingZipWriter {
     this.writing = false
   }
 
+  /**
+   * Gives the destination up without a central directory: for a run that failed partway, so the
+   * file is released at once rather than when the stream is collected. Nothing can be added or
+   * closed after it.
+   * @param {unknown} reason
+   */
+  async abort(reason) {
+    this.writing = true
+    await this.writer.abort(reason).catch(() => {
+      // A destination that has already failed has nothing left to release.
+    })
+  }
+
   /** Writes the central directory and closes the destination. */
   async close() {
     if (this.writing) throw new Error('An entry is still being written')

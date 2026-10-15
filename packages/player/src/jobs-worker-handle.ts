@@ -43,7 +43,7 @@ export class JobsWorkerHandle {
     this.next()
   }
 
-  postMessage(message: ToJobsMessage | (ToJobsMessage & { file: File })): void {
+  postMessage(message: ToJobsMessage): void {
     if (this.failure) return this.refuse(message)
     if (!this.ready) {
       this.pending.push(message)

@@ -42,8 +42,30 @@ try {
     }, modes)
     await page.waitForFunction(() => document.querySelector('#offline')?.dataset.state === 'ready', null, { timeout: 60_000 })
     if (src) await page.waitForFunction(() => document.querySelector('h5p-player')?.state === 'ready', null, { timeout: 60_000 })
-    // The content's fonts and a video's first frame.
-    await page.waitForTimeout(1500)
+    // The content's fonts and a video's first frame, waited for rather than guessed at; capped,
+    // so a video that never loads does not hold the render.
+    const frame = page.frames().find((candidate) => candidate.url().includes('/h5p/frame/'))
+    await Promise.race([
+      Promise.all([
+        page.evaluate(() => document.fonts.ready),
+        frame?.evaluate(() =>
+          Promise.all([
+            document.fonts.ready,
+            ...[...document.querySelectorAll('video')].map(
+              (video) =>
+                video.readyState >= 2 ||
+                new Promise((resolve) => {
+                  video.addEventListener('loadeddata', resolve, { once: true })
+                  video.addEventListener('error', resolve, { once: true })
+                })
+            )
+          ])
+        )
+      ]),
+      page.waitForTimeout(5000)
+    ])
+    // One frame more, for what `loadeddata` and the fonts have yet to paint.
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
     await page.screenshot({ path: resolve(outDir, name), ...(name.endsWith('.jpg') ? { type: 'jpeg', quality: 85 } : {}) })
     console.log(`[app-screenshots] ${name} ${width * scale}x${height * scale}`)
     await context.close()

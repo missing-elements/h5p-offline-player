@@ -39,9 +39,15 @@ function promisify<T>(request: IDBRequest<T>): Promise<T> {
   })
 }
 
+/**
+ * This database's own version, apart from the worker's `DB_VERSION`: a page that bumped the
+ * worker's would leave a worker still running the older code unable to open it.
+ */
+const USER_DATA_DB_VERSION = 1
+
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(USER_DATA_DB_NAME, 1)
+    const request = indexedDB.open(USER_DATA_DB_NAME, USER_DATA_DB_VERSION)
     request.onupgradeneeded = () => {
       const store = request.result.createObjectStore(USER_DATA_STORE, { keyPath: 'key' })
       store.createIndex('pkgId', 'pkgId')

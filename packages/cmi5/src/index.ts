@@ -17,7 +17,7 @@
  * again by the LMS; a trusted host may opt into storing it across reloads.
  */
 
-import { createCmi5Client, launchParametersOf } from './client.js'
+import { createCmi5Client, launchParametersOf, reasonIn } from './client.js'
 import { ReadyPhase } from './ready-phase.js'
 import { adaptPlayerStatement, allowedStatement as adaptAllowedStatement } from './statement-adapter.js'
 
@@ -193,9 +193,7 @@ export function isCmi5Launch(url: string = globalThis.location?.href ?? ''): boo
  * category: that would mark it as a cmi5-defined statement, which it is not. An id is added when
  * it has none that is a UUID, as every statement an AU issues needs one (9.1.0.0-1).
  */
-export function allowedStatement(statement: Statement, launch: LaunchParameters, data: Pick<LaunchData, 'contextTemplate'>): Statement {
-  return adaptAllowedStatement(statement, launch, data)
-}
+export { adaptAllowedStatement as allowedStatement }
 
 /**
  * An H5P score as cmi5 records it. H5P reports `raw` and `max` and sometimes `scaled`; cmi5
@@ -223,14 +221,12 @@ export function webAddress(value: unknown): string | null {
 
 /** What went wrong, as the LMS said it: a cmi5 launching system names the requirement a statement broke. */
 export function rejectionReason(error: unknown): string {
+  // `response.data` as the client's own error and the axios-shaped one a host's client may
+  // throw both carry it; `reasonIn` is the one reading of what it says.
   const data = (error as { response?: { data?: unknown } } | null)?.response?.data
-  if (data && typeof data === 'object') {
-    // A launching system's refusal carries `message`; a refused token, cmi5's `error-text`.
-    const { message, 'error-text': errorText } = data as { message?: unknown; 'error-text'?: unknown }
-    if (typeof message === 'string') return message
-    return typeof errorText === 'string' ? errorText : JSON.stringify(data)
-  }
-  if (typeof data === 'string' && data) return data
+  const reason = reasonIn(data)
+  if (reason) return reason
+  if (data && typeof data === 'object') return JSON.stringify(data)
   return error instanceof Error ? error.message : String(error)
 }
 
@@ -280,6 +276,8 @@ function readKept(storage: SessionStorage | null, key: string, launch: KeptLaunc
       ...(pendingOutcome ? { pendingOutcome } : {})
     }
   } catch {
+    // A storage that cannot be read, or holds something that is not a session, keeps nothing:
+    // the launch starts afresh, as it would without `storage` at all.
     return null
   }
 }
@@ -287,13 +285,18 @@ function readKept(storage: SessionStorage | null, key: string, launch: KeptLaunc
 function writeKept(storage: SessionStorage | null, key: string, value: KeptSession): void {
   try {
     storage?.setItem(key, JSON.stringify(value))
-  } catch {}
+  } catch {
+    // Not kept — a full or refused storage, a private window — and the session goes on from
+    // memory, which is the default; a reload then starts the launch afresh.
+  }
 }
 
 function forgetKept(storage: SessionStorage | null, key: string): void {
   try {
     storage?.removeItem(key)
-  } catch {}
+  } catch {
+    // What could not be written cannot be read back either; nothing is left behind to forget.
+  }
 }
 
 /* ------------------------------------------------------------------ the session */
@@ -400,8 +403,9 @@ export async function startCmi5(player: PlayerLike, options: Cmi5Options = {}): 
   const onFinished = (event: Event) => {
     const detail = (event as CustomEvent).detail
     const result = detail?.statement?.result
+    const score = cmi5Score(result?.score)
     const outcome: Outcome = {
-      ...(cmi5Score(result?.score) ? { score: cmi5Score(result.score) } : {}),
+      ...(score ? { score } : {}),
       ...(typeof result?.success === 'boolean' ? { success: result.success as boolean } : {})
     }
     const readyOutcome = readyPhase.outcome(outcome)
@@ -434,7 +438,6 @@ export async function startCmi5(player: PlayerLike, options: Cmi5Options = {}): 
     await client.initialize(saved ? { authToken: saved.authToken, initializedDate: saved.initializedDate } : undefined)
     data = client.getLaunchData()
     kept = saved ?? { ...bound, authToken: client.getAuthToken(), initializedDate: client.getInitializedDate(), movedOn: false }
-    pendingOutcome = saved?.pendingOutcome ?? pendingOutcome
     if (!saved) writeKept(storage, key, kept)
 
     const returnURL = webAddress(data.returnURL)

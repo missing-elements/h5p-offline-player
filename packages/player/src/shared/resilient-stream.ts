@@ -40,6 +40,7 @@ export function resilientStream(
 
   const drop = () => {
     controller?.abort()
+    // The abort above is what ends the request; a cancel that errors after it adds nothing.
     void reader?.cancel().catch(() => {})
     reader = null
     controller = null

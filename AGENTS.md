@@ -55,7 +55,9 @@ packages/player/          @missing-elements/h5p-offline-player — the published
       revision.ts           `withProvenance` and `indexFingerprint`: the build every statement names
       metadata.ts           `h5p.json`'s metadata in the shape the runtime reads, held to the core's licence table
       language.ts           the element's language tag, and that English needs none of the runtime's translations
-      range.ts, mime.ts, pkg-id.ts, stream-utils.ts
+      range.ts, mime.ts, pkg-id.ts (ids, keys and the hex they are written in)
+      stream-utils.ts       sliceStream, the stream opened only when read, and the native inflate: the server,
+                            the Jobs worker and the warm all take them from here, since 2026-10-15
     sw/
       sw-entry.ts           standalone worker  -> dist/h5p-sw.js
       mount.ts              mountH5P(self)     -> dist/h5p-sw-mount.js; the virtual file server
@@ -97,6 +99,9 @@ packages/runtime/         @missing-elements/h5p-runtime — the H5P core runtime
   src/finished.ts           which statement is the content's result, the `finished` event: H5P's own
                             rule, and the core's mark on sub-content; bundled into frame-boot.js,
                             unit-tested in tests/
+  src/library-names.ts      how content names a library and how the libraries it names are found: the
+                            check and the upgrade both parse through it (2026-10-15; until then each had
+                            its own parser, one taking `H5P.Foo-1.0` and the other only `H5P.Foo 1.0`)
   scripts/build.mjs         vendors h5p-standalone into dist/ (headers, the rebuilt stylesheet, the fonts,
                             LICENSE.txt, NOTICE.txt, MANIFEST.json), builds the boot script, writes
                             dist/l10n.js from l10n/, writes index.js
@@ -163,6 +168,9 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             the element, on @missing-elements/h5p-cmi5, and demo/cmi5-course.zip the
                             course structure for importing it into an LMS, naming the hosted page;
                             demo/element.js is the one import of the element every page loads;
+                            demo/page-common.js what the player page, the cmi5 page and the app share:
+                            the message box, the log, `foreignHost` (whether a package is another
+                            site's) and the trust prompt, one copy since 2026-10-15;
                             demo/theme.js the light/dark switch, a classic script every page
                             loads in its head before the stylesheet, since the CSP allows no
                             inline script and a pinned theme has to be on <html> before the
@@ -190,7 +198,10 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             build-app-icons, build-app-screenshots, build-libraries (the pack, into
                             packages/libraries), sweep-content-types (every content type in the pack
                             played; see *The content-type sweep*), lib/sweep-content.mjs its generator,
-                            lib/code-blocks.mjs the Vite plugin that highlights the pages' code
+                            lib/code-blocks.mjs the Vite plugin that highlights the pages' code,
+                            lib/hub.mjs the hub host, the cache and the download the two hub-reading
+                            scripts share, lib/pages.mjs the one list of the site's pages, for the
+                            build and the sitemap
   sweep/                    <machineName>.json for the content types the sweep cannot generate
                             playable content for, and the element's attributes they need
   vite.config.ts            the dev server and the hosted demo: the pages plus dist/'s layout at the

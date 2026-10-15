@@ -2,6 +2,7 @@ import {
   ARCHIVE_ENTRY,
   COLD_ENTRY_WAIT_MS,
   FAILURE_BACKOFF_MS,
+  FILE_HANDOVER_TIMEOUT_MS,
   JOB_REQUEST_DEDUPE_MS,
   STREAM_KEEPALIVE_MS,
   VERSION,
@@ -31,7 +32,8 @@ import {
 import { contentRange, parseRange, type ByteRange } from '../shared/range'
 import { openSource } from '../shared/source'
 import * as db from '../shared/idb'
-import { type IndexedEntry, type LocatedEntry, PackageReader, STORED, explainMissingLibraries, locationOf } from './package-reader'
+import { type IndexedEntry, type LocatedEntry, PackageReader, explainMissingLibraries, locationOf } from './package-reader'
+import { STORED } from '../shared/local-header'
 import { CONTENT_CHECK_HEADER, buildFrameDocument, createNonce } from './frame-document'
 import { loadSegment, matchRoute, routesFor, type LoadRef, type RouteMatch, type Routes } from './routes'
 import { sliceStream } from '../shared/stream-utils'
@@ -202,7 +204,6 @@ class VirtualServer {
             ok: true,
             type: 'indexed',
             pkgId: message.pkgId,
-            entryCount: reader.entries.size,
             title: reader.title,
             prefetch: reader.prefetchable(),
             // Only where a read is a round trip. A picked file and a downloaded archive are
@@ -211,7 +212,6 @@ class VirtualServer {
               reader.handle.descriptor.type === 'range-http' && !reader.partial
                 ? reader.warmSpans()
                 : undefined,
-            partial: reader.partial || undefined,
             ready: reader.partial ? await this.bootsEarly(reader) : undefined,
             revision: reader.revision(),
             metadata: reader.metadata,
@@ -453,20 +453,7 @@ class VirtualServer {
     const range = parseRange(rangeHeader, entry.size)
     if (range === 'unsatisfiable') return unsatisfiable(entry.size)
 
-    if (range === 'none') {
-      return new Response(cached.body, {
-        status: 200,
-        headers: entryHeaders(entry, { length: entry.size })
-      })
-    }
-
-    return new Response(sliceStream(cached.body, range), {
-      status: 206,
-      headers: entryHeaders(entry, {
-        length: range.end - range.start + 1,
-        contentRange: contentRange(range, entry.size)
-      })
-    })
+    return entryResponse(entry, range, range === 'none' ? cached.body : sliceStream(cached.body, range))
   }
 
   /**
@@ -512,16 +499,7 @@ class VirtualServer {
     else if (whole) body = reader.inflate(entry)
     else body = sliceStream(reader.inflate(entry), wanted)
 
-    if (range === 'none') {
-      return new Response(body, { status: 200, headers: entryHeaders(entry, { length: entry.size }) })
-    }
-    return new Response(body, {
-      status: 206,
-      headers: entryHeaders(entry, {
-        length: wanted.end - wanted.start + 1,
-        contentRange: contentRange(wanted, entry.size)
-      })
-    })
+    return entryResponse(entry, range, body)
   }
 
   /** Large and stored: the bytes sit flat in the archive, so they are sliced out of the source. */
@@ -535,17 +513,7 @@ class VirtualServer {
     const wanted: ByteRange = range === 'none' ? { start: 0, end: entry.size - 1 } : range
     const body = await reader.sliceStream(entry, wanted)
 
-    if (range === 'none') {
-      return new Response(body, { status: 200, headers: entryHeaders(entry, { length: entry.size }) })
-    }
-
-    return new Response(body, {
-      status: 206,
-      headers: entryHeaders(entry, {
-        length: wanted.end - wanted.start + 1,
-        contentRange: contentRange(wanted, entry.size)
-      })
-    })
+    return entryResponse(entry, range, body)
   }
 
   /**
@@ -870,7 +838,7 @@ class VirtualServer {
         // even once it has the file to give.
         if (this.pendingFiles.get(pkgId) === request) this.pendingFiles.delete(pkgId)
         reject(new PlayerError('bad-archive', 'The picked file is no longer available'))
-      }, COLD_ENTRY_WAIT_MS)
+      }, FILE_HANDOVER_TIMEOUT_MS)
     }
     this.pendingFiles.set(pkgId, request)
 
@@ -944,9 +912,18 @@ function unsatisfiable(size: number): Response {
 }
 
 function retryLater(message: string): Response {
-  return new Response(message, {
-    status: 503,
-    headers: { 'retry-after': '1', 'content-type': 'text/plain; charset=utf-8' }
+  return text(message, 503, { 'retry-after': '1' })
+}
+
+/**
+ * An entry's body as the answer to its request: the whole of it as a `200` when no range was
+ * asked for, else the `206` the range gets, with the length and `Content-Range` to match.
+ */
+function entryResponse(entry: IndexedEntry, range: ByteRange | 'none', body: BodyInit | null): Response {
+  if (range === 'none') return new Response(body, { status: 200, headers: entryHeaders(entry, { length: entry.size }) })
+  return new Response(body, {
+    status: 206,
+    headers: entryHeaders(entry, { length: range.end - range.start + 1, contentRange: contentRange(range, entry.size) })
   })
 }
 
@@ -974,10 +951,10 @@ function json(body: unknown): Response {
   })
 }
 
-function text(body: string, status: number): Response {
+function text(body: string, status: number, headers: Record<string, string> = {}): Response {
   return new Response(body, {
     status,
-    headers: { 'content-type': 'text/plain; charset=utf-8' }
+    headers: { 'content-type': 'text/plain; charset=utf-8', ...headers }
   })
 }
 

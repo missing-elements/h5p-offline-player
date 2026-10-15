@@ -4,5 +4,7 @@ import type { BuildResult, Plugin } from 'esbuild'
 
 export function buildServiceWorker(outfile: string): Promise<BuildResult>
 export function buildMountModule(outfile: string): Promise<BuildResult>
+export function buildJobsWorker(outfile: string): Promise<BuildResult>
+export function playerNotice(): Promise<string>
 export const mountFromSource: Plugin
 export function bundleHostWorker(entry: string, options?: { define?: Record<string, string>; dev?: boolean }): Promise<string>

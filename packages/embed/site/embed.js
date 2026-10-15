@@ -75,7 +75,11 @@ export function startEmbed({ librariesPack = null, packages = null, defaultLibra
 
   /* ---------------------------------------------------------------- sizing, upward */
 
-  /** The parent hears about the height in the shape h5p-resizer.js expects. Nothing in it is secret. */
+  /**
+   * A message to the page that frames this one: the height in the shape h5p-resizer.js expects,
+   * and `report`, `error` and `xapi` in this page's own. To any parent unless a target is named,
+   * since nothing in the height is secret; the xAPI relay names the origin that opted in.
+   */
   const post = (message, target = '*') => {
     if (framed) window.parent.postMessage(message, target)
   }

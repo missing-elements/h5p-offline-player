@@ -1,6 +1,7 @@
 import { SEGMENT_CONCURRENCY, SEGMENT_MIN_SPAN, SEGMENT_SIZE } from './constants'
 import type { ByteRange } from './range'
 import type { SourceHandle } from './source'
+import { deferredStream } from './stream-utils'
 
 /**
  * How a span of the archive is pulled: one ranged request, or several at once when the span is
@@ -24,22 +25,7 @@ export function streamSpan(handle: SourceHandle, range: ByteRange): ReadableStre
   if (handle.descriptor.type === 'range-http' && end - start + 1 >= SEGMENT_MIN_SPAN) {
     return segmentedStream(handle, { start, end })
   }
-  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
-
-  return new ReadableStream<Uint8Array>(
-    {
-      async pull(controller) {
-        reader ??= (await handle.stream({ start, end })).getReader()
-        const { done, value } = await reader.read()
-        if (done) controller.close()
-        else controller.enqueue(value)
-      },
-      async cancel(reason) {
-        await reader?.cancel(reason)
-      }
-    },
-    { highWaterMark: 0 }
-  )
+  return deferredStream(() => handle.stream({ start, end }))
 }
 
 /**
@@ -101,6 +87,7 @@ class Segment {
   cancel(): void {
     this.cancelled = true
     this.arrived.length = 0
+    // A request that is already over, or errored, has nothing left to cancel.
     void this.reader?.cancel().catch(() => {})
     this.wake?.()
   }

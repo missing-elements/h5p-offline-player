@@ -257,8 +257,6 @@ export type ToWorkerMessage =
  */
 export interface PrefetchEntry {
   entry: string
-  /** Uncompressed size — the number that decides whether starting it early is worth the bytes. */
-  size: number
   location: EntryLocation
 }
 
@@ -312,13 +310,10 @@ export type WorkerReply =
       ok: true
       type: 'indexed'
       pkgId: string
-      entryCount: number
       title?: string
       prefetch?: PrefetchEntry[]
       /** Spans to pull whole before booting. Only for a host that honours `Range`. */
       warm?: WarmSpan[]
-      /** Built from the forward index of an archive still downloading, not its central directory. */
-      partial?: boolean
       /** For a partial index: whether everything the runtime needs to boot has arrived. */
       ready?: boolean
       /**
@@ -349,7 +344,13 @@ export type FromWorkerMessage =
 
 /* ------------------------------------------------------------------ element → Jobs worker */
 
-export type ToJobsMessage =
+/**
+ * A job, with the picked `File` when the package is one: the element sends the file with every
+ * job for such a package, and the worker keeps it by package for the life of the worker.
+ */
+export type ToJobsMessage = ToJobsRequest & { file?: File }
+
+type ToJobsRequest =
   | { type: 'download'; pkgId: string; source: SourceDescriptor }
   /** `prefetch`: asked for ahead of demand, so it queues behind anything the runtime is waiting on. */
   | {
@@ -358,7 +359,6 @@ export type ToJobsMessage =
       entry: string
       location: EntryLocation
       source: SourceDescriptor
-      file?: File
       prefetch?: true
     }
   /** Pulls the spans into the cache. Reports under the reserved entry name `WARM_ENTRY`. */
@@ -373,7 +373,7 @@ export const JOBS_READY = 'jobs-ready'
 
 export type FromJobsMessage =
   | { type: 'progress'; pkgId: string; entry?: string; loaded: number; total: number | null }
-  | { type: 'done'; pkgId: string; entry?: string; size: number }
+  | { type: 'done'; pkgId: string; entry?: string }
   | { type: 'failed'; pkgId: string; entry?: string; code: ErrorCode; message: string }
 
 /* ------------------------------------------------------------------ frame → element */

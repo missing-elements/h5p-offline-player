@@ -109,7 +109,7 @@ describe('JobsWorkerHandle', () => {
     const { spawned, heard } = setup([{ label: 'blob' }, { label: 'file' }])
     spawned[0].load()
 
-    const done: FromJobsMessage = { type: 'done', pkgId: 'pkg', size: 1 }
+    const done: FromJobsMessage = { type: 'done', pkgId: 'pkg' }
     spawned[0].reply(done)
     expect(heard).toEqual([done])
 

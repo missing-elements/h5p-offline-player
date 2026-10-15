@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs'
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, extname, join, normalize, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { chromium } from 'playwright-core'
+import { chromium, errors as playwrightErrors } from 'playwright-core'
 
 /**
  * Plays a package the way a learner would — the real element, the real Service Worker, a real
@@ -19,6 +19,11 @@ import { chromium } from 'playwright-core'
 const require = createRequire(import.meta.url)
 const here = fileURLToPath(new URL('.', import.meta.url))
 const { version } = require('../package.json')
+
+/** How many console error lines the report keeps: enough to read, not a runaway log. */
+const CONSOLE_LINES_KEPT = 20
+/** How much of a revision the one-line summary shows: `sha256:` and sixteen hex characters. */
+const REVISION_SHOWN = 23
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -51,8 +56,14 @@ const MIME = {
  */
 export async function verifyPackage(options) {
   const file = resolve(options.file)
-  const size = (await stat(file).catch(() => null))?.size
-  if (size === undefined) throw new VerifyError(`No such file: ${file}`)
+  let size
+  try {
+    size = (await stat(file)).size
+  } catch (error) {
+    // Only a missing file is "no such file"; a file that cannot be read says why.
+    const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined
+    throw new VerifyError(code === 'ENOENT' ? `No such file: ${file}` : `Cannot read ${file}: ${error instanceof Error ? error.message : String(error)}`)
+  }
   const readyTimeout = options.readyTimeout ?? 60_000
   const settle = options.settle ?? 3_000
 
@@ -101,7 +112,12 @@ export async function verifyPackage(options) {
     let timedOut = false
     await page
       .waitForFunction(() => window.__verify.states.some((s) => s.state === 'ready' || s.state === 'error'), null, { timeout: readyTimeout })
-      .catch(() => {
+      .catch((error) => {
+        // Only the time running out says something about the package. A browser that crashed
+        // or a page that went away is the check failing to run, and is reported as that.
+        if (!(error instanceof playwrightErrors.TimeoutError)) {
+          throw new VerifyError(`The browser stopped before the package could be judged: ${error instanceof Error ? error.message : String(error)}`)
+        }
         timedOut = true
       })
     if (!timedOut) await page.waitForTimeout(settle)
@@ -123,6 +139,8 @@ export async function verifyPackage(options) {
               instances: window.H5P?.instances?.length ?? null
             }
           })
+          // A frame that has navigated away, or was never reachable, has nothing to measure:
+          // the verdict rules read that as nothing drawn.
           .catch(() => null)
       : null
     const csp = frame ? await frame.evaluate(() => window.__csp ?? []).catch(() => []) : []
@@ -151,7 +169,7 @@ export async function verifyPackage(options) {
       xapi: [...new Set(collected.xapi)],
       csp,
       failedRequests,
-      console: consoleErrors.filter((text) => !collected.errors.some((error) => text.includes(error.message))).slice(0, 20),
+      console: consoleErrors.filter((text) => !collected.errors.some((error) => text.includes(error.message))).slice(0, CONSOLE_LINES_KEPT),
       screenshot
     }
 
@@ -276,7 +294,7 @@ async function launch(executablePath) {
 export function summarize(report) {
   const name = basename(report.file)
   const took = report.readyMs !== null ? `ready in ${(report.readyMs / 1000).toFixed(2)} s` : `state ${report.state}`
-  const lines = [`${report.verdict}  ${name}  ${took}${report.revision ? `  revision ${report.revision.slice(0, 23)}…` : ''}`]
+  const lines = [`${report.verdict}  ${name}  ${took}${report.revision ? `  revision ${report.revision.slice(0, REVISION_SHOWN)}…` : ''}`]
   for (const reason of report.reasons) lines.push(`  ${reason}`)
   const missing = report.errors.find((error) => error.missingLibraries)?.missingLibraries
   if (missing) {

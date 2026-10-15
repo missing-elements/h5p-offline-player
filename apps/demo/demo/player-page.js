@@ -4,6 +4,7 @@
  * no URL field, no file picker, no progress bar and no "open in another browser" banner.
  */
 
+import { foreignHost, logInto, messageIn, trustPrompt } from './page-common.js'
 import librariesPack from '@missing-elements/h5p-libraries/libraries.h5p?url'
 
 const player = document.querySelector('h5p-player')
@@ -20,16 +21,10 @@ const offer = document.querySelector('#offer')
 const useBundle = document.querySelector('#use-bundle')
 const confirmBox = document.querySelector('#confirm-src')
 
-const write = (line) => {
-  const stamp = new Date().toLocaleTimeString([], { hour12: false })
-  log.textContent = `${stamp}  ${line}\n${log.textContent}`.slice(0, 20000)
-}
-
-const show = (text, kind = 'hint') => {
-  message.textContent = text
-  message.className = `message ${kind}`
-  message.hidden = !text
-}
+const write = logInto(log)
+const show = messageIn(message)
+/** The question before a link from another site plays with its own code; any other load dismisses it. */
+const trust = trustPrompt(confirmBox, document.querySelector('#confirm-open'))
 
 /**
  * What a host page can usefully say about each failure. Only the codes whose own message is
@@ -222,7 +217,7 @@ let currentLink = null
  */
 const loadUrl = (url, { trusted = true } = {}) => {
   log.textContent = ''
-  confirmBox.hidden = true
+  trust.dismiss()
   offer.hidden = true
   reload = () => loadUrl(url, { trusted })
   currentLink = url
@@ -240,7 +235,7 @@ const loadUrl = (url, { trusted = true } = {}) => {
 
 const loadFile = (file) => {
   log.textContent = ''
-  confirmBox.hidden = true
+  trust.dismiss()
   offer.hidden = true
   reload = () => loadFile(file)
   currentLink = null
@@ -281,36 +276,7 @@ for (const button of document.querySelectorAll('.samples button')) {
   })
 }
 
-/**
- * The host of a package on another site, or `null` for this site's own and for what is not a URL
- * (which `loadUrl` then reports). A package's libraries are JavaScript and the frame is
- * same-origin by design, so a package's own code runs with this origin's storage: the app's saved
- * states, the chunk store, the list of what was played. Typed into the field is the visitor's
- * choice; a link's `?src=` is whoever wrote the link's, so one on another site plays `untrusted`,
- * as data, and asks for a click that names the host only when it cannot play without its own code.
- */
-const foreignHost = (src) => {
-  try {
-    const url = new URL(src, location.href)
-    // A `data:` URL has no host and an opaque origin: name its scheme, so it counts as another site's.
-    return url.origin === location.origin ? null : url.host || url.protocol
-  } catch {
-    return null
-  }
-}
-
-/** What the pending link would load; any other load (`loadUrl`, `loadFile`) hides the question. */
-let pendingOpen = null
-const askBeforeOpening = (host, go) => {
-  confirmBox.querySelector('.host').textContent = host
-  confirmBox.hidden = false
-  pendingOpen = go
-}
-document.querySelector('#confirm-open').addEventListener('click', () => {
-  confirmBox.hidden = true
-  pendingOpen?.()
-  pendingOpen = null
-})
+const askBeforeOpening = trust.ask
 
 // `?src=` makes the page linkable.
 const initial = new URLSearchParams(location.search).get('src')

@@ -19,6 +19,27 @@ import { upgradeContent, type ServedLibrary, type UpgradeSource, type UpgradeTab
 import { isResult } from './finished'
 import { coreTranslations } from './l10n'
 
+/** How long a read of one of the package's JSON files may take before it counts as failed. */
+var LIBRARY_READ_TIMEOUT_MS = 20000;
+
+/** A fetch that gives up after `LIBRARY_READ_TIMEOUT_MS`, where the browser can be told to. */
+var boundedFetch = function (url: string): Promise<Response> {
+  var signal = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(LIBRARY_READ_TIMEOUT_MS) : undefined;
+  return fetch(url, { signal: signal });
+};
+
+/** An error's message, or the thing thrown when it is not an error. */
+var errorText = function (error: unknown): string {
+  return String((error && (error as Error).message) || error);
+};
+
+/** The one content h5p-standalone registered with the runtime, once it has. */
+var registeredContent = function () {
+  var contents = window.H5PIntegration && window.H5PIntegration.contents;
+  var key = contents ? Object.keys(contents)[0] : undefined;
+  return contents && key ? contents[key] : undefined;
+};
+
 interface BootConfig {
   pkgId: string
   h5pJsonPath: string
@@ -168,7 +189,8 @@ var options: Record<string, unknown> = {
   // then, which is why the element is asked first.
   saveFreq: false as number | false,
   // The runtime is initialised here, not by h5p-standalone: the saved state has to be in place
-  // first, and it comes from the element.
+  // first, and it comes from the element. Read with care: h5p-standalone's flag is inverted —
+  // undefined or truthy, and it calls `H5P.init()` itself; `false`, and it leaves it to us.
   preventH5PInit: false
 };
 
@@ -299,8 +321,7 @@ var librarySource = function (base: string, listed: string[] | undefined): Upgra
     // Bounded, and a read that runs out fails the upgrade rather than passing for "not served":
     // on a host without `Range` a miss waits until the download proves the entry absent, and a
     // library the content names but nothing carries would hold the boot back that long.
-    var signal = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(20000) : undefined;
-    return fetch(base + '/' + folder + '/library.json', { signal: signal })
+    return boundedFetch(base + '/' + folder + '/library.json')
       .then(function (response) {
         // Not JSON is not a library; the runtime fails on it in its own way.
         return response.ok ? response.json().catch(function () { return null; }) : null;
@@ -321,8 +342,7 @@ var librarySource = function (base: string, listed: string[] | undefined): Upgra
       if (!semantics[folder]) {
         // Bounded like a library.json, and nothing, rather than an error, for one that is not
         // there: the check removes sub-content it cannot check, and refuses a main library.
-        var signal = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(20000) : undefined;
-        semantics[folder] = fetch(base + '/' + folder + '/semantics.json', { signal: signal })
+        semantics[folder] = boundedFetch(base + '/' + folder + '/semantics.json')
           .then(function (response) { return response.ok ? response.json() : null; })
           .then(function (fields: unknown) { return Array.isArray(fields) ? (fields as SemanticField[]) : null; })
           .catch(function () { return null; });
@@ -342,7 +362,7 @@ var librarySource = function (base: string, listed: string[] | undefined): Upgra
       if (listed && listed.indexOf(library.folder) < 0) return Promise.resolve(null);
       var url = base + '/' + library.folder + '/upgrades.js';
       if (!steps[url]) {
-        steps[url] = fetch(url).then(function (response) {
+        steps[url] = boundedFetch(url).then(function (response) {
           if (!response.ok) {
             if (listed) throw new Error('could not load ' + library.folder + '/upgrades.js (' + response.status + ')');
             return null;
@@ -397,10 +417,9 @@ var writtenFor = function (manifest: Manifest): LibraryName | null {
  * them as written, which is how every package played before this ran, and says so in the console.
  */
 var upgradeToServed = function (): Promise<void> {
-  var contents = window.H5PIntegration && window.H5PIntegration.contents;
-  var key = contents ? Object.keys(contents)[0] : undefined;
-  if (!contents || !key) return Promise.resolve();
-  var content = contents[key];
+  // `const`, so the check below still holds inside the callbacks that follow.
+  const content = registeredContent();
+  if (!content) return Promise.resolve();
 
   return readManifest()
     .then(function (manifest) {
@@ -441,10 +460,9 @@ var upgradeToServed = function (): Promise<void> {
  */
 var checkUntrusted = function (): Promise<void> {
   if (!config.untrusted) return Promise.resolve();
-  var contents = window.H5PIntegration && window.H5PIntegration.contents;
-  var key = contents ? Object.keys(contents)[0] : undefined;
-  if (!contents || !key) return Promise.reject(new Error('the runtime holds no content to check'));
-  var content = contents[key];
+  // `const`, so the check below still holds inside the callbacks that follow.
+  const content = registeredContent();
+  if (!content) return Promise.reject(new Error('the runtime holds no content to check'));
 
   return readManifest()
     .then(function (manifest) {
@@ -475,7 +493,7 @@ var checkUntrusted = function (): Promise<void> {
       });
     })
     .catch(function (error: unknown) {
-      throw new Error("The content could not be checked against its libraries' semantics, so it does not play untrusted: " + String((error && (error as Error).message) || error));
+      throw new Error("The content could not be checked against its libraries' semantics, so it does not play untrusted: " + errorText(error));
     });
 };
 
@@ -557,7 +575,7 @@ askForUserData()
     post({ type: 'ready' });
   })
   .catch(function (error: unknown) {
-    post({ type: 'error', message: String((error && (error as Error).message) || error) });
+    post({ type: 'error', message: errorText(error) });
   });
 
 // Capture phase, because a resource that fails to load fires 'error' on its own element and

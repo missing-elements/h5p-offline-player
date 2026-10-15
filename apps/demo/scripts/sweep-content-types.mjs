@@ -170,6 +170,7 @@ async function play(context, { entry, override, file, mode }) {
       const frame = page.frames().find((candidate) => candidate.url().includes('/h5p/frame/'))
       if (frame) result.steps = await walk(page, frame)
       await page.waitForTimeout(SETTLE)
+      // A frame that has gone, or will not answer, has no violations and no buttons to list.
       result.csp = frame ? await frame.evaluate(() => window.__csp ?? []).catch(() => []) : []
       // What is left to press: where a content type's file would take the steps further.
       result.buttons = frame
@@ -181,7 +182,10 @@ async function play(context, { entry, override, file, mode }) {
             )
             .catch(() => [])
         : []
-      await page.locator('h5p-player').screenshot({ path: join(outDir, 'screenshots', `${machineName}-${mode}.png`) }).catch(() => {})
+      await page
+        .locator('h5p-player')
+        .screenshot({ path: join(outDir, 'screenshots', `${machineName}-${mode}.png`) })
+        .catch((error) => console.warn(`[sweep] no screenshot of ${machineName} ${mode}: ${error instanceof Error ? error.message : String(error)}`))
     }
 
     const recorded = await page.evaluate(() => window.__sweep)
@@ -353,6 +357,7 @@ async function readPack(path) {
 /** `sweep/<machineName>.json`, by machine name. */
 async function readOverrides() {
   const found = new Map()
+  // No `sweep/` folder is no overrides.
   for (const name of await readdir(overridesDir).catch(() => [])) {
     if (!name.endsWith('.json')) continue
     found.set(name.slice(0, -'.json'.length), JSON.parse(await readFile(join(overridesDir, name), 'utf8')))

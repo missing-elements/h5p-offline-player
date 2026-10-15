@@ -27,7 +27,11 @@ export class Cmi5RequestError extends Error {
   }
 }
 
-function reasonIn(data: unknown): string | null {
+/**
+ * What a refusal's body says: a launching system's refusal carries `message`, a refused token
+ * cmi5's `error-text`, and some answer with plain text.
+ */
+export function reasonIn(data: unknown): string | null {
   if (typeof data === 'string') return data.trim() || null
   if (data && typeof data === 'object') {
     const { message, 'error-text': errorText } = data as Record<string, unknown>
@@ -63,13 +67,16 @@ export function launchParametersOf(url: string): LaunchParameters | null {
 
 /** An ISO 8601 duration between two times, to the hundredth of a second xAPI keeps. */
 export function isoDuration(from: Date, to: Date): string {
+  const HUNDREDTHS_PER_MINUTE = 6_000
+  const HUNDREDTHS_PER_HOUR = 60 * HUNDREDTHS_PER_MINUTE
+  const HUNDREDTHS_PER_DAY = 24 * HUNDREDTHS_PER_HOUR
   let rest = Math.max(0, Math.round((to.getTime() - from.getTime()) / 10))
-  const days = Math.floor(rest / 8_640_000)
-  rest -= days * 8_640_000
-  const hours = Math.floor(rest / 360_000)
-  rest -= hours * 360_000
-  const minutes = Math.floor(rest / 6_000)
-  rest -= minutes * 6_000
+  const days = Math.floor(rest / HUNDREDTHS_PER_DAY)
+  rest -= days * HUNDREDTHS_PER_DAY
+  const hours = Math.floor(rest / HUNDREDTHS_PER_HOUR)
+  rest -= hours * HUNDREDTHS_PER_HOUR
+  const minutes = Math.floor(rest / HUNDREDTHS_PER_MINUTE)
+  rest -= minutes * HUNDREDTHS_PER_MINUTE
   const seconds = rest / 100
   const time = `${hours ? `${hours}H` : ''}${minutes ? `${minutes}M` : ''}${seconds ? `${seconds}S` : ''}`
   if (!days && !time) return 'PT0S'
@@ -233,7 +240,9 @@ export function createCmi5Client(options: Cmi5ClientOptions = {}): Cmi5Client {
       const { data } = ready()
       if (data.launchMode !== 'Normal') throw new Error(`Nothing may be recorded in ${data.launchMode} mode.`)
       const mastery = data.masteryScore
-      const statements: Statement[] = []
+      // Each with its verb beside it, so the bookkeeping after the send does not have to read
+      // the verb back out of the statement it built.
+      const statements: Array<{ verb: 'passed' | 'failed' | 'completed' | 'terminated'; statement: Statement }> = []
       const passed = judge(score, success, mastery)
       let outcome: 'passed' | 'failed' | null = null
       let completed = false
@@ -241,23 +250,27 @@ export function createCmi5Client(options: Cmi5ClientOptions = {}): Cmi5Client {
       // and no second `completed` (9.3.0.0-6).
       if (passed !== null && !history.passed && !judgedThisSession) {
         outcome = passed ? 'passed' : 'failed'
-        statements.push(defined(passed ? 'passed' : 'failed', {
-          result: { ...(score ? { score } : {}), success: passed, duration: duration() },
-          category: [MOVE_ON_CATEGORY],
-          ...(mastery !== undefined ? { extensions: { [MASTERY_SCORE]: mastery } } : {})
-        }))
+        statements.push({
+          verb: outcome,
+          statement: defined(outcome, {
+            result: { ...(score ? { score } : {}), success: passed, duration: duration() },
+            category: [MOVE_ON_CATEGORY],
+            ...(mastery !== undefined ? { extensions: { [MASTERY_SCORE]: mastery } } : {})
+          })
+        })
       }
       // No score here: only `passed` and `failed` may carry one (9.5.1.0-2).
       if (!history.completed) {
-        statements.push(defined('completed', {
-          result: { completion: true, duration: duration() },
-          category: [MOVE_ON_CATEGORY]
-        }))
+        statements.push({
+          verb: 'completed',
+          statement: defined('completed', { result: { completion: true, duration: duration() }, category: [MOVE_ON_CATEGORY] })
+        })
       }
-      if (!disableSendTerminated) statements.push(defined('terminated', { result: { duration: duration() } }))
-      for (const statement of statements) {
+      if (!disableSendTerminated) {
+        statements.push({ verb: 'terminated', statement: defined('terminated', { result: { duration: duration() } }) })
+      }
+      for (const { verb, statement } of statements) {
         await send(statement)
-        const verb = statement.verb.display['en-US']
         if (verb === 'completed') {
           history = { ...history, completed: true }
           completed = true

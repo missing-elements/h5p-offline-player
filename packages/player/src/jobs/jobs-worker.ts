@@ -3,7 +3,7 @@ import { ARCHIVE_ENTRY, CHUNK_SIZE, INPUT_LIVENESS_MS, WARM_ENTRY } from '../sha
 import { ChunkStore, QuotaError, announceQueued, announceRunning, isQuotaError } from '../shared/chunk-store'
 import { installEvictionPolicy } from '../shared/eviction'
 import { LocalHeaderScanner } from '../shared/forward-index'
-import { DEFLATE, LOCAL_HEADER_FIXED_SIZE, STORED, localHeaderDataStart } from '../shared/local-header'
+import { DEFLATE, STORED, readDataStart } from '../shared/local-header'
 import { packageLockName, packageLockPrefix } from '../shared/locks'
 import {
   JOBS_READY,
@@ -17,6 +17,7 @@ import {
 } from '../shared/protocol'
 import { openSource, type SourceHandle } from '../shared/source'
 import { streamSpan } from '../shared/span-stream'
+import { inflated } from '../shared/stream-utils'
 import { quotaMessage } from '../shared/storage'
 import { createChunkWriter } from './chunk-writer'
 import { JobQueue, type ExtractJob } from './job-queue'
@@ -60,7 +61,7 @@ function send(message: FromJobsMessage): void {
 // The large writes happen here, so this is where quota runs out: the policy has to be installed
 // here as well as in the Service Worker, or a full disk evicts whatever the browser lists first.
 // Nothing to forget on an eviction: this worker keeps no reader or index per package.
-installEvictionPolicy(() => {})
+installEvictionPolicy()
 
 /**
  * Doubles as the Web Lock name, which is why it carries the package prefix: while this job holds
@@ -70,7 +71,7 @@ function jobKey(pkgId: string, entry?: string): string {
   return packageLockName(pkgId, entry ?? ARCHIVE_ENTRY)
 }
 
-scope.addEventListener('message', (event: MessageEvent<ToJobsMessage & { file?: File }>) => {
+scope.addEventListener('message', (event: MessageEvent<ToJobsMessage>) => {
   const message = event.data
   if (!message) return
 
@@ -213,7 +214,7 @@ async function downloadArchive(
   const existing = await store.getArchiveMeta()
 
   if (existing?.complete) {
-    send({ type: 'done', pkgId, size: existing.size ?? existing.available })
+    send({ type: 'done', pkgId })
     return
   }
 
@@ -261,13 +262,25 @@ async function downloadArchive(
 
   let published = -1
   let publishing: Promise<void> = Promise.resolve()
+  let indexRefused = false
   const publishIndex = (final: boolean) => {
     if (final) scanner.finish()
     const snapshot = scanner.snapshot()
     if (!final && snapshot.entries.length === published) return publishing
     published = snapshot.entries.length
-    // Serialised: two snapshots racing to the same record could land the older one last.
-    publishing = publishing.then(() => store.setForwardIndex(snapshot))
+    // Serialised: two snapshots racing to the same record could land the older one last. A
+    // snapshot the store refuses is dropped and the chain goes on from the next one: the index
+    // is what lets the frame boot before the download is whole, and the central directory is
+    // the authority once it is, so a refused write costs an early boot and never the download.
+    // Caught on each link, because a rejected link would skip every later one and come back as
+    // an unhandled rejection on each `void` call, and fail the download at the final publish.
+    publishing = publishing
+      .then(() => store.setForwardIndex(snapshot))
+      .catch((error: unknown) => {
+        if (indexRefused) return
+        indexRefused = true
+        console.warn('[h5p-player] the forward index could not be written; the frame boots once the download is whole:', error)
+      })
     return publishing
   }
 
@@ -314,7 +327,7 @@ async function downloadArchive(
     return downloadArchive(pkgId, source, signal, true)
   }
   if (!meta?.complete) throw new PlayerError('bad-archive', 'The downloaded archive could not be kept in the browser storage')
-  send({ type: 'done', pkgId, size: meta.size ?? meta.available })
+  send({ type: 'done', pkgId })
 }
 
 /* ------------------------------------------------------------------ warming */
@@ -336,26 +349,22 @@ async function warmJob(
   const marker = await store.getWhole(WARM_ENTRY)
   if (marker) {
     await marker.body?.cancel()
-    send({ type: 'done', pkgId, entry: WARM_ENTRY, size: 0 })
+    send({ type: 'done', pkgId, entry: WARM_ENTRY })
     return
   }
 
   const handle = await openSource(pkgId, source, files.get(pkgId))
-  let landed = 0
   try {
     await warmPackage(handle, spans, store, {
       signal,
-      onProgress: ({ loaded, total }) => {
-        landed = loaded
-        send({ type: 'progress', pkgId, entry: WARM_ENTRY, loaded, total })
-      }
+      onProgress: ({ loaded, total }) => send({ type: 'progress', pkgId, entry: WARM_ENTRY, loaded, total })
     })
   } catch (error) {
     if (signal.aborted) return
     console.warn('[h5p-player] warming stopped early; the rest is served on demand:', error)
   }
   if (signal.aborted) return
-  send({ type: 'done', pkgId, entry: WARM_ENTRY, size: landed })
+  send({ type: 'done', pkgId, entry: WARM_ENTRY })
 }
 
 /* ------------------------------------------------------------------ extraction */
@@ -376,7 +385,7 @@ async function extractEntry(
   const existing = await store.getMeta(entryName)
 
   if (existing?.complete) {
-    send({ type: 'done', pkgId, entry: entryName, size: existing.size ?? existing.available })
+    send({ type: 'done', pkgId, entry: entryName })
     return
   }
 
@@ -403,7 +412,7 @@ async function extractEntry(
 
   const stopReporting = reportRunning(handle, pkgId, entryName)
   try {
-    await inflated(streamSpan(handle, { start, end }), location).pipeTo(
+    await inflated(streamSpan(handle, { start, end }), location.method, location.compressedSize).pipeTo(
       createChunkWriter({
         store,
         entry: entryName,
@@ -420,7 +429,7 @@ async function extractEntry(
     stopReporting()
   }
 
-  send({ type: 'done', pkgId, entry: entryName, size: location.size })
+  send({ type: 'done', pkgId, entry: entryName })
 }
 
 /** Where an entry's data begins: its local header, read for the name and extra lengths in front. */
@@ -428,21 +437,7 @@ async function dataStartOf(handle: SourceHandle, entryName: string, location: En
   if (location.header === undefined) {
     throw new PlayerError('bad-archive', `${entryName} has no known location in the archive`)
   }
-  const header = await handle.read({
-    start: location.header,
-    end: location.header + LOCAL_HEADER_FIXED_SIZE - 1
-  })
-  const start = localHeaderDataStart(location.header, header)
-  if (start === null) throw new PlayerError('bad-archive', `${entryName} has a malformed local header`)
-  return start
-}
-
-/** The entry's bytes as stored, or inflated when it is deflated. */
-function inflated(compressed: ReadableStream<Uint8Array>, location: EntryLocation): ReadableStream<Uint8Array> {
-  if (location.method === STORED || location.compressedSize === 0) return compressed
-  // The lib types the codec's input as `BufferSource`, stricter than the plain views it gets.
-  const inflate = new DecompressionStream('deflate-raw') as unknown as ReadableWritablePair<Uint8Array, Uint8Array>
-  return compressed.pipeThrough(inflate)
+  return readDataStart(handle, location.header, entryName)
 }
 
 /**

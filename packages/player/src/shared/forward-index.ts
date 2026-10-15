@@ -23,6 +23,8 @@
  * normalisation as everything else, and the snapshot is replaced by the real index once the whole
  * archive is present.
  */
+import { LOCAL_HEADER_FIXED_SIZE, LOCAL_HEADER_SIGNATURE } from './local-header'
+
 
 export interface ForwardEntry {
   /** The name as written in the archive. Normalised by the reader, not here. */
@@ -55,13 +57,11 @@ export interface ForwardIndexSnapshot {
   stopped: ForwardStop | null
 }
 
-const LOCAL_HEADER = 0x04034b50
 const CENTRAL_HEADER = 0x02014b50
 const END_OF_CENTRAL_DIRECTORY = 0x06054b50
 const ZIP64_END_OF_CENTRAL_DIRECTORY = 0x06064b50
 const ZIP64_END_LOCATOR = 0x07064b50
 const DESCRIPTOR = 0x08074b50
-const LOCAL_HEADER_FIXED_SIZE = 30
 const ZIP64_EXTRA_ID = 0x0001
 const FLAG_ENCRYPTED = 0x0001
 const FLAG_DESCRIPTOR = 0x0008
@@ -172,7 +172,7 @@ export class LocalHeaderScanner {
       this.parsedTo = this.position
       return false
     }
-    if (signature !== LOCAL_HEADER) {
+    if (signature !== LOCAL_HEADER_SIGNATURE) {
       this.stopped = 'bad-signature'
       return false
     }

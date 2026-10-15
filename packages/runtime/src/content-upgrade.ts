@@ -19,6 +19,8 @@
  * object — rather than by walking each library's semantics, so a parent that did not change still
  * has its children upgraded, and no `semantics.json` is read.
  */
+import { MAX_DEPTH, libraryKey, librariesIn, parseLibrary } from './library-names'
+
 
 export interface LibraryVersion {
   major: number
@@ -59,17 +61,12 @@ export interface UpgradeResult {
  * How long a single step may take to call back. Steps are synchronous rewrites of a JSON tree in
  * practice; one that never calls back would otherwise hold the content back for good.
  */
-export const STEP_TIMEOUT_MS = 3000
-
-/** Sub-content nests, but not this deep; the parameters are the package's, so the walk is bounded. */
-const MAX_DEPTH = 64
-
-const LIBRARY_STRING = /^([A-Za-z0-9_.-]+) (\d+)\.(\d+)$/
+const STEP_TIMEOUT_MS = 3000
 
 /** A newer minor of the same major: the only move the player's file server makes for a library. */
 const isUpgrade = (from: LibraryVersion, to: LibraryVersion) => to.major === from.major && to.minor > from.minor
 
-const libraryString = (machineName: string, version: LibraryVersion) => `${machineName} ${version.major}.${version.minor}`
+const libraryString = (machineName: string, version: LibraryVersion) => libraryKey({ machineName, major: version.major, minor: version.minor })
 
 /**
  * Upgrades the main content and every sub-content in it. Rejects on the first step that fails,
@@ -86,7 +83,7 @@ export async function upgradeContent(
   // below then finds each answer waiting rather than asking one library at a time.
   const [served] = await Promise.all([
     source.served(main.machineName, main.version),
-    ...namedLibraries(params).map(({ machineName, version }) => source.served(machineName, version))
+    ...librariesIn(params).map((library) => source.served(library.machineName, { major: library.major, minor: library.minor }))
   ])
   let changed = false
   if (served && isUpgrade(main.version, served)) {
@@ -176,10 +173,10 @@ async function upgradeSubContent(value: unknown, source: UpgradeSource, timeoutM
   }
 
   const node = value as Record<string, unknown>
-  const match = typeof node.library === 'string' ? LIBRARY_STRING.exec(node.library) : null
-  if (match && node.params && typeof node.params === 'object') {
-    const machineName = match[1]
-    const wanted = { major: Number(match[2]), minor: Number(match[3]) }
+  const named = parseLibrary(node.library)
+  if (named && node.params && typeof node.params === 'object') {
+    const machineName = named.machineName
+    const wanted = { major: named.major, minor: named.minor }
     const served = await source.served(machineName, wanted)
     if (served && isUpgrade(wanted, served)) {
       const steps = await source.steps(machineName, served)
@@ -201,22 +198,3 @@ async function upgradeSubContent(value: unknown, source: UpgradeSource, timeoutM
   return changed
 }
 
-/** Each library the parameters name, once, as written. */
-function namedLibraries(params: unknown): { machineName: string; version: LibraryVersion }[] {
-  const found = new Map<string, { machineName: string; version: LibraryVersion }>()
-  const walk = (value: unknown, depth: number) => {
-    if (depth > MAX_DEPTH || !value || typeof value !== 'object') return
-    if (Array.isArray(value)) {
-      for (const item of value) walk(item, depth + 1)
-      return
-    }
-    const library = (value as { library?: unknown }).library
-    const match = typeof library === 'string' ? LIBRARY_STRING.exec(library) : null
-    if (match && !found.has(library as string)) {
-      found.set(library as string, { machineName: match[1], version: { major: Number(match[2]), minor: Number(match[3]) } })
-    }
-    for (const child of Object.values(value)) walk(child, depth + 1)
-  }
-  walk(params, 0)
-  return [...found.values()]
-}
