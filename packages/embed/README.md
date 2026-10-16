@@ -47,14 +47,27 @@ npx @missing-elements/h5p-embed h5p-player \
 
 ## Hosting
 
-| Host | Policy and caching |
-|---|---|
-| Netlify, Cloudflare Pages | `_headers`, written beside the page |
-| Vercel | `vercel.json`, written beside the page |
-| GitHub Pages, S3, nginx, others | a `<meta>` policy in the page; `--ancestors` needs a `Content-Security-Policy: frame-ancestors …` header set on the server |
+Any static host, over https, at a domain's root or under a path. The page carries its own
+policy in a `<meta>` tag, so it is protected wherever it is served. The headers — the same
+policy with `frame-ancestors`, and the caching — are written beside it in the form each kind of
+host reads; use the one yours does and ignore the rest:
 
-It works at a domain's root or under a path, over https. Serve `h5p-sw.js` with
-`Cache-Control: no-cache`. To update, run the command again with `--force` and redeploy.
+| Host | File |
+|---|---|
+| A server of your own — Hetzner, IONOS, OVH, Scaleway, a university's machine | `Caddyfile` (run it as it is; Caddy fetches the certificate), `nginx.conf` (include it in the server block), `.htaccess` (Apache with `mod_headers`) |
+| Netlify, Cloudflare Pages | `_headers` |
+| Vercel | `vercel.json` |
+| GitHub Pages, S3 and other object storage | none can set headers: the page's `<meta>` policy applies, `--ancestors` does not, and `h5p-sw.js` is cached by the host's default |
+
+The headers themselves, for a host not listed:
+
+| Path | Headers |
+|---|---|
+| every path | `Content-Security-Policy` (the policy the command prints, with `frame-ancestors` from `--ancestors`), `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` |
+| `/h5p-sw.js` | `Cache-Control: no-cache`, so an update reaches learners on their next visit |
+| `/frame-assets/*`, `/resizer.js`, `/libraries.h5p` | `Cache-Control: public, max-age=3600, stale-while-revalidate=86400` |
+
+To update, run the command again with `--force` and redeploy.
 
 ## The address
 

@@ -182,8 +182,10 @@ document.querySelector('h5p-player').runtime = runtime</pre>
       </p>
       <pre class="code" data-lang="sh">npx @missing-elements/h5p-embed h5p-player</pre>
       <p>
-        The folder holds the page, the player, the H5P runtime and the library pack, with the
-        headers Netlify, Cloudflare Pages and Vercel read beside it. <code>--packages</code> limits
+        The folder holds the page, the player, the H5P runtime and the library pack, and the
+        headers written for whatever serves it: a <code>Caddyfile</code>, an
+        <code>nginx.conf</code> and an <code>.htaccess</code> for a server of your own, and the
+        files Netlify, Cloudflare Pages and Vercel read. <code>--packages</code> limits
         the hosts packages may come from, and <code>--ancestors</code> the sites that may frame it;
         the <a href="https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#readme" rel="noopener">package's README</a>
         has the rest. Then, on your site:

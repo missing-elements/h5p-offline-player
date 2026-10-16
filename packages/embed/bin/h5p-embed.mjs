@@ -84,8 +84,10 @@ subdomain of your site — then embed a package:
           style="width: 100%; border: 0"></iframe>
   <script src="https://<player domain>/resizer.js"></script>
 
-_headers (Netlify, Cloudflare Pages) and vercel.json (Vercel) carry the policy and the caching.
-Other hosts, GitHub Pages among them, get the policy from the page itself${site.ancestors ? ', without --ancestors,\nwhich only a header can carry' : ''}.`)
+The page carries its policy; the headers beside it are written for five kinds of host:
+Caddyfile, nginx.conf and .htaccess for a server of your own, _headers for Netlify and
+Cloudflare Pages, vercel.json for Vercel. Object storage and GitHub Pages serve the page's own
+policy and no headers${site.ancestors ? ' — there --ancestors has no effect, since only a header\ncan carry it' : ''}.`)
 } catch (error) {
   if (error instanceof EmbedError) {
     console.error(`h5p-embed: ${error.message}`)

@@ -81,11 +81,11 @@ describe('the policy', () => {
 })
 
 describe('the site', () => {
-  it('writes everything the page needs, beside each other, with the policy in all three places', async () => {
+  it('writes everything the page needs, beside each other, with the policy in every host format', async () => {
     const out = join(dir, 'locked')
     const site = await buildSite({ out, packages: 'https://cdn.example.org', ancestors: ['https://school.example'] })
 
-    for (const name of ['index.html', 'main.js', 'embed.js', 'embed.css', 'resizer.js', 'config.js', 'h5p-player.js', 'h5p-sw.js', 'h5p-jobs.js', 'libraries.h5p', 'libraries.txt', 'NOTICE.txt', '_headers', 'vercel.json']) {
+    for (const name of ['index.html', 'main.js', 'embed.js', 'embed.css', 'resizer.js', 'config.js', 'h5p-player.js', 'h5p-sw.js', 'h5p-jobs.js', 'libraries.h5p', 'libraries.txt', 'NOTICE.txt', '_headers', 'vercel.json', 'Caddyfile', 'nginx.conf', '.htaccess']) {
       expect(existsSync(join(out, name)), name).toBe(true)
     }
     for (const name of ['frame-boot.js', 'frame.bundle.js', 'main.bundle.js', 'h5p.css', 'LICENSE.txt', 'NOTICE.txt']) {
@@ -100,6 +100,24 @@ describe('the site', () => {
     expect(vercel.headers[0]).toEqual({ source: '/(.*)', headers: expect.arrayContaining([{ key: 'Content-Security-Policy', value: site.csp }]) })
     expect(vercel.headers).toContainEqual({ source: '/h5p-sw.js', headers: [{ key: 'Cache-Control', value: 'no-cache' }] })
     expect(await readFile(join(out, 'config.js'), 'utf8')).toContain('{"libraries":true,"packages":["https://cdn.example.org"],"defaultLibraries":null}')
+
+    // The three server formats say the same as the two host files, each in its own syntax.
+    const caddy = await readFile(join(out, 'Caddyfile'), 'utf8')
+    expect(caddy).toContain(`\theader Content-Security-Policy "${site.csp}"`)
+    expect(caddy).toContain('\theader /h5p-sw.js Cache-Control "no-cache"')
+    expect(caddy).toContain('\theader /frame-assets/* Cache-Control "public, max-age=3600')
+    const nginx = await readFile(join(out, 'nginx.conf'), 'utf8')
+    expect(nginx).toContain(`add_header Content-Security-Policy "${site.csp}" always;`)
+    expect(nginx).toContain('location = /h5p-sw.js {')
+    expect(nginx).toContain('location ^~ /frame-assets/ {')
+    // nginx forgets the server-level headers inside a location, so every location repeats them.
+    for (const block of nginx.split('location ').slice(1)) expect(block).toContain('add_header Content-Security-Policy')
+    const apache = await readFile(join(out, '.htaccess'), 'utf8')
+    expect(apache).toContain(`Header always set Content-Security-Policy "${site.csp}"`)
+    expect(apache).toContain('<Files "h5p-sw.js">\n\tHeader always set Cache-Control "no-cache"\n</Files>')
+    expect(apache).toContain('<If "%{REQUEST_URI} =~ m#/frame-assets/#">')
+    // The policy carries only single quotes, which is what lets every format quote it with double ones.
+    expect(site.csp).not.toContain('"')
   })
 
   it('leaves the library pack out when asked, and says so to the page', async () => {

@@ -127,9 +127,11 @@ npx @missing-elements/h5p-embed h5p-player --packages https://host.example
 `libraries=pack` on a site built with `--no-libraries`), `--ancestors` the sites that may frame the page; leave both out to allow any.
 Deploy the folder to a domain of the organisation's own: a separate registrable domain
 (`h5p-player.example.net`, not a subdomain of the site, which would receive its cookies) that
-holds nothing else — no accounts, no cookies. Netlify and Cloudflare Pages read the `_headers`
-it writes and Vercel its `vercel.json`; elsewhere the page carries the policy in a `<meta>` tag,
-without `--ancestors`. The site's page then carries:
+holds nothing else — no accounts, no cookies. The folder carries the headers for whatever
+serves it: a `Caddyfile`, an `nginx.conf` and an `.htaccess` for a server of the organisation's
+own (a Hetzner or OVH box, a university's Apache), `_headers` for Netlify and Cloudflare Pages,
+`vercel.json` for Vercel; on GitHub Pages or object storage, which set no headers, the page's
+own `<meta>` policy applies and `--ancestors` does not. The site's page then carries:
 
 ```html
 <iframe src="https://h5p-player.example.net/?src=https://host.example/activities/week-1-quiz.h5p&frame&copyright&export"

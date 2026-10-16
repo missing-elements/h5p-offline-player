@@ -168,11 +168,87 @@ function vercelConfig(rules) {
   ) + '\n'
 }
 
+/*
+ * The three server formats below are for a host of one's own — the European hosts a data
+ * protection officer accepts have no `_headers` convention, and a university's Apache or an
+ * nginx on a Hetzner box is where the embed page usually ends up. Each is written from the same
+ * rules as the two files above, so they cannot disagree. Values are quoted with double quotes
+ * in every format, which is safe because the policy carries only single quotes.
+ */
+
+/** The rule for every path, and the ones for a single path or prefix. */
+function splitRules(rules) {
+  const all = rules.find((rule) => rule.path === '/*')
+  return { all, specific: rules.filter((rule) => rule !== all) }
+}
+
+/** Caddy's `Caddyfile`: a site block to run as it is, or to paste into one. */
+function caddyfile(rules) {
+  const { all, specific } = splitRules(rules)
+  const lines = [
+    '# Written by h5p-embed. Replace the domain and the root, then `caddy run` beside this file,',
+    '# or paste the block into your Caddyfile. Caddy fetches the certificate itself.',
+    'h5p-player.example.net {',
+    '\troot * /srv/h5p-player',
+    '\tfile_server',
+    ...Object.entries(all.headers).map(([key, value]) => `\theader ${key} "${value}"`),
+    ...specific.flatMap(({ path, headers }) => Object.entries(headers).map(([key, value]) => `\theader ${path} ${key} "${value}"`)),
+    '}'
+  ]
+  return lines.join('\n') + '\n'
+}
+
+/**
+ * nginx: a file to `include` inside the `server` block that serves the folder. nginx's
+ * `add_header` in a `location` replaces every `add_header` inherited from the server level
+ * rather than adding to it, so each location repeats the headers that apply everywhere.
+ */
+function nginxConf(rules) {
+  const { all, specific } = splitRules(rules)
+  const header = ([key, value]) => `add_header ${key} "${value}" always;`
+  const matcher = (path) => (path.endsWith('/*') ? `^~ ${path.slice(0, -1)}` : `= ${path}`)
+  const lines = [
+    '# Written by h5p-embed. Include this file inside the server block that serves the folder:',
+    '#   server { listen 443 ssl; server_name h5p-player.example.net; root /srv/h5p-player; include /srv/h5p-player/nginx.conf; }',
+    '# A location repeats the headers set for every path: in nginx an add_header inside a location',
+    '# replaces the inherited ones instead of adding to them.',
+    ...Object.entries(all.headers).map(header),
+    ...specific.map(
+      ({ path, headers }) =>
+        `location ${matcher(path)} {\n${[...Object.entries(all.headers), ...Object.entries(headers)].map((entry) => `\t${header(entry)}`).join('\n')}\n}`
+    )
+  ]
+  return lines.join('\n') + '\n'
+}
+
+/** Apache's `.htaccess`, for a folder under a vhost that allows it. */
+function htaccess(rules) {
+  const { all, specific } = splitRules(rules)
+  const header = ([key, value]) => `Header always set ${key} "${value}"`
+  const block = ({ path, headers }) => {
+    const body = Object.entries(headers).map((entry) => `\t${header(entry)}`).join('\n')
+    // <Files> matches a name in any directory; a prefix needs the request URI, with no anchor at
+    // the start, so that the site works under a path as well as at a root.
+    return path.endsWith('/*')
+      ? `<If "%{REQUEST_URI} =~ m#${path.slice(0, -1)}#">\n${body}\n</If>`
+      : `<Files "${path.slice(1)}">\n${body}\n</Files>`
+  }
+  const lines = [
+    '# Written by h5p-embed. Needs mod_headers, and AllowOverride FileInfo on the folder; or paste',
+    '# the directives into the virtual host.',
+    ...Object.entries(all.headers).map(header),
+    ...specific.map(block)
+  ]
+  return lines.join('\n') + '\n'
+}
+
 function notice({ version, libraries }) {
   return `This folder is the H5P embed page, written by @missing-elements/h5p-embed.
 
   index.html, main.js, embed.js, embed.css, resizer.js, config.js
                     the embed page and the sizing script: MIT
+  Caddyfile, nginx.conf, .htaccess, _headers, vercel.json
+                    the same headers for five kinds of host; use the one yours reads
   h5p-player.js, h5p-sw.js, h5p-jobs.js
                     @missing-elements/h5p-offline-player ${version}: MIT. The two workers also
                     carry zip.js, BSD-3-Clause, its licence in each file's header.
@@ -259,6 +335,9 @@ export async function buildSite({ out, libraries = true, packages = null, ancest
   const rules = headerRules(csp)
   await writeFile(join(target, '_headers'), netlifyHeaders(rules))
   await writeFile(join(target, 'vercel.json'), vercelConfig(rules))
+  await writeFile(join(target, 'Caddyfile'), caddyfile(rules))
+  await writeFile(join(target, 'nginx.conf'), nginxConf(rules))
+  await writeFile(join(target, '.htaccess'), htaccess(rules))
   await writeFile(join(target, 'NOTICE.txt'), notice({ version, libraries: Boolean(pack) }))
 
   return {

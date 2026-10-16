@@ -151,7 +151,7 @@ packages/embed/           @missing-elements/h5p-embed — the embed page as a st
                             folder's root, and at /resizer.js on the demo)
   lib/build.mjs             buildSite(): copies the page, the player's dist/, the runtime's dist/ as
                             frame-assets/ and the library pack; writes config.js, the policy into the
-                            page, _headers, vercel.json and NOTICE.txt
+                            page, the headers for five kinds of host and NOTICE.txt
   bin/h5p-embed.mjs         the command
   tests/                    build.test.ts, no browser; site.test.ts, a written site on 127.0.0.1
                             framed by a page on localhost, as deployed
@@ -1883,9 +1883,13 @@ SPA-fallback trap described above cannot happen there.
   its own player domain had to build the demo app. `npx @missing-elements/h5p-embed <folder>`
   copies the page, the player's `dist/`, the runtime as `frame-assets/` and the library pack from
   the installed packages (so the versions are the ones published together, and nothing is
-  fetched), and writes the policy three ways: `_headers` for Netlify and Cloudflare Pages,
-  `vercel.json` for Vercel, and a `<meta>` in the page for every other host, GitHub Pages among
-  them — which cannot carry `frame-ancestors`, so `--ancestors` needs a header. `--packages`
+  fetched), and writes the policy six ways from one list of rules: a `<meta>` in the page for
+  every host — which cannot carry `frame-ancestors`, so `--ancestors` needs a header — and the
+  headers as `_headers` for Netlify and Cloudflare Pages, `vercel.json` for Vercel, and, since
+  2026-10-16, a `Caddyfile`, an `nginx.conf` and an `.htaccess` for a server of the host's own,
+  because the European hosts a data protection officer accepts read none of the first two and
+  the docs had named only US providers. nginx's `add_header` in a `location` replaces the
+  inherited headers, so each location in the file repeats the policy. `--packages`
   turns the default `connect-src 'self' https:` into exactly the hosts given, and `config.js`
   hands the same list to the page, which refuses an `src` or a library URL off it by name
   before fetching anything. (Until 2026-10-10 it also refused `hub` unless `https://api.h5p.org`
