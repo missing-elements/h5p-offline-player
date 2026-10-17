@@ -10,6 +10,7 @@ import {
 import { bundleHostWorker } from '../../packages/player/scripts/lib/worker-bundle.mjs'
 import { codeBlocksPlugin } from './scripts/lib/code-blocks.mjs'
 import { PAGES } from './scripts/lib/pages.mjs'
+import { partialsPlugin } from './scripts/lib/partials.mjs'
 
 /**
  * The demo app: the dev server for the whole repository, and the hosted demo — the player page
@@ -114,6 +115,8 @@ export default defineConfig(({ command }) => ({
     // The demo content first, then the player's fixtures: the pages use the former, and the
     // latter stay reachable for trying a fixture against the dev server.
     noRangeFixturesPlugin([resolve(rootDir, 'demo', 'content'), PLAYER_FIXTURES]),
+    // The shared header and head first, so the passes after it see a whole page.
+    partialsPlugin(resolve(rootDir, 'partials')),
     siteUrlPlugin(process.env.SITE_URL ?? (command === 'serve' ? 'http://localhost:5173' : 'http://localhost:4173')),
     // After the site URL, so a snippet shows the real address.
     codeBlocksPlugin()

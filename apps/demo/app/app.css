@@ -6,9 +6,10 @@
 
 /* Opaque, in the page's own colour, which app.js also gives the window's title bar
    (theme-color), so an installed app's two bars read as one; the insets keep it clear of a
-   phone's notch in landscape. */
+   phone's notch in landscape. As tall as the other pages' bar, so the header does not jump on the
+   way into the app. */
 .app .topbar {
-  padding: max(0.5rem, env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right)) 0.5rem
+  padding: max(0.75rem, env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right)) 0.75rem
     max(var(--gutter), env(safe-area-inset-left));
   background: var(--bg);
   -webkit-backdrop-filter: none;
@@ -16,10 +17,21 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-/* The open file's own title, where the app's name was. */
+/* The bar's start: the app's name on home, and on the open file's screen the back button and the
+   file's title in its place. One box, so the shared sheet's grid has the three it centres the
+   links between on either screen; the title takes what the box has spare and is cut short with
+   an ellipsis, its column kept to its share by `minmax(0, …)` so a long one cannot push the links
+   off the middle. */
+.app .appbar-start { display: flex; flex: 1 1 auto; align-items: center; gap: inherit; }
+.app .topbar { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+
+/* The open file's own title, where the app's name was. It counts for no width of its own
+   (`contain: inline-size`), so the box around it is as wide as the back button: sized by the text,
+   the box pushed the icons onto a row of their own on a narrow screen. */
 .app .appbar-title {
   flex: 1 1 0;
   min-width: 0;
+  contain: inline-size;
   margin: 0;
   overflow: hidden;
   font-weight: 600;
@@ -27,15 +39,13 @@
   white-space: nowrap;
 }
 
-.app .topbar-actions { margin-left: auto; }
-
-/* The site's links take a row of their own sooner than on the other pages, the shared sheet's
-   rule at a wider width: this bar carries one more icon, the menu's, and left to wrap by itself
-   it dropped the icons alone onto a second row. One row stopped fitting at 58rem with the system
-   font of macOS (2026-10-12); the rest is room for a wider one. In a tab only; installed, the
-   links are gone. */
-@media (max-width: 64rem) {
-  .app .topbar nav[aria-label="Site"] { order: 1; flex-basis: 100%; margin-left: 0; }
+/* The Star gives up its count sooner than on the other pages: this bar carries one more icon, the
+   menu's, and at 390px a four-character count pushed the icons onto a row of their own
+   (2026-10-17). The site's links take a row of their own below 64rem, the shared sheet's width,
+   which is set wide enough for that icon too. */
+@media (width < 26rem) {
+  .app .star-button { width: 1.9rem; padding: 0; justify-content: center; }
+  .app .star-count { display: none; }
 }
 
 /* Install, in a tab where the browser offers it: on the home screen beside "Works offline", and
@@ -336,7 +346,7 @@
    Chrome and Edge report `window-controls-overlay` rather than `standalone`, so both are named. */
 @media (display-mode: standalone), (display-mode: window-controls-overlay) {
   .app .topbar nav[aria-label="Site"],
-  .app .topbar .github,
+  .app .topbar .star-button,
   .app .install,
   .app .menu-install,
   .app .about,
@@ -347,7 +357,8 @@
   .app { display: flex; flex-direction: column; }
   .app main { display: flex; flex: 1; flex-direction: column; padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); }
   .app .home { flex: 1 0 auto; min-height: 0; }
-  .app .topbar { -webkit-user-select: none; user-select: none; }
+  /* A row, not the grid: with the links gone, the grid would put the icons in the middle. */
+  .app .topbar { display: flex; -webkit-user-select: none; user-select: none; }
   :root { overscroll-behavior-y: none; }
 }
 

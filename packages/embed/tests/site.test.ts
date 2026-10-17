@@ -64,6 +64,7 @@ let locked: Host
 let lean: Host
 let fallback: Host
 let previewing: Host
+let asking: Host
 
 /** The embedding site's page: the snippet the README gives, with a listener for the relay. */
 const snippet = (player: string, query: string) => `<!doctype html>
@@ -99,6 +100,30 @@ async function strippedQuiz(path: string) {
   await writeFile(path, new Uint8Array(await (await writer.close()).arrayBuffer()))
 }
 
+/**
+ * The quiz made against a Question Set newer than the pack's: played untrusted, its own copy is
+ * withheld and nothing else supplies it, so it plays only with its own code.
+ */
+async function ownCodeQuiz(path: string) {
+  const reader = new ZipReader(new BlobReader(new Blob([await readFile(quiz)])))
+  const writer = new ZipWriter(new BlobWriter('application/zip'))
+  for (const entry of await reader.getEntries()) {
+    if (entry.directory) continue
+    const name = entry.filename.replace(/^H5P\.QuestionSet-1\.21\//, 'H5P.QuestionSet-1.99/')
+    let bytes = await entry.getData!(new Uint8ArrayWriter())
+    if (name === 'h5p.json' || name === 'H5P.QuestionSet-1.99/library.json') {
+      const json = JSON.parse(new TextDecoder().decode(bytes))
+      if (name === 'h5p.json') {
+        for (const dependency of json.preloadedDependencies) if (dependency.machineName === 'H5P.QuestionSet') dependency.minorVersion = '99'
+      } else json.minorVersion = 99
+      bytes = new TextEncoder().encode(JSON.stringify(json))
+    }
+    await writer.add(name, new Uint8ArrayReader(bytes))
+  }
+  await reader.close()
+  await writeFile(path, new Uint8Array(await (await writer.close()).arrayBuffer()))
+}
+
 /** A page on the player's own origin that frames it, as a site's own preview would. */
 const preview = (query: string) => `<!doctype html><html><body><iframe src="./?${query}" style="width: 100%; border: 0"></iframe></body></html>`
 
@@ -125,12 +150,21 @@ beforeAll(async () => {
   await buildSite({ out: previewDir })
   await writeFile(join(previewDir, 'main.js'), "import { startEmbed } from './embed.js'\nstartEmbed({ askInOwnFrame: false })\n")
   const previews = (path: string) => (path === '/preview.html' ? preview(`src=${embedding.origin}/quiz.h5p`) : null)
+  // A site with no list, whose policy reaches the embedding site's plain-http host as it reaches
+  // any https one: a package from there is another site's, and plays untrusted.
+  const askingDir = join(dir, 'asking')
+  await buildSite({ out: askingDir })
+  const page = await readFile(join(askingDir, 'index.html'), 'utf8')
+  if (!page.includes("connect-src 'self' https:")) throw new Error('the written policy has no connect-src to widen')
+  await writeFile(join(askingDir, 'index.html'), page.replace("connect-src 'self' https:", `connect-src 'self' https: ${embedding.origin}`))
+  await ownCodeQuiz(join(dir, 'own-code.h5p'))
 
   open = await host(openDir, '127.0.0.1', previews)
   fallback = await host(fallbackDir, '127.0.0.1')
   previewing = await host(previewDir, '127.0.0.1', previews)
   lean = await host(leanDir, '127.0.0.1')
   locked = await host(lockedDir, '127.0.0.1')
+  asking = await host(askingDir, '127.0.0.1')
 
   pages.set('/open.html', snippet(open.origin, `src=${open.origin}/quiz.h5p&xapi=${embedding.origin}`))
   pages.set('/open-de.html', snippet(open.origin, `src=${open.origin}/quiz.h5p&lang=de`))
@@ -146,7 +180,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await browser?.close()
-  await Promise.all([embedding, open, locked, lean, fallback, previewing].map((h) => h?.close()))
+  await Promise.all([embedding, open, locked, lean, fallback, previewing, asking].map((h) => h?.close()))
   await rm(dir, { recursive: true, force: true })
 })
 
@@ -194,6 +228,24 @@ describe('a written site, framed from another site', () => {
     )
     await page.waitForFunction(() => (window as unknown as { relayed: unknown[] }).relayed.length > 0)
     expect(await heard(page)).toContainEqual(expect.objectContaining({ origin: open.origin, action: 'xapi' }))
+    await page.close()
+  })
+
+  it('answers a frame that loaded before resizer.js did', async () => {
+    const page = await browser.newPage()
+    await page.goto(`${embedding.origin}/open.html`)
+    await playsSized(page, open.origin)
+    const sized = await page.evaluate(() => document.querySelector('iframe')!.style.height)
+    // A copy of the script that arrives late says `ready` to every frame; the frame says hello
+    // again and reports its height again, so the height goes back to what the content needs.
+    await page.evaluate((src) => {
+      document.querySelector('iframe')!.style.height = '50px'
+      ;(window as unknown as { __h5pResizer?: boolean }).__h5pResizer = false
+      const script = document.createElement('script')
+      script.src = src
+      document.head.append(script)
+    }, `${open.origin}/resizer.js?again`)
+    await page.waitForFunction((height) => document.querySelector('iframe')!.style.height === height, sized, { timeout: 15_000 })
     await page.close()
   })
 
@@ -312,6 +364,17 @@ describe('a written site, framed from another site', () => {
     expect(await untrusted(page)).toBe(true)
     expect(await librariesOf(page)).toMatch(/libraries\.h5p$/)
     expect(await page.evaluate(() => document.querySelector('#notice button'))).toBeNull()
+    await page.close()
+  })
+
+  it('asks before playing a package from elsewhere that needs its own code, and plays it trusted on the click', async () => {
+    const page = await browser.newPage()
+    await page.goto(`${asking.origin}/?src=${embedding.origin}/own-code.h5p`)
+    await page.waitForSelector('#notice button', { timeout: 60_000 })
+    expect(await page.textContent('#notice')).toContain(`This package from ${new URL(embedding.origin).host} plays only with its own scripts.`)
+    await page.click('#notice button')
+    await page.waitForFunction(() => (document.querySelector('h5p-player') as unknown as { state: string }).state === 'ready', null, { timeout: 60_000 })
+    expect(await untrusted(page)).toBe(false)
     await page.close()
   })
 

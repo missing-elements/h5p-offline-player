@@ -545,16 +545,3 @@ it('gives the window’s title bar the page’s colour, in either theme', async 
   expect(dark[0]).toBe(await page.evaluate(() => getComputedStyle(document.body).backgroundColor))
   await page.close()
 })
-
-it('lets the keyboard reach the player page’s file input, which a label alone could not', async () => {
-  const page = await browser.newPage()
-  await page.goto(`${origin}/`)
-  let reached = false
-  for (let i = 0; i < 30 && !reached; i++) {
-    await page.keyboard.press(NEXT)
-    reached = await page.evaluate(() => (document.activeElement as HTMLInputElement | null)?.type === 'file')
-  }
-  expect(reached).toBe(true)
-  expect(await page.evaluate(() => getComputedStyle(document.activeElement!.closest('label')!).outlineStyle)).not.toBe('none')
-  await page.close()
-})

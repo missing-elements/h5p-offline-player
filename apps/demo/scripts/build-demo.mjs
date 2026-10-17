@@ -95,10 +95,11 @@ async function appPrecache() {
   return { version: hash.digest('hex').slice(0, 12), urls: ['/app/', ...[...files].sort().map((name) => `/${name}`)] }
 }
 
-// The theme switch's script runs before the first paint, so every page links it as a classic
-// script with `vite-ignore` — Vite bundles modules only — and it is copied as it is. Before the
-// precache is read: the app page links it too, and the list is hashed over the files it names.
-await cp(resolve(rootDir, 'demo', 'theme.js'), resolve(outDir, 'demo', 'theme.js'))
+// The theme switch's script and the Star's count run before the first paint, so every page links
+// them as classic scripts with `vite-ignore` — Vite bundles modules only — and they are copied as
+// they are. Before the precache is read: the app page links them too, and the list is hashed over
+// the files it names.
+for (const name of ['theme.js', 'stars.js']) await cp(resolve(rootDir, 'demo', name), resolve(outDir, 'demo', name))
 // The page-side half of the resizer protocol, for sites that frame /embed: a classic script at
 // the site root, named by the embed snippets, so an embedding page sends nothing to h5p.org. The
 // embed package's copy, the one a host's own player domain serves.

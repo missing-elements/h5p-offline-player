@@ -134,8 +134,8 @@ The LRS's admin UI is at `http://localhost:63390/admin`, user `admin`, password
 `http://localhost:63398`, and Chrome asks before a public site reaches a local address.
 
 The unit tests are in `packages/cmi5/tests/` (`requirements.test.ts` places every AU requirement
-of `@cmi5/requirements`), and `apps/demo/tests/cmi5.test.ts` launches the demo page from a mock
-LMS and LRS.
+of `@cmi5/requirements`), and `pnpm cmi5:catapult` launches the demo page from ADL's CATAPULT
+player, as above.
 
 ## What it does not do
 

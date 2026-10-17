@@ -177,15 +177,13 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             demo/theme.js the light/dark switch, a classic script every page
                             loads in its head before the stylesheet, since the CSP allows no
                             inline script and a pinned theme has to be on <html> before the
-                            first paint; demo/code-blocks.js the code blocks' tabs and Copy
-  tests/embed.test.ts       /resizer.js (the embed package's, served by a dev middleware and
-                            copied by the build) sizing the framed /embed
-  tests/app.test.ts         the installable app's screens, history and keyboard, through the dev server
+                            first paint; demo/stars.js the header's star count, the same kind of
+                            script for the same reason; demo/code-blocks.js the code blocks' tabs
+                            and Copy
+  tests/app.test.ts         the installable app's screens, history and keyboard, through the dev
+                            server; engine.ts and harness.ts its helpers. The demo's other pages
+                            have no tests (see *Commands*)
   tests/sweep-content.test.ts  the sweep's content generator, in Node
-  tests/code-blocks.test.ts    the pages' code blocks: every snippet kept as written, and the tabs
-                               and Copy in a browser
-  tests/                    cmi5.test.ts: the cmi5 page against a mock LMS and LRS on a second
-                            origin, through the dev server and a real browser
   cmi5-catapult/            docker-compose.yml for ADL's CATAPULT player, MySQL and the SQL LRS;
                             scripts/cmi5-catapult.mjs clones CATAPULT into it (ignored) and proves
                             the cmi5 page against the player
@@ -204,7 +202,13 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             lib/code-blocks.mjs the Vite plugin that highlights the pages' code,
                             lib/hub.mjs the hub host, the cache and the download the two hub-reading
                             scripts share, lib/pages.mjs the one list of the site's pages, for the
-                            build and the sitemap
+                            build and the sitemap, lib/partials.mjs the Vite plugin that puts the
+                            shared markup into them
+  partials/                 the markup every page shares, written once: head.html (the favicon,
+                            the two classic scripts, the stylesheet, analytics), topbar.html (the
+                            bar), topbar-nav.html and topbar-icons.html (its links, and the theme
+                            switch with the Star, which the app's own bar names around its buttons);
+                            a page writes `<!-- partial: topbar -->` on a line of its own
   sweep/                    <machineName>.json for the content types the sweep cannot generate
                             playable content for, and the element's attributes they need
   vite.config.ts            the dev server and the hosted demo: the pages plus dist/'s layout at the
@@ -259,7 +263,7 @@ pnpm dev               # vendors assets, builds fixtures, serves the demo on :51
 pnpm test              # every package: the player's unit + browser suites, the normalizer's and verifier's tests
 pnpm test:unit         # fast, no browser
 pnpm test:browser
-H5P_TEST_BROWSER=firefox pnpm test:engine   # the player's browser suite and the demo's tests in
+H5P_TEST_BROWSER=firefox pnpm test:engine   # the player's browser suite and the app's tests in
                        # Firefox, or webkit; after `playwright install firefox webkit` in the player
 pnpm typecheck         # every package
 pnpm build             # the player: types, element, both workers; builds the runtime package on the way
@@ -307,21 +311,28 @@ downloaded archive is read back before it is reported done*. Playwright's WebKit
 desktop port and not iOS Safari: the app's menu filled an iPhone's screen in Safari on 2026-10-13
 and drew correctly in Playwright's WebKit at every phone size.
 
-The demo's tests follow the same variable (`apps/demo/tests/engine.ts`; `tests/harness.ts`
+**What is tested, by the owner's rule of 2026-10-17: the packages and their source, and of the
+demo app only the installable app.** The demo's pages — the player page, the examples, `/embed`,
+the cmi5 page, the code blocks, the shared markup — have no tests and are checked by hand, the
+cmi5 page also against CATAPULT (`pnpm cmi5:catapult`). Where a page's test was the only one of a
+package's behaviour, the test moved into the package: the embed page asking before it plays a
+package that needs its own code, and `resizer.js` answering a frame that loaded before it, are in
+`packages/embed/tests/site.test.ts`; the cmi5 page's were already in `packages/cmi5/tests/`.
+
+The app's tests follow the same variable (`apps/demo/tests/engine.ts`; `tests/harness.ts`
 starts the dev server and the second-origin package host and waits on the element for all of
-them, since 2026-10-15), and `pnpm test:engine`
-runs them after the player's suite, so the `engines` job covers the app, the embed page and the
-cmi5 page too. Added on 2026-10-14; the first runs found one bug, under *The frame is navigated
-in place*, and four differences the tests now allow for: WebKit, as Safari does by default, passes
-over buttons on Tab and reaches them on Option-Tab; WebKit's private profile — the one Playwright
-gives a page, and a Safari private window — refuses a `File` in IndexedDB, so the app keeps no copy
-of a file there and asks for it again, and the test of the copy runs in a profile on disk; Firefox's
-own Back passes over a step a page wrote before anyone interacted with it, which is home when a
-link opens the app, so its Back leaves the app where the bar's Back, from script, goes home — the
-test goes back from script, as the bar does; and Firefox closes a top-level page Playwright opened
-when cmi5's Exit asks, which Chromium does not, so that test stands in for `close`. Three app
-tests are Chromium's alone: file handles, and the private profile that keeps a reference to a
-file rather than its bytes.
+them, since 2026-10-15), and `pnpm test:engine` runs them after the player's suite, so the
+`engines` job covers the app too. Added on 2026-10-14, when they also covered the embed and
+cmi5 pages; the first runs found one bug, under *The frame is navigated in place*, and four
+differences: WebKit, as Safari does by default, passes over buttons on Tab and reaches them on
+Option-Tab; WebKit's private profile — the one Playwright gives a page, and a Safari private
+window — refuses a `File` in IndexedDB, so the app keeps no copy of a file there and asks for it
+again, and the test of the copy runs in a profile on disk; Firefox's own Back passes over a step a
+page wrote before anyone interacted with it, which is home when a link opens the app, so its Back
+leaves the app where the bar's Back, from script, goes home — the test goes back from script, as
+the bar does; and Firefox closes a top-level page Playwright opened when cmi5's Exit asks, which
+Chromium does not. Three app tests are Chromium's alone: file handles, and the private profile
+that keeps a reference to a file rather than its bytes.
 
 `pnpm publish` in `packages/player` runs `prepublishOnly` — typecheck, the unit suite and the
 build — so a broken tree cannot ship; the browser suite is left out because it needs an installed
@@ -1773,12 +1784,10 @@ SPA-fallback trap described above cannot happen there.
   the handshake, and anything emitted in between was lost. `returnURL` comes from the launch
   data only, where cmi5 puts it, and is followed only as an `http` or `https` address — it was
   once also read from the query string, on an article's word, and a `javascript:` value would
-  have run in the page on Exit. `apps/demo/tests/cmi5.test.ts` runs the page against a mock
-  LMS and LRS on `127.0.0.1` from the dev server on `localhost`, dispatching the element's own
-  `xapi` and `finished` events rather than clicking through content, with a single-use token
-  as the spec has it, and pins the order and the merge, `revision` included, a rejected second
-  fetch after reload, a statement emitted before the handshake, and a `returnURL` that is not
-  followed. **Proven against ADL's CATAPULT player** — the reference launching
+  have run in the page on Exit. Until the demo's tests went on 2026-10-17, one ran the page
+  against a mock LMS and LRS and pinned the order and the merge, `revision` included, a rejected
+  second fetch after reload, a statement emitted before the handshake, and a `returnURL` that
+  is not followed. **Proven against ADL's CATAPULT player** — the reference launching
   system, which validates each statement against the numbered requirements and rejects a
   breach naming it — by `pnpm cmi5:catapult` (`apps/demo/scripts/cmi5-catapult.mjs`,
   `apps/demo/cmi5-catapult/docker-compose.yml`): adlnet/CATAPULT fetched at a pinned commit
@@ -1876,8 +1885,7 @@ SPA-fallback trap described above cannot happen there.
   it is being reworked. Still true: `/embed`'s query parameters (`src`, the bare `frame`,
   `copyright` and `export`, `xapi`) and its two message shapes — the resizer protocol upward and
   the `h5p-offline-player` xAPI relay — are an interface that site builds on (its snippets and
-  its copy of the page), so a change to one means a change there with it. `tests/embed.test.ts`
-  drives this site's `/embed` through the dev server.
+  its copy of the page), so a change to one means a change there with it.
 - **`@missing-elements/h5p-embed` is the Embed setup as a deployable folder.** Built on
   2026-10-09, the day the public site stopped being the production path: until then a host that wanted
   its own player domain had to build the demo app. `npx @missing-elements/h5p-embed <folder>`
@@ -1942,8 +1950,8 @@ SPA-fallback trap described above cannot happen there.
   transitive dependency check and `getContentPath` change what it reports.
 - **The pages carry their metadata, and the origin is filled in at build time.** Titles,
   descriptions, canonical links, Open Graph and Twitter tags, JSON-LD for the software on the
-  front page, `robots.txt` and `sitemap.xml`, and the GitHub link at the right of every page's
-  header, an icon beside the theme switch. The
+  front page, `robots.txt` and `sitemap.xml`, and the repository's Star button at the right of
+  every page's header, beside the theme switch (*The header's Star button*, below). The
   absolute URLs are written as `%SITE_URL%` in the HTML and replaced by `siteUrlPlugin`
   (`apps/demo/vite.config.ts`), which runs before Vite's own `%ENV%` pass so Vite does not warn about a
   name it does not know. `build-demo.mjs` decides the origin — `SITE_URL` if set, else Vercel's
@@ -2017,8 +2025,8 @@ SPA-fallback trap described above cannot happen there.
   `label.file` hid its input with `display: none`, so no key could open the picker on any page —
   the input is now out of sight but focusable. Install is on the home screen beside "Works
   offline" and in the menu, not in the bar, where it was one item too many and pushed the icons
-  onto a row of their own; for the same reason the site's links take their own row below 64rem
-  in this bar, against 44rem on the other pages.
+  onto a row of their own; for the same reason the site's links take their own row below 64rem,
+  on every page since 2026-10-17, so the bar is the same height in the app and out of it.
   **The files opened before are listed under the drop area** (2026-10-12, asked for by the owner):
   each one's title, its name or a link's host, when it was opened, and a cross that takes it off;
   a choice opens it again where it was left, since what the player knows a file by — name, size
@@ -2107,6 +2115,33 @@ SPA-fallback trap described above cannot happen there.
   change and no cookie is set; in dev it logs to the console. Added on 2026-09-26, removed on
   2026-10-07 and put back on 2026-10-13 by the owner. Demo only: the packages carry none, and
   `docs/privacy.md` describes the packages, not this site.
+- **The header's Star button shows the repository's live star count**, asked for by the owner on
+  2026-10-17: `demo/stars.js`, on every page with the header, reads `stargazers_count` from
+  `api.github.com` in the visitor's browser — the one request to a third party the pages make,
+  which `connect-src 'self' https:` already allowed — with `no-referrer`, at most once an hour,
+  since the API answers sixty unauthenticated requests an hour per address. It is a classic
+  script in the head, like `theme.js`, and puts the count it last had on `<html>` before the first
+  paint, as `data-stars` and as `--star-count`, a CSS string the stylesheet draws after the star
+  (`root.style.setProperty` is CSSOM, which `style-src 'self'` does not refuse). The first cut was
+  a module, which runs after the first paint, so the button grew under the reader on every page.
+  The time of a request is stored before it is made, so one that fails — offline, rate-limited —
+  waits the hour out too and keeps the count already shown; the first cut stored only a success,
+  and a rate-limited visitor asked again on every page, which kept the limit hit. In an installed
+  window of the app, where the button is hidden, the script returns at once, so the app reaches no
+  third party. Measured on the built site under the production headers: no layout shift in the bar across five pages with a
+  count kept, and one request where there had been five without. The links sit in the middle of
+  the bar from 64rem (a three-column grid), and on a row of their own below it. The app's bar puts
+  its back button, name and file title in one box (`.appbar-start`) so the file's screen has the
+  grid's three cells too; the title gets no intrinsic width (`contain: inline-size`), or the box
+  took the whole title's width and pushed the icons onto a row of their own on a phone. Its
+  installed window, with no links, keeps a flex row.
+- **The header and the head's shared lines are partials** (`partials/`, put into each page by
+  `scripts/lib/partials.mjs`, a `transformIndexHtml` hook that runs first, in dev and the build
+  alike), since 2026-10-17, asked for by the owner after the Star button had to be added to eleven
+  copies of the bar. The nav marks the page it is on itself — the link whose address is the
+  longest prefix of the page's — so a page names no current link. The footers stay in the pages:
+  each lists its own links. The per-page metadata — title, description, Open Graph and Twitter
+  tags, each written two or three times — is the obvious next candidate and has not been done.
 - **Caching.** Hashed files under `/assets/` are immutable; `h5p-sw.js` is `no-cache`;
   `frame-assets/` and `fixtures/` revalidate hourly. Fixtures also carry permissive CORS with
   `Range` allowed and `Content-Range` exposed, so another player instance can be pointed at them.

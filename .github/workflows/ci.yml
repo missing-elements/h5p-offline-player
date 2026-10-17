@@ -29,7 +29,7 @@ jobs:
       - run: pnpm build
       - run: pnpm build:demo
 
-  # The player's browser suite and the demo's tests in the other two engines; the job above runs
+  # The player's browser suite and the installable app's tests in the other two engines; the job above runs
   # them in Chromium. One engine per job: the dev server's switches are shared, and two engines
   # would flip them under each other. Firefox stops a worker that has no event for thirty seconds and checks the scripts
   # the worker makes up by the worker's URL; WebKit drops the cache writes of a worker terminated
