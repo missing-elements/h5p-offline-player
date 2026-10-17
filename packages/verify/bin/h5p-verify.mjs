@@ -9,8 +9,13 @@ Plays the package in a headless browser through h5p-offline-player and reports w
 works. Exit code 0: it plays (warnings possible). 1: it does not. 2: could not run.
 
 Options:
-  --libraries pack|<url> supply libraries for a package exported without its own (pack: the
-                         published library pack; hub means the same)
+  --untrusted            play it as a site plays a package it did not make: none of its own
+                         code runs, its libraries come only from --libraries (pack by
+                         default), and its content is checked against their semantics. What
+                         the check removed is reported as warnings
+  --libraries <sources>  where libraries come from, tried in order: pack (the published
+                         library pack; hub means the same), a bundle's URL, or a bundle on
+                         disk, such as a copy of the pack, which keeps the check offline
   --out <dir>            where report.json and screenshot.png go
                          (default: <package>.verify/ beside the package)
   --browser <path>       a Chromium-based browser; Chrome, Edge or Playwright's found otherwise
@@ -27,6 +32,7 @@ try {
     allowPositionals: true,
     options: {
       libraries: { type: 'string' },
+      untrusted: { type: 'boolean' },
       out: { type: 'string' },
       browser: { type: 'string' },
       ready: { type: 'string' },
@@ -64,6 +70,7 @@ try {
   const report = await verifyPackage({
     file,
     libraries: args.values.libraries,
+    untrusted: args.values.untrusted,
     out,
     browser: args.values.browser,
     readyTimeout: seconds(args.values.ready, 60_000),

@@ -17,9 +17,13 @@ until this passes and you have looked at the screenshot.
 Needs Node 20+ and a Chromium-based browser. Chrome or Edge on the machine is used if present;
 otherwise run `npx playwright install chromium` once (about 150 MB). Headless, no display.
 
+- `--untrusted` — play it the way a site plays a package it did not make: none of its own code
+  runs, the libraries come only from the pack, and the content is checked against each library's
+  `semantics.json`. Use it when the package goes to a site that accepts uploads or links from
+  others, an LMS or an embed site among them; when unsure, run it both ways.
 - `--libraries pack` — for a package without library folders (what h5p.com and h5p.org export),
   played against the library pack, the way a site with `libraries="pack"` supplies them.
-  `--libraries <url>` for another bundle.
+  `--libraries <url>` for another bundle, `--libraries <path>` for one on disk.
 - `--out <dir>` — where `report.json` and `screenshot.png` go; default `<package>.verify/`.
 - `--json` — the report as JSON instead of the summary.
 - `--browser <path>` — a Chromium executable, for CI or a sandbox where none is found.
@@ -44,6 +48,9 @@ Exit 2: the check could not run (no browser, no such file).
 | warning: `runtime error after ready` | often a harmless resize exception; sometimes a broken sub-content | check the screenshot; fix only if something is missing |
 | warning: `request failed: content/…` | a media file `content.json` references is not in the archive | add it or fix the path |
 | warning: `blocked by the frame's CSP` | content loading from an outside origin | put the asset in the package |
+| warning: `content check: <field>: markup removed: …` (with `--untrusted`) | the field holds tags, attributes or styles its library does not allow; the site will strip them | write the field in what `semantics.json` allows for it (its `tags` and `font`), or accept the loss if the text still reads right |
+| warning: `content check: <field>: removed`, `… became …` | a field the semantics do not name, or a value outside its options or range; or the libraries' upgrade moved it, when the pack is newer than what the content was written for | match the field to `semantics.json`, or build against the pack's versions |
+| `bad-archive` with `fix: the package carries … itself, but played untrusted …` | built against a library newer than the pack | build against the pack's versions, or the site must play it trusted |
 
 ## Look at the screenshot
 
@@ -60,14 +67,15 @@ content, or switching content type; if you cannot make something work, say so.
 
 Say what was checked: the package starts and renders in the H5P runtime. Do not imply more.
 The tool does not check that the answers are right, the level fits, the text is any good, the
-media are licensed, or the content is accessible; those are the user's to review. It also does
-not check library versions: a package built against newer library versions than the H5P hub
-carries (h5p-cli builds from GitHub `master`) plays here and is refused by h5p.com and by the
-offline app's library pack; if the destination is one of those, build against the hub's versions.
-A pass is not a trust decision either: the package's scripts ran in a headless browser on this
-machine, with its network, and a package that behaves at start-up can still read and send what
-other packages saved on a site that plays it. Run the tool only on packages you would open
-yourself.
+media are licensed, or the content is accessible; those are the user's to review. Played as it is,
+it does not check library versions: a package built against newer library versions than the H5P
+hub carries (h5p-cli builds from GitHub `master`) plays here and is refused by h5p.com and by the
+offline app's library pack; if the destination is one of those, build against the hub's versions,
+and `--untrusted` checks against the pack's. A pass is not a trust decision either: played as it
+is, the package's scripts ran in a headless browser on this machine, with its network, and a
+package that behaves at start-up can still read and send what other packages saved on a site that
+plays it. Run the tool only on packages you would open yourself, or with `--untrusted`, which runs
+none of the package's own scripts.
 
 Give the user the `revision` from the report with the file — it is the build identifier every
 xAPI statement from this package will carry.
