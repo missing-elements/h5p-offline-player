@@ -343,7 +343,7 @@ p.lede:has(+ .features) { margin-bottom: 1.25rem; }
 }
 .features strong { display: block; color: var(--fg); font-weight: 600; }
 
-.next-steps { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0 0 1.75rem; }
+.next-steps { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1.75rem 0; }
 .next-steps a {
   display: inline-flex;
   align-items: center;

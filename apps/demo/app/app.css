@@ -334,7 +334,7 @@
 .app .dialog-actions { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1.25rem; }
 
 /* The page's account of itself, in a tab: what a search engine reads. */
-.app .about { max-width: 48rem; margin-top: 2.5rem; }
+.app .about { max-width: 48rem; margin-top: 2.5rem; margin-inline: auto; }
 .app .about p { margin: 0 0 1rem; line-height: 1.6; }
 .app .about h3 { margin: 1.5rem 0 0.5rem; font-size: 1rem; }
 
