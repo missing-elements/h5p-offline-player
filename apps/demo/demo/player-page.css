@@ -318,23 +318,49 @@ p.lede { max-width: 48rem; margin: 0 0 1.75rem; color: var(--muted); font-size: 
    of its own, so that neither reads as part of the other. Until 2026-10-17 it was one paragraph
    with the links in the middle of the sentences. */
 p.lede:has(+ .features) { margin-bottom: 1.25rem; }
+/* The four are cards: in a row on a desktop, and below that in one row that scrolls sideways,
+   the next card showing at the edge to say so. Stacked, or two by two, they took a phone's or a
+   tablet's screen and pushed the player below it. The scrolling row runs past main's gutter to
+   the screen's edges and stops on each card. */
 .features {
-  display: grid;
-  gap: 0.9rem 1.75rem;
-  margin: 0 0 1.25rem;
-  padding: 0;
+  display: flex;
+  gap: 0.75rem;
+  margin: 0 calc(-1 * var(--gutter)) 1.25rem;
+  padding: 0 var(--gutter) 0.5rem;
   list-style: none;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: var(--gutter);
+  scrollbar-width: thin;
 }
-/* Four in a row, or two by two: never three and one. */
-@media (min-width: 40rem) { .features { grid-template-columns: repeat(2, 1fr); } }
-@media (min-width: 60rem) { .features { grid-template-columns: repeat(4, 1fr); } }
-.features li { position: relative; padding-left: 1.5rem; color: var(--muted); font-size: 0.95rem; line-height: 1.5; }
+@media (min-width: 60rem) {
+  .features {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    margin-inline: 0;
+    padding: 0;
+    overflow: visible;
+  }
+}
+.features li {
+  position: relative;
+  flex: 0 0 min(15rem, 78%);
+  padding: 0.75rem 0.875rem 0.75rem 2.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  scroll-snap-align: start;
+}
 /* A tick, drawn: two borders of a narrow box, turned. */
 .features li::before {
   content: "";
   position: absolute;
-  top: 0.3rem;
-  left: 0.25rem;
+  top: 1.05rem;
+  left: 1rem;
   width: 0.35rem;
   height: 0.7rem;
   border: solid var(--accent);
@@ -361,6 +387,17 @@ p.lede:has(+ .features) { margin-bottom: 1.25rem; }
 .next-steps a:hover { background: var(--surface-2); border-color: var(--muted); }
 /* The arrow is decoration; the second `content`, where it is understood, gives it no alt text. */
 .next-steps a::after { content: "→"; content: "→" / ""; color: var(--muted); }
+/* A dot before each label tells the two apart at a glance, in the theme's own green and red. */
+.next-steps a::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--dot, var(--muted));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dot, var(--muted)) 20%, transparent);
+}
+.next-steps .self-host { --dot: var(--ok); }
+.next-steps .offline-app { --dot: var(--danger); }
 
 /* ---------------------------------------------------------------- controls */
 
