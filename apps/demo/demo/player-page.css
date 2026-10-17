@@ -116,6 +116,12 @@
 [hidden] { display: none !important; }
 
 html { -webkit-text-size-adjust: 100%; }
+/* A link to a heading lands below the sticky bar, not under it: the bar's height at each width,
+   plus a breath. One row from 64rem; the links on their own row below; two rows of them under
+   40rem (measured 60, 102 and 129 px, 2026-10-18). */
+html { scroll-padding-top: 9.75rem; }
+@media (min-width: 40rem) { html { scroll-padding-top: 8rem; } }
+@media (min-width: 64rem) { html { scroll-padding-top: 5.25rem; } }
 
 body {
   margin: 0;
@@ -303,13 +309,15 @@ h1 {
   letter-spacing: -0.02em;
 }
 
+/* A section heading that reads as one. Until 2026-10-18 it was a small uppercase label in the
+   muted colour, the same as a table's header row, and the owner found the sections invisible. */
 h2 {
-  margin: 2.5rem 0 0.75rem;
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  margin: 2.75rem 0 0.75rem;
+  color: var(--fg);
+  font-size: clamp(1.2rem, 1.05rem + 0.6vw, 1.45rem);
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
 }
 
 p.lede { max-width: 48rem; margin: 0 0 1.75rem; color: var(--muted); font-size: 1.05em; }
@@ -461,6 +469,37 @@ label.file { position: relative; }
 label.file input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
 label.file:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+/* The element's two modes, on a row of their own at the foot of the form: a two-part switch and
+   what the chosen mode does. The radios stay real radios, out of sight, so arrows move between
+   them and the label is the click target. */
+.mode-row { display: flex; flex: 1 1 100%; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.875rem; }
+.mode {
+  display: inline-flex;
+  flex: none;
+  padding: 0.2rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--bg);
+}
+.mode label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0.25rem 0.9rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--ease), color var(--ease);
+}
+.mode input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.mode label:hover { color: var(--fg); }
+.mode label:has(input:checked) { background: var(--accent-soft); color: var(--accent); }
+.mode label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 1px; }
+.mode-note { flex: 1 1 20rem; margin: 0; color: var(--muted); font-size: 0.85rem; line-height: 1.45; }
+
 .samples { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.875rem 0 0; }
 
 .samples button {
@@ -546,6 +585,9 @@ label.file:has(input:focus-visible) { outline: 2px solid var(--accent); outline-
 }
 
 .timer[hidden] { display: none; }
+/* Which mode the content up now plays in, at the end of the line. */
+.mode-tag { margin-left: auto; color: var(--muted); font-size: 0.85rem; }
+.mode-tag[hidden] { display: none; }
 .status[data-state="ready"] .timer { color: var(--fg); }
 
 @keyframes pulse { 50% { opacity: 0.35; } }
@@ -790,30 +832,36 @@ footer .credit {
 
 /* ---------------------------------------------------------------- prose tables and lists */
 
+/* A table is a card: a border, a header row on the surface colour, a line between rows. The
+   borders are the cells' own (`separate`), since a collapsed border cannot be rounded. */
 .table {
   width: 100%;
-  margin: 0 0 1.25rem;
-  border-collapse: collapse;
+  margin: 0 0 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 0.9375rem;
   line-height: 1.5;
 }
 
 .table th,
 .table td {
-  padding: 0.6rem 0.75rem;
-  border-top: 1px solid var(--line);
+  padding: 0.7rem 0.9rem;
   text-align: left;
   vertical-align: top;
 }
 
 .table thead th {
-  border-top: 0;
-  font-size: 0.75rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 0.8125rem;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--muted);
 }
+.table thead th:first-child { border-top-left-radius: calc(var(--radius) - 1px); }
+.table thead th:last-child { border-top-right-radius: calc(var(--radius) - 1px); }
+.table tbody tr + tr td { border-top: 1px solid var(--line); }
 
 .table td:first-child code {
   white-space: nowrap;
@@ -913,9 +961,12 @@ footer .credit {
 /* ---------------------------------------------------------------- narrow screens */
 
 @media (max-width: 40rem) {
+  /* The card stays; each row is a block of lines in it. */
   .table thead { display: none; }
-  .table tr { display: block; padding: 0.5rem 0; border-top: 1px solid var(--line); }
-  .table td { display: block; padding: 0.15rem 0; border: 0; }
+  .table tr { display: block; padding: 0.75rem 0.9rem; }
+  .table tr + tr { border-top: 1px solid var(--line); }
+  .table td { display: block; padding: 0.15rem 0; }
+  .table tbody tr + tr td { border-top: 0; }
   .topbar { gap: 0.4rem 0.75rem; }
   .topbar nav { gap: 0.1rem; }
   .topbar nav a { padding: 0.3rem 0.55rem; font-size: 0.85rem; }

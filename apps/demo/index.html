@@ -90,6 +90,17 @@
           Choose file
           <input type="file" id="file" accept=".h5p,application/zip" />
         </label>
+        <!-- The element's two modes, for whatever the visitor plays next: changing it plays the
+             current package again in the other. See demo/player-page.js. -->
+        <div class="mode-row">
+          <div class="mode" role="radiogroup" aria-label="How to play the package" aria-describedby="mode-note">
+            <label><input type="radio" name="mode" value="trusted" checked />Trusted</label>
+            <label><input type="radio" name="mode" value="untrusted" />Untrusted</label>
+          </div>
+          <p class="mode-note" id="mode-note">
+            The package plays with its own libraries, as on the site that made it.
+          </p>
+        </div>
       </form>
 
       <div class="samples">
@@ -105,6 +116,7 @@
         <span class="badge" id="state" data-state="idle">idle</span>
         <progress id="progress" max="1" hidden></progress>
         <span class="timer" id="timer" hidden></span>
+        <span class="mode-tag" id="mode-tag" hidden></span>
       </div>
 
       <!-- The live region is on the page from the start and the message is put into it, which is
@@ -119,7 +131,7 @@
       </p>
 
       <!-- A link's ?src= on another site plays untrusted, and asks only when it needs its own code:
-           see foreignHost in demo/player-page.js. -->
+           see foreignHost in demo/page-common.js. -->
       <p class="message warning offer" id="confirm-src" hidden>
         <span>This package from <strong class="host"></strong> plays only with its own scripts. They
         would run on this site and could read what other packages saved in this browser. Open it

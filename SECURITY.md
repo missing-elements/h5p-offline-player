@@ -52,18 +52,29 @@ The relevant security boundary depends on how the player is deployed:
 - The player validates archive entry names and serves entries through a
   Service Worker virtual file server.
 - H5P content runs in a same-origin frame. That isolates styling and globals,
-  but it does **not** isolate a malicious archive from other data on the same
-  origin.
-- Hosts that accept arbitrary package URLs should use a dedicated player
-  origin. A host page should embed the component only for content it curates
-  or otherwise trusts.
+  but it does **not** isolate a package played as it is from other data on the
+  same origin: its own scripts run there.
+- A package played `untrusted` runs none of its own scripts. Its library
+  folders and every file in `content/` outside H5P's content file types are
+  withheld, its libraries come only from the bundle the host chose, every file
+  is served with `nosniff`, the frame's script policy names exact paths, and
+  its content is checked against each library's `semantics.json`, as the H5P
+  plugins check an upload. [docs/untrusted.md](./docs/untrusted.md) says what
+  it covers and what it does not.
+- Hosts that play packages they did not make should play them `untrusted`. A
+  site with signed-in users should also, or instead, put the player on a
+  dedicated origin (the Embed setup).
 - The generated frame Content Security Policy limits resource origins, but it
-  cannot make arbitrary same-origin package JavaScript safe.
+  cannot make a package's own JavaScript safe when the package plays as it is;
+  that is what `untrusted` withholds.
 
 Reports are particularly helpful for issues such as:
 
 - archive path traversal, package-to-package data exposure, or virtual-route
   access outside the intended package;
+- under `untrusted`: any script of the package's own that runs, a file served
+  that should have been withheld, or content that should have been removed by
+  the content check reaching the page;
 - bypasses of the frame CSP, origin checks, message authentication, or
   Service Worker scope boundaries;
 - unintended access to host-page data, IndexedDB, cookies, or saved learner
@@ -74,10 +85,12 @@ Reports are particularly helpful for issues such as:
 - vulnerabilities in the published player, runtime, library bundle, normalizer,
   verifier, cmi5 package, embed site writer, demo, or installable app.
 
-A malicious H5P archive executing its own bundled JavaScript is an expected
-property of H5P, not by itself a vulnerability. It becomes a security issue
-when that code escapes the documented deployment boundary or gains access it
-should not have.
+A malicious H5P archive executing its own bundled JavaScript when it plays as
+it is, is an expected property of H5P, not by itself a vulnerability. It
+becomes a security issue when that code escapes the documented deployment
+boundary or gains access it should not have, and under `untrusted` it is one
+whenever it runs at all. The known limit in Firefox, described in
+docs/untrusted.md, is not a vulnerability by itself.
 
 ## Coordinated disclosure
 

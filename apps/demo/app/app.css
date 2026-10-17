@@ -182,7 +182,8 @@
    again, and a cross at its end taking it off the list. */
 .app .recent { width: min(100%, 30rem); margin-top: 0.5rem; }
 .app .recent-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem; }
-.app .recent-head h2 { margin: 0; }
+/* A label beside its button, not a section heading: the shared sheet's h2 is a heading. */
+.app .recent-head h2 { margin: 0; color: var(--muted); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
 .app .text-button {
   min-height: 2rem;
   padding: 0.2rem 0.55rem;

@@ -20,6 +20,8 @@ const log = document.querySelector('#log')
 const offer = document.querySelector('#offer')
 const useBundle = document.querySelector('#use-bundle')
 const confirmBox = document.querySelector('#confirm-src')
+const modeNote = document.querySelector('#mode-note')
+const modeTag = document.querySelector('#mode-tag')
 
 const write = logInto(log)
 const show = messageIn(message)
@@ -80,6 +82,7 @@ player.addEventListener('statechange', (event) => {
   status.dataset.state = state
   if (state !== 'error') show('')
   bar.hidden = state !== 'downloading'
+  modeTag.hidden = state !== 'ready'
 
   if (state === 'ready') {
     const ms = stopClock('ready in')
@@ -116,6 +119,12 @@ player.addEventListener('progress', (event) => {
 
 player.addEventListener('ready', () => {
   bar.hidden = true
+  modeTag.textContent = player.untrusted
+    ? "Untrusted · this site's library pack · content checked"
+    : player.libraryBundle
+      ? "Trusted · its own libraries, the rest from this site's pack"
+      : 'Trusted · its own libraries'
+  write(`mode  ${modeTag.textContent}`)
   // The build every statement will name in `context.revision`. On a host without Range the frame
   // can boot before the index that yields it, and the statements wait for it instead.
   if (player.revision) write(`revision  ${player.revision}`)
@@ -133,13 +142,26 @@ player.addEventListener('finished', (event) => {
 player.addEventListener('error', (event) => {
   const { code, message: detail, missingLibraries } = event.detail
   bar.hidden = true
-  // Played untrusted, a link from another site turned out to need its own copy of a library: the
-  // visitor decides, naming the host.
-  if (missingLibraries?.carried && player.untrusted && currentLink) {
-    const link = currentLink
-    show('')
+  // Played untrusted, the package turned out to need its own copy of a library. From another
+  // site, the visitor decides, naming the host; this site's own or a picked file was played
+  // untrusted because the visitor chose it, and the switch is the way back.
+  if (missingLibraries?.carried && player.untrusted) {
     write(`refused  its own code: ${missingLibraries.folders.join(', ')}`)
-    askBeforeOpening(foreignHost(link), () => loadUrl(link, { trusted: true }))
+    const host = currentLink && foreignHost(currentLink)
+    if (host) {
+      const link = currentLink
+      show('')
+      askBeforeOpening(host, () => {
+        setMode('trusted')
+        loadUrl(link)
+      })
+    } else {
+      show(
+        `Played untrusted, this package is refused: it needs its own copy of ${missingLibraries.folders.join(', ')}, ` +
+          "newer than this site's library pack. Switch to Trusted to play it with its own scripts.",
+        'warning'
+      )
+    }
     return
   }
   // A runtime error once the content is up does not stop it — content types throw non-fatal
@@ -212,19 +234,43 @@ player.setAttribute('resize-code', `<script src="${EMBED_ORIGIN}/resizer.js"></s
 let currentLink = null
 
 /**
- * Plays a package at a URL. `trusted: false` plays it as data, `untrusted`: none of its own code
- * runs, and its libraries come from this site's bundle, which it cannot play without.
+ * The element's two modes, as the switch in the form sets them: Trusted plays a package with its
+ * own libraries, Untrusted as data, none of its own code running, its libraries from this site's
+ * bundle, which it cannot play without, and its content checked against their semantics. The
+ * switch is the visitor's and holds for whatever plays next. Three things set it for them, so
+ * that it always shows the mode playing: a `?src=` link from another site and the content-only
+ * sample, which play untrusted, and the click that lets a refused link run its own code.
  */
-const loadUrl = (url, { trusted = true } = {}) => {
+const NOTES = {
+  trusted: 'The package plays with its own libraries, as on the site that made it: its own scripts run on this site.',
+  untrusted:
+    "None of the package's own scripts run. Its libraries come from this site's pack, about 14 MB, fetched once, " +
+    'and every field is checked against its library\'s definition, as the H5P plugins for Moodle, WordPress and Drupal check an upload.'
+}
+const playsUntrusted = () => form.elements.mode.value === 'untrusted'
+const setMode = (mode) => {
+  form.elements.mode.value = mode
+  modeNote.textContent = NOTES[mode]
+}
+setMode(form.elements.mode.value)
+
+/** Untrusted needs the bundle, whatever the visitor has chosen for missing libraries. */
+const applyMode = () => {
+  applyLibrarySource()
+  const untrusted = playsUntrusted()
+  if (untrusted) player.setAttribute('libraries', librarySource ?? BUNDLE)
+  player.untrusted = untrusted
+  return untrusted ? '  (untrusted: none of its own code runs)' : ''
+}
+
+/** Plays a package at a URL, in the switch's mode. */
+const loadUrl = (url) => {
   log.textContent = ''
   trust.dismiss()
   offer.hidden = true
-  reload = () => loadUrl(url, { trusted })
+  reload = () => loadUrl(url)
   currentLink = url
-  applyLibrarySource()
-  if (!trusted) player.setAttribute('libraries', librarySource ?? BUNDLE)
-  player.untrusted = !trusted
-  write(`loading  ${url}${trusted ? '' : '  (untrusted: none of its own code runs)'}`)
+  write(`loading  ${url}${applyMode()}`)
   startClock()
   // The embed code is read with the load, like `libraries`, so it goes on before `src`.
   player.setAttribute('embed-code', embedCodeFor(url))
@@ -239,9 +285,7 @@ const loadFile = (file) => {
   offer.hidden = true
   reload = () => loadFile(file)
   currentLink = null
-  applyLibrarySource()
-  player.untrusted = false
-  write(`loading  ${file.name} (${(file.size / 1024).toFixed(0)} kB, from disk)`)
+  write(`loading  ${file.name} (${(file.size / 1024).toFixed(0)} kB, from disk)${applyMode()}`)
   startClock()
   urlInput.value = ''
   player.removeAttribute('embed-code')
@@ -267,12 +311,22 @@ fileInput.addEventListener('change', () => {
   if (file) loadFile(file)
 })
 
+// The same package again in the other mode, which is the quickest way to see the difference.
+for (const input of form.elements.mode) {
+  input.addEventListener('change', () => {
+    setMode(input.value)
+    reload?.()
+  })
+}
+
 // A sample marked `data-untrusted` plays as data against this site's bundle: a content-only
-// export, as h5p.com and h5p.org make them, the way a site plays a package it did not make.
+// export, as h5p.com and h5p.org make them, the way a site plays a package it did not make. The
+// others play in whichever mode the switch is in.
 for (const button of document.querySelectorAll('.samples button')) {
   button.addEventListener('click', () => {
     urlInput.value = button.dataset.src
-    loadUrl(button.dataset.src, { trusted: !('untrusted' in button.dataset) })
+    if ('untrusted' in button.dataset) setMode('untrusted')
+    loadUrl(button.dataset.src)
   })
 }
 
@@ -282,5 +336,6 @@ const askBeforeOpening = trust.ask
 const initial = new URLSearchParams(location.search).get('src')
 if (initial) {
   urlInput.value = initial
-  loadUrl(initial, { trusted: !foreignHost(initial) })
+  if (foreignHost(initial)) setMode('untrusted')
+  loadUrl(initial)
 }

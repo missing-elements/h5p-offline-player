@@ -63,7 +63,9 @@
         runs as your site, unless you set <code>untrusted</code>. Then none of a package's own code
         runs: it plays with the library pack's code, and its content is checked against each
         library's field definitions before it is shown, as the H5P CMS plugins check an author's
-        upload, which makes it as contained as in an H5P plugin on the same site. Embedded, a package runs on the player domain and never sees your page,
+        upload, which makes it as contained as in an H5P plugin on the same site.
+        <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/docs/untrusted.md" rel="noopener">Packages you did not make</a>
+        sets the two modes beside the plugins'. Embedded, a package runs on the player domain and never sees your page,
         cookies, storage or APIs; results reach you as relayed xAPI, and storage is kept per
         embedding site. In every setup the package is named by <code>src</code> — the element's
         attribute, or <code>?src=</code> on the embed page — and naming it loads and plays, the way

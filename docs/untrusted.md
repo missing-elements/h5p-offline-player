@@ -9,6 +9,21 @@ WordPress and Drupal treat an author's upload:
 <h5p-player src="https://elsewhere.example/course.h5p" untrusted></h5p-player>
 ```
 
+## The two modes, and the H5P plugins
+
+| | Played as it is | `untrusted` | An H5P plugin: Moodle, WordPress, Drupal |
+|---|---|---|---|
+| The package's own scripts | Run, as your site | Never served | Installed from an upload only for a user who may update libraries |
+| Where the libraries come from | The package, then `libraries` for what it lacks | `libraries` only: the pack, or a bundle you name | The libraries installed on the site |
+| Files in `content/` | All of them | H5P's list of content file types | H5P's list of content file types |
+| The content's fields | As written | Checked against each library's `semantics.json` | Checked the same way, on upload |
+| Scripts the frame allows | Your origin, and the hosts the runtime needs | Exact paths only | Whatever the site's own policy allows |
+| Media the content names by URL | Loads from that host | Loads from that host | Loads from that host |
+| A package carrying a newer library than the site has | Plays with its own copy | Refused, with `missingLibraries.carried` set, so you can offer to play it as it is | Refused, unless the uploader may update libraries |
+
+Played as it is suits packages your own team made. `untrusted` is for everything else: uploads,
+links from users, a marketplace, exports from another site.
+
 ## What is withheld
 
 - **The package's own library folders.** The libraries come from `libraries` (`pack` unless you
@@ -93,6 +108,10 @@ With or without `untrusted`:
   builds against the worker's own URL, so the worker's URL has to be in the policy, and with it
   every answer the worker gives. The package's folders are still withheld, and `nosniff` still
   holds.
+- **Media the content names.** A field that takes a URL, such as a video on YouTube or an image on
+  another host, loads from that host in the learner's browser, in either mode: the frame's policy
+  allows images, media and frames from anywhere, as content types need. Content cannot fetch data
+  from anywhere but your origin; `connect-src` holds it there.
 - **Your origin.** `untrusted` keeps a package's code off your origin, but its content still plays
   there. For a site with signed-in users, [Embed](https://github.com/missing-elements/h5p-offline-player#embed)
   puts the player on a separate domain as well.

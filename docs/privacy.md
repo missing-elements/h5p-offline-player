@@ -48,7 +48,7 @@ the [README](https://github.com/missing-elements/h5p-offline-player#which-setup)
 Every one of these requests carries the learner's IP address to its host. The last four rows
 depend on the content, not on the player: the frame's CSP allows those hosts so that the content
 types work, and blocks any other script, style or font source. Images, media and embedded frames
-may come from anywhere the content names. List what your packages actually use in your privacy
+may come from anywhere the content names, whether the package plays `untrusted` or not. List what your packages actually use in your privacy
 notice. A German court has held that loading Google Fonts from Google's servers without consent
 breaches the GDPR (LG München I, 3 O 17493/20, 2022).
 

@@ -2101,6 +2101,15 @@ SPA-fallback trap described above cannot happen there.
   app and `/embed`, jsDelivr's on the cmi5 page — and ask, naming the host, only when it is
   refused for needing its own copy of a library (`missingLibraries.carried`); the click plays it
   trusted. Their own origin's packages and what the visitor typed or picked play as before. The
+  player page shows both modes since 2026-10-18, asked for by the owner because a visitor saw only
+  one: a Trusted/Untrusted switch in its form holds for whatever plays next — a typed URL, a picked
+  file, a sample — and changing it plays the current package again in the other mode. A `?src=`
+  link from another site and the content-only sample set it to Untrusted, and the click that lets a
+  refused link run its own code sets it to Trusted, so it always shows the mode playing; the status
+  line names the mode once the content is up. Refused untrusted for needing its own code, a
+  package from this site or a picked file asks nothing, since the visitor chose the mode: the page
+  says to switch. What the content check changed is not shown: the runtime writes it to the
+  frame's console only, and the element has no way to tell the page. The
   app's list of recent files reopens a link the way it first opened, untrusted if it is on
   another site, asking again if it needs its own code. The cmi5 page covers both places a launch
   names the package, `?src=` and `launchParameters`, since a link can carry cmi5 parameters
