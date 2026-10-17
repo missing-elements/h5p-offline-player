@@ -106,6 +106,11 @@ describe('contentChanges', () => {
     expect(changes).toEqual([{ path: 'text', change: 'markup removed: <form>, <input> ×2; style removed: position' }])
   })
 
+  it('reads a text of tags that never close in linear time', { timeout: 1000 }, () => {
+    const changes = contentChanges({ text: `<p>Hi</p>${'<a'.repeat(100_000)}` }, { text: '<p>Hi</p>' })
+    expect(changes).toEqual([{ path: 'text', change: 'markup removed: <a> ×100000' }])
+  })
+
   it('reports removed fields, shortened lists and changed values, and leaves removed empty values out', () => {
     const changes = contentChanges(
       { a: { b: 'x', empty: [], gone: 1 }, list: [1, 2, 3], n: 5, plain: 'Tom & Jerry', html: '<p>a & b</p>' },

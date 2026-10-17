@@ -347,7 +347,7 @@ function lostMarkup(before, after) {
   // Attributes and styles are counted on the kinds of tag that are still there, so a tag removed
   // whole is reported once, as a tag, and not again through everything it carried.
   const kept = tags(after)
-  const openings = (html) => [...html.matchAll(/<[a-z][^>]*>/gi)].map((match) => match[0]).filter((tag) => kept.has(tagName(tag)))
+  const openings = (html) => openingTags(html).filter((tag) => kept.has(tagName(tag)))
   const attributes = (html) =>
     counted(openings(html).flatMap((tag) => [...tag.slice(1).matchAll(/\s([a-z][a-z0-9:-]*)\s*=/gi)].map((match) => match[1].toLowerCase())))
   const styles = (html) =>
@@ -370,6 +370,25 @@ function lostMarkup(before, after) {
   const stylesLost = lost(styles(before), styles(after))
   if (stylesLost.length) parts.push(`style removed: ${listed(stylesLost)}`)
   return parts.length ? parts.join('; ') : null
+}
+
+/**
+ * Every `<` followed by a letter, up to the next `>`: what `/<[a-z][^>]*>/gi` matches, found in
+ * one pass. The expression tries each `<` against the whole rest of the string, so a package
+ * whose text runs `<a<a<a…` with no `>` took time quadratic in its length; here, once no `>`
+ * follows one `<`, none follows any later one, and the scan stops.
+ * @param {string} html
+ */
+function openingTags(html) {
+  const found = []
+  for (let start = html.indexOf('<'); start !== -1; start = html.indexOf('<', start + 1)) {
+    if (!/[a-z]/i.test(html[start + 1] ?? '')) continue
+    const end = html.indexOf('>', start)
+    if (end === -1) break
+    found.push(html.slice(start, end + 1))
+    start = end
+  }
+  return found
 }
 
 /** The distinct messages, each with how often it occurred: `… (×4)`. */
