@@ -5,10 +5,14 @@
 // first paint, made it grow under the reader on every page.
 //
 // The count comes from GitHub's API in the visitor's browser, which `connect-src 'self' https:`
-// allows, at most once an hour: the API answers sixty unauthenticated requests an hour per address.
-// The time is written before asking, so a request that fails — offline, rate-limited, storage
-// refused — waits the hour out like one that succeeded, and the count already shown stays. With
-// no count ever fetched, the button shows none. In an installed window of the app the button is
+// allows, at most once an hour: the API answers sixty unauthenticated requests an hour per address,
+// and a school or an office is one address. What is stored is when to ask next, written before
+// asking, so the pages opened while a request is out do not ask too: an hour after a success, ten
+// minutes after a failure, and after a rate limit the moment GitHub says it lifts
+// (`X-RateLimit-Reset`, which it exposes to pages). The first cut stored when it last asked and
+// waited an hour after any failure, so a visitor rate-limited at 09:25 by a limit lifting at 09:40
+// saw no count until 10:25. The count already shown stays through a failure; with none ever
+// fetched, the button shows none. In an installed window of the app the button is
 // not shown at all (app.css), so nothing is drawn and nothing asked: an app meant to work offline
 // should not reach a third party for a button it hides.
 ;(() => {
@@ -16,14 +20,17 @@
 
   const API = 'https://api.github.com/repos/missing-elements/h5p-offline-player'
   const KEY = 'h5p-demo-stars'
-  const MAX_AGE_MS = 60 * 60 * 1000
+  const FRESH_MS = 60 * 60 * 1000
+  const RETRY_MS = 10 * 60 * 1000
   const root = document.documentElement
   const format = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
 
   const stored = () => {
     try {
+      // A record without `next` is the first cut's, which could hold a visitor back for an hour
+      // after a limit had lifted: it counts as nothing, and the page asks again.
       const kept = JSON.parse(localStorage.getItem(KEY) ?? 'null')
-      return kept && typeof kept.at === 'number' ? kept : null
+      return kept && typeof kept.next === 'number' ? kept : null
     } catch {
       return null
     }
@@ -54,14 +61,20 @@
   if (Number.isInteger(kept?.count)) show(kept.count)
   addEventListener('DOMContentLoaded', label)
 
-  if (kept && Date.now() - kept.at < MAX_AGE_MS) return
-  store({ count: kept?.count ?? null, at: Date.now() })
+  if (kept && Date.now() < kept.next) return
+  const last = kept?.count ?? null
+  store({ count: last, next: Date.now() + RETRY_MS })
   fetch(API, { referrerPolicy: 'no-referrer' })
-    .then((response) => (response.ok ? response.json() : null))
+    .then((response) => {
+      if (response.ok) return response.json()
+      const reset = Number(response.headers.get('x-ratelimit-reset')) * 1000
+      if (reset > Date.now()) store({ count: last, next: reset })
+      return null
+    })
     .then((repository) => {
       const count = repository?.stargazers_count
       if (!Number.isInteger(count)) return
-      store({ count, at: Date.now() })
+      store({ count, next: Date.now() + FRESH_MS })
       show(count)
     })
     .catch(() => {})

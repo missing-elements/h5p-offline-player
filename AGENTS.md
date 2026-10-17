@@ -2124,9 +2124,13 @@ SPA-fallback trap described above cannot happen there.
   paint, as `data-stars` and as `--star-count`, a CSS string the stylesheet draws after the star
   (`root.style.setProperty` is CSSOM, which `style-src 'self'` does not refuse). The first cut was
   a module, which runs after the first paint, so the button grew under the reader on every page.
-  The time of a request is stored before it is made, so one that fails — offline, rate-limited —
-  waits the hour out too and keeps the count already shown; the first cut stored only a success,
-  and a rate-limited visitor asked again on every page, which kept the limit hit. In an installed
+  What is stored is when to ask next, written before asking: an hour after a success, ten minutes
+  after a failure, and after a rate limit the moment GitHub's `X-RateLimit-Reset` names, which it
+  exposes to pages; a failure keeps the count already shown. The first cut stored only a success,
+  so a rate-limited visitor asked again on every page and kept the limit hit; the second waited an
+  hour after any failure, so the deployed site showed no count until an hour after a visit during
+  the limit — found on 2026-10-17, when testing had used up this address's sixty, and records in
+  that shape are read as stale. In an installed
   window of the app, where the button is hidden, the script returns at once, so the app reaches no
   third party. Measured on the built site under the production headers: no layout shift in the bar across five pages with a
   count kept, and one request where there had been five without. The links sit in the middle of
