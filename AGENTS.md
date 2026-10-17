@@ -2175,7 +2175,13 @@ SPA-fallback trap described above cannot happen there.
   in its manifest — `h5p.json` naming the main library alone, `content/`, no library folders, as
   h5p.com and h5p.org export — which the player page's sample button marked `data-untrusted`
   plays `untrusted` against the site's pack: the one place on the site that shows the untrusted
-  path, the addon rule and the pack's MathDisplay. The two-players example plays
+  path, the addon rule and the pack's MathDisplay. A sixth, `markup.h5p` (2026-10-18), is a
+  Column whose text holds markup no H5P site would have saved: a notice pinned over the content
+  with `position: fixed`, a sign-in form, a link dressed as a button. It carries its libraries and
+  plays in whichever mode the player page's switch is in, so switching shows what the content check
+  removes and what it keeps (the words, and the colours a text field allows). Building it found
+  `build-demo-content.mjs` failing for every package since the hub helpers moved: its loop ran as
+  the module loaded, before the helpers below it were declared. The two-players example plays
   `how-it-works.h5p` twice since the same day, the second `lang="de" frame copyright`, since
   one package under two settings is what the per-load fix is for. The outputs
   are committed, 5.5 MB for the four, because a deploy should need neither the hub nor the video

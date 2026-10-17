@@ -271,11 +271,12 @@ const loadUrl = (url) => {
   reload = () => loadUrl(url)
   currentLink = url
   write(`loading  ${url}${applyMode()}`)
-  startClock()
   // The embed code is read with the load, like `libraries`, so it goes on before `src`.
   player.setAttribute('embed-code', embedCodeFor(url))
-  // Removed first so re-setting the same URL still counts as a change.
+  // Removed first so re-setting the same URL still counts as a change. Removing it empties the
+  // player at once, through `idle`, which stops the clock: so the clock starts after it.
   player.removeAttribute('src')
+  startClock()
   player.setAttribute('src', url)
 }
 

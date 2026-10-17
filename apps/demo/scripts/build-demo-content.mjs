@@ -44,6 +44,15 @@ if (names.length === 0) {
   process.exit(1)
 }
 
+// Declared before the loop below, which runs as the module loads.
+const LOG = '[demo-content]'
+
+/** The hub's bundle for a content type, from the cache when it is there. */
+const hubBundle = (machineName) => cachedBundle(machineName, { refresh, log: LOG })
+
+/** Media by URL, cached the same way, keyed on the file name. */
+const fetched = async (url) => readFile(/** @type {string} */ (await download(url, basename(new URL(url).pathname), { refresh, log: LOG })))
+
 const work = await mkdtemp(join(tmpdir(), 'h5p-demo-content-'))
 
 try {
@@ -154,14 +163,6 @@ async function buildPackage(name) {
       (report.entries.some((entry) => entry.action === 'faststart') ? ', mp4 index moved to front' : '')
   )
 }
-
-const LOG = '[demo-content]'
-
-/** The hub's bundle for a content type, from the cache when it is there. */
-const hubBundle = (machineName) => cachedBundle(machineName, { refresh, log: LOG })
-
-/** Media by URL, cached the same way, keyed on the file name. */
-const fetched = async (url) => readFile(/** @type {string} */ (await download(url, basename(new URL(url).pathname), { refresh, log: LOG })))
 
 async function listFiles(dir, prefix = '') {
   const found = []
