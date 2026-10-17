@@ -74,7 +74,9 @@ Before opening a pull request:
 2. Run the relevant checks and state the commands and results in the pull
    request.
 3. Update documentation when a public API, deployment requirement, security
-   boundary, or user-visible behavior changes.
+   boundary, or user-visible behavior changes. A change to anything
+   [docs/compatibility.md](./docs/compatibility.md) covers is a version
+   decision: say so in the pull request.
 4. Preserve streaming behavior: do not introduce whole-archive or whole-media
    buffering.
 5. Preserve archive-name validation, origin checks, Service Worker boundaries,

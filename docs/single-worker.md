@@ -16,7 +16,9 @@ Routes then live under `<hostScope>h5p/`, and the element uses them instead of r
 
 ## Upgrading
 
-- Cache names include the package major version; minor and patch updates reuse cached packages, and a worker update never invalidates them.
+- Cache names include the package major version; minor and patch updates reuse cached packages, and a worker update never invalidates them. A major starts the cache afresh, and each package is downloaded once more; saved state is kept.
 - After an upgrade, the element updates its own worker before the first load (waiting up to three seconds).
 - Installed without a build step: re-download `h5p-sw.js` after upgrading. The element logs a warning when versions differ.
 - Single-worker hosts update their own worker; offer a reload on `controllerchange`, as the demo's app does.
+
+What an upgrade may change, by version number, is in [Compatibility](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/compatibility.md).

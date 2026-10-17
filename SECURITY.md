@@ -17,7 +17,9 @@ versions of the packages in this repository:
 | Demo and installable app | Deployment from `main` |
 
 Older releases may receive a fix when practical, but users should upgrade to a
-supported version.
+supported version. A security fix ships in any release, a patch included; what
+a version number promises otherwise is in
+[docs/compatibility.md](./docs/compatibility.md).
 
 ## Reporting a vulnerability
 

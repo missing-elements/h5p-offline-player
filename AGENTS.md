@@ -220,7 +220,9 @@ README.md                 what npm shows; ACCESSIBILITY.md, SECURITY.md, CONTRIB
 docs/                     the README's longer sections, one file each: streaming video, libraries, the
                           frame's CSP, packages you did not make (`untrusted` and the content check), the
                           revision on statements, resume, the verifier, cmi5, development,
-                          troubleshooting, single-worker hosts and upgrades, coming from h5p-standalone,
+                          troubleshooting, single-worker hosts and upgrades, compatibility (what a
+                          version number promises, written 2026-10-18 for 1.0; a change to anything it
+                          covers is a version decision), coming from h5p-standalone,
                           privacy (what is stored and sent, for a host's notice); the README links
                           them by absolute URL because npm renders the same file; suggestions-review.md
                           weighs a note of eight feature suggestions against the code (2026-09-30). The

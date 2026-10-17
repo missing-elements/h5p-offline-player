@@ -18,6 +18,9 @@ element's `revision` property holds it once the package is indexed.
 **At release**, record it: the normalizer prints the revision of the file it writes. Keep the
 published `.h5p`, from which anyone can recompute it.
 
+The recipe does not change within a major version of the player, and a major that changes it
+gives the new value a prefix of its own ([Compatibility](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/compatibility.md)).
+
 It identifies a build; it does not seal one, since a CRC can be forged on purpose. It also cannot
 say *when* a build was current — that belongs in your LMS, LRS or document control, against which
 an audit compares each statement's `revision` and timestamp. For a major change, publish at a new
