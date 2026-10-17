@@ -1465,11 +1465,29 @@ driver along and the normalizer should not.
   and warning means and what to do about it, to look at the screenshot because layout mistakes
   raise no error, never to make the check pass by removing what fails, and what a pass does not
   claim: nothing about the content's correctness, level, licensing or accessibility.
+- **`--untrusted` plays a package as a site that did not make it does** (2026-10-18, #38): the
+  element's `untrusted`, read back from it for the report rather than taken from the option, the
+  libraries from `--libraries` or the element's own `pack`. What the content check changed is
+  measured, not told: the runtime's notes, which the boot script writes to the frame's console and
+  the report keeps, cover six kinds of change and none of the markup it strips. So the verifier
+  fetches the package's `content.json` through the frame with `X-H5P-Content-Check: semantics`,
+  which the worker answers with the file as written, and compares it with the parameters the boot
+  script left in `H5PIntegration` (`contentChanges`): tags removed by name, attributes and style
+  properties counted only on the kinds of tag still there (a form removed whole is one line, not
+  its inputs' attributes too), fields and list items removed, values changed; a removed empty value
+  is left out, as upstream drops those too. The content upgrade runs before the check and can move
+  fields when the pack is newer than the content, so a change that is not markup is not attributed
+  to the check. Every change is a warning, never a failure: the content plays, as it would on the
+  site. A package that needs its own copy of a library is refused with `carried`, and the summary
+  says to build against the pack's versions or play it trusted. `--libraries` takes a bundle on
+  disk too, served from the verifier's own server at `/__libraries/<n>.h5p`, so the check runs
+  offline against a pack the caller names; the tests use the workspace's.
 
-Not built, deliberately: steps that click through the content and check the xAPI it sends, a
-content digest for reviewing what was generated, and a check of library versions against the
-hub's catalogue — the last of which is the commonest reason a package that plays here is refused
-on upload, since h5p-cli builds from GitHub `master` and h5p.com carries the hub's versions.
+Not built, deliberately: steps that click through the content and check the xAPI it sends, and a
+content digest for reviewing what was generated. A check of library versions against the hub's
+catalogue, the commonest reason a package that plays here is refused on upload (h5p-cli builds
+from GitHub `master`, and h5p.com carries the hub's versions), is not built either; `--untrusted`
+checks them against the pack's, which follows the hub weekly.
 The tests need the player built (`pnpm build`); the package's `test` script does that first.
 The repository's own sweep does click through content and read its statements (next section),
 for packages it makes; the verifier, which is handed a stranger's, still does not.
