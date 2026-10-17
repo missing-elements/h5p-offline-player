@@ -27,11 +27,36 @@ reaches `ready`, that nothing throws while booting (an error after `ready` is a 
 content drew something, and it lists failed requests, CSP blocks and the build's `revision`. It
 does not judge correctness, suitability, accessibility or licensing: look at the screenshot.
 
+## Played untrusted
+
+A site that plays packages it did not make plays them
+[`untrusted`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/untrusted.md),
+as the H5P plugins treat an upload: none of the package's own code runs, its libraries come only
+from the site's pack, and its content is checked against each library's `semantics.json`.
+`--untrusted` plays it that way:
+
+```bash
+npx @missing-elements/h5p-verify course.h5p --untrusted
+```
+
+```
+pass  course.h5p  ready in 0.83 s  revision sha256:c4fd49473b30cd97…
+  warning: content check: content[2].content.params.text: markup removed: <form>, <label> ×2, <input> ×2, <button>
+  warning: content check: content[3].content.params.text: attributes removed: style; style removed: display, padding, border-radius, background-color, color, text-decoration
+```
+
+Each warning is a field the content will lose on such a site, measured by comparing the package's
+`content.json` with what the runtime was handed. They are warnings because the content still plays.
+A package built against a library newer than the pack is refused, with what to do. The libraries
+come from the pack on jsDelivr unless `--libraries` names another; name a copy on disk, such as
+`node_modules/@missing-elements/h5p-libraries/libraries.h5p`, to run the check offline.
+
 ## Options
 
 | | |
 |---|---|
-| `--libraries pack\|<url>` | supply libraries for a package exported without them: `pack` is the library pack (`hub` means the same) |
+| `--untrusted` | play it as a site plays a package it did not make, and report what the content check removed |
+| `--libraries <sources>` | where libraries come from, tried in order: `pack` (the library pack; `hub` means the same), a bundle's URL, or a bundle on disk, which the verifier serves itself |
 | `--out <dir>` | where the report and screenshot go |
 | `--browser <path>` | a Chromium-based browser; otherwise Chrome, then Edge, then Playwright's Chromium |
 | `--ready <s>` | time allowed to reach `ready`, default 60 |
@@ -48,7 +73,7 @@ Needs Node 20 or later and a Chromium-based browser; without Chrome or Edge, run
 ```js
 import { verifyPackage, summarize } from '@missing-elements/h5p-verify'
 
-const report = await verifyPackage({ file: 'course.h5p', out: 'report/' })
+const report = await verifyPackage({ file: 'course.h5p', out: 'report/', untrusted: true })
 console.log(summarize(report))
 if (report.verdict !== 'pass') process.exit(1)
 ```

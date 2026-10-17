@@ -24,6 +24,12 @@ const { version } = require('../package.json')
 const CONSOLE_LINES_KEPT = 20
 /** How much of a revision the one-line summary shows: `sha256:` and sixteen hex characters. */
 const REVISION_SHOWN = 23
+/** How many of the content check's changes become warnings; `report.json` keeps them all. */
+const CHANGES_SHOWN = 20
+/** How the runtime's boot script begins the notes it writes to the frame's console after the content check. */
+const CHECK_NOTES = "<h5p-player>: the content was checked against its libraries' semantics"
+/** The header the Service Worker wants before it hands an untrusted package's `content.json` over as written. */
+const CONTENT_CHECK_HEADER = 'X-H5P-Content-Check'
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -44,7 +50,9 @@ const MIME = {
 /**
  * @typedef {object} VerifyOptions
  * @property {string} file the `.h5p` to play
- * @property {string} [libraries] `pack`, or the URL of a bundle, for a package without library folders
+ * @property {string} [libraries] where libraries come from, tried in order: `pack`, a bundle's URL, or a
+ *   bundle on disk, which the verifier serves itself; several separated by spaces
+ * @property {boolean} [untrusted] play the package `untrusted`, as a site that did not make it plays it
  * @property {string} [out] where `report.json` and `screenshot.png` go; nothing is written without it
  * @property {string} [browser] a Chromium-based browser executable; found automatically otherwise
  * @property {number} [readyTimeout] ms allowed to reach `ready`; default 60 000
@@ -66,8 +74,10 @@ export async function verifyPackage(options) {
   }
   const readyTimeout = options.readyTimeout ?? 60_000
   const settle = options.settle ?? 3_000
+  const untrusted = options.untrusted === true
+  const sources = librarySources(options.libraries)
 
-  const server = await serve(await playerDist())
+  const server = await serve(await playerDist(), sources.files)
   const browser = await launch(options.browser)
   try {
     const context = await browser.newContext({ viewport: { width: 1100, height: 800 } })
@@ -84,7 +94,10 @@ export async function verifyPackage(options) {
 
     const consoleErrors = []
     const failedRequests = []
+    const checkNotes = []
     page.on('console', (message) => {
+      // The content check's own account of what it changed, one note to a line.
+      if (message.type() === 'warning' && message.text().startsWith(CHECK_NOTES)) checkNotes.push(...message.text().split('\n- ').slice(1))
       // A failed load is on the response listener, with the probe 404s filtered out; the
       // console's copy of it names no URL and would only repeat it.
       if (message.type() === 'error' && !message.text().startsWith('Failed to load resource')) consoleErrors.push(message.text())
@@ -105,8 +118,10 @@ export async function verifyPackage(options) {
       if (url.startsWith(server.url) && error !== 'net::ERR_ABORTED') failedRequests.push({ url: url.slice(server.url.length), error })
     })
 
-    const query = options.libraries ? `?libraries=${encodeURIComponent(options.libraries)}` : ''
-    await page.goto(`${server.url}/${query}`)
+    const query = new URLSearchParams()
+    if (sources.attribute) query.set('libraries', sources.attribute)
+    if (untrusted) query.set('untrusted', '')
+    await page.goto(`${server.url}/${query.size ? `?${query}` : ''}`)
     await page.setInputFiles('#file', file)
 
     let timedOut = false
@@ -124,7 +139,7 @@ export async function verifyPackage(options) {
 
     const collected = await page.evaluate(() => {
       const player = document.querySelector('h5p-player')
-      return { ...window.__verify, state: player.state, revision: player.revision }
+      return { ...window.__verify, state: player.state, revision: player.revision, untrusted: player.untrusted === true }
     })
     const frame = page.frames().find((candidate) => candidate.url().includes('/h5p/frame/'))
     const rendered = frame
@@ -144,6 +159,21 @@ export async function verifyPackage(options) {
           .catch(() => null)
       : null
     const csp = frame ? await frame.evaluate(() => window.__csp ?? []).catch(() => []) : []
+    // Untrusted, the package's `content.json` beside what the runtime was handed: the Service
+    // Worker gives the file as written to a request that names the check, and the boot script
+    // leaves the checked parameters in `H5PIntegration`.
+    const played =
+      collected.untrusted && frame && collected.state === 'ready'
+        ? await frame
+            .evaluate(async (header) => {
+              const config = JSON.parse(document.getElementById('h5p-boot-config')?.textContent ?? 'null')
+              const content = Object.values(window.H5PIntegration?.contents ?? {})[0]
+              if (!config?.h5pJsonPath || typeof content?.jsonContent !== 'string') return null
+              const response = await fetch(`${config.h5pJsonPath}/content/content.json`, { headers: { [header]: 'semantics' } })
+              return response.ok ? { written: await response.text(), checked: content.jsonContent } : null
+            }, CONTENT_CHECK_HEADER)
+            .catch(() => null)
+        : null
 
     let screenshot = null
     if (options.out && collected.state === 'ready') {
@@ -157,7 +187,10 @@ export async function verifyPackage(options) {
       tool: `h5p-verify ${version}`,
       file,
       size,
-      libraries: options.libraries ?? null,
+      // Untrusted, the element takes the pack when nothing else is named.
+      libraries: options.libraries ?? (untrusted ? 'pack' : null),
+      // As the element played it, read back, not as asked.
+      untrusted: collected.untrusted,
       verdict: 'pass',
       reasons: [],
       warnings: [],
@@ -170,6 +203,9 @@ export async function verifyPackage(options) {
       csp,
       failedRequests,
       console: consoleErrors.filter((text) => !collected.errors.some((error) => text.includes(error.message))).slice(0, CONSOLE_LINES_KEPT),
+      contentCheck: collected.untrusted
+        ? { notes: checkNotes, changes: played ? contentChanges(JSON.parse(played.written), JSON.parse(played.checked)) : null }
+        : null,
       screenshot
     }
 
@@ -197,6 +233,17 @@ export async function verifyPackage(options) {
     for (const { url, status, error } of failedRequests) report.warnings.push(`request failed: ${url} (${status ?? error})`)
     for (const { directive, blocked } of csp) report.warnings.push(`blocked by the frame's CSP: ${blocked} (${directive})`)
     for (const text of report.console) report.warnings.push(`console error: ${text.slice(0, 200)}`)
+    // What the content lost is not a failure: it plays, as it would on the site. It is what a
+    // publisher reads before handing the package over.
+    if (report.contentCheck && report.state === 'ready') {
+      const { notes, changes } = report.contentCheck
+      for (const note of notes) report.warnings.push(`content check: ${note}`)
+      if (changes === null) report.warnings.push('content check: the content as played could not be compared with the package\'s own')
+      else {
+        for (const { path, change } of changes.slice(0, CHANGES_SHOWN)) report.warnings.push(`content check: ${path || '(the content)'}: ${change}`)
+        if (changes.length > CHANGES_SHOWN) report.warnings.push(`content check: ${changes.length - CHANGES_SHOWN} more changes in report.json`)
+      }
+    }
 
     if (options.out) {
       await mkdir(options.out, { recursive: true })
@@ -210,6 +257,139 @@ export async function verifyPackage(options) {
 }
 
 export class VerifyError extends Error {}
+
+/**
+ * `libraries` as the element reads it, with each bundle on disk given a route on the verifier's
+ * own server: `pack`, `hub` and URLs pass as they are. A path that names no file is an error
+ * before anything starts.
+ * @param {string | undefined} value
+ */
+function librarySources(value) {
+  /** @type {Map<string, string>} */
+  const files = new Map()
+  if (!value) return { attribute: null, files }
+  const tokens = value.split(/\s+/).filter(Boolean).map((token) => {
+    if (token === 'pack' || token === 'hub' || /^https?:\/\//i.test(token)) return token
+    const path = resolve(token)
+    if (!existsSync(path)) throw new VerifyError(`No such library bundle: ${path}`)
+    const route = `/__libraries/${files.size}.h5p`
+    files.set(route, path)
+    return route
+  })
+  return { attribute: tokens.join(' '), files }
+}
+
+/**
+ * What the content as played lost against the package's own `content.json`, field by field, by
+ * JSON path: markup removed from a text (tags, attributes and style properties by name), fields
+ * removed, list items removed, values changed. A removed empty value is left out: the check drops
+ * empty lists and groups as upstream does, and nothing reads them.
+ *
+ * Measured, not told: the runtime's own notes cover only part of what the check does, and none
+ * of the markup it strips. The content upgrade runs first and can move fields too, when the
+ * libraries served are newer than the ones the content was written for; a change that is not
+ * markup may be its.
+ * @param {unknown} written
+ * @param {unknown} played
+ * @returns {{ path: string, change: string }[]}
+ */
+export function contentChanges(written, played) {
+  /** @type {{ path: string, change: string }[]} */
+  const changes = []
+  const isContainer = (value) => value !== null && typeof value === 'object'
+  const isEmpty = (value) => value === '' || (isContainer(value) && Object.keys(value).length === 0)
+  const show = (value) => {
+    const text = JSON.stringify(value) ?? String(value)
+    return text.length > 40 ? `${text.slice(0, 40)}…` : text
+  }
+  const walk = (a, b, path) => {
+    if (a === b) return
+    if (typeof a === 'string' && typeof b === 'string') {
+      // A text that lost no markup shows both values, unless it is markup, whose rewrite (an
+      // entity escaped, a URL dropped) would not fit on a line.
+      changes.push({ path, change: lostMarkup(a, b) ?? (/[<>]/.test(a) ? 'text rewritten' : `${show(a)} became ${show(b)}`) })
+      return
+    }
+    if (isContainer(a) && isContainer(b) && Array.isArray(a) === Array.isArray(b)) {
+      if (Array.isArray(a) && a.length !== b.length) {
+        // Items cannot be paired once one is gone, so the list is reported whole.
+        const gone = a.length - b.length
+        changes.push({ path, change: gone > 0 ? `${gone} of ${a.length} items removed` : `${-gone} items added` })
+        return
+      }
+      for (const key of Object.keys(a)) {
+        const next = Array.isArray(a) ? `${path}[${key}]` : path ? `${path}.${key}` : key
+        if (!(key in b)) {
+          if (!isEmpty(a[key])) changes.push({ path: next, change: 'removed' })
+        } else walk(a[key], b[key], next)
+      }
+      for (const key of Object.keys(b)) {
+        if (!(key in a)) changes.push({ path: Array.isArray(b) ? `${path}[${key}]` : path ? `${path}.${key}` : key, change: 'added' })
+      }
+      return
+    }
+    changes.push({ path, change: `${show(a)} became ${show(b)}` })
+  }
+  walk(written, played, '')
+  return changes
+}
+
+/**
+ * The markup a text lost, by name: `<form>, <input> ×2; attributes: action, type ×2; style: position`.
+ * `null` when it lost none, and the text changed otherwise, an entity escaped or a URL dropped.
+ * @param {string} before
+ * @param {string} after
+ */
+function lostMarkup(before, after) {
+  const counted = (names) => names.reduce((map, name) => map.set(name, (map.get(name) ?? 0) + 1), new Map())
+  const tagName = (tag) => /^<([a-z][a-z0-9]*)/i.exec(tag)?.[1].toLowerCase() ?? ''
+  const tags = (html) => counted([...html.matchAll(/<([a-z][a-z0-9]*)\b/gi)].map((match) => match[1].toLowerCase()))
+  // Attributes and styles are counted on the kinds of tag that are still there, so a tag removed
+  // whole is reported once, as a tag, and not again through everything it carried.
+  const kept = tags(after)
+  const openings = (html) => openingTags(html).filter((tag) => kept.has(tagName(tag)))
+  const attributes = (html) =>
+    counted(openings(html).flatMap((tag) => [...tag.slice(1).matchAll(/\s([a-z][a-z0-9:-]*)\s*=/gi)].map((match) => match[1].toLowerCase())))
+  const styles = (html) =>
+    counted(
+      openings(html).flatMap((tag) =>
+        [...tag.matchAll(/\sstyle\s*=\s*"([^"]*)"/gi)].flatMap((match) =>
+          match[1].split(';').map((rule) => rule.split(':')[0].trim().toLowerCase()).filter(Boolean)
+        )
+      )
+    )
+  /** Each name `before` has more of than `after`, with how many more. */
+  const lost = (before, after) =>
+    [...before].flatMap(([name, count]) => (count > (after.get(name) ?? 0) ? [[name, count - (after.get(name) ?? 0)]] : []))
+  const listed = (pairs, shown = (name) => name) => pairs.map(([name, gone]) => (gone > 1 ? `${shown(name)} ×${gone}` : shown(name))).join(', ')
+  const parts = []
+  const tagsLost = lost(tags(before), tags(after))
+  if (tagsLost.length) parts.push(`markup removed: ${listed(tagsLost, (name) => `<${name}>`)}`)
+  const attributesLost = lost(attributes(before), attributes(after))
+  if (attributesLost.length) parts.push(`attributes removed: ${listed(attributesLost)}`)
+  const stylesLost = lost(styles(before), styles(after))
+  if (stylesLost.length) parts.push(`style removed: ${listed(stylesLost)}`)
+  return parts.length ? parts.join('; ') : null
+}
+
+/**
+ * Every `<` followed by a letter, up to the next `>`: what `/<[a-z][^>]*>/gi` matches, found in
+ * one pass. The expression tries each `<` against the whole rest of the string, so a package
+ * whose text runs `<a<a<a…` with no `>` took time quadratic in its length; here, once no `>`
+ * follows one `<`, none follows any later one, and the scan stops.
+ * @param {string} html
+ */
+function openingTags(html) {
+  const found = []
+  for (let start = html.indexOf('<'); start !== -1; start = html.indexOf('<', start + 1)) {
+    if (!/[a-z]/i.test(html[start + 1] ?? '')) continue
+    const end = html.indexOf('>', start)
+    if (end === -1) break
+    found.push(html.slice(start, end + 1))
+    start = end
+  }
+  return found
+}
 
 /** The distinct messages, each with how often it occurred: `… (×4)`. */
 function dedupe(messages) {
@@ -236,15 +416,21 @@ async function playerDist() {
   return { dist, runtime }
 }
 
-/** A static server for the player, the runtime and the test page, on a free localhost port. */
-function serve({ dist, runtime }) {
+/**
+ * A static server for the player, the runtime, the test page and any library bundle named on
+ * disk, on a free localhost port.
+ * @param {{ dist: string, runtime: string }} roots
+ * @param {Map<string, string>} bundles routes to bundle files
+ */
+function serve({ dist, runtime }, bundles = new Map()) {
   const page = join(here, 'page.html')
   const ASSETS = '/frame-assets/'
   const server = createServer(async (request, response) => {
     const path = decodeURIComponent(new URL(request.url ?? '/', 'http://localhost').pathname)
     const safe = (root, rest) => join(root, normalize(rest).replace(/^(\.\.[/\\])+/, ''))
-    const target = path === '/' ? page : path.startsWith(ASSETS) ? safe(runtime, path.slice(ASSETS.length)) : safe(dist, path)
-    if (target !== page && !target.startsWith(dist) && !target.startsWith(runtime)) {
+    const bundle = bundles.get(path)
+    const target = bundle ?? (path === '/' ? page : path.startsWith(ASSETS) ? safe(runtime, path.slice(ASSETS.length)) : safe(dist, path))
+    if (target !== page && !bundle && !target.startsWith(dist) && !target.startsWith(runtime)) {
       response.writeHead(403).end()
       return
     }
@@ -297,7 +483,12 @@ export function summarize(report) {
   const lines = [`${report.verdict}  ${name}  ${took}${report.revision ? `  revision ${report.revision.slice(0, REVISION_SHOWN)}…` : ''}`]
   for (const reason of report.reasons) lines.push(`  ${reason}`)
   const missing = report.errors.find((error) => error.missingLibraries)?.missingLibraries
-  if (missing) {
+  if (missing?.carried && report.untrusted) {
+    lines.push(
+      `  fix: the package carries ${missing.folders.join(', ')} itself, but played untrusted its libraries come only from ` +
+        `${report.libraries}, which lacks them: export it against the versions there, or the site has to play it trusted`
+    )
+  } else if (missing) {
     lines.push(`  fix: add the library folders (${missing.folders.join(', ')}), or --libraries pack if the destination site supplies libraries`)
   }
   for (const warning of report.warnings) lines.push(`  warning: ${warning}`)

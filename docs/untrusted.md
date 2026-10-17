@@ -116,4 +116,5 @@ With or without `untrusted`:
   there. For a site with signed-in users, [Embed](https://github.com/missing-elements/h5p-offline-player#embed)
   puts the player on a separate domain as well.
 - **Correctness.** The check is about safety. Whether a package works at all is what
-  [`h5p-verify`](verify.md) answers.
+  [`h5p-verify`](verify.md) answers; `h5p-verify --untrusted` plays it the way your site will, and
+  lists what the check removes from it.

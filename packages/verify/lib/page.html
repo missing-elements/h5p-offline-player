@@ -17,8 +17,11 @@
       // stamped with the page's clock so the report can say how long the boot took.
       const report = (window.__verify = { started: null, states: [], errors: [], xapi: [] })
       const player = document.querySelector('h5p-player')
-      const libraries = new URLSearchParams(location.search).get('libraries')
+      const query = new URLSearchParams(location.search)
+      const libraries = query.get('libraries')
       if (libraries) player.setAttribute('libraries', libraries)
+      // Played as a site plays a package it did not make: none of its own code, the content checked.
+      if (query.has('untrusted')) player.untrusted = true
 
       player.addEventListener('statechange', (event) => {
         report.states.push({ state: event.detail.state, at: performance.now() })

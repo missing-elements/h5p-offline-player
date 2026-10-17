@@ -8,6 +8,8 @@ npx @missing-elements/h5p-verify course.h5p        # exit 0: it plays; 1: it doe
 ```
 
 It names missing libraries, fails on an uncaught error while the runtime boots, and checks that
-the content drew something. It is meant as the last step of a pipeline that generates or
+the content drew something. With `--untrusted` it plays the package as a site that did not make
+it will, [untrusted](untrusted.md), against the library pack, and lists as warnings what the
+content check removes from each field: markup, attributes and styles by name, fields, values. It is meant as the last step of a pipeline that generates or
 rewrites packages; the skill in `skills/h5p-verify/` tells an agent when to run it and how to
 read the result.
