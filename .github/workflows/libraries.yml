@@ -48,7 +48,8 @@ jobs:
             pkg.version = [major, minor, patch + 1].join('.')
             fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\\n')
             console.log(pkg.version)")
-          # The player's libraries="pack" pins this version: stamp it in the same change.
+          # The player's libraries="pack" pins this version and carries its parts' index: stamp
+          # both in the same change.
           pnpm --filter @missing-elements/h5p-offline-player sync:assets
 
           # Every content type played against the new pack, for the review: CI does not start on
@@ -64,7 +65,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git switch -C "$branch"
-          git add packages/libraries packages/player/src/shared/constants.ts
+          git add packages/libraries packages/player/src/shared/constants.ts packages/player/src/shared/pack-index.ts
           git commit -m "chore(libraries): refresh from the H5P hub, $version"
           git push --force origin "$branch"
 

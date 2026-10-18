@@ -37,10 +37,80 @@ export type RemoteSourceDescriptor = Exclude<SourceDescriptor, { type: 'file' }>
 export type PackageStatus = 'registered' | 'indexed'
 
 /**
- * Where to look for libraries a package does not carry: `pack`, the published library pack (see
- * `LIBRARY_PACK_URL`), or the URL of a `.h5p` that carries them.
+ * Where to look for libraries a package does not carry: `pack`, the library pack (see
+ * `PackLibrary`), or the URL of a `.h5p` that carries them.
  */
 export type LibrarySource = 'pack' | { url: string }
+
+/** A dependency as `library.json` and `h5p.json` declare it, versions as numbers. */
+export interface PackDependency {
+  machineName: string
+  majorVersion: number
+  minorVersion: number
+}
+
+/**
+ * One library of the library pack, as its `parts/index.json` describes it: the pack is split into
+ * one archive per library folder, `<folder>.h5p`, so a package downloads only the libraries it
+ * needs, each checked against its hash.
+ */
+export interface PackLibrary {
+  /** `<machineName>-<major>.<minor>`, the one folder the part holds. */
+  folder: string
+  machineName: string
+  majorVersion: number
+  minorVersion: number
+  patchVersion: number
+  /** The dependencies its `library.json` declares. */
+  preloadedDependencies?: PackDependency[]
+  /** For an addon, the content the platforms add it to (`addTo` in its `library.json`). */
+  addTo?: unknown
+  /** The part's size in bytes. */
+  size: number
+  /** The part's SHA-256, lower-case hex. */
+  sha256: string
+}
+
+/**
+ * The pack, offered with an `index` so the worker can say which parts the package needs. `pinned`:
+ * the version this release pins, whose index the worker carries; otherwise the element hands over
+ * the index of a copy the host named, with each part's URL.
+ */
+export type PackOffer = {
+  /** Play the pack's newer version of a library the package carries. */
+  refresh: boolean
+  /** Supply from the pack what the package does not carry. Off while an earlier source is still to be tried. */
+  fill: boolean
+} & ({ pinned: true } | { libraries: Array<PackLibrary & { url: string }> })
+
+/** A part to download and attach. */
+export interface PackPart {
+  folder: string
+  url: string
+  size: number
+  sha256: string
+}
+
+/** A library the package carries that plays at the pack's newer version instead. */
+export interface RefreshedLibrary {
+  /** The machine name, `H5P.QuestionSet`. */
+  library: string
+  /** The version the package carries, `1.20.3`. */
+  from: string
+  /** The pack's, `1.21.2`. */
+  to: string
+}
+
+/**
+ * What the pack has to supply before the package can play: the parts to attach, and the package's
+ * own folders that the newer versions among them replace.
+ */
+export interface PackPlan {
+  parts: PackPart[]
+  /** The package's own library folders to withhold, each replaced by a part. */
+  superseded: string[]
+  refreshed: RefreshedLibrary[]
+}
 
 /** What an archive declared but does not contain. */
 export interface MissingLibraries {
@@ -104,6 +174,10 @@ export interface PackageRecord {
    * a restarted worker reattaches it without asking the page again.
    */
   libraryPkgId?: string
+  /** The parts of the library pack attached, in the order they were; see `LoadSettings.parts`. */
+  parts?: string[]
+  /** The package's own library folders a part replaces; see `LoadSettings.superseded`. */
+  superseded?: string[]
   /**
    * `libraries` marks an archive registered only to supply library folders to another package.
    * It is never played, so it is not held to carrying everything its own `h5p.json` declares.
@@ -153,6 +227,13 @@ export interface LoadSettings {
   untrusted?: boolean
   /** The bundle attached for this load; see `PackageRecord.libraryPkgId`. */
   libraryPkgId?: string
+  /** The library pack's parts attached for this load, by their package ids, consulted before the bundle. */
+  parts?: string[]
+  /**
+   * The package's own library folders withheld because a part carries a newer version of the
+   * library: requests for them resolve to the part's folder, by the rule `get()` serves with.
+   */
+  superseded?: string[]
   /** When a load last registered these, for keeping the newest few. */
   registered: number
 }
@@ -234,12 +315,17 @@ export type ToWorkerMessage =
   /**
    * `deep`: also follow each library's own dependencies, as the runtime will, and refuse what
    * none of them provides. Asked for once the library files are local or cached.
+   * `pack`: the library pack is a source; the reply carries a `plan` when it has parts to supply.
    */
-  | { type: 'index'; pkgId: string; view?: string; deep?: boolean }
+  | { type: 'index'; pkgId: string; view?: string; deep?: boolean; pack?: PackOffer }
   /** Answer to a `need-file` request: the page hands back the `File` the worker lost on restart. */
   | { type: 'file'; pkgId: string; file: File }
-  /** Points a package at another one, already registered and indexed, for its libraries. */
-  | { type: 'attach-libraries'; pkgId: string; libraryPkgId: string; view?: string }
+  /**
+   * Points a package at other ones, already registered and indexed, for its libraries: a bundle,
+   * which replaces the one before, or parts of the pack, which are added, with the package's own
+   * folders they replace.
+   */
+  | { type: 'attach-libraries'; pkgId: string; libraryPkgId?: string; parts?: string[]; superseded?: string[]; view?: string }
   /**
    * Asks for a library bundle already downloaded whole from `url`, for when `url` cannot be
    * reached now. Answered `downloaded-libraries`, with `null` when there is none.
@@ -325,6 +411,11 @@ export type WorkerReply =
       metadata?: ContentMetadata
       /** `h5p.json`'s `mainLibrary`, the content type, when the manifest names one. */
       mainLibrary?: string
+      /**
+       * Parts of the library pack to attach before the package can play, for an `index` that
+       * offered the pack. The reply carries nothing else then: index again once they are attached.
+       */
+      plan?: PackPlan
     }
   /** `views`: the register named a load key and the worker kept the settings under it. */
   | { ok: true; type: 'ack'; views?: true }
@@ -351,7 +442,8 @@ export type FromWorkerMessage =
 export type ToJobsMessage = ToJobsRequest & { file?: File }
 
 type ToJobsRequest =
-  | { type: 'download'; pkgId: string; source: SourceDescriptor }
+  /** `sha256`: what the downloaded bytes must hash to, for a part of the library pack. */
+  | { type: 'download'; pkgId: string; source: SourceDescriptor; sha256?: string }
   /** `prefetch`: asked for ahead of demand, so it queues behind anything the runtime is waiting on. */
   | {
       type: 'extract'

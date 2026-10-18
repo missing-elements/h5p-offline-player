@@ -6,6 +6,6 @@
 
 import '@missing-elements/h5p-embed/embed.css'
 import { startEmbed } from '@missing-elements/h5p-embed/embed.js'
-import librariesPack from '@missing-elements/h5p-libraries/libraries.h5p?url'
+import { pack } from '@missing-elements/h5p-libraries'
 
-startEmbed({ librariesPack })
+startEmbed({ pack })

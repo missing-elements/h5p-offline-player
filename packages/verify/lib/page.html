@@ -20,6 +20,9 @@
       const query = new URLSearchParams(location.search)
       const libraries = query.get('libraries')
       if (libraries) player.setAttribute('libraries', libraries)
+      const packBase = query.get('pack-base')
+      if (packBase) player.setAttribute('pack-base', packBase)
+      if (query.get('refresh-libraries') === 'off') player.setAttribute('refresh-libraries', 'off')
       // Played as a site plays a package it did not make: none of its own code, the content checked.
       if (query.has('untrusted')) player.untrusted = true
 

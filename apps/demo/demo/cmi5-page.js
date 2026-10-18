@@ -13,8 +13,12 @@
 
 import { foreignHost, logInto, trustPrompt } from './page-common.js'
 import { createCmi5Client, isCmi5Launch, startCmi5 } from '@missing-elements/h5p-cmi5'
+import { pack } from '@missing-elements/h5p-libraries'
 
 const player = document.querySelector('h5p-player')
+// This site's copy of the library pack, which an untrusted package's libraries come from: the
+// parts it needs, served here rather than from jsDelivr.
+player.pack = pack
 const status = document.querySelector('#status')
 const log = document.querySelector('#log')
 const exitButton = document.querySelector('#exit')

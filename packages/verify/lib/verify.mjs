@@ -1,6 +1,6 @@
 import { createServer } from 'node:http'
 import { createRequire } from 'node:module'
-import { existsSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, extname, join, normalize, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -50,9 +50,12 @@ const MIME = {
 /**
  * @typedef {object} VerifyOptions
  * @property {string} file the `.h5p` to play
- * @property {string} [libraries] where libraries come from, tried in order: `pack`, a bundle's URL, or a
- *   bundle on disk, which the verifier serves itself; several separated by spaces
+ * @property {string} [libraries] where libraries come from, tried in order: `pack`, a bundle's URL, a
+ *   bundle on disk, or a copy of the library pack's `parts/` folder on disk, which plays as `pack`;
+ *   the verifier serves what is on disk itself. Several separated by spaces
  * @property {boolean} [untrusted] play the package `untrusted`, as a site that did not make it plays it
+ * @property {boolean} [refreshLibraries] with the pack, play its newer versions of the libraries the
+ *   package carries, as the element does unless told otherwise; default true
  * @property {string} [out] where `report.json` and `screenshot.png` go; nothing is written without it
  * @property {string} [browser] a Chromium-based browser executable; found automatically otherwise
  * @property {number} [readyTimeout] ms allowed to reach `ready`; default 60 000
@@ -77,7 +80,7 @@ export async function verifyPackage(options) {
   const untrusted = options.untrusted === true
   const sources = librarySources(options.libraries)
 
-  const server = await serve(await playerDist(), sources.files)
+  const server = await serve(await playerDist(), sources.files, sources.packDir)
   const browser = await launch(options.browser)
   try {
     const context = await browser.newContext({ viewport: { width: 1100, height: 800 } })
@@ -120,6 +123,8 @@ export async function verifyPackage(options) {
 
     const query = new URLSearchParams()
     if (sources.attribute) query.set('libraries', sources.attribute)
+    if (sources.packDir) query.set('pack-base', PACK_ROUTE)
+    if (options.refreshLibraries === false) query.set('refresh-libraries', 'off')
     if (untrusted) query.set('untrusted', '')
     await page.goto(`${server.url}/${query.size ? `?${query}` : ''}`)
     await page.setInputFiles('#file', file)
@@ -139,7 +144,7 @@ export async function verifyPackage(options) {
 
     const collected = await page.evaluate(() => {
       const player = document.querySelector('h5p-player')
-      return { ...window.__verify, state: player.state, revision: player.revision, untrusted: player.untrusted === true }
+      return { ...window.__verify, state: player.state, revision: player.revision, untrusted: player.untrusted === true, libraryBundle: player.libraryBundle }
     })
     const frame = page.frames().find((candidate) => candidate.url().includes('/h5p/frame/'))
     const rendered = frame
@@ -191,6 +196,9 @@ export async function verifyPackage(options) {
       libraries: options.libraries ?? (untrusted ? 'pack' : null),
       // As the element played it, read back, not as asked.
       untrusted: collected.untrusted,
+      // The libraries the package carries that played at the pack's newer version: what a site
+      // with the pack shows, and a sign the export is older than the pack.
+      refreshed: collected.libraryBundle?.refreshed ?? [],
       verdict: 'pass',
       reasons: [],
       warnings: [],
@@ -258,25 +266,36 @@ export async function verifyPackage(options) {
 
 export class VerifyError extends Error {}
 
+/** Where the verifier serves a copy of the pack named on disk, which the element's `pack-base` names. */
+const PACK_ROUTE = '/__pack/'
+
 /**
  * `libraries` as the element reads it, with each bundle on disk given a route on the verifier's
- * own server: `pack`, `hub` and URLs pass as they are. A path that names no file is an error
- * before anything starts.
+ * own server, and a folder on disk — a copy of the pack's `parts/` — served as the pack: `pack`,
+ * `hub` and URLs pass as they are. A path that names nothing is an error before anything starts.
  * @param {string | undefined} value
  */
 function librarySources(value) {
   /** @type {Map<string, string>} */
   const files = new Map()
-  if (!value) return { attribute: null, files }
+  /** @type {string | null} */
+  let packDir = null
+  if (!value) return { attribute: null, files, packDir }
   const tokens = value.split(/\s+/).filter(Boolean).map((token) => {
     if (token === 'pack' || token === 'hub' || /^https?:\/\//i.test(token)) return token
     const path = resolve(token)
     if (!existsSync(path)) throw new VerifyError(`No such library bundle: ${path}`)
+    if (statSync(path).isDirectory()) {
+      if (!existsSync(join(path, 'index.json'))) throw new VerifyError(`${path} is a folder, and not a copy of the library pack: it has no index.json`)
+      if (packDir && packDir !== path) throw new VerifyError(`--libraries names two copies of the library pack: ${packDir} and ${path}`)
+      packDir = path
+      return 'pack'
+    }
     const route = `/__libraries/${files.size}.h5p`
     files.set(route, path)
     return route
   })
-  return { attribute: tokens.join(' '), files }
+  return { attribute: [...new Set(tokens)].join(' '), files, packDir }
 }
 
 /**
@@ -421,16 +440,20 @@ async function playerDist() {
  * disk, on a free localhost port.
  * @param {{ dist: string, runtime: string }} roots
  * @param {Map<string, string>} bundles routes to bundle files
+ * @param {string | null} packDir a copy of the pack's `parts/`, served under `PACK_ROUTE`
  */
-function serve({ dist, runtime }, bundles = new Map()) {
+function serve({ dist, runtime }, bundles = new Map(), packDir = null) {
   const page = join(here, 'page.html')
   const ASSETS = '/frame-assets/'
   const server = createServer(async (request, response) => {
     const path = decodeURIComponent(new URL(request.url ?? '/', 'http://localhost').pathname)
     const safe = (root, rest) => join(root, normalize(rest).replace(/^(\.\.[/\\])+/, ''))
     const bundle = bundles.get(path)
-    const target = bundle ?? (path === '/' ? page : path.startsWith(ASSETS) ? safe(runtime, path.slice(ASSETS.length)) : safe(dist, path))
-    if (target !== page && !bundle && !target.startsWith(dist) && !target.startsWith(runtime)) {
+    const inPack = packDir !== null && path.startsWith(PACK_ROUTE)
+    const target =
+      bundle ??
+      (path === '/' ? page : inPack ? safe(packDir, path.slice(PACK_ROUTE.length)) : path.startsWith(ASSETS) ? safe(runtime, path.slice(ASSETS.length)) : safe(dist, path))
+    if (target !== page && !bundle && !target.startsWith(dist) && !target.startsWith(runtime) && !(inPack && target.startsWith(packDir))) {
       response.writeHead(403).end()
       return
     }
@@ -490,6 +513,9 @@ export function summarize(report) {
     )
   } else if (missing) {
     lines.push(`  fix: add the library folders (${missing.folders.join(', ')}), or --libraries pack if the destination site supplies libraries`)
+  }
+  if (report.refreshed?.length) {
+    lines.push(`  refreshed from the pack: ${report.refreshed.map(({ library, from, to }) => `${library} ${from} → ${to}`).join(', ')}`)
   }
   for (const warning of report.warnings) lines.push(`  warning: ${warning}`)
   if (report.screenshot) lines.push(`  screenshot: ${report.screenshot}`)

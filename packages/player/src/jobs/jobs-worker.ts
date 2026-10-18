@@ -5,6 +5,7 @@ import { installEvictionPolicy } from '../shared/eviction'
 import { LocalHeaderScanner } from '../shared/forward-index'
 import { DEFLATE, STORED, readDataStart } from '../shared/local-header'
 import { packageLockName, packageLockPrefix } from '../shared/locks'
+import { hex } from '../shared/pkg-id'
 import {
   JOBS_READY,
   PlayerError,
@@ -170,7 +171,7 @@ async function run(message: Exclude<ToJobsMessage, { type: 'abort' }>): Promise<
     // watermark already where they need it.
     await navigator.locks.request(key, { signal: controller.signal }, async () => {
       if (message.type === 'download') {
-        await downloadArchive(message.pkgId, message.source, controller.signal)
+        await downloadArchive(message.pkgId, message.source, controller.signal, false, message.sha256)
       } else if (message.type === 'warm') {
         await warmJob(message.pkgId, message.source, message.spans, controller.signal)
       } else {
@@ -204,7 +205,8 @@ async function downloadArchive(
   pkgId: string,
   source: SourceDescriptor,
   signal: AbortSignal,
-  afresh = false
+  afresh = false,
+  sha256?: string
 ): Promise<void> {
   if (source.type !== 'chunked') {
     throw new PlayerError('network', 'Only a chunked source is downloaded ahead of play')
@@ -324,10 +326,25 @@ async function downloadArchive(
   const meta = await store.getArchiveMeta()
   if (!meta?.complete && !afresh) {
     await store.destroy()
-    return downloadArchive(pkgId, source, signal, true)
+    return downloadArchive(pkgId, source, signal, true, sha256)
   }
   if (!meta?.complete) throw new PlayerError('bad-archive', 'The downloaded archive could not be kept in the browser storage')
+  if (sha256) await checkHash(store, meta.size ?? meta.available, sha256, source.url)
   send({ type: 'done', pkgId })
+}
+
+/**
+ * Reads a downloaded part of the library pack back and refuses it unless its bytes hash to what
+ * the pack's index says, dropping what was stored: the part is library code the host's site will
+ * run, and the index — the one this release pins, or the host's — is what names it. Read whole,
+ * which is the one buffering here and is bounded by the pack's largest part, a few megabytes;
+ * nothing streams SHA-256 in a browser. Once kept, a part is known by its hash and not checked again.
+ */
+async function checkHash(store: ChunkStore, size: number, expected: string, url: string): Promise<void> {
+  const bytes = await new Response(store.readRange(ARCHIVE_ENTRY, { start: 0, end: size - 1 })).arrayBuffer()
+  if (hex(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))) === expected) return
+  await store.destroy()
+  throw new PlayerError('bad-archive', `${url} is not the library the pack's index names: its bytes do not match the index's hash`)
 }
 
 /* ------------------------------------------------------------------ warming */

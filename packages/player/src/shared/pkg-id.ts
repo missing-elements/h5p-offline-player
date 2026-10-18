@@ -48,6 +48,15 @@ export function filePkgId(file: { name: string; size: number; lastModified: numb
 }
 
 /**
+ * Id for a part of the library pack: from its hash alone, so one library is kept once whoever
+ * serves it — jsDelivr, a host's copy, a bundler's asset under a hashed name — and a part kept
+ * already needs no request, online or not.
+ */
+export function partPkgId(sha256: string): Promise<string> {
+  return shortHash(`part\u0000${sha256}`)
+}
+
+/**
  * A key for one load of a package, under which the worker keeps what that load asked for — trust,
  * language, display options, the bundle attached. Random, so that no two loads share one, and
  * nothing outside the frame that carries it in its URLs can name it.

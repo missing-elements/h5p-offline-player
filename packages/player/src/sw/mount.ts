@@ -4,10 +4,14 @@ import {
   FAILURE_BACKOFF_MS,
   FILE_HANDOVER_TIMEOUT_MS,
   JOB_REQUEST_DEDUPE_MS,
+  LIBRARY_PACK_BASE,
   STREAM_KEEPALIVE_MS,
   VERSION,
   WATERMARK_POLL_MS
 } from '../shared/constants'
+import { PACK_INDEX } from '../shared/pack-index'
+import { packLibrariesIn } from '../shared/pack'
+import { planPack } from './pack-plan'
 import {
   ChunkStore,
   FORWARD_INDEX_ENTRY,
@@ -25,6 +29,8 @@ import {
   PlayerError,
   type FromWorkerMessage,
   type LoadSettings,
+  type PackOffer,
+  type PackPlan,
   type PackageRecord,
   type ToWorkerMessage,
   type WorkerReply
@@ -145,6 +151,12 @@ class VirtualServer {
    * and in the bundle attached. Lost on worker restart and rebuilt on the next request.
    */
   private readers = new Map<string, Promise<PackageReader>>()
+  /**
+   * Readers of packages that are played, which an `index` holds to carrying their libraries: not
+   * a bundle or a part registered only to supply some. Checked there rather than as the archive
+   * is opened, since an `index` that offers the pack plans what it lacks first.
+   */
+  private playable = new WeakSet<PackageReader>()
   /** Picked files, re-sent by the page after a restart because a `File` cannot be persisted. */
   private files = new Map<string, Blob>()
   private pendingFiles = new Map<string, PendingFile>()
@@ -192,6 +204,15 @@ class VirtualServer {
         case 'index': {
           const load = { pkgId: message.pkgId, view: message.view }
           const reader = await this.refresh(load, await this.reader(load))
+          if (message.pack) {
+            const plan = await this.planFromPack(reader, message.pack, message.deep === true)
+            if (plan) {
+              reply({ ok: true, type: 'indexed', pkgId: message.pkgId, plan })
+              return
+            }
+          }
+          // A partial reader may simply not have what is missing yet; the final index says.
+          if (!reader.partial && this.playable.has(reader)) reader.assertLibrariesPresent()
           if (message.deep && !reader.partial) {
             const served = reader.hasFallbacks ? await reader.mergedManifest() : reader.manifest
             const missing = await reader.missingDependencies(served, (located) => this.readJson(located))
@@ -221,11 +242,11 @@ class VirtualServer {
         }
 
         case 'attach-libraries': {
-          const { pkgId, view, libraryPkgId } = message
+          const { pkgId, view } = message
           const changed = await db.changePackage(pkgId, (record) => {
-            if (!record || !view) return record && { ...record, libraryPkgId }
+            if (!record || !view) return record && attached(record, message)
             const settings = record.views?.[view]
-            return settings && { ...record, views: { ...record.views, [view]: { ...settings, libraryPkgId } } }
+            return settings && { ...record, views: { ...record.views, [view]: attached(settings, message) } }
           })
           if (view && !changed) throw new UnknownPackageError(pkgId)
           // Dropped so the next request rebuilds the reader with the bundle attached.
@@ -725,7 +746,9 @@ class VirtualServer {
     const file = record.source.type === 'file' ? await this.fileFor(pkgId) : undefined
     // A bundle registered to supply libraries is the host's choice, never the package's.
     const untrusted = settings.untrusted === true && record.role !== 'libraries'
-    const { libraryPkgId } = settings
+    const { libraryPkgId, parts = [], superseded = [] } = settings
+    // The pack's parts first, then a bundle: the parts are what was planned for this package.
+    const attached = [...parts, ...(libraryPkgId ? [libraryPkgId] : [])]
 
     // An archive still downloading is served from its forward index — what the local headers
     // have given up so far — until it is whole and the central directory can take over.
@@ -740,8 +763,8 @@ class VirtualServer {
           stopped: null
         }
         const partialHandle = await openSource(pkgId, record.source, file, { partial: true })
-        const partial = await PackageReader.fromForwardIndex(pkgId, partialHandle, snapshot, { untrusted })
-        if (libraryPkgId) partial.use(await this.reader({ pkgId: libraryPkgId }))
+        const partial = await PackageReader.fromForwardIndex(pkgId, partialHandle, snapshot, { untrusted, superseded })
+        for (const id of attached) partial.use(await this.reader({ pkgId: id }))
         await this.rememberManifest(record, partial)
         return partial
       }
@@ -749,18 +772,44 @@ class VirtualServer {
 
     const handle = await openSource(pkgId, record.source, file)
 
-    // Validation waits until any attached bundle is in place; a bundle registered to supply
-    // libraries to something else is never held to its own manifest at all.
-    const standalone = record.role !== 'libraries' && !libraryPkgId
-    const reader = await PackageReader.open(pkgId, handle, { requireLibraries: standalone, untrusted })
-
-    if (libraryPkgId) {
-      reader.use(await this.reader({ pkgId: libraryPkgId }))
-      reader.assertLibrariesPresent()
-    }
+    // Not held to its libraries here: an `index` does that, after any plan from the pack, and a
+    // bundle or a part registered to supply libraries to something else never is.
+    const reader = await PackageReader.open(pkgId, handle, { requireLibraries: false, untrusted, superseded })
+    for (const id of attached) reader.use(await this.reader({ pkgId: id }))
+    await reader.settleRevision()
+    if (record.role !== 'libraries') this.playable.add(reader)
 
     await this.rememberManifest(record, reader)
     return reader
+  }
+
+  /**
+   * What the library pack has to supply before the package can play, or `null` when nothing:
+   * the parts it needs, and the package's own folders that newer versions among them replace
+   * (`planPack`). The pack's own index for the version this release pins, or the one of a copy
+   * the element hands over.
+   *
+   * A partial reader plans once what the plan needs has arrived: for an untrusted package, the
+   * manifest and the content; otherwise what the boot needs, the folders `h5p.json` declares, so
+   * that the parts are attached before the frame boots early. A package without its libraries
+   * waits for the whole archive, as it did, since what it lacks cannot be told before the end.
+   */
+  private async planFromPack(reader: PackageReader, offer: PackOffer, deep: boolean): Promise<PackPlan | null> {
+    if (reader.partial && !(reader.untrusted ? reader.get('h5p.json') && reader.contentArrived : reader.bootReady())) return null
+    const pack =
+      'pinned' in offer ? PACK_INDEX.map((library) => ({ ...library, url: `${LIBRARY_PACK_BASE}${library.folder}.h5p` })) : packLibrariesIn(offer.libraries)
+    // A `library.json` over HTTP is two ranged requests until the warm has cached it; from a
+    // picked file or a download, or once warmed, it is a local read.
+    const readable = deep || reader.partial || reader.handle.descriptor.type !== 'range-http'
+    return planPack({
+      own: await reader.ownLibraries(readable ? (located) => this.readJson(located) : undefined),
+      provided: reader.providedLibraries(),
+      roots: await reader.contentDependencies(),
+      params: await reader.contentParameters(),
+      pack,
+      refresh: offer.refresh === true && !reader.untrusted,
+      fill: offer.fill !== false
+    })
   }
 
   /**
@@ -855,6 +904,23 @@ class VirtualServer {
  */
 function settingsOf(record: PackageRecord, view: string | undefined): Omit<LoadSettings, 'registered'> | undefined {
   return view ? record.views?.[view] : record
+}
+
+/**
+ * A load's settings, or a row's, with what an `attach-libraries` brings: a bundle replaces the one
+ * before, and parts of the pack and the folders they replace are added to those already there.
+ */
+function attached<T extends { libraryPkgId?: string; parts?: string[]; superseded?: string[] }>(
+  settings: T,
+  { libraryPkgId, parts = [], superseded = [] }: { libraryPkgId?: string; parts?: string[]; superseded?: string[] }
+): T {
+  const merged = (before: string[] | undefined, added: string[]) => [...new Set([...(before ?? []), ...added])]
+  return {
+    ...settings,
+    ...(libraryPkgId ? { libraryPkgId } : {}),
+    ...(parts.length ? { parts: merged(settings.parts, parts) } : {}),
+    ...(superseded.length ? { superseded: merged(settings.superseded, superseded) } : {})
+  }
 }
 
 /** A registration's settings, as kept under its load key; a bundle is attached by the load itself. */

@@ -36,8 +36,8 @@ list a breaking change, or a fix of either kind, first, with what to do about it
   registers, or `h5p/` in the scope of a host's own worker that mounts them. Every other request is
   left to the network, or to the host's own handlers.
 - **What statements carry.** `context.platform` is `h5p-offline-player <version>`, and
-  `context.revision` is `sha256:<hex>`, followed by `; libraries` and the bundle's own when a
-  bundle supplied the libraries ([Which build a learner completed](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/revision.md)).
+  `context.revision` is `sha256:<hex>`, followed by `; libraries` and the fingerprint of what
+  supplied libraries, a bundle's or the pack's archives' ([Which build a learner completed](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/revision.md)).
   The recipe behind the hash does not change within a major, and a major that changes it gives
   the new value a prefix of its own, so an audit can always tell which recipe to recompute with.
 - **What names a package.** `activity-id` defaults to the package URL, and the statements'
@@ -71,10 +71,15 @@ list a breaking change, or a fix of either kind, first, with what to do about it
 ### The library pack, `@missing-elements/h5p-libraries`
 
 `libraries="pack"` plays against the pack version a player release pins, so one player version
-always plays a package against the same libraries. A player patch may move the pin to a newer
-pack: libraries move to newer minors, and content written for an older minor is brought up by the
-libraries' own upgrade steps. A pack that drops a content type or a library major the one before
-carried comes only with a player major.
+always plays a package against the same libraries. The pin moves in a minor release, never in a
+patch: with `pack`, a library a package carries plays at the pack's newer version, so a new pack
+changes what packages that carry their libraries play, and their `revision`, and a learner's state
+saved against the build before starts over. Libraries move to newer minors, and content written
+for an older minor is brought up by the libraries' own upgrade steps. A pack that drops a content
+type or a library major the one before carried comes only with a player major.
+
+What is covered of the pack itself: the `pack` export, `parts/` with its `index.json` and one
+`<folder>.h5p` per library, and `libraries.h5p`, the whole pack as one file.
 
 ### The embed site, `@missing-elements/h5p-embed`
 

@@ -75,6 +75,27 @@ if (stamped !== constants) {
   await writeFile(constantsPath, stamped, 'utf8')
 }
 
+// The pinned pack's index, compiled into the Service Worker: which parts a package needs is
+// decided without a request, and each part is checked against the hash written here, so the CDN
+// cannot change the code a host runs. Written only when it changes, like the files above.
+const packIndex = JSON.parse(await readFile(resolve(rootDir, '..', 'libraries', 'parts', 'index.json'), 'utf8'))
+const packIndexPath = resolve(rootDir, 'src', 'shared', 'pack-index.ts')
+const packIndexModule = `// Written by scripts/sync-h5p-assets.mjs from @missing-elements/h5p-libraries ${librariesJson.version}'s
+// parts/index.json. Do not edit; run \`pnpm sync:assets\` in packages/player.
+import type { PackLibrary } from './protocol'
+
+/**
+ * The index of the library pack this release pins, \`LIBRARY_PACK_VERSION\`: each library's
+ * version and dependencies, and its part's size and SHA-256. The Service Worker plans from it for
+ * \`libraries="pack"\`, and the parts are fetched from \`LIBRARY_PACK_BASE\`.
+ */
+export const PACK_INDEX: readonly PackLibrary[] = [
+${packIndex.libraries.map((entry) => `  ${JSON.stringify(entry)}`).join(',\n')}
+]
+`
+const currentPackIndex = (await exists(packIndexPath)) ? await readFile(packIndexPath, 'utf8') : ''
+if (currentPackIndex !== packIndexModule) await writeFile(packIndexPath, packIndexModule, 'utf8')
+
 console.log(
   `[sync-h5p] @missing-elements/h5p-runtime ${manifest.runtime} (h5p-standalone v${manifest.h5pStandalone}) -> public/frame-assets`
 )

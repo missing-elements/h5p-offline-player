@@ -1,7 +1,7 @@
 import { memoryHandle, zipOf } from './helpers/archives'
 import { describe, expect, it } from 'vitest'
 import { Uint8ArrayReader, ZipReader } from '@zip.js/zip.js'
-import { indexFingerprint, platformOf, revisionOf, withProvenance } from '../../src/shared/revision'
+import { indexFingerprint, librariesFingerprint, platformOf, revisionOf, withProvenance } from '../../src/shared/revision'
 import { PackageReader } from '../../src/sw/package-reader'
 import { VERSION } from '../../src/shared/constants'
 import type { SourceHandle } from '../../src/shared/source'
@@ -85,6 +85,33 @@ describe('the reader', () => {
     )
     content.use(bundle)
     expect(content.revision()).toBe(`${content.fingerprint}; libraries ${bundle.fingerprint}`)
+  })
+
+  it('names several parts of the pack by one fingerprint of the set, once settled', async () => {
+    const content = await PackageReader.open('p', handleOf(await zipOf(PACKAGE)), { requireLibraries: false })
+    const part = async (folder: string) =>
+      PackageReader.open(folder, handleOf(await zipOf({ 'h5p.json': PACKAGE['h5p.json'], [`${folder}/library.json`]: '{}' })), { requireLibraries: false })
+    const [a, b] = [await part('H5P.A-1.0'), await part('H5P.B-1.0')]
+    content.use(a)
+    content.use(b)
+    // Not before: a revision that names only some of what was played would be wrong.
+    expect(content.revision()).toBeUndefined()
+    await content.settleRevision()
+    const set = await librariesFingerprint([a.fingerprint!, b.fingerprint!])
+    expect(content.revision()).toBe(`${content.fingerprint}; libraries ${set}`)
+  })
+})
+
+describe('librariesFingerprint', () => {
+  const one = `sha256:${'1'.repeat(64)}`
+  const two = `sha256:${'2'.repeat(64)}`
+
+  it('is SHA-256 over the fingerprints, sorted, a line each', async () => {
+    expect(await librariesFingerprint([one, two])).toBe('sha256:4b7de16713be46a2c4ef6a364470515305f6189e7688c1de495568a26713b19e')
+  })
+
+  it('names the set, whatever order the parts were attached in', async () => {
+    expect(await librariesFingerprint([two, one])).toBe(await librariesFingerprint([one, two]))
   })
 })
 

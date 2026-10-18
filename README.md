@@ -22,8 +22,9 @@ no extraction step, no third-party service between your learners and your conten
 - **Plays the packages people have.** Large ones stream: a video starts before the archive has
   arrived, and a host without `Range` support still gets an early start. An export without its
   libraries, as h5p.com and h5p.org make them, plays against a
-  [library pack](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/libraries.md) of every content type the H5P hub serves, and content
-  written for an older library version is upgraded first.
+  [library pack](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/libraries.md) of every content type the H5P hub serves, downloading
+  only the libraries it needs; an older export plays the pack's newer versions of its own, and its
+  content is upgraded to them first.
 - **Validates what it plays.** With `untrusted`, none of a package's own code runs, and its content
   is checked field by field against each library's definitions by a port of H5P's own validator.
   Every package's entry names and libraries are checked before it starts. See
@@ -87,6 +88,16 @@ runtime is a separate package because it is GPL-3.0 (see [Licence](#licence)). W
 that does not emit `new URL(…, import.meta.url)` assets, esbuild among them, serve both packages'
 `dist/` and set `sw` and `assets-base`.
 
+For [`libraries="pack"`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/libraries.md)
+served from your own site rather than jsDelivr, install `@missing-elements/h5p-libraries` too
+and hand over its `pack` export, which the bundler emits as one asset per library:
+
+```js
+import { pack } from '@missing-elements/h5p-libraries'
+
+document.querySelector('h5p-player').pack = pack
+```
+
 ### Install without a build step
 
 ```html
@@ -136,7 +147,10 @@ allows one Service Worker, or must work offline, mounts the player in its own wo
 | `jobs` | attribute | The background worker's URL, for a CSP without `blob:` in `worker-src`. Default: `blob:`, then `h5p-jobs.js` beside the element |
 | `runtime` | property | The `runtime` export of `@missing-elements/h5p-runtime`. Set before `src` |
 | `assets-base` | attribute | Where the runtime's `dist/` is served. Default: `frame-assets/` beside the element |
-| `libraries` | attribute | Sources for a package without its libraries, tried in order: `pack` (the library pack on jsDelivr), a `.h5p` URL, or both — `libraries="/libraries.h5p pack"`. `hub` means `pack`. Default: such packages are refused |
+| `libraries` | attribute | Sources for a package's libraries, tried in order: `pack`, the library pack, of which only the libraries a package needs are downloaded, and whose newer versions play in place of those a package carries; a `.h5p` URL, which only fills gaps; or both. `hub` means `pack`. Default: a package plays as it is, and one without its libraries is refused |
+| `pack-base` | attribute | Where `pack` is: the folder of a copy of `@missing-elements/h5p-libraries`' `parts/` on your site. Default: jsDelivr, at the version this release pins |
+| `pack` | property | The `pack` export of `@missing-elements/h5p-libraries`, as a bundler emits it; wins over `pack-base`. Set before `src` |
+| `refresh-libraries` | attribute | `off` plays the libraries a package carries as exported, and `pack` only fills gaps. Default: the pack's newer versions play |
 | `untrusted` | attribute, property | Plays a package you did not make as data: its own library folders are ignored and the libraries come from `libraries` (default `pack`), `content/` serves only H5P's own file types, and the frame's script policy names exact paths. Its content is checked against each library's `semantics.json`, as the H5P CMS plugins check it. A package that needs its own copy of a library is refused, with `missingLibraries.carried` set. Needs the runtime at 0.2 or later |
 | `allow-origins` | attribute | Extra origins for the frame's CSP, space separated |
 | `frame`, `copyright`, `export`, `icon`, `embed` | attribute | Show the H5P action bar and its buttons. `export` needs `download-url` or a package URL, `embed` needs `embed-code` |
@@ -156,7 +170,7 @@ allows one Service Worker, or must work offline, mounts the player in its own wo
 | `pkgId`, `revision` | read-only | The loaded package's id and build fingerprint |
 | `source` | read-only | `{ type: 'range-http' \| 'chunked' \| 'file', size, … }` |
 | `metadata` | read-only | `h5p.json`'s metadata plus `mainLibrary` |
-| `libraryBundle` | read-only | `{ url, origin, fromCache }` for the bundle that supplied missing libraries |
+| `libraryBundle` | read-only | `{ url, origin, fromCache, refreshed? }` for what supplied libraries: for the pack, `refreshed` lists the libraries the package carries that played at the pack's version, `{ library, from, to }` |
 | `scope` | read-only | The Service Worker scope |
 
 `clearUserData()` forgets the state kept on this device for the current package; remove `src` and set it again to restart the content.
@@ -191,7 +205,7 @@ is an example.
 
 - [Packages you did not make](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/untrusted.md) — `untrusted` and the content check
 - [Video that cannot stream](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/streaming-video.md) — `preload` and the normalizer
-- [Packages without libraries](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/libraries.md) — the library bundle and the hub
+- [Libraries](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/libraries.md) — the library pack, for packages without their libraries and older than it
 - [The frame's CSP](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/frame-csp.md) — `allow-origins`, and what `untrusted` narrows
 - [Which build a learner completed](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/revision.md) — `revision`
 - [Resume](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/resume.md) — saved state on the device or with the host

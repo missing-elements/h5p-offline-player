@@ -19,7 +19,7 @@ pnpm build:demo             # the hosted demo, as Vercel builds it, into apps/de
 pnpm preview:demo           # serve it locally with the production headers
 pnpm demo:content           # rebuild the demo's content packages from their sources
 pnpm demo:icons             # re-render the installable app's icons
-pnpm libraries              # rebuild packages/libraries from the H5P hub
+pnpm libraries              # rebuild packages/libraries from the H5P hub: the pack, its parts, the index
 pnpm sweep                  # play every content type in the pack, after pnpm build
 pnpm l10n                   # take H5P's own strings from Moodle's language packs again
 ```

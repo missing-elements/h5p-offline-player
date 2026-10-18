@@ -30,7 +30,7 @@ a subdomain shares your site's cookies.
 | `--packages <origins>` | Play packages and fetch library bundles only from these origins (the site's own is always allowed). Add `https://cdn.jsdelivr.net` for `libraries=pack` on a site built with `--no-libraries`. Default: any https host |
 | `--ancestors <origins>` | Only these sites may frame the page (`frame-ancestors`, header only). Default: any site |
 | `--default-libraries <sources>` | The `libraries` value for addresses that name none: `pack` or URLs. Checked against `--packages`. Default: none, so exports without libraries are refused unless the address asks |
-| `--no-libraries` | Leave out the 13.7 MB library pack; `libraries=pack` then fetches it from jsDelivr, where allowed |
+| `--no-libraries` | Leave out the library pack, 13.8 MB in `libraries/`, one archive per library, of which a learner's browser fetches only those a package needs; `libraries=pack` then fetches them from jsDelivr, where allowed |
 | `--force` | Write into a non-empty folder, replacing only this tool's files |
 | `-h`, `--help` / `-v`, `--version` | |
 
@@ -65,7 +65,7 @@ The headers themselves, for a host not listed:
 |---|---|
 | every path | `Content-Security-Policy` (the policy the command prints, with `frame-ancestors` from `--ancestors`), `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` |
 | `/h5p-sw.js` | `Cache-Control: no-cache`, so an update reaches learners on their next visit |
-| `/frame-assets/*`, `/resizer.js`, `/libraries.h5p` | `Cache-Control: public, max-age=3600, stale-while-revalidate=86400` |
+| `/frame-assets/*`, `/resizer.js`, `/libraries/*` | `Cache-Control: public, max-age=3600, stale-while-revalidate=86400` |
 
 To update, run the command again with `--force` and redeploy.
 
@@ -74,7 +74,8 @@ To update, run the command again with `--force` and redeploy.
 | Parameter | Effect |
 |---|---|
 | `src=<url>` | The package, required. Encode `&`, `#`, `+`, `%` and spaces |
-| `libraries=pack`, `<url>` or `none` | Libraries for an export without them; several are tried in order. `pack` is this domain's copy, or jsDelivr's without one; `hub` means `pack`; `none` turns off `--default-libraries` |
+| `libraries=pack`, `<url>` or `none` | Where libraries come from; several are tried in order. `pack` is this domain's copy, or jsDelivr's without one: a package gets the libraries it lacks from it, and those it carries at the pack's newer versions. `hub` means `pack`; `none` turns off `--default-libraries` |
+| `refresh-libraries=off` | Play the libraries a package carries as exported; `pack` then only fills gaps |
 | `frame`, `copyright`, `export`, `icon`, `reporting` | H5P's action bar and its buttons |
 | `fullscreen=off` | No fullscreen button |
 | `preload=auto` | Start fetching media at once |
@@ -112,7 +113,7 @@ Whatever `xapi=` says, the frame also posts to its parent:
 { context: 'h5p-offline-player', action: 'report',
   source,         // { type: 'range-http' | 'chunked' | 'file', size }
   metadata,       // { title, license, licenseVersion, authors, mainLibrary }, from h5p.json; show as text
-  libraryBundle,  // { url, origin, fromCache }, or null
+  libraryBundle,  // { url, origin, fromCache, refreshed? }, or null; refreshed: [{ library, from, to }]
   elapsedMs }
 { context: 'h5p-offline-player', action: 'error', code, message }  // code 'refused', 'no-src' or the load's
 ```
@@ -127,19 +128,21 @@ await buildSite({ out: 'public/player', packages: ['https://cdn.example.org'] })
 `buildSite` takes `out`, `libraries` (default `true`), `packages`, `ancestors`, `defaultLibraries`
 and `force`, as the flags. `@missing-elements/h5p-embed/embed.js` exports `startEmbed()`, the
 page's script, which reads the page's `<h5p-player>`, `#loader` and `#notice` (see
-`site/index.html` and `site/embed.css`). Its options: `librariesPack` (the URL `libraries=pack`
-names), `packages` (allowed origins, `null` for any), `defaultLibraries`, `runtime` (the
+`site/index.html` and `site/embed.css`). Its options: `pack` (the `@missing-elements/h5p-libraries`
+export, which `libraries=pack` then plays from) or `packBase` (the folder of a copy of its
+`parts/`), `packages` (allowed origins, `null` for any), `defaultLibraries`, `runtime` (the
 `@missing-elements/h5p-runtime` export, for a bundled element) and `askInOwnFrame` (default
 `true`; `false` plays a package from another origin as it is when a same-origin page frames it).
+`librariesPack`, the URL of a whole `libraries.h5p`, still works, as a bundle that only fills gaps.
 
 ```js
 import '@missing-elements/h5p-offline-player'
 import { runtime } from '@missing-elements/h5p-runtime'
-import librariesPack from '@missing-elements/h5p-libraries/libraries.h5p?url'
+import { pack } from '@missing-elements/h5p-libraries'
 import '@missing-elements/h5p-embed/embed.css'
 import { startEmbed } from '@missing-elements/h5p-embed/embed.js'
 
-startEmbed({ runtime, librariesPack, defaultLibraries: 'pack' })
+startEmbed({ runtime, pack, defaultLibraries: 'pack' })
 ```
 
 ## Privacy

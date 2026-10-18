@@ -5,9 +5,11 @@ import { languageTag } from './shared/language'
 import type { ContentMetadata } from './shared/metadata'
 import { JobsWorkerHandle, type JobsScript } from './jobs-worker-handle'
 import { parseLibrarySources } from './shared/library-sources'
+import { packLibrariesIn } from './shared/pack'
 import {
   CONTROL_TIMEOUT_MS,
-  LIBRARY_PACK_URL,
+  LIBRARY_PACK_BASE,
+  PACK_INDEX_CACHE,
   SAVE_INTERVAL_S,
   SILENT_ANSWER_TIMEOUT_MS,
   VERSION,
@@ -19,6 +21,10 @@ import {
   type ErrorCode,
   type LibrarySource,
   type MissingLibraries,
+  type PackLibrary,
+  type PackOffer,
+  type PackPlan,
+  type RefreshedLibrary,
   type FrameOptions,
   type FrameUser,
   type FrameAssets,
@@ -38,7 +44,7 @@ import {
   type WorkerReply
 } from './shared/protocol'
 import { packageLockName } from './shared/locks'
-import { filePkgId, loadKey, randomHex, remotePkgId } from './shared/pkg-id'
+import { filePkgId, loadKey, partPkgId, randomHex, remotePkgId } from './shared/pkg-id'
 import { platformOf, withProvenance } from './shared/revision'
 import { probeSource } from './shared/source'
 import { loadSegment, routesFor, type LoadRef, type Routes } from './sw/routes'
@@ -176,17 +182,40 @@ export interface PackageMetadata extends ContentMetadata {
 export type PackageSource = SourceDescriptor
 
 /**
- * The bundle that supplied the libraries a package did not carry: the URL that answered (the
- * `libraries` source that won, the pack's CDN address for `pack`), its origin, and
- * whether it was read from a copy downloaded earlier rather than fetched now. `fromCache` is
- * what a page needs for "nothing left this origin": a bundle on the page's own origin, or one
- * served from cache, meant no request to a third party.
+ * What supplied libraries the package did not carry, or newer versions of those it did: the URL
+ * that answered (the `libraries` source that won; for `pack`, where its parts are — jsDelivr's
+ * address, a `pack-base`, or the `pack` property's), its origin, and whether it was read from a
+ * copy downloaded earlier rather than fetched now. `fromCache` is what a page needs for "nothing
+ * left this origin": a bundle on the page's own origin, or one served from cache, meant no
+ * request to a third party. `refreshed`, for the pack: the libraries the package carries that
+ * played at the pack's newer version.
  */
 export interface LibraryBundle {
   url: string
   origin: string
   fromCache: boolean
+  refreshed?: RefreshedLibrary[]
 }
+
+export type { RefreshedLibrary } from './shared/protocol'
+
+/** Each library of a pack, with where its part is: the `pack` export of `@missing-elements/h5p-libraries`. */
+export interface LibraryPack {
+  libraries: Array<PackLibrary & { url: string }>
+}
+
+/**
+ * Where `libraries="pack"` finds the pack: the version this release pins, on jsDelivr, whose index
+ * the worker carries; a copy at `pack-base`, whose index is read from there; or the `pack`
+ * property, which carries its index. `url` is what `libraryBundle` reports.
+ */
+type PackLocation =
+  | { kind: 'pinned'; url: string }
+  | { kind: 'base'; url: string }
+  | { kind: 'given'; url: string; libraries: Array<PackLibrary & { url: string }> }
+
+/** How many rounds of parts one index may ask for before it is taken to be going round in circles. */
+const PLAN_ROUNDS = 4
 
 /** What the `ready` event carries: everything the element knows about the package by then. */
 export interface ReadyDetail {
@@ -267,9 +296,9 @@ function adoptShadowStyles(root: ShadowRoot): void {
 export class H5PPlayerElement extends HTMLElement {
   /**
    * The two attributes a change of which does something at once. Every other one — `sw`,
-   * `assets-base`, `jobs`, `libraries`, `preload`, `resume`, the frame options — is read when a
-   * load starts or when the package is registered, so a change takes effect on the next load
-   * and needs no callback.
+   * `assets-base`, `jobs`, `libraries`, `pack-base`, `refresh-libraries`, `preload`, `resume`, the
+   * frame options — is read when a load starts or when the package is registered, so a change
+   * takes effect on the next load and needs no callback.
    */
   static get observedAttributes(): string[] {
     return ['src', 'auto-resize']
@@ -331,6 +360,7 @@ export class H5PPlayerElement extends HTMLElement {
   /** The learner the host named, for the statements' actor; handed to the frame as it boots. */
   private userValue: FrameUser | null = null
   private runtimeValue: FrameAssets | null = null
+  private packValue: Array<PackLibrary & { url: string }> | null = null
   /**
    * The mode the frame holding `userDataSession` was answered under, which its saves follow.
    * Kept apart from `loadResumeMode`: a straggler save from the previous document can arrive
@@ -759,38 +789,61 @@ export class H5PPlayerElement extends HTMLElement {
     frameUrl: string
   ): Promise<IndexResult> {
     let booted = false
+    let downloaded = false
     let attempt: Promise<void> | null = null
+    // The pack's parts are attached while the package still arrives, once the worker can say
+    // which, so the frame boots early with them. A part that will not come leaves the rest of
+    // the download to boot without the pack, and the final index to decide.
+    const sources = this.librarySources()
+    let pack = sources.includes('pack') ? this.packLocation() : null
+    const fill = sources[0] === 'pack'
 
     const tryBoot = () => {
       if (booted || attempt || signal.aborted) return
-      attempt = this.send({ type: 'index', ...load })
-        .then((reply) => {
-          if (signal.aborted || booted) return
-          // Only a partial index says `ready`, and only after the dependency walk. Once the
-          // download is whole the worker answers from the central directory with no `ready` and
-          // no walk, which is the final index's job below: booting on that answer let the runtime
-          // ask for a library before the bundle that supplies it was attached.
-          if (reply.ok && reply.type === 'indexed' && reply.ready === true) {
-            booted = true
-            this.iframe.title = frameTitle(reply.title)
-            this.navigateFrame(frameUrl)
-          }
-        })
+      let again = false
+      attempt = (async () => {
+        const offer = pack ? await this.packOffer(pack, { refresh: this.refreshesLibraries, fill }) : undefined
+        const reply = await this.send({ type: 'index', ...load, ...(offer ? { pack: offer } : {}) })
+        if (signal.aborted || booted || !reply.ok || reply.type !== 'indexed') return
+        if (reply.plan && pack) {
+          const location = pack
+          // Not again on the next report, should the parts fail: the final index will try.
+          pack = null
+          await this.supplyParts(load, reply.plan, location, signal, { quiet: true })
+          pack = location
+          // At once, not on the next report: a small archive may send no other.
+          again = true
+          return
+        }
+        // Only a partial index says `ready`, and only after the dependency walk. Once the
+        // download is whole the worker answers from the central directory with no `ready` and
+        // no walk, which is the final index's job below: booting on that answer let the runtime
+        // ask for a library before the bundle that supplies it was attached.
+        if (reply.ready === true) {
+          booted = true
+          this.iframe.title = frameTitle(reply.title)
+          this.navigateFrame(frameUrl)
+        }
+      })()
         .catch(() => {
           // Too early to index, or the index cannot yet boot: the next progress report asks again.
         })
         .finally(() => {
           attempt = null
+          // Once the download is whole, the final index below is the one to ask.
+          if (again && !downloaded) tryBoot()
         })
     }
 
     await this.runDownload(load.pkgId, source, signal, 'download', tryBoot)
+    downloaded = true
     if (signal.aborted) return nothingIndexed()
     if (attempt) await attempt
 
-    // A frame already up keeps its state; the rest of this is the worker's bookkeeping.
+    // A frame already up keeps its state; the rest of this is the worker's bookkeeping. And it
+    // keeps its libraries: a folder the runtime has read is not replaced under it.
     if (!booted) this.setState('indexing')
-    return this.index(load, signal, true)
+    return this.index(load, signal, true, booted ? false : this.refreshesLibraries)
   }
 
   /**
@@ -800,37 +853,188 @@ export class H5PPlayerElement extends HTMLElement {
    * Without a `libraries` attribute this is one call that either works or reports exactly what is
    * missing. Reaching out to a third party is never something the element decides on its own.
    * With a list — `libraries="/libraries.h5p pack"` — the first source that covers the package
-   * wins, and the next is tried only for what the one before still left absent: a site's own,
-   * older copy of the pack answers the common case with no request to a CDN, and the pack this
-   * release pins answers a library the copy has not got. A source that cannot be reached at all — the bundle's host down, and
-   * no copy of it downloaded before — is passed over the same way while another remains, since
-   * the point of naming a second one is to have it when the first is not there; only the last
-   * source's failure is the load's. The last source attached stays attached: the worker keeps
-   * one bundle per package, and a later bundle in the list is expected to cover the earlier.
+   * wins, and the next is tried only for what the one before still left absent. A source that
+   * cannot be reached at all — the bundle's host down, and no copy of it downloaded before — is
+   * passed over the same way while another remains, since the point of naming a second one is to
+   * have it when the first is not there; only the last source's failure is the load's. The last
+   * bundle attached stays attached: the worker keeps one bundle per package, and a later bundle
+   * in the list is expected to cover the earlier.
+   *
+   * The pack is offered with every index, and the worker answers with the parts it has to supply
+   * (`supplyParts`): with `refresh`, the newer versions of libraries the package carries from the
+   * start, and what the package lacks once every source before the pack has been tried. A refresh
+   * that cannot be had — a part that will not download, or does not match its hash — is given up
+   * and the package plays as exported; a load is never failed for it.
    *
    * With `deep`, the worker also follows each library's own dependencies, as the runtime will,
    * and what none of the package's folders provides is fetched the same way.
    */
-  private async index(load: LoadRef, signal: AbortSignal, deep = false): Promise<IndexResult> {
+  private async index(load: LoadRef, signal: AbortSignal, deep = false, refresh = this.refreshesLibraries): Promise<IndexResult> {
     const sources = this.librarySources()
-    for (let attempt = 0; ; attempt++) {
+    const packAt = sources.indexOf('pack')
+    let pack = packAt >= 0 ? this.packLocation() : null
+    let fill = packAt === 0
+    let next = fill ? 1 : 0
+    let packFailure: unknown = null
+    let rounds = 0
+
+    for (;;) {
       try {
-        return indexResultOf(await this.send({ type: 'index', ...load, ...(deep ? { deep } : {}) }))
+        let offer: PackOffer | undefined
+        if (pack) {
+          try {
+            offer = await this.packOffer(pack, { refresh, fill })
+          } catch (error) {
+            // The index of the host's copy cannot be read, and none was read before: on without
+            // the pack, which a package that carries its libraries does not need.
+            if (signal.aborted) throw error
+            packFailure = error
+            pack = null
+          }
+        }
+        const reply = await this.send({ type: 'index', ...load, ...(deep ? { deep } : {}), ...(offer ? { pack: offer } : {}) })
+        if (!(reply.ok && reply.type === 'indexed' && reply.plan && pack)) return indexResultOf(reply)
+
+        if (++rounds > PLAN_ROUNDS) throw new PlayerError('bad-archive', 'The library pack kept asking for parts it had already supplied')
+        try {
+          await this.supplyParts(load, reply.plan, pack, signal)
+        } catch (error) {
+          if (signal.aborted) throw error
+          if (refresh && reply.plan.refreshed.length > 0) {
+            refresh = false
+            continue
+          }
+          packFailure = error
+          pack = null
+        }
+        if (signal.aborted) return nothingIndexed()
       } catch (error) {
         const missing = error instanceof PlayerError ? error.missingLibraries : undefined
-        const source = sources[attempt]
-        if (!missing || !source) throw error
+        if (!missing) throw error
+        const source = sources[next++]
+        if (source === 'pack') {
+          if (pack) fill = true
+          continue
+        }
+        if (!source) {
+          if (!packFailure) throw error
+          const reason = packFailure instanceof Error ? packFailure.message : String(packFailure)
+          throw new PlayerError(
+            'bad-archive',
+            `This package is missing ${missing.folders.join(', ')}, and the library pack did not supply them: ${reason}`,
+            { cause: packFailure, missingLibraries: missing }
+          )
+        }
 
         try {
           await this.supplyLibraries(load, missing, source, signal)
         } catch (failure) {
-          if (signal.aborted || attempt + 1 >= sources.length) throw failure
+          if (signal.aborted || next >= sources.length) throw failure
         }
         if (signal.aborted) return nothingIndexed()
         // Round again: either it is complete now, or the index names what is still absent and
         // the next source, if there is one, is asked for that.
       }
     }
+  }
+
+  /** `refresh-libraries`: on unless `off`. Read by the load. */
+  private get refreshesLibraries(): boolean {
+    return this.getAttribute('refresh-libraries')?.trim() !== 'off'
+  }
+
+  /** Where `libraries="pack"` is: the `pack` property, else a `pack-base`, else the pinned pack on jsDelivr. */
+  private packLocation(): PackLocation {
+    if (this.packValue?.length) {
+      return { kind: 'given', url: new URL('.', this.packValue[0].url).href, libraries: this.packValue }
+    }
+    const base = this.getAttribute('pack-base')?.trim()
+    if (base) return { kind: 'base', url: new URL(base.endsWith('/') ? base : `${base}/`, location.href).href }
+    return { kind: 'pinned', url: LIBRARY_PACK_BASE }
+  }
+
+  /** The pack as an `index` offers it: the worker's own index for the pinned one, else the copy's. */
+  private async packOffer(pack: PackLocation, { refresh, fill }: { refresh: boolean; fill: boolean }): Promise<PackOffer> {
+    if (pack.kind === 'pinned') return { pinned: true, refresh, fill }
+    return { libraries: pack.kind === 'given' ? pack.libraries : await packIndexAt(pack.url), refresh, fill }
+  }
+
+  /**
+   * Downloads the parts of the pack an index asked for, all at once, each checked against its
+   * hash, and attaches them with the package's own folders they replace. A part kept from before
+   * is used with no request: its id is its hash. Each is held like the package, so eviction
+   * leaves it alone while the package plays. `quiet` leaves the state to a download under way.
+   */
+  private async supplyParts(load: LoadRef, plan: PackPlan, pack: PackLocation, signal: AbortSignal, { quiet = false } = {}): Promise<void> {
+    const parts = await Promise.all(
+      plan.parts.map(async (part) => ({
+        pkgId: await partPkgId(part.sha256),
+        sha256: part.sha256,
+        source: { type: 'chunked', url: part.url, size: part.size, validator: null } satisfies SourceDescriptor
+      }))
+    )
+    await Promise.all(
+      parts.map(({ pkgId, source }) =>
+        // The pack is the host's choice: it serves its libraries whatever the package's trust.
+        this.send({ type: 'register', record: { ...this.recordFor(pkgId, source), role: 'libraries', untrusted: undefined } })
+      )
+    )
+    for (const { pkgId } of parts) this.holdPackage(pkgId, signal)
+
+    if (!quiet) this.setState('downloading')
+    const fetched = await this.runPartDownloads(parts, signal)
+    if (signal.aborted) return
+
+    if (!quiet) this.setState('indexing')
+    await Promise.all(parts.map(({ pkgId }) => this.send({ type: 'index', pkgId })))
+    await this.send({ type: 'attach-libraries', ...load, parts: parts.map(({ pkgId }) => pkgId), superseded: plan.superseded })
+
+    const before = this.internalLibraryBundle?.refreshed ? this.internalLibraryBundle : null
+    this.internalLibraryBundle = {
+      url: pack.url,
+      origin: new URL(pack.url).origin,
+      fromCache: !fetched && (before?.fromCache ?? true),
+      refreshed: [...(before?.refreshed ?? []), ...plan.refreshed]
+    }
+  }
+
+  /**
+   * Has the Jobs worker download the parts, all at once, and reports them as one `libraries`
+   * progress. Resolves whether a byte came over the network: a part kept from before answers at once.
+   */
+  private runPartDownloads(parts: Array<{ pkgId: string; sha256: string; source: SourceDescriptor & { type: 'chunked' } }>, signal: AbortSignal): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+      const pending = new Set(parts.map(({ pkgId }) => pkgId))
+      if (pending.size === 0) return resolve(false)
+      const jobs = this.ensureJobs()
+      const total = parts.reduce((sum, { source }) => sum + (source.size ?? 0), 0)
+      const loaded = new Map<string, number>()
+      let fetched = false
+
+      const finish = (error?: PlayerError) => {
+        jobs.removeEventListener('message', onMessage)
+        if (error) reject(error)
+        else resolve(fetched)
+      }
+      const onMessage = (event: MessageEvent<FromJobsMessage>) => {
+        const message = event.data
+        if (!pending.has(message.pkgId) || message.entry) return
+        if (message.type === 'progress') {
+          fetched = true
+          loaded.set(message.pkgId, message.loaded)
+          const sum = [...loaded.values()].reduce((a, b) => a + b, 0)
+          this.emitProgress({ phase: 'libraries', loaded: sum, total, fraction: fractionOf({ loaded: sum, total }) })
+          return
+        }
+        pending.delete(message.pkgId)
+        if (message.type === 'failed') finish(new PlayerError(message.code, message.message))
+        else if (pending.size === 0) finish()
+      }
+
+      jobs.addEventListener('message', onMessage)
+      signal.addEventListener('abort', () => finish(), { once: true })
+      for (const { pkgId, sha256, source } of parts) this.postToJobs({ type: 'download', pkgId, source, sha256 })
+    })
   }
 
   /**
@@ -843,10 +1047,10 @@ export class H5PPlayerElement extends HTMLElement {
   private async supplyLibraries(
     load: LoadRef,
     missing: MissingLibraries,
-    source: LibrarySource,
+    source: { url: string },
     signal: AbortSignal
   ): Promise<void> {
-    const url = libraryBundleUrl(source)
+    const url = new URL(source.url, location.href).href
 
     try {
       let descriptor: RemoteSourceDescriptor
@@ -866,6 +1070,7 @@ export class H5PPlayerElement extends HTMLElement {
         this.setState('indexing')
         await this.send({ type: 'index', pkgId: earlier })
         await this.send({ type: 'attach-libraries', ...load, libraryPkgId: earlier })
+        this.holdPackage(earlier, signal)
         this.internalLibraryBundle = { url, origin: new URL(url).origin, fromCache: true }
         return
       }
@@ -894,6 +1099,8 @@ export class H5PPlayerElement extends HTMLElement {
       this.setState('indexing')
       await this.send({ type: 'index', pkgId: libraryPkgId })
       await this.send({ type: 'attach-libraries', ...load, libraryPkgId })
+      // Held like the package: eviction would otherwise be free to take the bundle it reads from.
+      this.holdPackage(libraryPkgId, signal)
       this.internalLibraryBundle = { url, origin: new URL(url).origin, fromCache: false }
     } catch (error) {
       if (signal.aborted) throw error
@@ -1050,6 +1257,31 @@ export class H5PPlayerElement extends HTMLElement {
             : []
         }
       : null
+  }
+
+  /**
+   * The library pack, as a bundler emits it: the `pack` export of `@missing-elements/h5p-libraries`,
+   * its index with the URL of each part. `libraries="pack"` then plays from these, and nothing is
+   * asked of jsDelivr. Read by the load, so set it before `src`; it takes precedence over
+   * `pack-base`. Entries that are not well formed are dropped, and a value left with none is none.
+   */
+  get pack(): LibraryPack | null {
+    return this.packValue ? { libraries: this.packValue } : null
+  }
+
+  set pack(value: LibraryPack | null) {
+    const libraries = Array.isArray(value?.libraries)
+      ? packLibrariesIn(
+          value.libraries.map((library) => {
+            try {
+              return { ...library, url: new URL(library.url, location.href).href }
+            } catch {
+              return null
+            }
+          })
+        )
+      : []
+    this.packValue = libraries.length ? libraries : null
   }
 
   /** The `runtime` property, else an `assets-base`, else `frame-assets/` beside the element. */
@@ -1737,9 +1969,49 @@ function indexResultOf(reply: WorkerReply): IndexResult {
   }
 }
 
-/** Where to fetch the libraries a package is missing. */
-function libraryBundleUrl(source: LibrarySource): string {
-  return source === 'pack' ? LIBRARY_PACK_URL : new URL(source.url, location.href).href
+/** The indexes of pack copies read on this page, by folder: a load indexes several times. */
+const packIndexes = new Map<string, Promise<Array<PackLibrary & { url: string }>>>()
+
+/**
+ * The index of a pack copy at `base`, `index.json` there, each part's URL beside it, read once a
+ * page. Kept in the Cache API as last read, so a package that needs the pack plans the same with
+ * no network; the network is asked first, so a copy the host has replaced is read anew on the
+ * next page. One that cannot be read is asked for again by the next load.
+ */
+function packIndexAt(base: string): Promise<Array<PackLibrary & { url: string }>> {
+  let reading = packIndexes.get(base)
+  if (!reading) {
+    reading = readPackIndex(base)
+    packIndexes.set(base, reading)
+    reading.catch(() => packIndexes.delete(base))
+  }
+  return reading
+}
+
+async function readPackIndex(base: string): Promise<Array<PackLibrary & { url: string }>> {
+  const url = new URL('index.json', base).href
+  const cache = await caches.open(PACK_INDEX_CACHE).catch(() => null)
+  let response: Response
+  try {
+    response = await fetch(url, { cache: 'no-cache' })
+    if (!response.ok) throw new PlayerError('network', `${url} returned ${response.status}`)
+    await cache?.put(url, response.clone()).catch(() => {})
+  } catch (error) {
+    const kept = await cache?.match(url).catch(() => undefined)
+    if (!kept) throw error instanceof PlayerError ? error : new PlayerError('network', `${url} could not be read`, { cause: error })
+    response = kept
+  }
+  const index = (await response.json().catch(() => null)) as { libraries?: unknown } | null
+  const entries = Array.isArray(index?.libraries) ? index.libraries : []
+  const libraries = packLibrariesIn(
+    entries.map((entry: unknown) =>
+      entry && typeof entry === 'object' && typeof (entry as { folder?: unknown }).folder === 'string'
+        ? { ...entry, url: new URL(`${(entry as { folder: string }).folder}.h5p`, base).href }
+        : null
+    )
+  )
+  if (libraries.length === 0) throw new PlayerError('bad-archive', `${url} is not the index of a library pack`)
+  return libraries
 }
 
 /** Whether the `hub` note has been logged on this page; once is enough. */

@@ -15,6 +15,8 @@ const content = resolve(import.meta.dirname, '../../../apps/demo/demo/content')
 const quiz = join(content, 'quiz.h5p')
 /** The workspace's library pack, served by the verifier itself, so the untrusted cases need no network. */
 const pack = resolve(import.meta.dirname, '../../libraries/libraries.h5p')
+/** The same pack split into its parts, which `libraries=pack` plays from. */
+const parts = resolve(import.meta.dirname, '../../libraries/parts')
 let dir: string
 
 beforeAll(async () => {
@@ -95,6 +97,17 @@ const quizNeedingNewerLibrary = () =>
       bytes = new TextEncoder().encode(JSON.stringify(json))
     }
     await writer.add(folder ? entry.filename.replace(folder[0], 'H5P.QuestionSet-1.99/') : entry.filename, new Uint8ArrayReader(bytes))
+  })
+
+/** The quiz built against an older patch of Question Set than the pack has: its own `library.json` says patch 0. */
+const quizWithOlderPatch = () =>
+  rewrittenQuiz('older-patch.h5p', async (entry, bytes, writer) => {
+    if (/^H5P\.QuestionSet-1\.\d+\/library\.json$/.test(entry.filename)) {
+      const json = JSON.parse(new TextDecoder().decode(bytes))
+      json.patchVersion = 0
+      bytes = new TextEncoder().encode(JSON.stringify(json))
+    }
+    await writer.add(entry.filename, new Uint8ArrayReader(bytes))
   })
 
 describe('contentChanges', () => {
@@ -217,6 +230,29 @@ describe('h5p-verify', () => {
     // Trusted, the same package plays with its own copy.
     expect((await verifyPackage({ file: await quizNeedingNewerLibrary() })).verdict).toBe('pass')
   }, 240_000)
+
+  it("with a copy of the pack, plays its newer version of a library the package carries, and says so", async () => {
+    const file = await quizWithOlderPatch()
+    const report = await verifyPackage({ file, libraries: parts })
+    expect(report.verdict, summarize(report)).toBe('pass')
+    // The demo's quiz is older than the pack in other libraries too, by a patch or two.
+    expect(report.refreshed).toContainEqual({ library: 'H5P.QuestionSet', from: '1.21.0', to: expect.stringMatching(/^1\.21\.\d+$/) })
+    expect(summarize(report)).toMatch(/refreshed from the pack: H5P\.QuestionSet 1\.21\.0 → 1\.21\.\d+/)
+
+    const asExported = await verifyPackage({ file, libraries: parts, refreshLibraries: false })
+    expect(asExported.verdict).toBe('pass')
+    expect(asExported.refreshed).toEqual([])
+  }, 240_000)
+
+  it('plays an export without its libraries from the parts of the pack it needs', async () => {
+    const report = await verifyPackage({ file: await strippedQuiz(), libraries: parts })
+    expect(report.verdict, summarize(report)).toBe('pass')
+    expect(report.revision).toMatch(/^sha256:[0-9a-f]{64}; libraries sha256:[0-9a-f]{64}$/)
+  }, 240_000)
+
+  it('refuses a folder that is not a copy of the pack, before starting a browser', async () => {
+    await expect(verifyPackage({ file: quiz, libraries: dir })).rejects.toThrow(/not a copy of the library pack/)
+  })
 
   it('refuses a library bundle on disk that does not exist, before starting a browser', async () => {
     await expect(verifyPackage({ file: quiz, libraries: join(dir, 'no-such-pack.h5p') })).rejects.toThrow(/No such library bundle/)

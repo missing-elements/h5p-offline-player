@@ -14,7 +14,7 @@ WordPress and Drupal treat an author's upload:
 | | Played as it is | `untrusted` | An H5P plugin: Moodle, WordPress, Drupal |
 |---|---|---|---|
 | The package's own scripts | Run, as your site | Never served | Installed from an upload only for a user who may update libraries |
-| Where the libraries come from | The package, then `libraries` for what it lacks | `libraries` only: the pack, or a bundle you name | The libraries installed on the site |
+| Where the libraries come from | The package, at the pack's newer version where `libraries` names the pack, then `libraries` for what it lacks | `libraries` only: the pack's libraries it needs, or a bundle you name | The libraries installed on the site |
 | Files in `content/` | All of them | H5P's list of content file types | H5P's list of content file types |
 | The content's fields | As written | Checked against each library's `semantics.json` | Checked the same way, on upload |
 | Scripts the frame allows | Your origin, and the hosts the runtime needs | Exact paths only | Whatever the site's own policy allows |
@@ -27,7 +27,7 @@ links from users, a marketplace, exports from another site.
 ## What is withheld
 
 - **The package's own library folders.** The libraries come from `libraries` (`pack` unless you
-  name another source), which is code you chose. See [Packages without libraries](libraries.md).
+  name another source), which is code you chose. See [Libraries](libraries.md).
 - **Every file in `content/` that is not one of H5P's own content types.** Images, audio, video,
   fonts, office documents, subtitles and JSON are served. Scripts, stylesheets, HTML, SVG and XML
   are not.

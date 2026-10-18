@@ -3,13 +3,16 @@ import { writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { BlobReader, BlobWriter, TextReader, Uint8ArrayReader, Uint8ArrayWriter, ZipReader, ZipWriter, configure } from '@zip.js/zip.js'
 import { formatBytes } from '@missing-elements/h5p-normalize'
-import { download as cachedDownload, hubBundle as cachedBundle } from './lib/hub.mjs'
+import { splitPack, writePackModule } from '../../../packages/libraries/scripts/parts.mjs'
+import { HUB, download as cachedDownload, hubBundle as cachedBundle } from './lib/hub.mjs'
 
 /**
- * Builds the library pack, `packages/libraries/libraries.h5p` (`@missing-elements/h5p-libraries`,
- * which the installable app carries), and its licence notice, `packages/libraries/libraries.txt`. Exports from h5p.com and h5p.org carry no libraries, and an offline app
- * that has to fetch them from the hub first is not offline, so the app carries the hub's runtime
- * libraries for every content type and attaches them to any package missing its own.
+ * Builds the library pack, `@missing-elements/h5p-libraries`: `packages/libraries/libraries.h5p`,
+ * the same split into one archive per library under `parts/` with its `index.json` and the
+ * `index.js` a bundler reads (`splitPack` and `writePackModule` in that package's
+ * `scripts/parts.mjs`), and the licence notice, `packages/libraries/libraries.txt`. Exports from
+ * h5p.com and h5p.org carry no libraries, and the player fetches the parts such a package needs;
+ * it also plays the pack's newer version of a library a package carries.
  *
  * Every content type below is fetched from the hub (cached under the OS temp directory, shared
  * with `build-demo-content.mjs`; `--refresh` fetches again), and so is every addon in `ADDONS`
@@ -89,6 +92,18 @@ const rootDir = resolve(import.meta.dirname, '..')
 const outDir = resolve(rootDir, '..', '..', 'packages', 'libraries')
 const refresh = process.argv.includes('--refresh')
 
+// Declared before the loop below, which runs as the module loads.
+const LOG = '[libraries]'
+
+/** The hub bundle for a content type, cached; `null` when the hub no longer has it. */
+const hubBundle = (machineName) => cachedBundle(machineName, { refresh, optional: true, log: LOG })
+
+/**
+ * A file, cached under `name`; with `optional`, `null` when its host says there is no such file.
+ * @param {string} url @param {string} name @param {boolean} [optional]
+ */
+const download = (url, name, optional = false) => cachedDownload(url, name, { refresh, optional, log: LOG })
+
 /** folder -> { library, files: Map<name, Uint8Array> }, keeping the newest minor per major. */
 const kept = new Map()
 const skipped = []
@@ -158,6 +173,8 @@ for (const { files } of libraries) {
 }
 const pack = new Uint8Array(await (await writer.close()).arrayBuffer())
 await writeFile(join(outDir, 'libraries.h5p'), pack)
+const parts = await splitPack(pack, join(outDir, 'parts'))
+await writePackModule(parts, outDir)
 
 const lines = [
   'H5P Offline Player library pack: the H5P hub runtime libraries the installable app carries,',
@@ -177,7 +194,7 @@ const lines = [
 await writeFile(join(outDir, 'libraries.txt'), lines.join('\n'))
 
 console.log(
-  `[libraries] ${libraries.length} libraries from ${CONTENT_TYPES.length - skipped.length} content types -> packages/libraries/libraries.h5p ${formatBytes(pack.length)}` +
+  `[libraries] ${libraries.length} libraries from ${CONTENT_TYPES.length - skipped.length} content types -> packages/libraries/libraries.h5p ${formatBytes(pack.length)}, and ${parts.length} parts` +
     (skipped.length ? ` (not on the hub: ${skipped.join(', ')})` : '')
 )
 
@@ -185,14 +202,3 @@ console.log(
 function newer(a, b) {
   return a.minorVersion !== b.minorVersion ? a.minorVersion > b.minorVersion : (a.patchVersion ?? 0) > (b.patchVersion ?? 0)
 }
-
-const LOG = '[libraries]'
-
-/** The hub bundle for a content type, cached; `null` when the hub no longer has it. */
-const hubBundle = (machineName) => cachedBundle(machineName, { refresh, optional: true, log: LOG })
-
-/**
- * A file, cached under `name`; with `optional`, `null` when its host says there is no such file.
- * @param {string} url @param {string} name @param {boolean} [optional]
- */
-const download = (url, name, optional = false) => cachedDownload(url, name, { refresh, optional, log: LOG })

@@ -12,8 +12,12 @@ them itself:
 
 `revision` is a SHA-256 over the archive's index — each file's name, sizes and CRC — so any
 change to the package gives a new value and the same file always gives the same one. When
-`libraries` supplied the libraries, the bundle's follows: `sha256:…; libraries sha256:…`. The
-element's `revision` property holds it once the package is indexed.
+`libraries` supplied libraries, what supplied them follows: `sha256:…; libraries sha256:…`. That
+is a `.h5p` bundle's own index fingerprint, or for the library pack one SHA-256 over the
+fingerprints of the archives the package played with, one per library, sorted and a line each:
+so the libraries a package carries but played at the pack's newer version count, and a pack
+release that changes none of a package's libraries leaves its revision as it was. The element's
+`revision` property holds it once the package is indexed.
 
 **At release**, record it: the normalizer prints the revision of the file it writes. Keep the
 published `.h5p`, from which anyone can recompute it.

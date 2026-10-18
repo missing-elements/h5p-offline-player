@@ -67,7 +67,7 @@
         </li>
         <li>
           <strong>Any export</strong>
-          Exports without their libraries play with a pinned pack, untrusted ones as checked data.
+          Missing or older libraries come from a pinned pack, only those needed; untrusted packages play as checked data.
         </li>
         <li>
           <strong>Learning records</strong>
@@ -90,15 +90,19 @@
           Choose file
           <input type="file" id="file" accept=".h5p,application/zip" />
         </label>
-        <!-- The element's two modes, for whatever the visitor plays next: changing it plays the
-             current package again in the other. See demo/player-page.js. -->
+        <!-- The element's two modes, for whatever the visitor plays next, and whether a library the
+             package carries plays at the pack's newer version: changing either plays the current
+             package again. See demo/player-page.js. -->
         <div class="mode-row">
           <div class="mode" role="radiogroup" aria-label="How to play the package" aria-describedby="mode-note">
             <label><input type="radio" name="mode" value="trusted" checked />Trusted</label>
             <label><input type="radio" name="mode" value="untrusted" />Untrusted</label>
           </div>
+          <div class="mode">
+            <label><input type="checkbox" id="refresh" checked aria-describedby="mode-note" />Newest libraries</label>
+          </div>
           <p class="mode-note" id="mode-note">
-            The package plays with its own libraries, as on the site that made it.
+            The package's own scripts run on this site. What it lacks comes from this site's library pack.
           </p>
         </div>
       </form>
@@ -126,11 +130,6 @@
       <div role="status" aria-live="polite">
         <p class="message" id="message" hidden></p>
       </div>
-      <p class="message hint offer" id="offer" hidden>
-        <span>Load the libraries from</span>
-        <button type="button" id="use-bundle">this site's bundle · ~14 MB</button>
-      </p>
-
       <!-- A link's ?src= on another site plays untrusted, and asks only when it needs its own code:
            see foreignHost in demo/page-common.js. -->
       <p class="message warning offer" id="confirm-src" hidden>

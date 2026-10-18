@@ -85,12 +85,17 @@ describe('the site', () => {
     const out = join(dir, 'locked')
     const site = await buildSite({ out, packages: 'https://cdn.example.org', ancestors: ['https://school.example'] })
 
-    for (const name of ['index.html', 'main.js', 'embed.js', 'embed.css', 'resizer.js', 'config.js', 'h5p-player.js', 'h5p-sw.js', 'h5p-jobs.js', 'libraries.h5p', 'libraries.txt', 'NOTICE.txt', '_headers', 'vercel.json', 'Caddyfile', 'nginx.conf', '.htaccess']) {
+    for (const name of ['index.html', 'main.js', 'embed.js', 'embed.css', 'resizer.js', 'config.js', 'h5p-player.js', 'h5p-sw.js', 'h5p-jobs.js', 'libraries/index.json', 'libraries.txt', 'NOTICE.txt', '_headers', 'vercel.json', 'Caddyfile', 'nginx.conf', '.htaccess']) {
       expect(existsSync(join(out, name)), name).toBe(true)
     }
     for (const name of ['frame-boot.js', 'frame.bundle.js', 'main.bundle.js', 'h5p.css', 'LICENSE.txt', 'NOTICE.txt']) {
       expect(existsSync(join(out, 'frame-assets', name)), name).toBe(true)
     }
+    // The pack's parts, every one its index names, for the player to fetch as a package needs them.
+    const index = JSON.parse(await readFile(join(out, 'libraries', 'index.json'), 'utf8'))
+    expect(index.libraries.length).toBeGreaterThan(50)
+    for (const { folder } of index.libraries) expect(existsSync(join(out, 'libraries', `${folder}.h5p`)), folder).toBe(true)
+    expect(existsSync(join(out, 'libraries.h5p'))).toBe(false)
 
     const html = await readFile(join(out, 'index.html'), 'utf8')
     expect(html).toContain(`content="${contentSecurityPolicy({ packages: ['https://cdn.example.org'], meta: true })}"`)
@@ -123,9 +128,9 @@ describe('the site', () => {
   it('leaves the library pack out when asked, and says so to the page', async () => {
     const out = join(dir, 'lean')
     await buildSite({ out, libraries: false })
-    expect(existsSync(join(out, 'libraries.h5p'))).toBe(false)
+    expect(existsSync(join(out, 'libraries'))).toBe(false)
     expect(await readFile(join(out, 'config.js'), 'utf8')).toContain('{"libraries":false,"packages":null,"defaultLibraries":null}')
-    expect(await readFile(join(out, 'NOTICE.txt'), 'utf8')).not.toContain('libraries.h5p')
+    expect(await readFile(join(out, 'NOTICE.txt'), 'utf8')).not.toContain('libraries/')
   })
 
   it('says so, rather than crashing, when the folder is a file', async () => {

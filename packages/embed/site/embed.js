@@ -5,8 +5,8 @@
  * `h5p-embed` was told when it wrote the site, and the demo's `/embed` with the demo's copy of the
  * library pack.
  *
- *   ?src=<package url>[&libraries=pack|<url> …|none][&preload=auto][&xapi=<parent origin>]
- *    [&frame][&copyright][&export][&icon][&reporting][&fullscreen=off]
+ *   ?src=<package url>[&libraries=pack|<url> …|none][&refresh-libraries=off][&preload=auto]
+ *    [&xapi=<parent origin>][&frame][&copyright][&export][&icon][&reporting][&fullscreen=off]
  *    [&activity-id=<IRI>][&custom-css=<stylesheet url>][&lang=<language tag>]
  *
  * Upward it speaks H5P's own resizer protocol — the `hello` / `resize` exchange that h5p.org's
@@ -23,8 +23,12 @@ const PACK_CDN_ORIGIN = 'https://cdn.jsdelivr.net'
 
 /**
  * @param {object} [options]
- * @param {string | null} [options.librariesPack] the URL of a copy of `@missing-elements/h5p-libraries`
- *   on this site, which `libraries=pack` names; without one, `pack` is the element's copy on jsDelivr
+ * @param {string | null} [options.packBase] the folder of this site's copy of the library pack's
+ *   parts (`parts/` of `@missing-elements/h5p-libraries`), which `libraries=pack` plays from
+ * @param {{ libraries: object[] } | null} [options.pack] the same, as the `pack` export a bundler
+ *   resolves; it wins over `packBase`. Without either, `pack` is the element's copy on jsDelivr
+ * @param {string | null} [options.librariesPack] the URL of a whole `libraries.h5p` on this site,
+ *   for a page written before the pack was split: played as any bundle, with no refresh
  * @param {string[] | null} [options.packages] the origins packages and library bundles may come
  *   from, besides this page's own; `null` plays any, one from another origin `untrusted` when the
  *   storage is this origin's
@@ -38,11 +42,15 @@ const PACK_CDN_ORIGIN = 'https://cdn.jsdelivr.net'
  *   page of its own origin, whose storage it shares. A site whose own preview frames the page for
  *   a package the visitor just chose passes `false`
  */
-export function startEmbed({ librariesPack = null, packages = null, defaultLibraries = null, runtime = null, askInOwnFrame = true } = {}) {
+export function startEmbed({ packBase = null, pack = null, librariesPack = null, packages = null, defaultLibraries = null, runtime = null, askInOwnFrame = true } = {}) {
   const params = new URLSearchParams(location.search)
   const player = document.querySelector('h5p-player')
-  // Before `src`: the element resolves the runtime's files when a package is set.
+  // Before `src`: the element resolves the runtime's files, and reads where the pack is, when a
+  // package is set.
   if (runtime) player.runtime = runtime
+  if (pack) player.pack = pack
+  else if (packBase) player.setAttribute('pack-base', packBase)
+  const ownPack = Boolean(pack || packBase)
   const notice = document.querySelector('#notice')
   const loader = document.querySelector('#loader')
   const framed = window.parent !== window
@@ -237,12 +245,13 @@ export function startEmbed({ librariesPack = null, packages = null, defaultLibra
     if (value === 'none') return { value: '' }
     for (const token of value.split(/\s+/).filter(Boolean)) {
       if (token === 'pack' || token === 'hub') {
-        // This site's copy of the pack; without one, the element's own `pack`, the copy on
-        // jsDelivr, where that may be reached, so a snippet written for `pack` keeps playing after
-        // a rebuild with --no-libraries. `hub` has meant `pack` since player 0.6: the one H5P hub
-        // host that answers a browser serves a catalogue older than current exports need.
-        if (librariesPack) sources.push(librariesPack)
-        else if (permitted(PACK_CDN_ORIGIN)) sources.push('pack')
+        // This site's copy of the pack, which the element was pointed at above; without one, the
+        // element's own `pack`, the copy on jsDelivr, where that may be reached, so a snippet
+        // written for `pack` keeps playing after a rebuild with --no-libraries. `hub` has meant
+        // `pack` since player 0.6: the one H5P hub host that answers a browser serves a
+        // catalogue older than current exports need.
+        if (ownPack || (!librariesPack && permitted(PACK_CDN_ORIGIN))) sources.push('pack')
+        else if (librariesPack) sources.push(librariesPack)
         else return { error: 'This player was set up without the library pack, so libraries=pack is not available here.' }
       } else {
         const origin = urlOrigin(token)
@@ -256,7 +265,8 @@ export function startEmbed({ librariesPack = null, packages = null, defaultLibra
   /**
    * The element's display options, by their attribute names, for the embedding page to ask for:
    * `&frame&copyright&export` shows H5P's action bar with those buttons, `&fullscreen=off` takes
-   * that one away, `&activity-id=` names the statements' object and `&custom-css=` restyles the
+   * that one away, `&refresh-libraries=off` plays a package's own libraries even where the pack
+   * has newer ones, `&activity-id=` names the statements' object and `&custom-css=` restyles the
    * content to the embedding site's taste. `&lang=` is the embedding page's language, which this
    * page cannot read across origins: H5P's own buttons and dialogs follow it. Not `custom-js`,
    * `embed-code` or `user`: a script is a capability on this origin that a link should not hand
@@ -267,6 +277,9 @@ export function startEmbed({ librariesPack = null, packages = null, defaultLibra
       if (params.has(name) && params.get(name) !== 'off') player.setAttribute(name, '')
     }
     if (params.get('fullscreen') === 'off') player.setAttribute('fullscreen', 'off')
+    // The pack's newer versions of the libraries a package carries, unless the embedding page
+    // needs the package exactly as exported.
+    if (params.get('refresh-libraries') === 'off') player.setAttribute('refresh-libraries', 'off')
     for (const name of ['activity-id', 'custom-css']) {
       const value = params.get(name)?.trim()
       if (value) player.setAttribute(name, value)
@@ -358,11 +371,11 @@ export function startEmbed({ librariesPack = null, packages = null, defaultLibra
   // as the host's own: an untrusted package plays with this site's sources alone, the page's
   // default or its pack, and the address's only once the click has trusted it.
   const own = defaultLibraries?.trim() ? librarySources(defaultLibraries.trim()).value : ''
-  const pack = own || librarySources('pack').value
-  if (!pack) {
+  const sitesSources = own || librarySources('pack').value
+  if (!sitesSources) {
     askToTrust()
     return
   }
   player.untrusted = true
-  start(src, pack)
+  start(src, sitesSources)
 }

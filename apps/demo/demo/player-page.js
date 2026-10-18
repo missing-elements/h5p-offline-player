@@ -5,7 +5,7 @@
  */
 
 import { foreignHost, logInto, messageIn, trustPrompt } from './page-common.js'
-import librariesPack from '@missing-elements/h5p-libraries/libraries.h5p?url'
+import { pack } from '@missing-elements/h5p-libraries'
 
 const player = document.querySelector('h5p-player')
 const form = document.querySelector('#load-form')
@@ -17,8 +17,7 @@ const timer = document.querySelector('#timer')
 const bar = document.querySelector('#progress')
 const message = document.querySelector('#message')
 const log = document.querySelector('#log')
-const offer = document.querySelector('#offer')
-const useBundle = document.querySelector('#use-bundle')
+const refreshToggle = document.querySelector('#refresh')
 const confirmBox = document.querySelector('#confirm-src')
 const modeNote = document.querySelector('#mode-note')
 const modeTag = document.querySelector('#mode-tag')
@@ -119,12 +118,16 @@ player.addEventListener('progress', (event) => {
 
 player.addEventListener('ready', () => {
   bar.hidden = true
+  const refreshed = player.libraryBundle?.refreshed ?? []
   modeTag.textContent = player.untrusted
-    ? "Untrusted · this site's library pack · content checked"
-    : player.libraryBundle
-      ? "Trusted · its own libraries, the rest from this site's pack"
-      : 'Trusted · its own libraries'
+    ? "Untrusted · libraries from this site's pack · content checked"
+    : refreshed.length > 0
+      ? `Trusted · ${refreshed.length === 1 ? 'one library' : `${refreshed.length} libraries`} at the pack's newer version`
+      : player.libraryBundle
+        ? "Trusted · its own libraries, the rest from this site's pack"
+        : 'Trusted · its own libraries'
   write(`mode  ${modeTag.textContent}`)
+  for (const { library, from, to } of refreshed) write(`refreshed  ${library} ${from} → ${to}`)
   // The build every statement will name in `context.revision`. On a host without Range the frame
   // can boot before the index that yields it, and the statements wait for it instead.
   if (player.revision) write(`revision  ${player.revision}`)
@@ -170,39 +173,26 @@ player.addEventListener('error', (event) => {
   show(late ? `The content reported an error and kept running: ${detail}` : (EXPLANATIONS[code] ?? detail), late ? 'hint' : 'error')
   write(`error  ${code}: ${detail}`)
 
-  // The element reports what a package is missing; where to get it is the host's call, and here
-  // the visitor's: this site's bundle, about 14 MB, offered rather than fetched unasked. Once it
-  // has been tried there is nothing else to offer.
-  const tried = player.getAttribute('libraries')
-  // The element's own text is written for the developer ("set the libraries attribute"); the
-  // visitor gets the buttons instead.
-  if (missingLibraries && !tried) {
+  // Missing with the pack offered: neither the package nor this site's pack has it — a newer
+  // minor than the pack, or a content type it does not serve. The element's own text is written
+  // for the developer ("set the libraries attribute").
+  if (missingLibraries) {
     show(
-      missingLibraries.all
-        ? `This package was exported without its H5P libraries, as h5p.com and h5p.org do by default. Missing: ${missingLibraries.folders.join(', ')}.`
-        : `This package does not carry every H5P library it needs. Missing: ${missingLibraries.folders.join(', ')}.`,
+      `This package needs ${missingLibraries.folders.join(', ')}, which neither it nor this site's library pack has: ` +
+        'a newer version than the pack, or a content type the pack does not serve.',
       'warning'
     )
   }
-  offer.hidden = !missingLibraries || tried === BUNDLE
 })
 
 /**
- * The same bundle the installable app carries: every H5P hub content type's runtime libraries,
- * `@missing-elements/h5p-libraries`, emitted by Vite as an asset. Fetched only once a visitor
- * picks it for a package that lacks its own — the player page stays light, and nothing is
- * downloaded for packages that carry their libraries.
+ * The library pack, `@missing-elements/h5p-libraries`, the one the installable app carries: one
+ * archive per library, each emitted by Vite as an asset of this site. `libraries="pack"` takes
+ * from it the libraries a package lacks, and the newer versions of those it carries; only the
+ * archives a package needs are fetched, and nothing for one as new as the pack.
  */
-const BUNDLE = librariesPack
-
-/** Where missing libraries come from: `null` until the visitor has chosen, then for every load. */
-let librarySource = null
-
-/** `libraries` has to be set before `src`: it is read when a load discovers it needs it. */
-const applyLibrarySource = () => {
-  if (librarySource) player.setAttribute('libraries', librarySource)
-  else player.removeAttribute('libraries')
-}
+player.pack = pack
+player.setAttribute('libraries', 'pack')
 
 /**
  * Replays the last load. Kept as a closure rather than a URL because a package picked from disk
@@ -242,32 +232,40 @@ let currentLink = null
  * sample, which play untrusted, and the click that lets a refused link run its own code.
  */
 const NOTES = {
-  trusted: 'The package plays with its own libraries, as on the site that made it: its own scripts run on this site.',
+  trusted: "The package's own scripts run on this site. What it lacks comes from this site's library pack, only the libraries it needs.",
   untrusted:
-    "None of the package's own scripts run. Its libraries come from this site's pack, about 14 MB, fetched once, " +
+    "None of the package's own scripts run. Its libraries come from this site's pack, only the ones it needs, " +
     'and every field is checked against its library\'s definition, as the H5P plugins for Moodle, WordPress and Drupal check an upload.'
 }
+const REFRESH_NOTES = {
+  on: ' Where the pack has a newer version of a library the package carries, that version plays.',
+  off: ' The libraries the package carries play as exported.'
+}
 const playsUntrusted = () => form.elements.mode.value === 'untrusted'
+const describeMode = () => {
+  const mode = form.elements.mode.value
+  modeNote.textContent = NOTES[mode] + (mode === 'trusted' ? REFRESH_NOTES[refreshToggle.checked ? 'on' : 'off'] : '')
+  // Untrusted, none of the package's own libraries play, so there is nothing to refresh.
+  refreshToggle.disabled = mode === 'untrusted'
+}
 const setMode = (mode) => {
   form.elements.mode.value = mode
-  modeNote.textContent = NOTES[mode]
+  describeMode()
 }
 setMode(form.elements.mode.value)
 
-/** Untrusted needs the bundle, whatever the visitor has chosen for missing libraries. */
 const applyMode = () => {
-  applyLibrarySource()
   const untrusted = playsUntrusted()
-  if (untrusted) player.setAttribute('libraries', librarySource ?? BUNDLE)
   player.untrusted = untrusted
-  return untrusted ? '  (untrusted: none of its own code runs)' : ''
+  if (refreshToggle.checked) player.removeAttribute('refresh-libraries')
+  else player.setAttribute('refresh-libraries', 'off')
+  return untrusted ? '  (untrusted: none of its own code runs)' : refreshToggle.checked ? '' : '  (libraries as exported)'
 }
 
 /** Plays a package at a URL, in the switch's mode. */
 const loadUrl = (url) => {
   log.textContent = ''
   trust.dismiss()
-  offer.hidden = true
   reload = () => loadUrl(url)
   currentLink = url
   write(`loading  ${url}${applyMode()}`)
@@ -283,7 +281,6 @@ const loadUrl = (url) => {
 const loadFile = (file) => {
   log.textContent = ''
   trust.dismiss()
-  offer.hidden = true
   reload = () => loadFile(file)
   currentLink = null
   write(`loading  ${file.name} (${(file.size / 1024).toFixed(0)} kB, from disk)${applyMode()}`)
@@ -299,13 +296,6 @@ form.addEventListener('submit', (event) => {
   if (url) loadUrl(url)
 })
 
-const retryWith = (source, label) => {
-  librarySource = source
-  offer.hidden = true
-  write(`retrying with libraries from ${label}`)
-  reload?.()
-}
-useBundle.addEventListener('click', () => retryWith(BUNDLE, "this site's bundle"))
 
 fileInput.addEventListener('change', () => {
   const [file] = fileInput.files
@@ -319,6 +309,13 @@ for (const input of form.elements.mode) {
     reload?.()
   })
 }
+
+// And with its libraries as exported, or at the pack's newer versions: an older export's look
+// against the current one.
+refreshToggle.addEventListener('change', () => {
+  describeMode()
+  reload?.()
+})
 
 // A sample marked `data-untrusted` plays as data against this site's bundle: a content-only
 // export, as h5p.com and h5p.org make them, the way a site plays a package it did not make. The
