@@ -76,20 +76,45 @@ assets-base="/the/runtime's/dist/"`.
 
 **Install without a build step**
 
-```html
-<script type="module"
-  src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@<version>/dist/h5p-player.js"></script>
-<h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js"
-            assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-runtime@<version>/dist/"></h5p-player>
+Copy the files onto the site, so that nothing a learner's browser loads comes from another
+server; npm only fetches them. `public/` is the folder the site is served from:
+
+```bash
+npm install @missing-elements/h5p-offline-player @missing-elements/h5p-runtime
+cp -r node_modules/@missing-elements/h5p-offline-player/dist public/h5p-player
+cp -r node_modules/@missing-elements/h5p-runtime/dist public/h5p-player/frame-assets
 ```
 
-Download `https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@<version>/dist/h5p-sw.js`
+```html
+<script type="module" src="/h5p-player/h5p-player.js"></script>
+<h5p-player src="https://host.example/course.h5p"></h5p-player>
+```
+
+No `sw` or `assets-base`: the element finds `h5p-sw.js` and `frame-assets/` beside its own
+script, and the worker always matches the element's version. For `libraries="pack"`, also copy
+`@missing-elements/h5p-libraries`' `parts/` to `public/h5p-libraries/`, with its `libraries.txt`
+beside them, and set `pack-base="/h5p-libraries/"`. On an upgrade, delete the folders and copy
+them again: `cp -r` into a folder that exists nests the copy inside it.
+
+If the user prefers a CDN, load the element and the runtime from jsDelivr and copy only the
+worker, and tell them that every learner's browser then reaches jsDelivr, as it does for the
+pack unless `pack-base` names a copy:
+
+```html
+<script type="module"
+  src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@<player version>/dist/h5p-player.js"></script>
+<h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js"
+            assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-runtime@<runtime version>/dist/"></h5p-player>
+```
+
+Download `https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@<player version>/dist/h5p-sw.js`
 and place it on the site; `sw` points at it. `assets-base` names the runtime package's `dist/`
 on the CDN, since the player's own package does not carry the runtime. The root is fine: its scope becomes `/h5p/`, not
-`/`, so an existing site worker is untouched. Use one explicit version (`npm view
-@missing-elements/h5p-offline-player version` for the latest) in both URLs — unpinned, the CDN
-moves and the copied worker does not — and re-download `h5p-sw.js` on every upgrade; the
-console warns when the two differ.
+`/`, so an existing site worker is untouched. Pin an explicit version in each URL; the two
+packages have their own version numbers (`npm view @missing-elements/h5p-offline-player version`
+and `npm view @missing-elements/h5p-runtime version` for the latest). Unpinned, the CDN moves and
+the copied worker does not. Re-download `h5p-sw.js` on every upgrade of the player; the console
+warns when the two differ.
 
 **Sizing:** the element follows the content's own height by default. Set `auto-resize="off"`
 only when the page sizes it itself, from CSS or from the `resize` event, because the height the

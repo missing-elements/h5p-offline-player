@@ -46,7 +46,7 @@
       <h2>Markup</h2>
       <pre class="code" data-lang="html">&lt;!-- This site's copy of the page. Your own player domain, from npx @missing-elements/h5p-embed,
      serves it at its root: https://h5p-player.example.net/?src=… --&gt;
-&lt;iframe src="%SITE_URL%/embed?src=%SITE_URL%/demo/content/quiz.h5p&amp;xapi=https://your-site.example"
+&lt;iframe src="%SITE_URL%/embed?src=https://alekswebnet.github.io/h5p/gh-normalized.h5p&amp;xapi=https://your-site.example"
         allow="fullscreen; microphone; camera" style="width: 100%; border: 0"&gt;&lt;/iframe&gt;
 
 &lt;!-- Optional, as the element's attributes: &amp;libraries=pack  &amp;preload=auto
@@ -97,8 +97,11 @@
         log.textContent = `${stamp}  ${line}\n${log.textContent}`.slice(0, 20000)
       }
 
+      // A package on another site, as a player domain is usually handed one: GitHub Pages sends
+      // CORS headers and honours Range, so the video streams.
+      const src = 'https://alekswebnet.github.io/h5p/gh-normalized.h5p'
       // The embedding site names itself, so the relay goes to this origin and to no other.
-      frame.src = `/embed?src=${encodeURIComponent('/demo/content/quiz.h5p')}&xapi=${encodeURIComponent(location.origin)}&frame&copyright&export`
+      frame.src = `/embed?src=${encodeURIComponent(src)}&xapi=${encodeURIComponent(location.origin)}&frame&copyright&export`
 
       addEventListener('message', ({ source, origin, data }) => {
         if (source !== frame.contentWindow || origin !== location.origin || !data) return

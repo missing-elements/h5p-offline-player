@@ -100,6 +100,36 @@ document.querySelector('h5p-player').pack = pack
 
 ### Install without a build step
 
+Copy the files onto your own site, so that nothing a learner's browser loads comes from anyone
+else's server; npm is only how you get them. `public/` stands for the folder your site is served
+from:
+
+```bash
+npm install @missing-elements/h5p-offline-player @missing-elements/h5p-runtime
+cp -r node_modules/@missing-elements/h5p-offline-player/dist public/h5p-player
+cp -r node_modules/@missing-elements/h5p-runtime/dist public/h5p-player/frame-assets
+```
+
+```html
+<script type="module" src="/h5p-player/h5p-player.js"></script>
+<h5p-player src="https://host.example/course.h5p"></h5p-player>
+```
+
+The element finds the Service Worker and the runtime beside its own script, so it needs no other
+attribute, and the worker is always the element's own version. For `libraries="pack"`, copy the
+library pack too, with the list of its libraries' licences, and name its folder with
+`pack-base="/h5p-libraries/"`:
+
+```bash
+npm install @missing-elements/h5p-libraries
+cp -r node_modules/@missing-elements/h5p-libraries/parts public/h5p-libraries
+cp node_modules/@missing-elements/h5p-libraries/libraries.txt public/h5p-libraries/
+```
+
+To upgrade, delete the folders and copy them again.
+
+Or load the element and the runtime from jsDelivr, and copy only the Service Worker:
+
 ```html
 <script type="module"
   src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@0.10.0/dist/h5p-player.js"></script>
@@ -110,7 +140,8 @@ document.querySelector('h5p-player').pack = pack
 Copy `dist/h5p-sw.js` of the same version onto your own site: browsers register a Service Worker
 only from the page's origin. Its scope is `/h5p/`, so an existing site worker is left alone. Pin
 the version, and copy the worker again whenever you change it; the element warns when the two
-differ.
+differ. Every learner's browser then fetches the player from jsDelivr, as it does the pack's
+libraries unless `pack-base` names a copy of your own.
 
 ### Embed
 

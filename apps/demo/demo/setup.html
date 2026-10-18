@@ -84,7 +84,7 @@
         <tbody>
           <tr>
             <td><code>h5p-player.js</code><br /><span>the element</span></td>
-            <td>Anywhere: your bundle, or a CDN</td>
+            <td>Anywhere: your bundle, your own site, or a CDN</td>
             <td>It is an ordinary ES module.</td>
           </tr>
           <tr>
@@ -96,6 +96,11 @@
             <td><code>@missing-elements/h5p-runtime</code><br /><span>the H5P runtime</span></td>
             <td>Your bundle (the <code>runtime</code> property), a CDN via <code>assets-base</code>, or <code>frame-assets/</code> next to the element</td>
             <td>Plain static files, loaded into the frame the worker generates. A package of its own because it is GPL-3.0; the player is MIT.</td>
+          </tr>
+          <tr>
+            <td><code>@missing-elements/h5p-libraries</code><br /><span>the library pack, for <code>libraries="pack"</code></span></td>
+            <td>Your bundle (the <code>pack</code> property), your own site via <code>pack-base</code>, or jsDelivr, the default</td>
+            <td>Plain static files, one archive per library, of which a learner's browser downloads only those a package needs.</td>
           </tr>
         </tbody>
       </table>
@@ -131,10 +136,64 @@ document.querySelector('h5p-player').runtime = runtime</pre>
       <pre class="code" data-lang="html">&lt;h5p-player src="…"
             sw="/vendor/h5p-player/h5p-sw.js"
             assets-base="/vendor/h5p-runtime/"&gt;&lt;/h5p-player&gt;</pre>
+      <p>
+        Exports from h5p.com and h5p.org often carry only their content, without the libraries
+        that play it. <code>libraries="pack"</code> takes each library a package needs from the
+        <a href="https://www.npmjs.com/package/@missing-elements/h5p-libraries" rel="noopener">library pack</a>,
+        and plays the pack's newer version of any library a package carries. On its own it fetches
+        them from jsDelivr. To serve them from your own site, install the pack too and hand its
+        <code>pack</code> export to the element. The bundler emits each library as an asset, and a
+        learner's browser downloads only the ones a package needs.
+      </p>
+      <div class="code-tabs">
+        <pre class="code" data-lang="sh" data-tab="npm">npm i @missing-elements/h5p-libraries</pre>
+        <pre class="code" data-lang="sh" data-tab="pnpm">pnpm add @missing-elements/h5p-libraries</pre>
+        <pre class="code" data-lang="sh" data-tab="yarn">yarn add @missing-elements/h5p-libraries</pre>
+      </div>
+      <pre class="code" data-lang="js">import '@missing-elements/h5p-offline-player'
+import { runtime } from '@missing-elements/h5p-runtime'
+import { pack } from '@missing-elements/h5p-libraries'
+
+const player = document.querySelector('h5p-player')
+player.runtime = runtime
+player.pack = pack</pre>
+      <pre class="code" data-lang="html">&lt;h5p-player src="https://host.example/course.h5p" libraries="pack"&gt;&lt;/h5p-player&gt;</pre>
+      <p>
+        The libraries keep their own licences, mostly MIT. Copy the package's
+        <code>libraries.txt</code>, which lists them, onto your site with the build.
+        <code>refresh-libraries="off"</code> plays the libraries a package carries as exported,
+        and the pack then only supplies what is missing.
+      </p>
 
       <h2 id="no-build">Install without a build step</h2>
       <p>
-        Load the element from the CDN, and copy the one file that has to be yours onto the site.
+        <strong>From your own site.</strong> Copy the files onto the site, so that nothing a
+        learner's browser loads comes from anyone else's server; npm is only how you get them.
+        <code>public/</code> stands for the folder your site is served from:
+      </p>
+      <pre class="code" data-lang="sh">npm install @missing-elements/h5p-offline-player @missing-elements/h5p-runtime
+cp -r node_modules/@missing-elements/h5p-offline-player/dist public/h5p-player
+cp -r node_modules/@missing-elements/h5p-runtime/dist public/h5p-player/frame-assets</pre>
+      <pre class="code" data-lang="html">&lt;script type="module" src="/h5p-player/h5p-player.js"&gt;&lt;/script&gt;
+
+&lt;h5p-player src="https://host.example/course.h5p"&gt;&lt;/h5p-player&gt;</pre>
+      <p>
+        The element finds the Service Worker and the runtime beside its own script, so it needs no
+        other attribute, and the worker is always the element's own version. For
+        <code>libraries="pack"</code>, copy the library pack too, with the list of its libraries'
+        licences, and name its folder:
+      </p>
+      <pre class="code" data-lang="sh">npm install @missing-elements/h5p-libraries
+cp -r node_modules/@missing-elements/h5p-libraries/parts public/h5p-libraries
+cp node_modules/@missing-elements/h5p-libraries/libraries.txt public/h5p-libraries/</pre>
+      <pre class="code" data-lang="html">&lt;h5p-player src="https://host.example/course.h5p"
+            libraries="pack" pack-base="/h5p-libraries/"&gt;&lt;/h5p-player&gt;</pre>
+      <p>To upgrade, delete the folders and copy them again.</p>
+      <p>
+        <strong>From the CDN.</strong> Or load the element and the runtime from jsDelivr, and copy
+        only the one file that has to be yours. Every learner's browser then fetches the player
+        from jsDelivr, as it does the pack's libraries unless <code>pack-base</code> names a copy
+        of your own.
       </p>
       <pre class="code" data-lang="html">&lt;script type="module"
   src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@0.10.0/dist/h5p-player.js"&gt;&lt;/script&gt;
@@ -166,7 +225,7 @@ document.querySelector('h5p-player').runtime = runtime</pre>
         the <a href="https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#readme" rel="noopener">package's README</a>
         has the rest. Then, on your site:
       </p>
-      <pre class="code" data-lang="html">&lt;iframe src="https://h5p-player.example.net/?src=%SITE_URL%/demo/content/quiz.h5p&amp;xapi=https://your-site.example"
+      <pre class="code" data-lang="html">&lt;iframe src="https://h5p-player.example.net/?src=https://alekswebnet.github.io/h5p/gh-normalized.h5p&amp;xapi=https://your-site.example"
         allow="fullscreen; microphone; camera" style="width: 100%; border: 0"&gt;&lt;/iframe&gt;
 &lt;script src="https://h5p-player.example.net/resizer.js"&gt;&lt;/script&gt;</pre>
       <p>
