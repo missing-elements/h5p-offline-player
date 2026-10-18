@@ -121,7 +121,8 @@ packages/runtime/         @missing-elements/h5p-runtime — the H5P core runtime
   vendor/h5p-core/          the core as upstream has it, committed: js/, styles/, the fonts and image the
                             styles reach, strings.json (the player's English strings from
                             `getLocalization()`), SOURCE.json (the commit, and `H5PCore::$scripts` and
-                            `$styles`, which say what is taken and in what order)
+                            `$styles`, which say what is taken and in what order); not scanned by
+                            CodeQL (.github/codeql/codeql-config.yml), since a finding there is upstream's
   l10n/                     the core's interface strings, one JSON file per language, from Moodle's
                             language packs, and index.json, their sources and aliases; committed,
                             written by scripts/build-l10n.mjs (`pnpm l10n`, and every Monday by

@@ -1,0 +1,7 @@
+name: CodeQL config
+
+# The H5P core as h5p-php-library has it, at the commit vendor/h5p-core/SOURCE.json names, and
+# not changed here: a finding in it is upstream's, reported there and taken with `pnpm core:sync`.
+# Until #37 the same code came from h5p-standalone under node_modules/, which was not scanned either.
+paths-ignore:
+  - packages/runtime/vendor
