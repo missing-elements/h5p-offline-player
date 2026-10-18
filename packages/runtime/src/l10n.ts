@@ -40,7 +40,7 @@ export function matchLanguage(tag: string | undefined, languages: readonly strin
 }
 
 /**
- * h5p-standalone's `translations` for a frame whose language is `tag`, from the table
+ * The strings laid over the core's English for a frame whose language is `tag`, from the table
  * `dist/l10n.js` left: the matched language's strings, and nothing that is not a string. `undefined`
  * without a table — an English frame loads none — or without a language for the tag in it.
  */

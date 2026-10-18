@@ -35,7 +35,7 @@ describe('findMissingLibraries', () => {
     expect(missing).toEqual([])
   })
 
-  it('accepts a bare machine name, which h5p-standalone falls back to', () => {
+  it('accepts a bare machine name, the folder older packages use', () => {
     const missing = findMissingLibraries(
       entries('H5P.InteractiveVideo/library.json', 'H5P.Video/library.json'),
       manifest

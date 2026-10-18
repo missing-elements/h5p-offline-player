@@ -64,7 +64,6 @@ const DEV_ASSETS_BASE = '/frame-assets/'
 
 /** File names inside the runtime's directory, relative to the assets base. */
 const ASSET_FILES = {
-  mainJs: 'main.bundle.js',
   frameJs: 'frame.bundle.js',
   frameCss: 'h5p.css',
   bootJs: 'frame-boot.js',
@@ -122,7 +121,6 @@ const BLOB_JOBS_SCRIPT: JobsScript = {
 /** The runtime inside a directory: the dev server's, the default beside the element, or an `assets-base`. */
 function assetsIn(base: string): FrameAssets {
   return {
-    mainJs: new URL(ASSET_FILES.mainJs, base).href,
     frameJs: new URL(ASSET_FILES.frameJs, base).href,
     frameCss: new URL(ASSET_FILES.frameCss, base).href,
     bootJs: new URL(ASSET_FILES.bootJs, base).href,
@@ -1241,9 +1239,12 @@ export class H5PPlayerElement extends HTMLElement {
   }
 
   set runtime(value: FrameAssets | null) {
-    this.runtimeValue = value && [value.mainJs, value.frameJs, value.frameCss, value.bootJs].every((url) => typeof url === 'string' && url)
+    // A runtime up to 0.2 names h5p-standalone's loader as well, `mainJs`, and is kept with it:
+    // the worker still writes the frame document such a runtime's boot script expects.
+    const files = value && [value.frameJs, value.frameCss, value.bootJs]
+    this.runtimeValue = files && files.every((url) => typeof url === 'string' && url)
       ? {
-          mainJs: value.mainJs,
+          ...(typeof value.mainJs === 'string' && value.mainJs ? { mainJs: value.mainJs } : {}),
           frameJs: value.frameJs,
           frameCss: value.frameCss,
           bootJs: value.bootJs,

@@ -47,8 +47,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ## The H5P runtime is not in this package
 
 The element plays content inside a frame that runs the H5P core runtime, and that runtime is
-**GPL-3.0** — it comes from [h5p/h5p-php-library](https://github.com/h5p/h5p-php-library) by way
-of [h5p-standalone](https://github.com/tunapanda/h5p-standalone). Up to 0.4 this package shipped
+**GPL-3.0** — it is the core of [h5p/h5p-php-library](https://github.com/h5p/h5p-php-library),
+which came by way of [h5p-standalone](https://github.com/tunapanda/h5p-standalone) until the
+runtime vendored it from upstream at a commit. Up to 0.4 this package shipped
 it under `dist/frame-assets/` and was published as `(MIT AND GPL-3.0-only)`. From 0.5 it does
 not: the runtime, its stylesheet and fonts, and the script that boots it inside the frame are
 [`@missing-elements/h5p-runtime`](https://www.npmjs.com/package/@missing-elements/h5p-runtime),

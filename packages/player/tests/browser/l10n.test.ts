@@ -93,7 +93,6 @@ describe('the core’s strings', () => {
   it('come from the runtime property’s own files when a host hands them over, and stay English when it has none', async () => {
     const base = new URL('/frame-assets/', location.href).href
     const runtime = {
-      mainJs: `${base}main.bundle.js`,
       frameJs: `${base}frame.bundle.js`,
       frameCss: `${base}h5p.css`,
       bootJs: `${base}frame-boot.js`,

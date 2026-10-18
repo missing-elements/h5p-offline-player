@@ -7,38 +7,20 @@ import { resolve } from 'node:path'
  */
 
 /**
- * The core's interface strings in English, by key: the `l10n.H5P` defaults h5p-standalone puts
- * into `H5PIntegration`, which the frame lays a language's strings over. Read from the installed
- * bundle, so the keys are the ones the vendored core knows, and in its order.
+ * The core's interface strings in English, by key: the player's part of `getLocalization()` in
+ * the vendored core, which the boot script puts into `H5PIntegration` and lays a language's
+ * strings over. `scripts/sync-core.mjs` writes it with the core, so the keys are the ones the
+ * vendored core knows, and in its order. They came from h5p-standalone's bundle until the core was
+ * vendored (#37): the same 67, word for word.
  *
  * @returns {Record<string, string>}
  */
 export function coreStrings() {
-  const path = resolve(import.meta.dirname, '..', 'node_modules', 'h5p-standalone', 'dist', 'main.bundle.js')
-  const bundle = readFileSync(path, 'utf8')
-  const start = bundle.indexOf('l10n:{H5P:{')
-  if (start < 0) throw new Error(`[h5p-runtime] ${path} no longer defines l10n.H5P where expected`)
-
-  // The object literal, matched brace for brace; a brace inside a string does not count.
-  let depth = 0
-  let quote = ''
-  let end = start + 'l10n:'.length
-  for (; end < bundle.length; end++) {
-    const char = bundle[end]
-    if (quote) {
-      if (char === '\\') end++
-      else if (char === quote) quote = ''
-    } else if (char === '"' || char === "'") quote = char
-    else if (char === '{') depth++
-    else if (char === '}' && --depth === 0) break
-  }
-  const literal = bundle.slice(start + 'l10n:'.length, end + 1)
-  if (!/^\{H5P:\{[\s\S]*\}\}$/.test(literal)) throw new Error(`[h5p-runtime] could not read l10n.H5P from ${path}`)
-
-  /** @type {{ H5P: Record<string, unknown> }} */
-  const l10n = new Function(`return ${literal}`)()
-  const strings = Object.fromEntries(Object.entries(l10n.H5P).filter(([, value]) => typeof value === 'string'))
-  if (Object.keys(strings).length < 50) throw new Error(`[h5p-runtime] only ${Object.keys(strings).length} strings in l10n.H5P`)
+  const path = resolve(import.meta.dirname, '..', 'vendor', 'h5p-core', 'strings.json')
+  /** @type {Record<string, unknown>} */
+  const parsed = JSON.parse(readFileSync(path, 'utf8'))
+  const strings = Object.fromEntries(Object.entries(parsed).filter(([, value]) => typeof value === 'string'))
+  if (Object.keys(strings).length < 50) throw new Error(`[h5p-runtime] only ${Object.keys(strings).length} strings in ${path}`)
   return /** @type {Record<string, string>} */ (strings)
 }
 

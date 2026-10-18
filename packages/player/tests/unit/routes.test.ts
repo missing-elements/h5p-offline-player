@@ -33,6 +33,12 @@ describe('matchRoute', () => {
     expect(matchRoute(routes, `${routes.frame}${PKG}`)).toEqual({ kind: 'frame', pkgId: PKG })
   })
 
+  it("matches the frame's question of what to load, under the same load", () => {
+    expect(routes.boot).toBe('https://site.example/assets/h5p/boot/')
+    expect(matchRoute(routes, `${routes.boot}${loadSegment({ pkgId: PKG, view: VIEW })}`)).toEqual({ kind: 'boot', pkgId: PKG, view: VIEW })
+    expect(matchRoute(routes, `${routes.boot}not-a-package`)).toEqual({ kind: 'none' })
+  })
+
   it('matches an entry request and keeps the whole path', () => {
     expect(matchRoute(routes, `${routes.virtual}${PKG}/content/images/a.png`)).toEqual({
       kind: 'entry',

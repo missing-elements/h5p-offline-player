@@ -1,6 +1,8 @@
 # Coming from h5p-standalone
 
-The element runs h5p-standalone inside its frame and takes its options by the same names where they still apply.
+The element takes h5p-standalone's options by the same names where they still apply. It ran
+h5p-standalone inside its frame until the runtime vendored the H5P core from h5p-php-library and
+loaded it itself; the libraries load in the same order, and the options mean what they meant.
 
 | h5p-standalone | Here | Note |
 |---|---|---|

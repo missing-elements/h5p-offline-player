@@ -87,7 +87,7 @@ describe('the site', () => {
     for (const name of ['index.html', 'main.js', 'embed.js', 'embed.css', 'resizer.js', 'config.js', 'h5p-player.js', 'h5p-sw.js', 'h5p-jobs.js', 'libraries/index.json', 'libraries.txt', 'NOTICE.txt', '_headers', 'vercel.json', 'Caddyfile', 'nginx.conf', '.htaccess']) {
       expect(existsSync(join(out, name)), name).toBe(true)
     }
-    for (const name of ['frame-boot.js', 'frame.bundle.js', 'main.bundle.js', 'h5p.css', 'LICENSE.txt', 'NOTICE.txt']) {
+    for (const name of ['frame-boot.js', 'frame.bundle.js', 'h5p.css', 'LICENSE.txt', 'NOTICE.txt']) {
       expect(existsSync(join(out, 'frame-assets', name)), name).toBe(true)
     }
     // The pack's parts, every one its index names, for the player to fetch as a package needs them.

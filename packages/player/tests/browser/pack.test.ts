@@ -69,6 +69,20 @@ describe('the library pack, split into parts', () => {
     expect(await loadOf(player)).toMatchObject({ parts: ['H5P.OfflineTest-1.2.h5p'], superseded: ['H5P.OfflineTest'] })
   })
 
+  it("plays the pack's folders, named with versions, beside the package's own named without", async () => {
+    // The content type comes from the pack at 1.2; the extra library, which the pack has at the
+    // package's own version, from the package's folder named without one. h5p-standalone named
+    // every folder one way, by its first dependency, and ended its boot on the extra library's 404.
+    const player = await play(fresh(FIXTURES.unversionedPack, 'mixed'), withPack())
+
+    expect(messageOf(player)).toBe(`${BASIC_MESSAGE} [1.1] [1.2]`)
+    expect(await loadOf(player)).toMatchObject({ parts: ['H5P.OfflineTest-1.2.h5p'], superseded: ['H5P.OfflineTest'] })
+    const view = frameWindow(player) as Window & { h5pOfflineExtraLoaded?: boolean; H5PIntegration: { libraryDirectories: Record<string, string> } }
+    expect(view.h5pOfflineExtraLoaded).toBe(true)
+    // So that the core's `H5P.getLibraryPath` finds the folder its name does not say.
+    expect(view.H5PIntegration.libraryDirectories).toEqual({ 'H5P.OfflineExtra-1.0': 'H5P.OfflineExtra' })
+  })
+
   it('plays the package as exported with refresh-libraries="off"', async () => {
     const player = await play(fresh(FIXTURES.basic, 'off'), withPack({ 'refresh-libraries': 'off' }))
 

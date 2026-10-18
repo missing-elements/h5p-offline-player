@@ -34,20 +34,18 @@
   ],
   "keywords": [
     "h5p",
-    "h5p-standalone",
+    "h5p-core",
     "h5p-offline-player",
     "runtime"
   ],
   "scripts": {
     "build": "node scripts/build.mjs",
+    "core:sync": "node scripts/sync-core.mjs",
     "l10n": "node scripts/build-l10n.mjs",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
     "test": "pnpm typecheck && vitest run",
     "test:unit": "pnpm typecheck && vitest run",
     "prepublishOnly": "pnpm test && pnpm build"
-  },
-  "dependencies": {
-    "h5p-standalone": "^3.8.2"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

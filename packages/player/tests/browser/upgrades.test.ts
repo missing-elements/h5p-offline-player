@@ -68,8 +68,8 @@ describe('content written for an older minor', () => {
   })
 
   it('names a main library whose minor is 0 in full', async () => {
-    // h5p-standalone wrote "H5P.OfflineTest 1", which the core took for the folder
-    // `H5P.OfflineTest-1.undefined`, and every statement's category with it.
+    // h5p-standalone, which loaded the runtime until #37, wrote "H5P.OfflineTest 1", which the
+    // core took for the folder `H5P.OfflineTest-1.undefined`, and every statement's category with it.
     const player = await play(FIXTURES.basic)
     expect(content(player).libraryInfo.versionedNameNoSpaces).toBe('H5P.OfflineTest-1.0')
   })

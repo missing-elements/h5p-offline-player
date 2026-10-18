@@ -473,14 +473,42 @@ for (const [name, minor, content] of [
   ])
 }
 
-// 7. Library folders with no version suffix, the way older packages are built. h5p-standalone
-//    probes the versioned name first, takes the 404 and falls back to the bare one.
+// 7. Library folders with no version suffix, the way older packages are built. Each library is
+//    looked for under the versioned name first and under the bare one after the 404.
 built.push([
   'unversioned.h5p',
   await writeArchive('unversioned.h5p', async (writer) => {
     for (const { entryName, path } of baseFiles) {
       const bare = entryName.replace(/^H5P\.OfflineTest-1\.0\//, 'H5P.OfflineTest/')
       await writer.add(bare, new Uint8ArrayReader(new Uint8Array(await readFile(path))))
+    }
+  })
+])
+
+// 7a. The same, carrying the extra library too, which h5p.json lists after the content type. Played
+//     with the pack, its content type plays at the pack's 1.2, from a folder named with its
+//     version, and the extra library, which the pack has at the same version, from the package's
+//     own folder named without one. h5p-standalone named every folder one way, by whether the first
+//     dependency answered under its versioned name, so the two kinds of folder side by side ended
+//     its boot on the extra library's 404 (#37).
+const UNVERSIONED_MANIFEST = { ...JSON.parse(await readFile(resolve(sourceDir, 'h5p.json'), 'utf8')) }
+UNVERSIONED_MANIFEST.preloadedDependencies = [
+  ...UNVERSIONED_MANIFEST.preloadedDependencies,
+  { machineName: 'H5P.OfflineExtra', majorVersion: 1, minorVersion: 0 }
+]
+built.push([
+  'unversioned-pack.h5p',
+  await writeArchive('unversioned-pack.h5p', async (writer) => {
+    for (const { entryName, path } of baseFiles) {
+      if (entryName === 'h5p.json') {
+        await writer.add('h5p.json', new TextReader(JSON.stringify(UNVERSIONED_MANIFEST)))
+        continue
+      }
+      const bare = entryName.replace(/^H5P\.OfflineTest-1\.0\//, 'H5P.OfflineTest/')
+      await writer.add(bare, new Uint8ArrayReader(new Uint8Array(await readFile(path))))
+    }
+    for (const { entryName, path } of extraLibFiles) {
+      await writer.add(entryName.replace(/^H5P\.OfflineExtra-1\.0\//, 'H5P.OfflineExtra/'), new Uint8ArrayReader(new Uint8Array(await readFile(path))))
     }
   })
 ])

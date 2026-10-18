@@ -88,6 +88,8 @@ export interface FrameDocumentOptions {
   pkgId: string
   /** Absolute URL of the package root on the virtual file server, without a trailing slash. */
   virtualRoot: string
+  /** Absolute URL of the load's `boot` route, where a runtime after 0.2 asks what to load. */
+  bootUrl: string
   assets: FrameAssets
   nonce: string
   title?: string
@@ -102,7 +104,8 @@ export interface FrameDocumentOptions {
   frameOptions?: FrameOptions
   /**
    * The library folders that carry an `upgrades.js`, for the boot script's upgrade of content
-   * written for an older minor than the one served.
+   * written for an older minor than the one served: a runtime up to 0.2 reads it here, a later
+   * one from the `boot` route.
    */
   upgrades?: string[]
   /** The language tag the element was in, which H5P's own strings follow; English without one. */
@@ -132,7 +135,7 @@ function escapeHtml(value: string): string {
 export function bootScriptUrl(assets: FrameAssets): string {
   if (assets.bootJs) return assets.bootJs
   try {
-    return new URL('frame-boot.js', assets.mainJs).href
+    return new URL('frame-boot.js', assets.mainJs ?? '').href
   } catch {
     // A `mainJs` that is not a URL has no sibling to resolve; the bare name is left to the frame's
     // own base, as a record from before 0.5 would have resolved it.
@@ -176,7 +179,7 @@ function assetOrigins(assets: FrameAssets, base: string, language: string): stri
   const origins = new Set<string>()
   const strings = l10nScriptUrl(assets, language)
   const urls = [
-    assets.mainJs,
+    ...(assets.mainJs ? [assets.mainJs] : []),
     assets.frameJs,
     assets.frameCss,
     bootScriptUrl(assets),
@@ -279,7 +282,7 @@ function sanitizeFrameOptions(options: FrameOptions | undefined): FrameOptions |
 function untrustedScriptSources(options: FrameDocumentOptions): string[] {
   const strings = l10nScriptUrl(options.assets, frameLanguage(options.language))
   const files = [
-    options.assets.mainJs,
+    ...(options.assets.mainJs ? [options.assets.mainJs] : []),
     options.assets.frameJs,
     bootScriptUrl(options.assets),
     ...(strings ? [strings] : []),
@@ -368,19 +371,25 @@ export function buildFrameDocument(options: FrameDocumentOptions): string {
   const language = frameLanguage(options.language)
   const l10nJs = l10nScriptUrl(assets, language)
 
+  // A runtime up to 0.2 boots through h5p-standalone's `main.bundle.js`, which the document loads
+  // ahead of the boot script, and takes the upgrade list from here; a later one has no such file
+  // and asks the `boot` route for what to load.
+  const loader = assets.mainJs
+
   // A JSON block, not a script: it is data, so it needs no nonce, and the boot script proper —
   // `frame-boot.js` from the runtime package, loaded by URL under the nonce — is the same bytes
   // for every package. `<` is escaped so no value can end the block early.
   const bootConfig = JSON.stringify({
     pkgId,
     h5pJsonPath: virtualRoot,
+    boot: loader ? undefined : options.bootUrl,
     frameJs: assets.frameJs,
     frameCss: assets.frameCss,
     title: options.title,
     // Checked again on the way out, as the options are: the record came back from IndexedDB.
     metadata: contentMetadata(options.metadata),
     options: sanitizeFrameOptions(options.frameOptions),
-    upgrades: options.upgrades,
+    upgrades: loader ? options.upgrades : undefined,
     // What the boot script picks H5P's own strings by, when it has the runtime's translations.
     language: l10nJs ? language : undefined,
     // The boot script checks the content against its libraries' semantics, and asks for it with
@@ -390,9 +399,10 @@ export function buildFrameDocument(options: FrameDocumentOptions): string {
 
   const fontFaces = fontFaceRules(assets.fonts)
   // The core's strings in every language the runtime has, a script that leaves them on `window`
-  // for the boot script, which picks the element's language and hands its strings to
-  // h5p-standalone: so it comes before it.
+  // for the boot script, which picks the element's language and builds the core's settings with
+  // its strings: so it comes before it.
   const strings = l10nJs ? `<script nonce="${nonce}" src="${escapeHtml(l10nJs)}" charset="UTF-8"></script>\n` : ''
+  const legacyLoader = loader ? `<script nonce="${nonce}" src="${escapeHtml(loader)}" charset="UTF-8"></script>\n` : ''
 
   // The last rule in the style block is for H5P.Video's YouTube handler, which pins its iframe
   // over the 16:9 box it builds with one line that reaches into the YouTube API object's minified
@@ -416,8 +426,7 @@ ${fontFaces}
 </head>
 <body>
 <div id="h5p-root"></div>
-<script nonce="${nonce}" src="${escapeHtml(assets.mainJs)}" charset="UTF-8"></script>
-${strings}<script type="application/json" id="h5p-boot-config">${bootConfig}</script>
+${legacyLoader}${strings}<script type="application/json" id="h5p-boot-config">${bootConfig}</script>
 <script nonce="${nonce}" src="${escapeHtml(bootScriptUrl(assets))}"></script>
 </body>
 </html>`

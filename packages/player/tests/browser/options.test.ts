@@ -4,7 +4,8 @@ import '../../src/h5p-offline-player'
 import { FIXTURES, createPlayer, frameDocument, frameWindow, play, waitForEvent } from './utils'
 
 /**
- * h5p-standalone's display and loading options, as the element's attributes. Each is read off the
+ * The display and loading options, by the names h5p-standalone gave them, as the element's
+ * attributes. Each is read off the
  * runtime's own configuration (`H5PIntegration`) or the frame's DOM, not off the element, so what
  * is pinned is what the content actually sees.
  */
@@ -43,7 +44,7 @@ async function complete(player: H5PPlayerElement): Promise<Statement> {
   return (await xapi).detail.statement
 }
 
-describe('h5p-standalone options', () => {
+describe('the display and loading options', () => {
   it('hides the action bar by default and shows it when asked, with the buttons the content is told to offer', async () => {
     const plain = await play(FIXTURES.basic)
     expect(frameDocument(plain).querySelector('.h5p-actions')).toBeNull()

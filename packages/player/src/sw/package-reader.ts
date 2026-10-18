@@ -1047,7 +1047,7 @@ export function textMatches(params: unknown, patterns: RegExp[]): boolean {
 }
 
 /** The well-formed entries of a manifest's or a `library.json`'s `preloadedDependencies`. */
-function dependenciesIn(value: unknown): LibraryDependency[] {
+export function dependenciesIn(value: unknown): LibraryDependency[] {
   const dependencies = (value as { preloadedDependencies?: unknown } | null)?.preloadedDependencies
   if (!Array.isArray(dependencies)) return []
   const version = (part: unknown) => typeof part === 'number' || (typeof part === 'string' && /^\d+$/.test(part))
@@ -1058,10 +1058,10 @@ function dependenciesIn(value: unknown): LibraryDependency[] {
 }
 
 /**
- * The two folder names a library may be stored under. h5p-standalone probes the versioned one
- * first and falls back to the bare machine name, so a package is usable with either.
+ * The two folder names a library may be stored under: the versioned one, and the bare machine
+ * name older packages use. Each is tried in that order, as h5p-standalone tried them.
  */
-function libraryFolderNames(dependency: LibraryDependency): string[] {
+export function libraryFolderNames(dependency: LibraryDependency): string[] {
   return [
     `${dependency.machineName}-${dependency.majorVersion}.${dependency.minorVersion}`,
     dependency.machineName
