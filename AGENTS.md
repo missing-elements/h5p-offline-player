@@ -1681,6 +1681,17 @@ Sizes come from the resize events content types raise when they actually change.
 H5P also deliberately stays quiet when a resize would not change the height, so no event is not
 the same as a broken exchange.
 
+A font arriving is the one change no content raises a resize for, so the boot script raises it
+(2026-10-18, #42). The frame's text faces load once text asks for them, and in Chrome H5P's
+first measurement often ran before they had: on the demo's player page a Column of text played
+after another package lost its bottom 47 px, its action bar, every time, and only a window
+resize put it right; WebKit and Firefox had the face in time in the same runs. On each
+`loading` of `document.fonts` the boot script waits for `ready` and two animation frames, then
+triggers `resize` on every instance, which H5P measures and reports through the same exchange.
+Not `loadingdone`, which WebKit never fires, and not `ready` alone, which WebKit resolves before
+its layout has taken the face: both measured. `playback.test.ts` gives the fixture's text a face
+three times the fallback's size once it loads, and fails in all three engines without this.
+
 `externalEmbed: false` is the other native mode and is **not** usable here: it has the frame call
 `window.parent.H5P.fullScreen(...)`, read `window.parent.H5P.isFullscreen` and forward xAPI
 through `window.parent.H5P.externalDispatcher`. That assumes the embedding page is itself an H5P
