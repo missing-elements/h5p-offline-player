@@ -638,15 +638,17 @@ progress[hidden] { display: none; }
 h5p-player {
   display: block;
   margin-top: 1.25rem;
-  min-height: clamp(16rem, 55vh, 28rem);
 }
 
-/* A box like the page's other boxes only while it is one: empty, loading, or failed. Once
-   content is up the frame fills the element edge to edge and the content draws its own chrome,
-   so the border and shadow would double it, and a rounded box that clips cuts the corners out
-   of whatever the content puts there — a Question Set's footer bar, a presentation's controls,
-   a video's picture. The element reflects its state as an attribute. */
+/* A box like the page's other boxes only while it is one: empty, loading, or failed, with a
+   height of its own since nothing in it gives one. Once content is up the element is as tall as
+   the content says — a minimum height left on it showed as empty space under a short quiz, and
+   under a video on a phone — and the frame fills it edge to edge while the content draws its
+   own chrome, so the border and shadow would double it, and a rounded box that clips cuts the
+   corners out of whatever the content puts there — a Question Set's footer bar, a
+   presentation's controls, a video's picture. The element reflects its state as an attribute. */
 h5p-player:not([state="ready"]) {
+  min-height: clamp(16rem, 55vh, 28rem);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   overflow: hidden;
