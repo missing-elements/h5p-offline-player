@@ -127,6 +127,9 @@ declare global {
       setUserData?: (contentId: unknown, dataType: string, data: unknown, options?: { subContentId?: unknown; errorCallback?: (error: unknown) => void }) => void
       deleteUserData?: (contentId: unknown, dataType: string, subContentId?: unknown) => void
       getContentPath?: (contentId: unknown) => string
+      /** The top-level instance of each content `H5P.init` created. */
+      instances?: unknown[]
+      trigger?: (instance: unknown, eventType: string) => void
     }
     H5PIntegration?: { saveFreq?: number | false; contents?: Record<string, IntegrationContent> }
     H5PUpgrades?: Record<string, UpgradeTable | undefined>
@@ -572,6 +575,31 @@ askForUserData()
     // Sizing is H5P's own: it talks the resizer protocol to the element over postMessage,
     // driven by the resize events content types raise when they actually change. Watching the
     // DOM from here would miss those and fire on changes that are not resizes.
+    //
+    // A font arriving is the one change no content raises one for. The frame's faces load once
+    // text asks for them, and H5P's first measurement can run before they have: text laid out
+    // in the fallback face wraps differently in its own, and the frame kept the earlier height
+    // with the overflow hidden. In Chrome a Column of text played after another package lost
+    // its bottom 47 px, its action bar, every time. So once the faces in flight have arrived,
+    // every instance is asked to resize, and H5P measures and reports as it always does. On
+    // `loading` rather than `loadingdone`, which WebKit never fires, and two frames after
+    // `ready`, which WebKit resolves before its layout has taken the face.
+    var fonts = document.fonts;
+    if (fonts && typeof H5P.trigger === 'function') {
+      var afterFonts = function () {
+        fonts.ready.then(function () {
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+              (H5P.instances || []).forEach(function (instance) {
+                H5P.trigger!(instance, 'resize');
+              });
+            });
+          });
+        });
+      };
+      fonts.addEventListener('loading', afterFonts);
+      if (fonts.status === 'loading') afterFonts();
+    }
     post({ type: 'ready' });
   })
   .catch(function (error: unknown) {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import '../../src/h5p-offline-player'
 import type { ReadyDetail } from '../../src/h5p-offline-player'
-import { FIXTURES, clearPackageCaches, createPlayer, frameDocument, frameFetch, frameWindow, messageOf, play, pressComplete, virtualUrl, waitForEvent } from './utils'
+import { FIXTURES, clearPackageCaches, createPlayer, frameDocument, frameFetch, frameWindow, messageOf, play, pressComplete, virtualUrl, waitFor, waitForEvent } from './utils'
 
 /**
  * The whole pipeline, end to end: probe, index, synthesize a frame, serve every file the H5P
@@ -308,6 +308,35 @@ describe('playing a package', () => {
     // The element writes its height on the line after it dispatches `resize`, so there is nothing to wait for.
     const { height } = (await resized).detail
     expect(Math.round(player.getBoundingClientRect().height)).toBe(height)
+  })
+
+  it('follows the content when a font arrives after the content was measured', async () => {
+    const player = createPlayer()
+    player.style.removeProperty('height')
+    const resized = waitForEvent(player, 'resize')
+    player.setAttribute('src', FIXTURES.basic)
+    await resized
+
+    const doc = frameDocument(player)
+    const view = frameWindow(player) as Window & typeof globalThis
+    const content = () => Math.round(doc.getElementById('h5p-root')!.getBoundingClientRect().height)
+    const before = content()
+
+    // A face the text asks for before it has loaded, three times the fallback's size once it has:
+    // nothing in the content raises a resize when it arrives. Its file is one the frame declares,
+    // so the frame's policy lets it through, with a query that keeps it from any cache.
+    const inter = [...doc.styleSheets]
+      .flatMap((sheet) => [...sheet.cssRules])
+      .find((rule): rule is CSSFontFaceRule => rule instanceof view.CSSFontFaceRule && rule.style.getPropertyValue('font-family').replace(/["']/g, '') === 'Inter')!
+    const file = /url\("?([^")]+)"?\)/.exec(inter.style.getPropertyValue('src'))![1]
+    // `size-adjust` is in every engine the suite runs and not yet in TypeScript's DOM types.
+    const descriptors: FontFaceDescriptors & { sizeAdjust: string } = { sizeAdjust: '300%' }
+    const face = new view.FontFace('Late', `url("${file}?late=${Date.now()}")`, descriptors)
+    doc.fonts.add(face)
+    doc.querySelector<HTMLElement>('.h5p-offline-test-message')!.style.fontFamily = 'Late, sans-serif'
+    await face.loaded
+
+    await waitFor(() => content() > before && Math.abs(Math.round(player.getBoundingClientRect().height) - content()) <= 1)
   })
 
   it('leaves the height to the host with auto-resize="off", and hands it back when set later', async () => {
