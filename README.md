@@ -104,7 +104,7 @@ document.querySelector('h5p-player').pack = pack
 <script type="module"
   src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@0.10.0/dist/h5p-player.js"></script>
 <h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js"
-            assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-runtime@0.2.4/dist/"></h5p-player>
+            assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-runtime@0.2.5/dist/"></h5p-player>
 ```
 
 Copy `dist/h5p-sw.js` of the same version onto your own site: browsers register a Service Worker
