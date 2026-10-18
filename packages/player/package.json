@@ -45,7 +45,13 @@
     "web-component",
     "custom-element",
     "service-worker",
-    "elearning"
+    "elearning",
+    "h5p-headless",
+    "h5p-offline",
+    "headless",
+    "offline",
+    "standalone",
+    "xapi"
   ],
   "scripts": {
     "sync:assets": "node scripts/sync-h5p-assets.mjs",

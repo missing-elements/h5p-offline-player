@@ -2083,7 +2083,12 @@ SPA-fallback trap described above cannot happen there.
   (`apps/demo/vite.config.ts`), which runs before Vite's own `%ENV%` pass so Vite does not warn about a
   name it does not know. `build-demo.mjs` decides the origin — `SITE_URL` if set, else Vercel's
   `VERCEL_PROJECT_PRODUCTION_URL`, else the preview's localhost — and writes the sitemap and
-  robots file with it. `/embed` stays out of the sitemap and carries `noindex`. The social card,
+  robots file with it. `/embed` stays out of the sitemap and carries `noindex`. Since 2026-10-18,
+  asked for by the owner, each title names H5P and what the page is about in the words people
+  search for, and the front page says it is a standalone, headless and offline player in its
+  title, its lede and a section of that name, and its h1 says what the player is: the package's
+  npm name, the h1 until then, is in the bar, and broke mid-word on a phone. Its JSON-LD adds a
+  `WebSite`, which gives search results the site's name rather than the host's. The social card,
   `demo/og-image.png`, is rendered by `pnpm demo:og` in Chromium from a small HTML page and
   committed, because link previews want a raster image and the deploy has no browser.
 - **`/app/` is the installable player, and the one place the single-worker setup runs.** A teacher hands out

@@ -4,9 +4,10 @@
 [![licence](https://img.shields.io/npm/l/%40missing-elements%2Fh5p-offline-player)](https://github.com/missing-elements/h5p-offline-player/blob/main/LICENSE)
 [![skills.sh](https://skills.sh/b/missing-elements/h5p-offline-player)](https://skills.sh/missing-elements/h5p-offline-player)
 
-Self-hosted H5P without an H5P server. One web component, on static hosting you control, that
-plays `.h5p` packages from your own URLs or from disk: no Moodle, WordPress or Lumi, no backend,
-no extraction step, no third-party service between your learners and your content.
+Self-hosted H5P without an H5P server. A standalone player in one web component, on static
+hosting you control, that plays `.h5p` packages from your own URLs or from disk in any front end:
+no Moodle, WordPress or Lumi, no backend, no extraction step, no third-party service between your
+learners and your content.
 
 - [Player](https://h5p-offline-player.vercel.app/) — paste a URL or pick a file
 - [Offline app (PWA)](https://h5p-offline-player.vercel.app/app/) — install it and play `.h5p` files with no network

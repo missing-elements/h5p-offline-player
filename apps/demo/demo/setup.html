@@ -3,23 +3,23 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Setting it up — h5p-offline-player</title>
-    <meta name="description" content="How to self-host the H5P player: install it on your own site, with or without a bundler, or serve its player page from a domain of your own and frame it. What has to live where, and which way suits your site." />
+    <title>How to self-host H5P on your own site — h5p-offline-player</title>
+    <meta name="description" content="How to self-host H5P with no H5P server: install the player with a bundler, in React, Vue or plain HTML, copy it onto a static site, or serve its player page from a domain of your own and frame it." />
     <link rel="canonical" href="%SITE_URL%/demo/setup.html" />
     <meta name="theme-color" content="#2f6df6" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="h5p-offline-player" />
     <meta property="og:locale" content="en_US" />
-    <meta property="og:title" content="Setting it up — h5p-offline-player" />
-    <meta property="og:description" content="How to self-host the H5P player: install it on your own site, with or without a bundler, or serve its player page from a domain of your own and frame it. What has to live where, and which way suits your site." />
+    <meta property="og:title" content="How to self-host H5P on your own site — h5p-offline-player" />
+    <meta property="og:description" content="How to self-host H5P with no H5P server: install the player with a bundler, in React, Vue or plain HTML, copy it onto a static site, or serve its player page from a domain of your own and frame it." />
     <meta property="og:url" content="%SITE_URL%/demo/setup.html" />
     <meta property="og:image" content="%SITE_URL%/demo/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="h5p-offline-player: self-hosted H5P, with no H5P server" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Setting it up — h5p-offline-player" />
-    <meta name="twitter:description" content="How to self-host the H5P player: install it on your own site, with or without a bundler, or serve its player page from a domain of your own and frame it. What has to live where, and which way suits your site." />
+    <meta name="twitter:title" content="How to self-host H5P on your own site — h5p-offline-player" />
+    <meta name="twitter:description" content="How to self-host H5P with no H5P server: install the player with a bundler, in React, Vue or plain HTML, copy it onto a static site, or serve its player page from a domain of your own and frame it." />
     <meta name="twitter:image" content="%SITE_URL%/demo/og-image.png" />
     <!-- partial: head -->
     <script type="module" src="/demo/code-blocks.js"></script>
@@ -128,6 +128,14 @@ document.querySelector('h5p-player').runtime = runtime</pre>
         the files into the build and rewrite the URLs, and the runtime's export hands the element
         the addresses it ended up with. Already have a Service Worker on the site? Nothing changes.
         Each registration has its own scope, and the two never see each other's requests.
+      </p>
+      <p>
+        In a framework the element is a tag like any other, in React, Vue, Svelte or Angular. The
+        imports have to run in the browser, since the element defines itself as it loads: where
+        pages are rendered on the server, as in Next.js, Nuxt, SvelteKit or Astro, import them where
+        only the browser runs code, such as an effect, <code>onMount</code> or an Astro
+        <code>&lt;script&gt;</code>. Vue and Angular want the tag declared as a custom element
+        (<code>compilerOptions.isCustomElement</code>, <code>CUSTOM_ELEMENTS_SCHEMA</code>).
       </p>
       <p>
         A bundler that does not follow that pattern, esbuild among them, leaves the files behind.
