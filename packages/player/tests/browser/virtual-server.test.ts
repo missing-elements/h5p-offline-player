@@ -55,7 +55,7 @@ describe('the virtual file server', () => {
     expect(response.status).toBe(416)
   })
 
-  it('404s a missing entry, which is how h5p-standalone probes folder naming', async () => {
+  it('404s a missing entry, which is how a library is looked for under its other folder name', async () => {
     const player = await play(FIXTURES.basic)
     const response = await frameFetch(player, virtualUrl(player, 'H5P.OfflineTest/library.json'))
     expect(response.status).toBe(404)

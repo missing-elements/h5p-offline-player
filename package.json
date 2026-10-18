@@ -22,6 +22,7 @@
     "libraries": "pnpm --filter @missing-elements/h5p-demo libraries",
     "sweep": "pnpm --filter @missing-elements/h5p-demo sweep",
     "l10n": "pnpm --filter @missing-elements/h5p-runtime l10n",
+    "core:sync": "pnpm --filter @missing-elements/h5p-runtime core:sync",
     "cmi5:catapult": "pnpm --filter @missing-elements/h5p-demo cmi5:catapult"
   },
   "engines": {

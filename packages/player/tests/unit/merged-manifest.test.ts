@@ -92,7 +92,7 @@ describe('mergedManifest with the pack attached', () => {
   it('keeps a dependency the pack carries only in a newer minor, as the content wrote it', async () => {
     const merged = await (await withPack(stripped)).mergedManifest()
     // 1.20 and 1.16, not the pack's 1.21 and 1.17: the file server maps the folder, and the
-    // content's own version is what h5p-standalone asks for.
+    // content's own version is what the runtime asks for.
     expect(merged.preloadedDependencies?.[0]).toEqual({ machineName: 'H5P.QuestionSet', majorVersion: '1', minorVersion: '20' })
     expect(merged.preloadedDependencies?.[1]).toMatchObject({ machineName: 'H5P.MultiChoice', minorVersion: 16 })
   })

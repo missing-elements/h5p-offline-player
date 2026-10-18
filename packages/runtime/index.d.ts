@@ -17,9 +17,7 @@ export interface RuntimeFont {
 export interface FrameRuntime {
   /** This package's version. */
   version: string
-  /** h5p-standalone `main.bundle.js`: the loader that walks dependencies and boots the runtime. */
-  mainJs: string
-  /** h5p-standalone `frame.bundle.js`: h5p.js, jQuery and the core runtime. */
+  /** `frame.bundle.js`: the H5P core's scripts, jQuery and h5p.js among them, from h5p-php-library. */
   frameJs: string
   /** The core stylesheet, rebuilt to stand alone: icon fonts and images inlined. */
   frameCss: string

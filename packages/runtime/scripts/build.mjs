@@ -1,16 +1,22 @@
 import { cp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { build } from 'esbuild'
+import { build, transform } from 'esbuild'
+import { CORE_DIR } from './sync-core.mjs'
 
 /**
- * Builds `dist/`: the h5p-standalone runtime vendored from `node_modules`, the frame's boot
- * script compiled from `src/frame-boot.ts`, and the notices — everything the player loads inside
- * its frame, and nothing the player itself is made of. Then writes `index.js`, which names every
- * one of those files with a static `new URL` so that a bundler emits them.
+ * Builds `dist/`: the H5P core from `vendor/h5p-core/`, which `scripts/sync-core.mjs` takes from
+ * h5p/h5p-php-library at a pinned commit, the frame's boot script compiled from
+ * `src/frame-boot.ts`, and the notices — everything the player loads inside its frame, and nothing
+ * the player itself is made of. Then writes `index.js`, which names every one of those files with
+ * a static `new URL` so that a bundler emits them.
  *
- * The runtime scripts' code is copied unmodified; each only gains a leading licence comment (see
- * below). The player synthesizes the document they run in; this package does not patch H5P.
+ * `frame.bundle.js` is the core's scripts in the order `H5PCore::$scripts` gives, joined into one
+ * file under a licence comment and minified: the way an H5P site loads them, one global script
+ * after another. Minifying keeps every top-level name, which is what the scripts share, and only
+ * shortens the names inside functions; h5p-standalone's bundle was minified too, and unminified
+ * the file costs every frame's first load about 20 kB more, gzipped. The player synthesizes the
+ * document the scripts run in; this package does not patch H5P.
  *
  * Every file in `dist/` stands alone, because `index.js` names each one with its own
  * `new URL('./dist/<file>', import.meta.url)` and a consumer's bundler emits each under a hashed
@@ -33,9 +39,8 @@ import { build } from 'esbuild'
  * from the committed `l10n/`, which `scripts/build-l10n.mjs` writes.
  *
  * `dist/` also gets a `LICENSE.txt` and a `NOTICE.txt`, written here rather than kept by hand so
- * that they always name the h5p-standalone version actually vendored — that tag is the
- * corresponding source — and so that they land beside the files they describe wherever `dist/`
- * is copied or served.
+ * that they always name the h5p-php-library commit actually vendored — the corresponding source —
+ * and so that they land beside the files they describe wherever `dist/` is copied or served.
  */
 
 const rootDir = resolve(import.meta.dirname, '..')
@@ -69,51 +74,46 @@ export const DIST_DIR = resolve(rootDir, 'dist')
  */
 export async function buildRuntime({ quiet = false } = {}) {
   const packageJson = JSON.parse(await readFile(resolve(rootDir, 'package.json'), 'utf8'))
-  const standaloneDir = resolve(rootDir, 'node_modules', 'h5p-standalone', 'dist')
-
-  if (!(await exists(standaloneDir))) {
-    fail('node_modules/h5p-standalone is missing. Run "pnpm install" at the repository root first.')
-  }
-
-  const standaloneVersion = JSON.parse(
-    await readFile(resolve(rootDir, 'node_modules', 'h5p-standalone', 'package.json'), 'utf8')
-  ).version
+  const sourcePath = resolve(CORE_DIR, 'SOURCE.json')
+  if (!(await exists(sourcePath))) fail('vendor/h5p-core/ is missing. Run "pnpm core:sync" in packages/runtime.')
+  /** @type {{ repository: string, commit: string, date: string, coreApi: string, scripts: string[], styles: string[] }} */
+  const core = JSON.parse(await readFile(sourcePath, 'utf8'))
+  const corresponding = `${core.repository}/tree/${core.commit}`
+  const coreName = `h5p/h5p-php-library at ${core.commit.slice(0, 10)} (${core.date.slice(0, 10)})`
 
   await rm(DIST_DIR, { recursive: true, force: true })
   await mkdir(DIST_DIR, { recursive: true })
 
-  // `main.bundle.js` walks the package's dependencies; `frame.bundle.js` is h5p.js, jQuery and the
-  // core runtime. Each is given a `/*! … */` header naming its licences, because a consumer's
-  // bundler emits each file on its own under a hashed name and none of the text files in this
-  // directory travel with it — a user's build of the player's 0.1.5 shipped `frame.bundle-*.js`,
-  // the GPL file, with no notice at all, and `main.bundle-*.js` pointing at a
-  // `main.bundle.js.LICENSE.txt` that was never emitted. Bundlers keep a `/*!` comment in an asset
-  // they emit as is, and webpack's Terser, which minifies emitted `.js` assets too, moves it into
-  // a `.LICENSE.txt` it does ship. The pointer webpack left in `main.bundle.js` is replaced by the
-  // notice it pointed at, so that file is not shipped. Nothing after the first line changes.
-  const corresponding = `https://github.com/tunapanda/h5p-standalone/tree/v${standaloneVersion}`
-  const headers = {
-    'frame.bundle.js': `/*! H5P core runtime (h5p.js and its companions) from h5p/h5p-php-library, GPL-3.0-only (https://github.com/h5p/h5p-php-library). jQuery 3.5.1, MIT (https://jquery.org/license). h5p-standalone ${standaloneVersion}, MIT, Copyright (c) 2015 Tunapanda. Corresponding source: ${corresponding}. See NOTICE.md in @missing-elements/h5p-runtime. */`,
-    'main.bundle.js': `/*! h5p-standalone ${standaloneVersion}, MIT, Copyright (c) 2015 Tunapanda (${corresponding}). See NOTICE.md in @missing-elements/h5p-runtime. */`
+  // The core's scripts, one after another. A `;` between them, so that a file ending without one
+  // cannot run into the next: `})` followed by `(function` would call the one with the other.
+  // The file opens with a `/*! … */` comment naming its licences, because a consumer's bundler
+  // emits each file on its own under a hashed name and none of the text files in this directory
+  // travel with it — a user's build of the player's 0.1.5 shipped the GPL runtime with no notice
+  // at all. Bundlers keep a `/*!` comment in an asset they emit as is, and webpack's Terser, which
+  // minifies emitted `.js` assets too, moves it into a `.LICENSE.txt` it does ship.
+  const scripts = []
+  for (const path of core.scripts) {
+    const file = resolve(CORE_DIR, path)
+    if (!(await exists(file))) fail(`vendor/h5p-core/${path} is missing; run "pnpm core:sync" again`)
+    scripts.push(`/* ${path} */\n${(await readFile(file, 'utf8')).trimEnd()}\n;`)
   }
-  const WEBPACK_POINTER = '/*! For license information please see main.bundle.js.LICENSE.txt */\n'
+  const jquery = /^\/\*! jQuery v(\d+\.\d+\.\d+)/.exec(await readFile(resolve(CORE_DIR, 'js', 'jquery.js'), 'utf8'))?.[1]
+  if (!jquery) fail("vendor/h5p-core/js/jquery.js no longer opens with jQuery's licence comment")
+  const frameHeader = `/*! H5P core runtime (${core.scripts.map((path) => path.slice('js/'.length)).join(', ')}) from ${coreName}, GPL-3.0-only. Includes jQuery ${jquery}, MIT (https://jquery.org/license). Corresponding source: ${corresponding}. See NOTICE.txt beside this file or NOTICE.md in @missing-elements/h5p-runtime. */`
+  // A plain script, not a module: no format is given, so top-level names stay as they are. The
+  // target is the one the boot script is built for; the core itself uses ES2020 syntax already.
+  const { code: frameCode } = await transform(scripts.join('\n'), { loader: 'js', minify: true, legalComments: 'inline', target: 'es2022' })
+  await writeFile(resolve(DIST_DIR, 'frame.bundle.js'), `${frameHeader}\n${frameCode}`, 'utf8')
 
-  for (const [file, header] of Object.entries(headers)) {
-    const source = resolve(standaloneDir, file)
-    if (!(await exists(source))) fail(`Required runtime file missing: ${source}`)
-    let code = await readFile(source, 'utf8')
-    if (file === 'main.bundle.js') {
-      if (!code.startsWith(WEBPACK_POINTER)) fail(`${source} no longer starts with webpack's licence pointer`)
-      const pointed = (await readFile(resolve(standaloneDir, 'main.bundle.js.LICENSE.txt'), 'utf8')).trim()
-      code = `${pointed}\n${code.slice(WEBPACK_POINTER.length)}`
-    }
-    await writeFile(resolve(DIST_DIR, file), `${header}\n${code}`, 'utf8')
+  // The core's stylesheets, one after another in the order `H5PCore::$styles` gives, as one sheet.
+  const stylesDir = resolve(CORE_DIR, 'styles')
+  const sheets = []
+  for (const path of core.styles) {
+    const file = resolve(CORE_DIR, path)
+    if (!(await exists(file))) fail(`vendor/h5p-core/${path} is missing; run "pnpm core:sync" again`)
+    sheets.push(await readFile(file, 'utf8'))
   }
-
-  // `styles/h5p.css` is the stylesheet the runtime loads; `h5p-fonts.css` beside it repeats its
-  // `@font-face` rules for the editor and is never requested by a player.
-  const stylesheet = resolve(standaloneDir, 'styles', 'h5p.css')
-  if (!(await exists(stylesheet))) fail(`Required runtime file missing: ${stylesheet}`)
+  const stylesheet = 'vendor/h5p-core/styles'
 
   // Rules are matched on the source text rather than parsed; `@font-face` bodies hold no braces.
   const FONT_FACE = /@font-face\s*\{([^}]*)\}/g
@@ -123,7 +123,7 @@ export async function buildRuntime({ quiet = false } = {}) {
   // A face that does not fit the shape the player's frame document accepts fails the build here,
   // where it is seen, rather than being dropped by the frame at runtime, where nothing would say
   // why the text fell back.
-  const source = await readFile(stylesheet, 'utf8')
+  const source = sheets.join('\n')
   const fonts = []
   const stripped = source.replace(FONT_FACE, (rule, body) => {
     const url = body.match(TEXT_FONT)
@@ -138,7 +138,7 @@ export async function buildRuntime({ quiet = false } = {}) {
     // overwrite the first under this name, so it is refused until the naming accounts for it.
     const file = `${url[1]}-${weight}${style === 'italic' ? '-italic' : ''}.woff2`
     if (fonts.some((font) => font.file === file)) fail(`Two @font-face rules map to ${file} in ${stylesheet}: ${rule}`)
-    fonts.push({ family, style, weight, file, source: resolve(standaloneDir, 'fonts', url[1], url[2]) })
+    fonts.push({ family, style, weight, file, source: resolve(CORE_DIR, 'fonts', url[1], url[2]) })
     return ''
   })
   if (fonts.length === 0) fail(`No Inter or Open Sans @font-face found in ${stylesheet}`)
@@ -150,7 +150,7 @@ export async function buildRuntime({ quiet = false } = {}) {
   }
 
   await build({
-    stdin: { contents: stripped, resolveDir: resolve(standaloneDir, 'styles'), loader: 'css', sourcefile: 'h5p.css' },
+    stdin: { contents: stripped, resolveDir: stylesDir, loader: 'css', sourcefile: 'h5p.css' },
     outfile: resolve(DIST_DIR, 'h5p.css'),
     bundle: true,
     minify: true,
@@ -161,7 +161,7 @@ export async function buildRuntime({ quiet = false } = {}) {
     // reachable even where LICENSE.txt and NOTICE.txt beside it do not travel.
     legalComments: 'none',
     banner: {
-      css: `/*! H5P core stylesheet from h5p-standalone ${standaloneVersion}, GPL-3.0 (https://github.com/h5p/h5p-php-library). See NOTICE.txt beside this file or NOTICE.md in @missing-elements/h5p-runtime. */`
+      css: `/*! H5P core stylesheets (${core.styles.map((path) => path.slice('styles/'.length)).join(', ')}) from ${coreName}, GPL-3.0-only. Corresponding source: ${corresponding}. See NOTICE.txt beside this file or NOTICE.md in @missing-elements/h5p-runtime. */`
     },
     loader: { '.woff2': 'dataurl', '.woff': 'dataurl', '.gif': 'dataurl', '.svg': 'dataurl', '.png': 'dataurl' }
   })
@@ -185,8 +185,8 @@ export async function buildRuntime({ quiet = false } = {}) {
   })
 
   // The fonts' licences, which sit in their own folders upstream.
-  await cp(resolve(standaloneDir, 'fonts', 'inter', 'LICENSE.txt'), resolve(DIST_DIR, 'fonts', 'Inter-LICENSE.txt'))
-  await cp(resolve(standaloneDir, 'fonts', 'open-sans', 'OFL.txt'), resolve(DIST_DIR, 'fonts', 'OpenSans-OFL.txt'))
+  await cp(resolve(CORE_DIR, 'fonts', 'inter', 'LICENSE.txt'), resolve(DIST_DIR, 'fonts', 'Inter-LICENSE.txt'))
+  await cp(resolve(CORE_DIR, 'fonts', 'open-sans', 'OFL.txt'), resolve(DIST_DIR, 'fonts', 'OpenSans-OFL.txt'))
 
   // The core's strings in other languages, from `l10n/` (`scripts/build-l10n.mjs`), all in one
   // classic script with the aliases beside them: the player's frame document names it before the
@@ -217,13 +217,13 @@ export async function buildRuntime({ quiet = false } = {}) {
 
   const manifest = {
     runtime: packageJson.version,
-    h5pStandalone: standaloneVersion,
+    core: { repository: core.repository, commit: core.commit, date: core.date, coreApi: core.coreApi },
     fonts: fonts.map(({ family, style, weight, file }) => ({ family, style, weight, file }))
   }
   await writeFile(resolve(DIST_DIR, 'MANIFEST.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
 
   await cp(resolve(rootDir, 'LICENSE'), resolve(DIST_DIR, 'LICENSE.txt'))
-  await writeFile(resolve(DIST_DIR, 'NOTICE.txt'), distNotice(standaloneVersion, packageJson.version), 'utf8')
+  await writeFile(resolve(DIST_DIR, 'NOTICE.txt'), distNotice(core, jquery, packageJson.version), 'utf8')
 
   // `index.js`: one static `new URL` per file, the one shape Vite, Rollup and webpack 5 emit as an
   // asset and rewrite. Generated, because the font list comes from the sheet. Written only when
@@ -233,7 +233,7 @@ export async function buildRuntime({ quiet = false } = {}) {
   const currentIndex = (await exists(indexPath)) ? await readFile(indexPath, 'utf8') : ''
   if (currentIndex !== index) await writeFile(indexPath, index, 'utf8')
 
-  if (!quiet) console.log(`[h5p-runtime] h5p-standalone v${standaloneVersion} and the boot script -> dist/`)
+  if (!quiet) console.log(`[h5p-runtime] the H5P core from ${coreName}, core API ${core.coreApi}, and the boot script -> dist/`)
   return manifest
 }
 
@@ -264,7 +264,6 @@ function unbundled(href) {
  */
 export const runtime = {
   version: ${JSON.stringify(version)},
-  mainJs: ${url('main.bundle.js')},
   frameJs: ${url('frame.bundle.js')},
   frameCss: ${url('h5p.css')},
   bootJs: ${url('frame-boot.js')},
@@ -282,44 +281,54 @@ ${fonts
 `
 }
 
-function distNotice(standalone, runtime) {
+function distNotice(core, jquery, runtime) {
+  /** A list of file names, as lines of the notice indented under its item. */
+  const wrap = (names) => {
+    const lines = ['']
+    for (const [index, name] of names.entries()) {
+      const word = index < names.length - 1 ? `${name},` : name
+      if (lines.at(-1) && lines.at(-1).length + word.length + 1 > 84) lines.push('')
+      lines[lines.length - 1] = lines.at(-1) ? `${lines.at(-1)} ${word}` : word
+    }
+    return lines.join('\n    ')
+  }
   return `@missing-elements/h5p-runtime ${runtime} -- third-party notice
 
 These files are the H5P runtime that <h5p-player> loads inside its frame, and the script that
-boots it there. The runtime was copied from h5p-standalone ${standalone}
-(https://github.com/tunapanda/h5p-standalone, tag v${standalone}): the scripts' code unmodified,
-each given a leading licence comment, the stylesheet rebuilt so that it stands alone, its icon
-fonts and images inlined as data URLs, its Inter and Open Sans faces moved to fonts/ and listed
-in MANIFEST.json for the player's frame document to declare. Keep this file and LICENSE.txt
-beside them when you copy or serve the directory.
+boots it there. The runtime is the H5P core from h5p/h5p-php-library at commit
+${core.commit} (${core.date.slice(0, 10)}, core API ${core.coreApi}):
+the scripts as upstream wrote them, joined into one file under a licence comment, and the
+stylesheets joined and rebuilt so that the sheet stands alone, its icon fonts and image inlined
+as data URLs and its Inter and Open Sans faces moved to fonts/ and listed in MANIFEST.json for
+the player's frame document to declare. Keep this file and LICENSE.txt beside them when you copy
+or serve the directory.
 
 frame.bundle.js
-  - H5P core: h5p.js, h5p-event-dispatcher.js, h5p-x-api.js, h5p-x-api-event.js,
-    h5p-content-type.js, h5p-confirmation-dialog.js, request-queue.js, h5p-action-bar.js,
-    h5p-tooltip.js, from https://github.com/h5p/h5p-php-library (vendor/h5p/js/ in
-    h5p-standalone). GNU General Public License v3.0 -- LICENSE.txt in this directory.
-  - jQuery 3.5.1. MIT, Copyright JS Foundation and other contributors, https://jquery.org/license
-  - h5p-standalone's own frame code. MIT, Copyright (c) 2015 Tunapanda.
+  - H5P core, from https://github.com/h5p/h5p-php-library:
+    ${wrap(core.scripts.map((path) => path.slice('js/'.length)))}. GNU General Public License v3.0 --
+    LICENSE.txt in this directory.
+  - jQuery ${jquery}, in jquery.js above. MIT, Copyright JS Foundation and other contributors,
+    https://jquery.org/license
 
 h5p.css
-  - H5P core styles/h5p.css, with the h5p-core-30, h5p-hub-publish and h5p-theme icon fonts and
-    images/throbber.gif inlined. Same origin, GNU General Public License v3.0 -- LICENSE.txt.
+  - H5P core, from the same repository:
+    ${wrap(core.styles.map((path) => path.slice('styles/'.length)))},
+    with the h5p-core-30, h5p-hub-publish and h5p-theme icon fonts and images/throbber.gif
+    inlined. Same origin, GNU General Public License v3.0 -- LICENSE.txt.
 
 fonts/inter-*     Inter, SIL Open Font License 1.1 -- fonts/Inter-LICENSE.txt
 fonts/open-sans-* Open Sans, SIL Open Font License 1.1 -- fonts/OpenSans-OFL.txt
-
-main.bundle.js
-  - h5p-standalone. MIT, Copyright (c) 2015 Tunapanda. Includes regenerator-runtime (MIT),
-    named in its own leading comment.
 
 frame-boot.js
   - The frame's boot script, from src/frame-boot.ts in this package. Copyright (c) 2026
     missing-elements, GNU General Public License v3.0 -- LICENSE.txt. It runs in the H5P
     document and calls the core's API, which is why it is part of this package and not of
-    the MIT player. It includes a port of H5PContentValidator from h5p/h5p-php-library
-    (GNU General Public License v3.0) and of the filter_xss functions of Drupal 7's
-    includes/common.inc (Copyright Drupal contributors, GNU General Public License v2.0 or
-    later), which check the content of a package played untrusted.
+    the MIT player. It builds the core's settings from the core's own English strings
+    (H5PCore::getLocalization() at the commit above), and includes a port of
+    H5PContentValidator from h5p/h5p-php-library (GNU General Public License v3.0) and of
+    the filter_xss functions of Drupal 7's includes/common.inc (Copyright Drupal
+    contributors, GNU General Public License v2.0 or later), which check the content of a
+    package played untrusted.
 
 l10n.js
   - The core's interface strings in other languages, taken from Moodle's language packs
@@ -329,10 +338,10 @@ l10n.js
     when they were taken.
 
 Corresponding source for the GPL parts as built:
-https://github.com/tunapanda/h5p-standalone/tree/v${standalone} (src/ and vendor/h5p/), and
-https://github.com/missing-elements/h5p-offline-player/tree/main/packages/runtime.
-h5p-standalone does not record which h5p-php-library revision vendor/h5p/ was taken from
-(https://github.com/tunapanda/h5p-standalone/issues/188).
+${core.repository}/tree/${core.commit}
+(js/ and styles/), and
+https://github.com/missing-elements/h5p-offline-player/tree/main/packages/runtime, whose
+vendor/h5p-core/ holds the same files and scripts/ the build that joins them.
 `
 }
 

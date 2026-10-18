@@ -215,9 +215,9 @@ describe('playing a package', () => {
   })
 
   it('plays a package whose library folders carry no version', async () => {
-    // Older packages are built this way. h5p-standalone probes the versioned name first and the
-    // 404 it gets is what tells it to fall back to the bare one, so that 404 has to be a clean
-    // 404 rather than an error.
+    // Older packages are built this way. Each library is looked for under the versioned name
+    // first, and the 404 it gets is what sends the lookup to the bare one, so that 404 has to be a
+    // clean 404 rather than an error.
     const player = await play(FIXTURES.unversioned)
 
     expect(player.state).toBe('ready')

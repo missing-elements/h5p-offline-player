@@ -26,10 +26,19 @@ Without one, point the element at a copy of `dist/`:
 
 Or copy `dist/` to `frame-assets/` next to `h5p-player.js`, where the element looks by default.
 
-`dist/` holds `main.bundle.js` and `frame.bundle.js` (h5p-standalone's loader, the H5P core and
-jQuery), `h5p.css`, `fonts/`, `frame-boot.js`, `l10n.js`, `MANIFEST.json`, `LICENSE.txt` and
-`NOTICE.txt`. Use a runtime version within the range the player names as its optional peer
-dependency.
+`dist/` holds `frame.bundle.js` (the H5P core's scripts, jQuery among them), `h5p.css`, `fonts/`,
+`frame-boot.js`, `l10n.js`, `MANIFEST.json`, `LICENSE.txt` and `NOTICE.txt`. Use a runtime version
+within the range the player names as its optional peer dependency.
+
+## The H5P core
+
+The core is h5p-php-library's, the scripts and stylesheets an H5P site loads, at the commit
+`vendor/h5p-core/SOURCE.json` names, with the list of files and their order taken from
+`H5PCore::$scripts` and `H5PCore::$styles` at that commit. `pnpm core:sync master` in this package
+moves it to upstream's newest commit, `pnpm core:sync <sha>` to another, and the build joins the
+files as they are. The boot script builds the core's settings and loads each library's scripts and
+stylesheets in the order the player's Service Worker gives it, which is the order h5p-standalone
+loaded them in until this package dropped it.
 
 ## Checking content
 

@@ -270,9 +270,9 @@ The player is MIT ([LICENSE](https://github.com/missing-elements/h5p-offline-pla
 Its Service Worker bundles [zip.js](https://github.com/gildas-lormeau/zip.js), BSD-3-Clause
 ([NOTICE.md](https://github.com/missing-elements/h5p-offline-player/blob/main/packages/player/NOTICE.md)).
 
-The H5P runtime the frame loads is GPL-3.0, from [h5p-php-library](https://github.com/h5p/h5p-php-library)
-by way of [h5p-standalone](https://github.com/tunapanda/h5p-standalone)
-([#188](https://github.com/tunapanda/h5p-standalone/issues/188)). It is published separately as
+The H5P runtime the frame loads is GPL-3.0: the H5P core from
+[h5p-php-library](https://github.com/h5p/h5p-php-library), at a commit its notice names, and the
+script that boots it. It is published separately as
 [`@missing-elements/h5p-runtime`](https://www.npmjs.com/package/@missing-elements/h5p-runtime);
 the player talks to it only over HTTP and `postMessage`. Its
 [NOTICE.md](https://github.com/missing-elements/h5p-offline-player/blob/main/packages/runtime/NOTICE.md)

@@ -40,7 +40,7 @@ await cp(RUNTIME_DIST, targetDir, { recursive: true })
 // Written only when it changes, like the version stamp below, so a sync leaves git clean.
 const fontsModulePath = resolve(rootDir, 'src', 'frame-fonts.ts')
 const fontsModule = `// Written by scripts/sync-h5p-assets.mjs from @missing-elements/h5p-runtime ${manifest.runtime}'s
-// MANIFEST.json (h5p-standalone ${manifest.h5pStandalone}). Do not edit; run \`pnpm sync:assets\` in packages/player.
+// MANIFEST.json (the H5P core at ${manifest.core.commit.slice(0, 10)}). Do not edit; run \`pnpm sync:assets\` in packages/player.
 
 /**
  * The text faces the runtime's stylesheet declares, in its order, by the file names under its
@@ -97,5 +97,5 @@ const currentPackIndex = (await exists(packIndexPath)) ? await readFile(packInde
 if (currentPackIndex !== packIndexModule) await writeFile(packIndexPath, packIndexModule, 'utf8')
 
 console.log(
-  `[sync-h5p] @missing-elements/h5p-runtime ${manifest.runtime} (h5p-standalone v${manifest.h5pStandalone}) -> public/frame-assets`
+  `[sync-h5p] @missing-elements/h5p-runtime ${manifest.runtime} (the H5P core at ${manifest.core.commit.slice(0, 10)}, core API ${manifest.core.coreApi}) -> public/frame-assets`
 )

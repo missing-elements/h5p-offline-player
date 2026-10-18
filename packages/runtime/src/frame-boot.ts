@@ -1,7 +1,13 @@
 /**
- * Runs inside the frame. It boots h5p-standalone against the virtual file server, forwards xAPI
- * to the element and relays the worker's job requests — the Service Worker can only message a
- * client, and the element is the one that owns the Jobs worker.
+ * Runs inside the frame. It boots the H5P core against the virtual file server, forwards xAPI to
+ * the element and relays the worker's job requests — the Service Worker can only message a client,
+ * and the element is the one that owns the Jobs worker.
+ *
+ * Booting is what a site's H5P plugin does for its iframe: it writes the core's settings,
+ * `H5PIntegration`, loads the core's scripts and stylesheets and then each library's, and calls
+ * `H5P.init`. What to load comes from the worker's `boot` route, which has walked the libraries
+ * (`LibraryLoad` in the player); until the core was vendored (#37) h5p-standalone did all of it
+ * here, and the settings are built as it built them, field for field, so content sees no change.
  *
  * Built by `scripts/build.mjs` to `dist/frame-boot.js`, a classic script the player's Service
  * Worker names with `<script nonce src>` in the document it synthesizes (`frame-document.ts` in
@@ -18,6 +24,9 @@ import { checkContent, checkContentMetadata, libraryKey, librariesIn, parseLibra
 import { upgradeContent, type ServedLibrary, type UpgradeSource, type UpgradeTable } from './content-upgrade'
 import { isResult } from './finished'
 import { coreTranslations } from './l10n'
+// The core's own English strings, from `getLocalization()` at the vendored commit: the defaults a
+// language's strings are laid over, and what a frame in English shows.
+import ENGLISH from '../vendor/h5p-core/strings.json'
 
 /** How long a read of one of the package's JSON files may take before it counts as failed. */
 var LIBRARY_READ_TIMEOUT_MS = 20000;
@@ -33,7 +42,7 @@ var errorText = function (error: unknown): string {
   return String((error && (error as Error).message) || error);
 };
 
-/** The one content h5p-standalone registered with the runtime, once it has. */
+/** The one content this frame registers with the runtime, once it has. */
 var registeredContent = function () {
   var contents = window.H5PIntegration && window.H5PIntegration.contents;
   var key = contents ? Object.keys(contents)[0] : undefined;
@@ -42,7 +51,14 @@ var registeredContent = function () {
 
 interface BootConfig {
   pkgId: string
+  /** The package's root on the virtual file server, without a trailing slash. */
   h5pJsonPath: string
+  /**
+   * The worker's `boot` route for this load, which answers what to load (`LibraryLoad`). Absent
+   * from a worker of a player that pairs with runtime 0.2, which wrote the document for
+   * h5p-standalone's loader.
+   */
+  boot?: string
   frameJs: string
   frameCss: string
   /** `h5p.json`'s title, and its licence, authors and the rest, in the shape `H5P.buildMetadataCopyrights` reads. */
@@ -50,8 +66,6 @@ interface BootConfig {
   metadata?: Record<string, unknown>
   /** What the host asked for; the same shape as `FrameOptions` in shared/protocol.ts. */
   options?: FrameOptions
-  /** The library folders, reachable from this package, that carry an `upgrades.js`. Absent from a worker older than the list. */
-  upgrades?: string[]
   /**
    * The element's language, which H5P's own strings follow, when the worker named `l10n.js`. Not
    * the document's `lang`: that is the content's, as H5P writes it.
@@ -72,13 +86,38 @@ interface BootConfig {
  */
 var CONTENT_CHECK_HEADER = 'X-H5P-Content-Check';
 
-/** The one content h5p-standalone puts in `H5PIntegration.contents`, as far as the upgrade touches it. */
+/** What the worker's `boot` route answers: `LibraryLoad` in the player's `shared/protocol.ts`. */
+interface LibraryLoad {
+  library: string
+  scripts: string[]
+  styles: string[]
+  directories: Record<string, string>
+  upgrades: string[]
+}
+
+/** The one content in `H5PIntegration.contents`, as far as this script touches it. */
 interface IntegrationContent {
   library: string
   jsonContent: string
   metadata?: unknown
-  /** The content's folder, `<virtual root>/content`, as h5p-standalone sets it. */
+  /** The content's folder, `<virtual root>/content`. */
   contentUrl?: string
+}
+
+/** The core's settings, `H5PIntegration`, in the shape a site's H5P plugin writes them. */
+interface Integration {
+  baseUrl: string
+  url: string
+  urlLibraries: string
+  libraryDirectories: Record<string, string>
+  contents: Record<string, IntegrationContent & Record<string, unknown>>
+  saveFreq: number | false
+  postUserStatistics: boolean
+  reportingIsEnabled: boolean
+  ajax: Record<string, string>
+  l10n: { H5P: Record<string, string> }
+  core: { scripts: string[]; styles: string[] }
+  user?: { name: string; mail: string }
 }
 
 interface FrameOptions {
@@ -116,7 +155,6 @@ type UserDataDone = (error?: unknown, data?: unknown) => void
 
 declare global {
   interface Window {
-    H5PStandalone: { H5P: new (root: HTMLElement, options: object) => Promise<unknown> }
     H5P?: {
       externalDispatcher?: { on(name: string, handler: (event: { data?: { statement?: XapiStatement } }) => void): void }
       init?: () => void
@@ -131,7 +169,7 @@ declare global {
       instances?: unknown[]
       trigger?: (instance: unknown, eventType: string) => void
     }
-    H5PIntegration?: { saveFreq?: number | false; contents?: Record<string, IntegrationContent> }
+    H5PIntegration?: Integration
     H5PUpgrades?: Record<string, UpgradeTable | undefined>
     /** Left by `l10n.js`, which the frame document names before this script unless its language is English. */
     H5PRuntimeL10n?: unknown
@@ -171,72 +209,153 @@ if (navigator.serviceWorker) {
 
 var root = document.getElementById('h5p-root')!;
 
-var options: Record<string, unknown> = {
-  h5pJsonPath: config.h5pJsonPath,
-  frameJs: config.frameJs,
-  frameCss: config.frameCss,
-  // Div embedding, not the default iframe: with 'iframe' H5P core writes the content into an
-  // inner about:blank frame, and whether such a child inherits this document's Service Worker
-  // controller differs between browsers. With 'div' this document is the H5P document.
-  embedType: 'div',
-  frame: false,
-  copyright: false,
-  export: false,
-  icon: false,
-  fullScreen: true,
-  // No result endpoint exists here. xAPI leaves as events; nothing is posted.
-  postUserStatistics: false,
-  // Off unless the element says otherwise below, before the runtime loads. A number, and the
-  // runtime hands the saved state to the content, asks it for its state that often, and saves as
-  // the document goes away — that last handler it registers as it loads, on the value it sees
-  // then, which is why the element is asked first.
-  saveFreq: false as number | false,
-  // The runtime is initialised here, not by h5p-standalone: the saved state has to be in place
-  // first, and it comes from the element. Read with care: h5p-standalone's flag is inverted —
-  // undefined or truthy, and it calls `H5P.init()` itself; `false`, and it leaves it to us.
-  preventH5PInit: false
-};
-
-// What the host asked for, by h5p-standalone's names; the defaults above stand where it said
-// nothing. A button whose target is missing stays off: an export button with no file to download
-// and an embed button with no code to offer would both be broken buttons.
+// What the host asked for. A button whose target is missing stays off: an export button with no
+// file to download and an embed button with no code to offer would both be broken buttons.
 var custom: FrameOptions = config.options || {};
-var flags = ['frame', 'copyright', 'icon', 'fullScreen', 'reportingIsEnabled'] as const;
-for (var f = 0; f < flags.length; f++) {
-  if (typeof custom[flags[f]] === 'boolean') options[flags[f]] = custom[flags[f]];
-}
-if (custom.downloadUrl) {
-  options.downloadUrl = custom.downloadUrl;
-  if (typeof custom.export === 'boolean') options.export = custom.export;
-}
-if (custom.embedCode) {
-  options.embedCode = custom.embedCode;
-  if (custom.resizeCode) options.resizeCode = custom.resizeCode;
-  if (typeof custom.embed === 'boolean') options.embed = custom.embed;
-}
-if (custom.customCss && custom.customCss.length) options.customCss = custom.customCss;
-if (custom.customJs && custom.customJs.length) options.customJs = custom.customJs;
-if (custom.activityId) options.xAPIObjectIRI = custom.activityId;
-
-// h5p-standalone fetches `h5p.json`, each `library.json` and `content.json` with these.
-if (config.untrusted) {
-  options.assetsRequestFetchOptions = { credentials: 'same-origin', headers: { [CONTENT_CHECK_HEADER]: 'semantics' } };
-}
-
-// The package's own account of itself. h5p-standalone takes `metadata` as an option and, given
-// none, makes one up — `{ title, license: 'U' }`, "Undisclosed" — for every package, whatever
-// its manifest says; the runtime then hides the copyright button, and names no activity in the
-// statements' object. The worker read it off `h5p.json`.
-if (config.title) options.title = config.title;
-if (config.metadata) options.metadata = config.metadata;
+var flag = function (value: boolean | undefined, otherwise: boolean) {
+  return typeof value === 'boolean' ? value : otherwise;
+};
 
 // The core's own strings in the element's language, when this package has them: the worker names
 // `l10n.js` ahead of this script for any language but English, and the strings for the language
-// the configuration names are picked from it. h5p-standalone lays `translations` over its English
-// defaults key by key, so a string a language lacks stays English, and it does so before the
-// core's ready handler builds the licence names from them.
+// the configuration names are picked from it. They are laid over the core's English key by key,
+// so a string a language lacks stays English, and before the core's ready handler builds the
+// licence names from them.
 var translations = coreTranslations(window.H5PRuntimeL10n, config.language);
-if (translations) options.translations = translations;
+
+/**
+ * The core's settings for this one content, as a site's H5P plugin writes them and as
+ * h5p-standalone wrote them here before the core was vendored. A random content id, as it gave.
+ * `url` is the package's root rather than that id: the core joins it with `/content/<id>` only
+ * where a content's own `contentUrl` is missing, and `H5P.getContentPath`, which joins it always,
+ * is answered from `contentUrl` below.
+ */
+var integrationFor = function (load: LibraryLoad, jsonContent: string, preload: UserDataPreload | null): Integration {
+  var contentId = Math.random().toString(36).substring(2, 9);
+  var base = config.h5pJsonPath;
+  var file = function (path: string) { return base + '/' + path; };
+  var content: IntegrationContent & Record<string, unknown> = {
+    library: load.library,
+    title: config.title || '',
+    // The statements' object id. The element sets the package URL unless the host named another;
+    // a picked file has none, and keeps the package's root on the virtual server.
+    url: custom.activityId || base,
+    contentUrl: base + '/content',
+    jsonContent: jsonContent,
+    // The host's stylesheets and scripts after the libraries', so that they can override them.
+    styles: load.styles.map(file).concat(custom.customCss || []),
+    scripts: load.scripts.map(file).concat(custom.customJs || []),
+    fullScreen: flag(custom.fullScreen, true),
+    exportUrl: custom.downloadUrl,
+    embedCode: custom.embedCode || '',
+    resizeCode: (custom.embedCode && custom.resizeCode) || '',
+    displayOptions: {
+      frame: flag(custom.frame, false),
+      copyright: flag(custom.copyright, false),
+      icon: flag(custom.icon, false),
+      export: Boolean(custom.downloadUrl) && flag(custom.export, false),
+      embed: Boolean(custom.embedCode) && flag(custom.embed, false),
+      copy: false
+    },
+    // The package's own account of itself, which the worker read off `h5p.json`; one that has
+    // none is "Undisclosed", as a platform saves content without a licence.
+    metadata: config.metadata || { title: config.title || '', license: 'U' }
+  };
+  var integration: Integration = {
+    baseUrl: location.origin,
+    url: base,
+    urlLibraries: base,
+    libraryDirectories: load.directories || {},
+    contents: {},
+    // A number, and the runtime hands the saved state to the content, asks it for its state that
+    // often, and saves as the document goes away — that last handler it registers as its ready
+    // handler runs, on the value it sees then, which is why the element is asked first.
+    saveFreq: preload && resume && preload.saveInterval ? preload.saveInterval : false,
+    // No result endpoint exists here. xAPI leaves as events; nothing is posted.
+    postUserStatistics: false,
+    reportingIsEnabled: flag(custom.reportingIsEnabled, false),
+    ajax: {},
+    l10n: { H5P: Object.assign({}, ENGLISH, translations ? translations.H5P : {}) },
+    core: { scripts: [config.frameJs], styles: [config.frameCss] }
+  };
+  if (preload && preload.user) integration.user = preload.user;
+  integration.contents['cid-' + contentId] = content;
+  return integration;
+};
+
+/**
+ * The content for the element the core initialises: a `.h5p-content` naming the content, in a
+ * `.h5p-iframe` wrapper, as a plugin writes it for content embedded as a div rather than an inner
+ * frame. Div, not iframe: with an inner frame the core writes the content into an `about:blank`
+ * document, and whether such a child inherits this document's Service Worker controller differs
+ * between browsers. With a div this document is the H5P document.
+ */
+var mountContent = function (integration: Integration) {
+  var wrapper = document.createElement('div');
+  wrapper.className = 'h5p-iframe';
+  var content = document.createElement('div');
+  content.className = 'h5p-content';
+  content.setAttribute('data-content-id', Object.keys(integration.contents)[0].slice('cid-'.length));
+  wrapper.appendChild(content);
+  root.appendChild(wrapper);
+};
+
+/** Stylesheets, added in order and not waited for, each marked as the core's own. */
+var addStyles = function (urls: string[]) {
+  urls.forEach(function (url) {
+    var link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = url;
+    link.dataset.h5p = url;
+    document.head.appendChild(link);
+  });
+};
+
+/**
+ * Scripts, run in order and waited for: not async, so the browser runs them as they were added
+ * while it fetches them all at once. Each is marked, so the listener at the end of this file
+ * reports one that does not load; until then nothing would end the wait.
+ */
+var addScripts = function (urls: string[]): Promise<void> {
+  return Promise.all(
+    urls.map(function (url) {
+      var script = document.createElement('script');
+      script.src = url;
+      script.async = false;
+      script.dataset.h5p = url;
+      var loaded = new Promise<void>(function (resolve) {
+        script.onload = function () { resolve(); };
+      });
+      document.head.appendChild(script);
+      return loaded;
+    })
+  ).then(function () { return undefined; });
+};
+
+/** What to load, from the worker; its refusal, which names what is missing, as the error. */
+var readLoad = function (): Promise<LibraryLoad> {
+  return fetch(config.boot!).then(function (response) {
+    if (response.ok) return response.json() as Promise<LibraryLoad>;
+    return response.text().then(function (reason) {
+      throw new Error(reason || 'The player could not say what to load (' + response.status + ')');
+    });
+  });
+};
+
+/**
+ * The content's parameters, as the core takes them: a string. For a package played `untrusted`
+ * asked for with `CONTENT_CHECK_HEADER`, without which the worker serves none.
+ */
+var readContent = function (): Promise<string> {
+  var init: RequestInit = { credentials: 'same-origin' };
+  if (config.untrusted) init.headers = { [CONTENT_CHECK_HEADER]: 'semantics' };
+  return fetch(config.h5pJsonPath + '/content/content.json', init)
+    .then(function (response) {
+      if (!response.ok) throw new Error('content/content.json could not be read (' + response.status + ')');
+      return response.json();
+    })
+    .then(function (params: unknown) { return JSON.stringify(params); });
+};
 
 /**
  * Whether the element opened this frame with `resume`. In the URL rather than in the boot
@@ -311,11 +430,11 @@ var askForUserData = function (): Promise<UserDataPreload | null> {
 /**
  * Where the upgrade learns what runs. A library's `library.json`, asked for under the version the
  * content names, says which version answered: the worker serves a newer minor when the exact one
- * is absent, and the bare folder name is tried after the versioned one, as h5p-standalone does.
+ * is absent, and the bare folder name is tried after the versioned one, as the worker tries them.
  * Its `upgrades.js` is fetched only from a folder the worker listed, so nothing is asked for that
- * is not there; a worker from before the list gets asked anyway, and a 404 then means no steps.
+ * is not there.
  */
-var librarySource = function (base: string, listed: string[] | undefined): UpgradeSource & { semantics(folder: string): Promise<SemanticField[] | null> } {
+var librarySource = function (base: string, listed: string[]): UpgradeSource & { semantics(folder: string): Promise<SemanticField[] | null> } {
   var served: Record<string, Promise<ServedLibrary | null>> = {};
   var steps: Record<string, Promise<UpgradeTable | null>> = {};
   var semantics: Record<string, Promise<SemanticField[] | null>> = {};
@@ -362,14 +481,11 @@ var librarySource = function (base: string, listed: string[] | undefined): Upgra
       return served[versioned];
     },
     steps: function (machineName, library) {
-      if (listed && listed.indexOf(library.folder) < 0) return Promise.resolve(null);
+      if (listed.indexOf(library.folder) < 0) return Promise.resolve(null);
       var url = base + '/' + library.folder + '/upgrades.js';
       if (!steps[url]) {
         steps[url] = boundedFetch(url).then(function (response) {
-          if (!response.ok) {
-            if (listed) throw new Error('could not load ' + library.folder + '/upgrades.js (' + response.status + ')');
-            return null;
-          }
+          if (!response.ok) throw new Error('could not load ' + library.folder + '/upgrades.js (' + response.status + ')');
           return response.text().then(function (code) {
             // Evaluated, not added as a script: the platforms' upgrade worker loads these with
             // `importScripts` inside a try, so one that throws as it loads fails the upgrade
@@ -387,8 +503,11 @@ var librarySource = function (base: string, listed: string[] | undefined): Upgra
   };
 };
 
-/** Where the upgrade and the check learn what is served, shared so a library is asked for once. */
-var libraries = librarySource(config.h5pJsonPath, config.upgrades);
+/**
+ * Where the upgrade and the check learn what is served, shared so a library is asked for once; set
+ * once the worker has said which folders carry an `upgrades.js`.
+ */
+var libraries: ReturnType<typeof librarySource>;
 
 interface Manifest {
   mainLibrary?: unknown
@@ -439,8 +558,8 @@ var upgradeToServed = function (): Promise<void> {
         content.metadata === undefined ? undefined : JSON.parse(JSON.stringify(content.metadata)),
         libraries
       ).then(function (result) {
-        // In full. h5p-standalone builds the name from library.json and leaves out a major or a
-        // minor that is 0 — "H5P.Accordion 1" — which the core turns into the folder
+        // The version served, in full: a name that leaves out a major or a minor of 0 —
+        // "H5P.Accordion 1", as h5p-standalone wrote it — the core turns into the folder
         // `H5P.Accordion-1.undefined`, the category every statement then carries.
         if (result.library) content.library = result.library;
         if (result.changed) {
@@ -500,11 +619,33 @@ var checkUntrusted = function (): Promise<void> {
     });
 };
 
+/**
+ * The core and the content's libraries, in place: the settings written, the content's element
+ * mounted, the stylesheets added and the scripts run, the core's first. `preventInit` is set
+ * before the core loads, since its ready handler initialises everything unless told not to, and
+ * the saved state has to be in place first.
+ */
+var bootCore = function (preload: UserDataPreload | null): Promise<void> {
+  if (!config.boot) {
+    return Promise.reject(new Error("The player's Service Worker is older than this runtime: it pairs with @missing-elements/h5p-runtime 0.2. Update the player, its element and h5p-sw.js together, to the release that names this runtime."));
+  }
+  return Promise.all([readLoad(), readContent()]).then(function (answers) {
+    var load = answers[0];
+    libraries = librarySource(config.h5pJsonPath, load.upgrades);
+    var integration = integrationFor(load, answers[1], preload);
+    window.H5PIntegration = integration;
+    window.H5P = window.H5P || {};
+    window.H5P.preventInit = true;
+    mountContent(integration);
+    var content = integration.contents[Object.keys(integration.contents)[0]];
+    addStyles(integration.core.styles.concat(content.styles as string[]));
+    return addScripts(integration.core.scripts.concat(content.scripts as string[]));
+  });
+};
+
 askForUserData()
   .then(function (preload) {
-    if (preload && preload.user) options.user = preload.user;
-    if (preload && resume) options.saveFreq = preload.saveInterval;
-    return new window.H5PStandalone.H5P(root, options).then(function () {
+    return bootCore(preload).then(function () {
       // Whenever the element answered, not only under `resume`: with a user set, the runtime
       // takes itself to be on a site and sends every user-data call to an AJAX URL that does not
       // exist here, and the boot died on it. Without `resume` the shim holds nothing and saves
@@ -519,7 +660,7 @@ askForUserData()
     // Behind the runtime's own ready handler, not merely after its scripts have loaded. The core
     // registers that handler as it loads and the frame's document is often still `interactive`
     // then — its own scripts and styles delay `load` — so jQuery runs it at `load`, which can
-    // fall after h5p-standalone resolves. The handler builds `H5P.copyrightLicenses`, which
+    // fall after the scripts above have run. The handler builds `H5P.copyrightLicenses`, which
     // `H5P.init` reads for the copyright button of any package whose licence is not
     // "Undisclosed"; initialised before it, such a package died on `copyrightLicenses['MIT']`.
     // Queued behind it, the init below runs once it has; preventInit keeps it from initialising.
@@ -530,14 +671,14 @@ askForUserData()
     });
   })
   .then(function () {
-    // What h5p-standalone would have done itself but for `preventH5PInit`.
+    // The core's own start, which `preventInit` held back.
     var H5P = window.H5P!;
     // `reportingIsEnabled` reaches a content type as `extras.isReportingEnabled` on h5p.com,
     // whose core sets it; this core never does, and of the hub's content types only Interactive
     // Book and Documentation Tool read the integration flag themselves. Question Set, Interactive
     // Video, Course Presentation and Game Map read the extras, so the top-level instance — the
     // one `H5P.init` creates, marked `standalone` — gets it here.
-    if (options.reportingIsEnabled && typeof H5P.newRunnable === 'function') {
+    if (window.H5PIntegration!.reportingIsEnabled && typeof H5P.newRunnable === 'function') {
       var newRunnable = H5P.newRunnable;
       H5P.newRunnable = function (library, contentId, attachTo, skipResize, extras) {
         if (extras && extras.standalone) extras.isReportingEnabled = true;
@@ -545,10 +686,11 @@ askForUserData()
       };
     }
     // The core builds a content's folder as `H5PIntegration.url + '/content/' + id`, as on a
-    // site, where `url` is the site's H5P folder; h5p-standalone sets `url` to the content id,
-    // so the path pointed nowhere. Its own `H5P.getPath` reads the content's `contentUrl` first,
-    // which h5p-standalone does set, and so does this. IFrame Embedder is the one content type
-    // that asks, for a page the package carries — which, played untrusted, is not served.
+    // site, where `url` is the site's H5P folder and each content has a folder below it; here the
+    // content is the package's own `content/`, one level below `url`. The core's own
+    // `H5P.getPath` reads the content's `contentUrl` first, which is set above, and so does this.
+    // IFrame Embedder is the one content type that asks, for a page the package carries — which,
+    // played untrusted, is not served.
     var getContentPath = H5P.getContentPath;
     if (typeof getContentPath === 'function') {
       H5P.getContentPath = function (contentId) {

@@ -13,15 +13,21 @@ const PKG = 'b'.repeat(32)
 const options = {
   pkgId: PKG,
   virtualRoot: `https://site.example/assets/h5p/virtual/${PKG}`,
+  bootUrl: `https://site.example/assets/h5p/boot/${PKG}`,
   assets: {
-    mainJs: 'https://site.example/frame-assets/main.bundle.js',
     frameJs: 'https://site.example/frame-assets/frame.bundle.js',
     frameCss: 'https://site.example/frame-assets/h5p.css',
     bootJs: 'https://site.example/frame-assets/frame-boot.js'
-  },
+  } as { mainJs?: string; frameJs: string; frameCss: string; bootJs?: string },
   nonce: 'deadbeef',
   title: 'A course'
 }
+
+/** A record an element wrote with the runtime up to 0.2, which boots through h5p-standalone's loader. */
+const legacy = { ...options, assets: { ...options.assets, mainJs: 'https://site.example/frame-assets/main.bundle.js' } }
+
+/** The boot configuration the document carries. */
+const bootConfigOf = (html: string) => JSON.parse(/id="h5p-boot-config">([^<]*)</.exec(html)![1])
 
 describe('buildContentSecurityPolicy', () => {
   it('allows the per-response nonce and nothing else inline', () => {
@@ -34,7 +40,6 @@ describe('buildContentSecurityPolicy', () => {
     const csp = buildContentSecurityPolicy({
       ...options,
       assets: {
-        mainJs: 'https://cdn.example/dist/main.bundle.js',
         frameJs: 'https://cdn.example/dist/frame.bundle.js',
         frameCss: 'https://cdn.example/dist/frame-assets/h5p.css'
       }
@@ -113,7 +118,6 @@ describe('the policy for an untrusted package', () => {
     const sources = scriptSources(buildContentSecurityPolicy({ ...options, untrusted: true }))
     expect(sources).not.toContain("'self'")
     expect(sources).toContain(`${options.virtualRoot}/`)
-    expect(sources).toContain(options.assets.mainJs)
     expect(sources).toContain(options.assets.frameJs)
     expect(sources).toContain(options.assets.bootJs)
     expect(sources).toContain("'nonce-deadbeef'")
@@ -214,7 +218,7 @@ describe('buildFrameDocument', () => {
     expect(html).not.toMatch(/<script nonce="deadbeef">/)
     expect(html).toContain('<script type="application/json" id="h5p-boot-config">')
     // A record written before the file existed names no `bootJs`; it is looked for beside `main.bundle.js`.
-    const older = buildFrameDocument({ ...options, assets: { ...options.assets, bootJs: undefined } })
+    const older = buildFrameDocument({ ...legacy, assets: { ...legacy.assets, bootJs: undefined } })
     expect(older).toContain('src="https://site.example/frame-assets/frame-boot.js"')
     const explicit = buildFrameDocument({ ...options, assets: { ...options.assets, bootJs: 'https://cdn.example/x/boot-abc.js' } })
     expect(explicit).toContain('src="https://cdn.example/x/boot-abc.js"')
@@ -222,13 +226,25 @@ describe('buildFrameDocument', () => {
     expect(buildFrameDocument({ ...options, virtualRoot: 'https://site.example/</script>' })).not.toContain('</script>"')
   })
 
-  it('tells the boot script which library folders carry an upgrades.js, and leaves the list out when it has none', () => {
-    // The boot script fetches upgrade steps only from these, so it never asks for a script that
-    // is not there; with no list, from a worker older than it, it asks and takes a 404 as none.
-    expect(buildFrameDocument({ ...options, upgrades: ['H5P.QuestionSet-1.21', 'H5P.Summary-1.10'] })).toContain(
-      '"upgrades":["H5P.QuestionSet-1.21","H5P.Summary-1.10"]'
-    )
-    expect(html).not.toContain('"upgrades"')
+  it("names the load's boot route, where the boot script asks what to load, and no loader", () => {
+    const html = buildFrameDocument({ ...options, upgrades: ['H5P.QuestionSet-1.21'] })
+    expect(bootConfigOf(html).boot).toBe(options.bootUrl)
+    expect(html).not.toContain('main.bundle.js')
+    // The route answers with the list of folders that carry an `upgrades.js`, with the rest.
+    expect(bootConfigOf(html).upgrades).toBeUndefined()
+  })
+
+  it('writes the document a runtime up to 0.2 expects: its loader first, and the upgrade list', () => {
+    // A record such an element wrote names h5p-standalone's `main.bundle.js`, whose boot script
+    // walks the libraries in the frame and takes the folders that carry an `upgrades.js` from here;
+    // with no list, from a worker older than it, it asks and takes a 404 as none.
+    const html = buildFrameDocument({ ...legacy, upgrades: ['H5P.QuestionSet-1.21', 'H5P.Summary-1.10'] })
+    expect(html).toContain('<script nonce="deadbeef" src="https://site.example/frame-assets/main.bundle.js" charset="UTF-8"></script>')
+    expect(html.indexOf('main.bundle.js')).toBeLessThan(html.indexOf('frame-boot.js'))
+    expect(html).toContain('"upgrades":["H5P.QuestionSet-1.21","H5P.Summary-1.10"]')
+    expect(bootConfigOf(html).boot).toBeUndefined()
+    expect(buildFrameDocument(legacy)).not.toContain('"upgrades"')
+    expect(buildContentSecurityPolicy({ ...legacy, untrusted: true })).toContain(legacy.assets.mainJs)
   })
 
 })
@@ -341,13 +357,15 @@ describe('the boot script', () => {
     expect(source).toContain("document.getElementById('h5p-boot-config')")
   })
 
-  it('uses div embedding, so there is no inner about:blank frame to inherit a controller', () => {
-    expect(source).toMatch(/embedType:\s*["']div["']/)
+  it('mounts the content as a div, so there is no inner about:blank frame to inherit a controller', () => {
+    expect(source).toContain("content.className = 'h5p-content'")
+    expect(source).not.toMatch(/createElement\(["']iframe["']\)/)
   })
 
   it('turns off every result endpoint, because there is no server to post to', () => {
     expect(source).toMatch(/postUserStatistics:\s*false/)
-    expect(source).toMatch(/saveFreq:\s*false/)
+    // Saves go to the element, and only with `resume`.
+    expect(source).toMatch(/saveFreq:[^\n]*\bresume\b[^\n]*:\s*false,/)
   })
 
   it('reports a runtime script or stylesheet that fails to load, in the capture phase', () => {
@@ -374,7 +392,7 @@ describe('the boot script', () => {
 describe('the host’s frame options', () => {
   const withOptions = (frameOptions: object) => buildFrameDocument({ ...options, frameOptions } as typeof options & { frameOptions: object })
 
-  it('ride into the boot config by h5p-standalone’s names', () => {
+  it('ride into the boot config by the names h5p-standalone gave them', () => {
     const html = withOptions({ frame: true, copyright: true, reportingIsEnabled: true, activityId: 'https://lms.example/a/1' })
     expect(html).toContain('"options":{"frame":true,"copyright":true,"reportingIsEnabled":true,"activityId":"https://lms.example/a/1"}')
   })
@@ -444,7 +462,7 @@ describe('the package’s metadata', () => {
 describe('the frame’s language', () => {
   const l10nJs = 'https://site.example/frame-assets/l10n.js'
   const translated = { ...options, assets: { ...options.assets, l10nJs } }
-  const bootLanguage = (html: string) => JSON.parse(/id="h5p-boot-config">([^<]*)</.exec(html)![1]).language
+  const bootLanguage = (html: string) => bootConfigOf(html).language
   const htmlTag = (html: string) => /<html [^>]*>/.exec(html)![0]
 
   it('is English when neither the element nor the package says otherwise, with no translations', () => {
@@ -457,7 +475,7 @@ describe('the frame’s language', () => {
   it('names the runtime’s translations ahead of the boot script, and tells it the element’s language', () => {
     const html = buildFrameDocument({ ...translated, language: 'de-AT' })
     const at = html.indexOf(`<script nonce="${options.nonce}" src="${l10nJs}" charset="UTF-8"></script>`)
-    expect(at).toBeGreaterThan(html.indexOf('main.bundle.js'))
+    expect(at).toBeGreaterThan(0)
     expect(at).toBeLessThan(html.indexOf('frame-boot.js'))
     expect(bootLanguage(html)).toBe('de-AT')
   })

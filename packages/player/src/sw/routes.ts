@@ -1,7 +1,8 @@
 /**
  * URL shape of the virtual routes. Our own registration uses the scope `<swDir>h5p/`, so routes
  * sit directly under it; `mountH5P` puts them at `<hostScope>h5p/`. Both spell the same thing —
- * `…/h5p/virtual/…` and `…/h5p/frame/…` — so everything downstream works off one base.
+ * `…/h5p/virtual/…`, `…/h5p/frame/…` and `…/h5p/boot/…` — so everything downstream works off one
+ * base.
  */
 
 import { LOAD_KEY_BYTES, PKG_ID_LENGTH } from '../shared/pkg-id'
@@ -11,6 +12,8 @@ export interface Routes {
   base: string
   virtual: string
   frame: string
+  /** What a frame loads, its libraries in order (`LibraryLoad`), which its boot script asks for. */
+  boot: string
   ping: string
 }
 
@@ -22,6 +25,7 @@ export function routesFor(scope: string): Routes {
     base,
     virtual: `${base}virtual/`,
     frame: `${base}frame/`,
+    boot: `${base}boot/`,
     ping: `${base}virtual/_ping`
   }
 }
@@ -38,6 +42,7 @@ export interface LoadRef {
 export type RouteMatch =
   | { kind: 'ping' }
   | ({ kind: 'frame' } & LoadRef)
+  | ({ kind: 'boot' } & LoadRef)
   | ({ kind: 'entry'; path: string } & LoadRef)
   | { kind: 'none' }
 
@@ -58,9 +63,10 @@ function parseLoad(segment: string): LoadRef | null {
 export function matchRoute(routes: Routes, url: string): RouteMatch {
   if (url === routes.ping) return { kind: 'ping' }
 
-  if (url.startsWith(routes.frame)) {
-    const load = parseLoad(url.slice(routes.frame.length).split(/[/?#]/, 1)[0])
-    return load ? { kind: 'frame', ...load } : { kind: 'none' }
+  for (const kind of ['frame', 'boot'] as const) {
+    if (!url.startsWith(routes[kind])) continue
+    const load = parseLoad(url.slice(routes[kind].length).split(/[/?#]/, 1)[0])
+    return load ? { kind, ...load } : { kind: 'none' }
   }
 
   if (url.startsWith(routes.virtual)) {

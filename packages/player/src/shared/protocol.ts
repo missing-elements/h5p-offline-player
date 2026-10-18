@@ -245,11 +245,16 @@ export interface LoadSettings {
  * is GPL-3.0 and the player is MIT; the player carries none of these files and only names them.
  */
 export interface FrameAssets {
-  /** h5p-standalone `main.bundle.js` — the loader that walks dependencies and boots the runtime. */
-  mainJs: string
-  /** h5p-standalone `frame.bundle.js` — h5p.js, jQuery and the core runtime. */
+  /**
+   * h5p-standalone's `main.bundle.js`, the loader of the runtime up to 0.2, which walked the
+   * libraries in the frame and booted the core: present in a record an element wrote with such a
+   * runtime, whose frame document the worker still writes the way it expects. A later runtime has
+   * none; its boot script loads what the worker's `boot` route names (`LibraryLoad`).
+   */
+  mainJs?: string
+  /** `frame.bundle.js` — the H5P core's scripts, jQuery and h5p.js among them. */
   frameJs: string
-  /** h5p-standalone `styles/h5p.css`, rebuilt to stand alone: icon fonts and images inlined. */
+  /** `h5p.css`, the core's stylesheets rebuilt to stand alone: icon fonts and images inlined. */
   frameCss: string
   /**
    * The frame's boot script, `frame-boot.js`, which the worker names in the frame document.
@@ -276,6 +281,28 @@ export interface FrameFont {
   style: string
   weight: string
   url: string
+}
+
+/**
+ * What a frame loads, as the worker's `boot` route answers it (`sw/library-load.ts`): the boot
+ * script of a runtime after 0.2 asks for it and builds `H5PIntegration` from it, where h5p-standalone
+ * walked the libraries itself. A contract between the player and the runtime, like the boot
+ * configuration: a field the boot script needs is one every worker it pairs with writes.
+ */
+export interface LibraryLoad {
+  /** The main library at the version served, `H5P.QuestionSet 1.21`: `H5PIntegration`'s `library`. */
+  library: string
+  /** Every library's scripts, dependencies first, as entry names under the package's root. */
+  scripts: string[]
+  /** Every library's stylesheets, in the same order. */
+  styles: string[]
+  /**
+   * The core's `libraryDirectories`: for a library served from a folder its version does not name,
+   * `H5P.Foo-1.2` → `H5P.Foo`, so that `H5P.getLibraryPath` finds it.
+   */
+  directories: Record<string, string>
+  /** The library folders, reachable from the package, that carry an `upgrades.js`. */
+  upgrades: string[]
 }
 
 export type ErrorCode =

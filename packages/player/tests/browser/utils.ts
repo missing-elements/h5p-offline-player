@@ -63,7 +63,8 @@ export const FIXTURES = {
   writtenFor12: '/fixtures/upgrade-1.2.h5p',
   upgradeFails: '/fixtures/upgrade-fails.h5p',
   /** Library folders with no version suffix, the shape older packages use. */
-  unversioned: '/fixtures/unversioned.h5p'
+  unversioned: '/fixtures/unversioned.h5p',
+  unversionedPack: '/fixtures/unversioned-pack.h5p'
 } as const
 
 /**

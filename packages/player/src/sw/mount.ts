@@ -28,6 +28,7 @@ import { contentTypeOf } from '../shared/mime'
 import {
   PlayerError,
   type FromWorkerMessage,
+  type LibraryLoad,
   type LoadSettings,
   type PackOffer,
   type PackPlan,
@@ -38,7 +39,8 @@ import {
 import { contentRange, parseRange, type ByteRange } from '../shared/range'
 import { openSource } from '../shared/source'
 import * as db from '../shared/idb'
-import { type IndexedEntry, type LocatedEntry, PackageReader, explainMissingLibraries, locationOf } from './package-reader'
+import { type IndexedEntry, type LocatedEntry, PackageReader, dependenciesIn, explainMissingLibraries, libraryFolderNames, locationOf } from './package-reader'
+import { libraryLoad, walkLibraries } from './library-load'
 import { STORED } from '../shared/local-header'
 import { CONTENT_CHECK_HEADER, buildFrameDocument, createNonce } from './frame-document'
 import { loadSegment, matchRoute, routesFor, type LoadRef, type RouteMatch, type Routes } from './routes'
@@ -318,6 +320,9 @@ class VirtualServer {
         case 'frame':
           return await this.serveFrame(match)
 
+        case 'boot':
+          return await this.serveBoot(match)
+
         case 'entry':
           return await this.serveEntry(event, match, match.path)
 
@@ -346,18 +351,23 @@ class VirtualServer {
 
     await bookkeeping(db.touchPackage(load.pkgId))
 
-    // From the reader the element's `index` left open, never a new one: a picked file's reader
-    // asks the page for the file through the frame, and the frame is what is being served. With
-    // no reader the list is left out, and the frame asks for each script and takes a 404 as none.
-    const upgrades = await this.readers.get(loadSegment(load))?.then(
-      (reader) => reader.foldersWithUpgrades(),
-      () => undefined
-    )
+    // For a runtime up to 0.2, whose boot script takes the list from the document: from the
+    // reader the element's `index` left open, never a new one, since a picked file's reader asks
+    // the page for the file through the frame, and the frame is what is being served. With no
+    // reader the list is left out, and the frame asks for each script and takes a 404 as none. A
+    // later runtime asks the `boot` route, whose answer carries it.
+    const upgrades = settings.frameAssets.mainJs
+      ? await this.readers.get(loadSegment(load))?.then(
+          (reader) => reader.foldersWithUpgrades(),
+          () => undefined
+        )
+      : undefined
 
     const nonce = createNonce()
     const body = buildFrameDocument({
       pkgId: load.pkgId,
       virtualRoot: `${this.routes.virtual}${loadSegment(load)}`,
+      bootUrl: `${this.routes.boot}${loadSegment(load)}`,
       assets: settings.frameAssets,
       nonce,
       title: record.title,
@@ -378,6 +388,46 @@ class VirtualServer {
         'cache-control': 'no-store'
       }
     })
+  }
+
+  /**
+   * What the frame loads (`LibraryLoad`): every library the content needs, its scripts and
+   * stylesheets dependencies first, as `sw/library-load.ts` works them out from the manifest the
+   * runtime is served — the merged one when archives are attached. The boot script of a runtime
+   * after 0.2 asks for it as it starts. Asked by the frame rather than written into its document,
+   * because only a request from the frame can open a reader the worker lost on a restart: for a
+   * picked file the page is asked for the file through the frame, which, while its own document is
+   * being served, does not exist yet.
+   *
+   * A library is looked up the way `get()` serves its files — the folder its version names, the
+   * bare machine name, a compatible newer minor — and on an archive still arriving it is waited
+   * for as any entry the frame asks for is. One that nothing answers for is named in the refusal.
+   */
+  private async serveBoot(load: LoadRef): Promise<Response> {
+    const reader = await this.refresh(load, await this.reader(load))
+    const manifest = reader.hasFallbacks ? await reader.mergedManifest() : reader.manifest
+    const walk = await walkLibraries(dependenciesIn(manifest), async (dependency) => {
+      for (const folder of libraryFolderNames(dependency)) {
+        const name = `${folder}/library.json`
+        let located = reader.get(name)
+        if (!located && reader.partial) {
+          const outcome = await this.awaitEntry(load, reader, name)
+          if (outcome !== 'stalled') located = outcome.located
+        }
+        if (located) {
+          const served = located.entry.name
+          return { folder: served.slice(0, served.indexOf('/')), library: await this.readJson(located) }
+        }
+      }
+      return null
+    })
+    if (walk.missing.length > 0) {
+      const missingLibraries = { mainLibrary: manifest.mainLibrary, folders: walk.missing.sort(), all: false }
+      throw new PlayerError('bad-archive', explainMissingLibraries(missingLibraries), { missingLibraries })
+    }
+    const libraries = libraryLoad(manifest, walk)
+    if (!libraries) throw new PlayerError('bad-archive', `h5p.json names ${String(manifest.mainLibrary)} as its main library, and does not list it among its dependencies`)
+    return json({ ...libraries, upgrades: reader.foldersWithUpgrades() } satisfies LibraryLoad)
   }
 
   /* ---------------------------------------------------------------- package entries */

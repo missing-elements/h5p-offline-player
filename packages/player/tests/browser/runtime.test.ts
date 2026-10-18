@@ -11,7 +11,6 @@ import { FIXTURES, createPlayer, frameDocument, waitForSettled } from './utils'
 describe('the runtime property', () => {
   const base = new URL('/frame-assets/', location.href).href
   const runtime = {
-    mainJs: `${base}main.bundle.js?via=runtime`,
     frameJs: `${base}frame.bundle.js?via=runtime`,
     frameCss: `${base}h5p.css?via=runtime`,
     bootJs: `${base}frame-boot.js?via=runtime`,
@@ -29,14 +28,15 @@ describe('the runtime property', () => {
     expect(player.state).toBe('ready')
 
     const scripts = [...frameDocument(player).querySelectorAll('script[src]')].map((script) => script.getAttribute('src'))
-    expect(scripts).toContain(runtime.mainJs)
+    // The boot script under the nonce, and the core it loads after it.
     expect(scripts).toContain(runtime.bootJs)
+    expect(scripts).toContain(runtime.frameJs)
     expect(frameDocument(player).querySelector('style')?.textContent).toContain(runtime.fonts[0].url)
   })
 
-  it('refuses a value missing one of the four files, since that frame would never boot', () => {
+  it('refuses a value missing one of the three files, since that frame would never boot', () => {
     const player = createPlayer()
-    player.runtime = { mainJs: 'a', frameJs: 'b', frameCss: 'c' } as never
+    player.runtime = { frameJs: 'b', frameCss: 'c' } as never
     expect(player.runtime).toBeNull()
     player.runtime = runtime
     expect(player.runtime?.bootJs).toBe(runtime.bootJs)

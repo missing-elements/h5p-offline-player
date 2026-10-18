@@ -68,6 +68,8 @@ packages/player/          @missing-elements/h5p-offline-player — the published
       package-reader.ts     zip index + per-entry serving strategy
       pack-plan.ts          which parts of the pack a package needs, and which of its own folders they
                             replace (`planPack`): pure, unit-tested in tests/unit/pack-plan.test.ts
+      library-load.ts       what a frame loads, its libraries' scripts and styles in order (`LibraryLoad`),
+                            which the `boot` route answers: h5p-standalone's walk and sort, ported (#37)
       frame-document.ts     the frame HTML the worker synthesizes, and its CSP; it names the runtime's
                             frame-boot.js with `<script nonce src>`, the script itself is the runtime package's
       watermark-wait.ts     the stall-bounded wait for an entry's bytes, and what counts as progress
@@ -111,9 +113,15 @@ packages/runtime/         @missing-elements/h5p-runtime — the H5P core runtime
   src/library-names.ts      how content names a library and how the libraries it names are found: the
                             check and the upgrade both parse through it (2026-10-15; until then each had
                             its own parser, one taking `H5P.Foo-1.0` and the other only `H5P.Foo 1.0`)
-  scripts/build.mjs         vendors h5p-standalone into dist/ (headers, the rebuilt stylesheet, the fonts,
-                            LICENSE.txt, NOTICE.txt, MANIFEST.json), builds the boot script, writes
-                            dist/l10n.js from l10n/, writes index.js
+  scripts/build.mjs         builds dist/ from vendor/h5p-core/: frame.bundle.js, the core's scripts joined
+                            and minified, h5p.css rebuilt to stand alone, the fonts, LICENSE.txt,
+                            NOTICE.txt, MANIFEST.json; builds the boot script, writes dist/l10n.js from
+                            l10n/, writes index.js
+  scripts/sync-core.mjs     `pnpm core:sync [<ref>]`: vendors the H5P core from h5p-php-library at a commit
+  vendor/h5p-core/          the core as upstream has it, committed: js/, styles/, the fonts and image the
+                            styles reach, strings.json (the player's English strings from
+                            `getLocalization()`), SOURCE.json (the commit, and `H5PCore::$scripts` and
+                            `$styles`, which say what is taken and in what order)
   l10n/                     the core's interface strings, one JSON file per language, from Moodle's
                             language packs, and index.json, their sources and aliases; committed,
                             written by scripts/build-l10n.mjs (`pnpm l10n`, and every Monday by
@@ -293,6 +301,9 @@ pnpm libraries         # rebuild packages/libraries from the H5P hub; before a r
 pnpm l10n              # take the core's translations from Moodle's language packs again, into
                        # packages/runtime/l10n/; every Monday by .github/workflows/l10n.yml, which
                        # opens a PR when a translation changed
+pnpm core:sync master  # vendor the H5P core from h5p-php-library's newest commit, into
+                       # packages/runtime/vendor/h5p-core/; with no argument, the recorded commit
+                       # again; then the sweep, and the release notes name the commit
 pnpm sweep             # play every content type in the pack, untrusted and trusted, and check
                        # each boots; after pnpm build
 pnpm preview:demo      # serves dist-demo/ with the production headers and the /no-range route
@@ -358,7 +369,7 @@ declaration whose source was deleted, and up to 0.1.6 the package shipped two of
 declarations of its own Vite configs.
 
 `pnpm dev` and `pnpm test` both run the player's `prepare:dev` first, which builds the runtime
-package (`packages/runtime/dist/`, h5p-standalone vendored plus the boot script) and copies it
+package (`packages/runtime/dist/`, the vendored H5P core plus the boot script) and copies it
 to `packages/player/public/frame-assets/`, and builds the fixtures into
 `packages/player/public/fixtures/`. None of those directories is in git; all are reproducible.
 
@@ -541,9 +552,9 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   declares `preloadedDependencies`; each one must appear as `<name>-<major>.<minor>/library.json`
   or `<name>/library.json`. This is not a nicety: exports from h5p.com and h5p.org routinely
   contain nothing but `h5p.json` and `content/`, because the site they came from already has the
-  libraries. Without the check, h5p-standalone asks for `<MainLibrary>/library.json`, takes the
-  404 as "these folders are unversioned", asks again without the version, takes a second 404 and
-  fails with nothing anyone can act on. `findMissingLibraries` is pure and unit-tested; the
+  libraries. Without the check, h5p-standalone, the loader until #37, asked for
+  `<MainLibrary>/library.json`, took the 404 as "these folders are unversioned", asked again
+  without the version, took a second 404 and failed with nothing anyone could act on. `findMissingLibraries` is pure and unit-tested; the
   end-to-end case is the `content-only.h5p` fixture.
   **The libraries' own dependencies are checked too, once their files are at hand** (2026-10-13).
   A platform's export lists the whole tree in `h5p.json`, but an old one can name a version its
@@ -629,7 +640,7 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   without it a `content/notes.txt` holding JavaScript, injected as `<script src>` from the
   package's own path, ran — measured, with the header off, the browser test failed with "ran".
   And the frame's `script-src` drops `'self'` for exact paths (`untrustedScriptSources`): the
-  package's virtual root, the runtime's four files, the host's `custom-js`, and the YouTube, Vimeo
+  package's virtual root, the runtime's scripts, the host's `custom-js`, and the YouTube, Vimeo
   and Panopto APIs (`UNTRUSTED_SCRIPT_PATHS`, YouTube's `iframe_api` loading its widget script
   from `/s/player/`), and the worker's own script (`workerScript`, `self.location`). That last one
   is Firefox's: it checks a script the worker made up — every entry is a `new Response` — against
@@ -684,8 +695,8 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   `$relativePathRegExp`) between the pinned commit and `master`, port what changed, move the
   commit named in `content-check.ts`, and run upstream beside the port again.
   Fail closed across versions: the boot script asks for an untrusted package's `content.json`
-  with `X-H5P-Content-Check: semantics` (`CONTENT_CHECK_HEADER`, through h5p-standalone's
-  `assetsRequestFetchOptions`), and the worker answers anything else with a 403, so a runtime
+  with `X-H5P-Content-Check: semantics` (`CONTENT_CHECK_HEADER`; through h5p-standalone's
+  `assetsRequestFetchOptions` until #37), and the worker answers anything else with a 403, so a runtime
   older than the check — which would play the content as written — plays nothing.
   With it the setup advice changed the same day: packages a site did not make can be installed
   with `untrusted`, and a site with signed-in users can install with every package `untrusted`,
@@ -743,8 +754,8 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   `content-upgrade.ts` in the runtime package runs the steps by the rules of h5p-php-library's
   `h5p-content-upgrade-process.js`: the steps after the content's minor up to the target, lowest
   first, each given the parameters, a callback and `{ metadata }`, the `{ contentUpgrade }` form
-  beside a bare function. The boot script calls it once h5p-standalone has resolved, when the
-  parameters are in `H5PIntegration` and not yet read, and before `H5P.init`. Four things differ
+  beside a bare function. The boot script calls it once the libraries' scripts have run, when
+  the parameters are in `H5PIntegration` and not yet read, and before `H5P.init`. Four things differ
   from upstream. The target is the version served, read off the `library.json` that answers under
   the version the content names, so the reader's rule stays the only one; upstream upgrades to the
   version the parent's semantics name. Sub-content is found by its shape, as `librariesNamedIn`
@@ -760,15 +771,16 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   loudly, not as "not served". Any failure leaves the parameters as written,
   which is how every package played before, and logs a console error, which the verifier reports
   as a warning. Sub-content takes the served version into its `library` string, as upstream does,
-  and so does the main library: h5p-standalone builds that name from `library.json` and drops a
+  and so does the main library: h5p-standalone built that name from `library.json` and dropped a
   major or minor that is 0 — "H5P.Accordion 1" — which the core turned into
   `H5P.Accordion-1.undefined`, the category of every statement; fifteen runnable libraries in the
-  pack have a 0, the demo's Accordion among them. The worker lists the folders that carry an
-  `upgrades.js` in the boot config (`PackageReader.foldersWithUpgrades`, as `upgrades`), so nothing
-  is fetched that is not there. `serveFrame` takes the list from the reader the element's `index`
-  left open and never opens one, since a picked file's reader would ask for the file through the
-  very frame being served; without a list — a worker older than the boot script — each script is
-  asked for and a 404 means none. Not done: a change of major, which the file server never makes,
+  pack have a 0, the demo's Accordion among them. Since #37 the worker names it in full in the
+  first place. The worker lists the folders that carry an `upgrades.js`
+  (`PackageReader.foldersWithUpgrades`, as `upgrades`), so nothing is fetched that is not there:
+  in the `boot` route's answer, and for a runtime up to 0.2 in the boot config, which `serveFrame`
+  takes from the reader the element's `index` left open and never opens one, since a picked file's
+  reader would ask for the file through the very frame being served; without a list — a worker
+  older than the boot script — each script is asked for and a 404 means none. Not done: a change of major, which the file server never makes,
   and upstream's checks against the parent's semantics. `packages/runtime/tests/` pins the rules;
   `tests/browser/upgrades.test.ts` plays exports written for 1.0, 1.1 and 1.2, sub-content
   included, against a bundle at 1.2, and one whose step throws.
@@ -783,9 +795,10 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   English with German buttons around it — the first cut wrote the element's tag there, and review
   caught it the same day — and the element's tag only for a package that names none. That one
   file has every language and the aliases; the boot script picks one by RFC 4647 lookup through
-  the aliases (`src/l10n.ts` in the runtime — `de-AT` gets `de`, `nb` Norwegian) and hands it to
-  h5p-standalone as `translations`, deep-merged over its English, so a missing key stays English,
-  and in time for the core's ready handler to build the licence names from it. The player holds
+  the aliases (`src/l10n.ts` in the runtime — `de-AT` gets `de`, `nb` Norwegian) and lays it over
+  the core's own English, `getLocalization()` at the vendored commit (`vendor/h5p-core/strings.json`,
+  until #37 h5p-standalone's copy of the same 67 strings), so a missing key stays English, and in
+  time for the core's ready handler to build the licence names from it. The player holds
   no list of languages, decided the same day: a first cut had a file per language and the player
   matching tags against the runtime's list, so a new language took a release of both. Now it is a
   runtime release, at the price of one file, about 50 kB gzipped, fetched once by a learner whose
@@ -940,8 +953,9 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   statelessness is untouched. Consequences: the frame's boot script asks the element for the
   state *before* it loads the runtime (`?resume=1` on the frame URL says to), because core
   registers its unload-time save while loading, on the `saveFreq` it sees then; and the boot
-  script initialises the runtime itself (`preventH5PInit: false`), the one hook h5p-standalone
-  gives between loading the scripts and `H5P.init()`. A save is authenticated by a token the
+  script initialises the runtime itself, the core's `preventInit` holding the init back between
+  loading the scripts and `H5P.init()` (h5p-standalone's inverted `preventH5PInit: false` until
+  #37). A save is authenticated by a token the
   element handed that document, not by `event.source`: the last save is posted as the document
   unloads, and by the time the element handles it the sender is gone and `source` is null.
   `clearUserData()` withdraws the token, so the document still running — and that last save,
@@ -1076,8 +1090,52 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   All three ride on `ready`'s detail with `pkgId` and `revision`, and all are `null` again
   after `forgetPackage`. Deliberately not exposed: the index summary (deflated media, whether
   a video can stream), which the Service Worker alone has and would be a bigger change.
-- **A 404 from the virtual server is load-bearing.** h5p-standalone probes `library.json` under
-  both the versioned and unversioned folder names and picks whichever answers.
+- **The runtime is the H5P core at a commit, and the frame loads what the worker's `boot` route
+  names, in h5p-standalone's order** (#37, 2026-10-18). Until then the runtime was
+  h5p-standalone's two bundles: its copy of the core, synced about once a year and recording no
+  upstream revision, and its loader, `main.bundle.js`, which walked every `library.json` from the
+  frame. Now `pnpm core:sync` vendors h5p-php-library at a commit into
+  `packages/runtime/vendor/h5p-core/` — which scripts and stylesheets, and in what order, is
+  upstream's own `H5PCore::$scripts` and `$styles` at that commit — and the build joins the scripts
+  into `frame.bundle.js` and minifies them, top-level names kept: they are global scripts, as a
+  site loads them, and jQuery's wrapper puts `jQuery` on `window` only where no CommonJS `module`
+  is in scope, which H5P's own `jQuery.noConflict(true)` right after it relies on (h5p-standalone
+  got the same by building that file as an ES module). Measured on the build: 48.5 kB gzipped,
+  against 54.6 for the two bundles it replaces. The boot script builds `H5PIntegration` itself,
+  field for field as h5p-standalone did, with the core's English strings from `getLocalization()`
+  at the same commit — the same 67, word for word — and `url` the package's root rather than a
+  random id, which no library in the pack reads. **The route, not the document**: the worker
+  answers `…/h5p/boot/<load>` with `LibraryLoad` (`sw/library-load.ts`) — the main library at the
+  version served, in full; every library's scripts and styles; `libraryDirectories` for a library
+  served from a folder its version does not name, which the core's `H5P.getLibraryPath` reads; and
+  the `upgrades` list. Asked by the frame because only a request from the frame can open a reader
+  the worker lost on a restart: for a picked file the page is asked for it through the frame,
+  which while its own document is being served does not exist yet. **The order is h5p-standalone's
+  to the letter** — its `loadDependencies` levels, its `sortDependencies` edges, the `toposort`
+  2.0.2 it bundles with its tie-breaks, the phantom node a library without dependencies gets
+  included — because it is the order every content type has been played in here.
+  `tests/unit/library-load.test.ts` runs h5p-standalone's own code beside the port on five hundred
+  random graphs; the demo's six packages, nine fixtures and the sweep's fifty-five, captured from
+  the frame before and after, load the same files in the same order. Two things differ: a library
+  is named by the folder it is served from, so content asking for 1.0 where 1.1 answers loads
+  `H5P.Question-1.5/…` rather than `H5P.Question-1.4/…` that the server mapped, and two requests one
+  folder answers load it once; and a dependency cycle is broken where it closes, where
+  h5p-standalone threw. **One fix fell out**: h5p-standalone decided once, from the first
+  dependency's versioned probe, whether every folder had a version in its name, so an older package
+  with folders named without versions, played with the pack, whose newer parts sit in folders named
+  with them, ended its boot on the next 404 — the `boardgame.h5p` fixture did, and
+  `unversioned-pack.h5p` with `pack.test.ts` pins it; the walk tries each library both ways.
+  **Across versions**: a record that names `mainJs` came from an element paired with the runtime
+  up to 0.2, and the worker still writes that document — the loader, the upgrade list in the
+  config — so an element from before keeps playing against an updated worker; a later boot script
+  given a document without the `boot` URL, a worker from before, says to update the player and
+  `h5p-sw.js` together. An element of this player with a runtime up to 0.2 through `assets-base`
+  cannot work and does not try: the peer range says which runtime it plays with.
+- **A 404 from the virtual server is load-bearing.** A library's `library.json` is looked for
+  under the versioned folder name and then the bare one, and the first 404 is what sends the
+  lookup on: the worker's walk for the `boot` route does it inside the worker, and the boot
+  script's upgrade lookup through the virtual server. Until #37 h5p-standalone probed the same way
+  from the frame, once, for the first dependency, and named every folder by the answer.
 - **h5p-standalone's options are attributes by the same names, and ride in the package record.**
   Added on 2026-10-07 after the question "do we support `customJs` and `customCss`": `frame`,
   `copyright`, `export`, `icon`, `embed`, `fullscreen`, `download-url`, `embed-code`, `resize-code`,
@@ -1139,10 +1197,12 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   `about:blank` frame, and whether that child inherits the Service Worker controller differs
   between browsers.
 - **`H5P.getContentPath` answers the content's own folder.** The core builds it as
-  `H5PIntegration.url + '/content/' + id`, which on a site is the H5P folder; h5p-standalone sets
-  `url` to the content id, so it answered `<id>/content/<id>`, relative to nothing. Its own
-  `H5P.getPath` reads `contents['cid-<id>'].contentUrl` first, which h5p-standalone does set, and
-  the boot script makes `getContentPath` do the same (2026-10-13). IFrame Embedder is the one
+  `H5PIntegration.url + '/content/' + id`, which on a site is the H5P folder and each content's
+  own below it; here the content is the package's `content/`, one level below `url`, which the
+  boot script sets to the package's root (h5p-standalone set the content id, so it answered
+  `<id>/content/<id>`, relative to nothing). The core's own `H5P.getPath` reads
+  `contents['cid-<id>'].contentUrl` first, which the boot script sets, and it makes
+  `getContentPath` do the same (2026-10-13). IFrame Embedder is the one
   content type in the pack that asks, for a page the package carries — so it showed nothing, in
   either mode, until then; played `untrusted` it still does, by design, since `content/` serves
   no HTML. `playback.test.ts` pins the path.
@@ -1421,7 +1481,7 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   packages this player will be handed for years.
 - **The frame reports the runtime's own failed loads.** Its `error` listener is capture-phase,
   because a resource failure fires on the element and never bubbles, and it reports only tags
-  marked `data-h5p` — the ones h5p-standalone injected. A content image that 404s, or an
+  marked `data-h5p` — the ones the boot script added, the core's and the libraries'. A content image that 404s, or an
   optional script a content type reaches for, is the content's business.
 - **Eviction never touches a package under a Web Lock, in any tab.** Every lock name starts with
   `h5p:<pkgId>:` (`locks.ts`): the Jobs worker holds one per download or extraction for as long
@@ -1445,8 +1505,9 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
     dependency it declares resolves to a folder that is present *and finished arriving* — a
     folder has finished once an entry of a later folder has arrived, since exporters write a
     folder's files together. An index the scanner had to give up on never says ready.
-  - **On a partial reader a miss waits; it does not 404.** h5p-standalone treats a 404 as a fact
-    about the package. `awaitEntry` wakes on each index publish and each move of the archive
+  - **On a partial reader a miss waits; it does not 404.** A 404 is taken as a fact about the
+    package: by the worker's walk, by the boot script's upgrade lookup, and by h5p-standalone
+    before #37. `awaitEntry` wakes on each index publish and each move of the archive
     watermark until the entry appears, the reader can prove it absent (`provablyAbsent`: its folder
     has finished arriving, or it is the versioned probe on a library the package keeps
     unversioned), or the real index answers. The stall bound watches the *archive* watermark: the
@@ -1459,8 +1520,9 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   (`interactive-video-2-618.h5p`) sets bit 3 on *every* entry — sizes after the data, all stored —
   so a walker that trusts local-header sizes gets nothing from it; the scanner resolves those by
   finding the descriptor signature and accepting it only where its compressed size equals the
-  bytes seen since the data began. h5p-standalone probes the *versioned* folder name first, so on
-  a modern export the boot never issues the one 404 a partial index would have to wait on.
+  bytes seen since the data began. A library is looked for under the *versioned* folder name
+  first, so on a modern export the boot never issues the one 404 a partial index would have to
+  wait on.
   `zip.js`'s own `ZipReaderStream` is not an option here: it buffers the entire input into a Blob
   and then reads the central directory from the end (`getEntriesGenerator` → `streamToBlob`) —
   a streaming surface over whole-archive buffering.
@@ -1709,7 +1771,7 @@ Three artefacts, built three different ways, because they are consumed three dif
 | `dist/h5p-sw.js` | esbuild, IIFE | Registered by URL; has to run on a site with no build step |
 | `dist/h5p-sw-mount.js` | esbuild, ESM | For hosts that enforce one worker per origin |
 | `dist/h5p-jobs.js` | esbuild, IIFE | The Jobs worker as a file, for a page whose CSP refuses a `blob:` worker |
-| `packages/runtime/dist/` | `packages/runtime/scripts/build.mjs` | h5p-standalone's scripts unmodified but for a licence header, its stylesheet rebuilt to stand alone, and the boot script; a package of its own, GPL |
+| `packages/runtime/dist/` | `packages/runtime/scripts/build.mjs` | The H5P core from `vendor/h5p-core/`, its scripts joined and minified under a licence header, its stylesheets rebuilt to stand alone, and the boot script; a package of its own, GPL |
 | `apps/demo/dist-demo/` | `apps/demo/scripts/build-demo.mjs` | The hosted demo: the pages, and `dist/`'s layout at the site root |
 
 The Jobs worker ships twice. `vite.config.ts` bundles it with esbuild into a string behind
@@ -2404,15 +2466,15 @@ curl -sL -o packages/player/public/fixtures/real.h5p \
 ## Licensing
 
 The player, `@missing-elements/h5p-offline-player`, is MIT, and since 0.5 (2026-10-08) nothing
-in it is anything else. The H5P core runtime it loads is not: h5p-standalone declares MIT and
-its own code is, but its `frame.bundle.js` is built from `vendor/h5p/js/` — h5p.js, the event
-dispatcher, xAPI, the content type base, the confirmation dialog, the request queue, the action
-bar, the tooltip — copied from `h5p/h5p-php-library`, which is GPL-3.0 by its LICENSE.txt and
-composer.json. H5P's own licensing page says the GPL is there because of the HTML purifier on
+in it is anything else. The H5P core runtime it loads is not: h5p.js, the event dispatcher, xAPI,
+the content type base, the confirmation dialog, the request queue, the action bar, the tooltip,
+the stylesheets and the `h5p-*` icon fonts are `h5p/h5p-php-library`'s, which is GPL-3.0 by its
+LICENSE.txt and composer.json. They came by way of h5p-standalone, which declares MIT, until #37
+(2026-10-18); the runtime now vendors them from upstream itself, at a commit
+(`vendor/h5p-core/SOURCE.json`). H5P's own licensing page says the GPL is there because of the HTML purifier on
 the PHP side and has promised since 2017 to make it optional; the JavaScript carries no separate
-grant, so it is GPL by the repository's terms. The core stylesheet and the `h5p-*` icon fonts
-come from the same repository. Upstream confirmed the consequence in
-tunapanda/h5p-standalone#188 on 2026-08-26 and has not changed its metadata.
+grant, so it is GPL by the repository's terms. h5p-standalone confirmed the consequence for
+its copy in tunapanda/h5p-standalone#188 on 2026-08-26 and has not changed its metadata.
 
 Up to 0.4 the player shipped that runtime under `dist/frame-assets/` and was published as
 `(MIT AND GPL-3.0-only)`, with the question of whether the copyleft reached a host's bundle
@@ -2428,18 +2490,19 @@ choice, not necessity: licensing our own file MIT inside the GPL package would b
 would reopen the "intimate call" argument the move exists to close. Three things follow:
 
 - `packages/runtime/NOTICE.md` is kept by hand; `dist/LICENSE.txt` and `dist/NOTICE.txt` are
-  written by the runtime's build, so they always name the h5p-standalone tag actually vendored —
-  that tag is the corresponding source, since upstream records no h5p-php-library revision.
-  Bumping h5p-standalone (a dependency of the runtime package now, not the player) regenerates
-  them and means re-reading that NOTICE.md. The player's `NOTICE.md` says where the runtime went
-  and carries zip.js's notice.
+  written by the runtime's build, so they always name the h5p-php-library commit actually
+  vendored, which with the build is the corresponding source. Until #37 they named the
+  h5p-standalone tag, which recorded no upstream revision. Moving the core (`pnpm core:sync`)
+  regenerates them and means re-reading that NOTICE.md, which names the commit as of its writing.
+  The player's `NOTICE.md` says where the runtime went and carries zip.js's notice.
 - What a user ships has to carry its notices *in the file*, because a bundler emits each file on
   its own and nothing from the package root goes with it — found by a user's 0.1.5 build, which
   had the GPL runtime and zip.js with no notice anywhere. So every shipped file with third-party
   code opens with a `/*! … */` header: the two workers carry zip.js's BSD-3-Clause licence in full
   (`zipJsNotice` in `scripts/lib/worker-bundle.mjs`, read from the installed package; its clause 2
-  asks for the whole text), and the runtime's `frame.bundle.js`, `main.bundle.js`, `h5p.css` and
-  `frame-boot.js` name their licences and the corresponding source. A new dependency that ends up
+  asks for the whole text), and the runtime's `frame.bundle.js`, `h5p.css` and `frame-boot.js`
+  name their licences and the corresponding source; `frame.bundle.js` keeps jQuery's own `/*!`
+  notice inside it too. A new dependency that ends up
   in a bundle means a new header and a new entry in the right NOTICE.md.
 - Our own shipped files carry a one-line notice too (`playerNotice` in
   `scripts/lib/worker-bundle.mjs`, on the element, both Service Worker scripts and the Jobs
@@ -2515,6 +2578,9 @@ deliberate additions to it, not drift:
 - The runtime is a package of its own. The design has one package with the frame assets inside
   it; the GPL on the H5P core made that `(MIT AND GPL-3.0-only)`, and from 0.5 the runtime and
   the frame's boot script are `@missing-elements/h5p-runtime` so the player can be MIT alone.
+- The runtime is the H5P core vendored from h5p-php-library at a commit, and the worker says what
+  the frame loads. The design runs h5p-standalone in the frame, with its copy of the core and its
+  loader; #37 replaced both, keeping its load order.
 - A published library bundle, and `libraries` as an ordered list. The design has `hub` or one
   URL; the hub's move put a bundle the project controls first, and since 0.6 the hub is not asked
   at all (`hub` meant the pack until it went before 1.0). Since 0.10 the pack is split, a package downloads only

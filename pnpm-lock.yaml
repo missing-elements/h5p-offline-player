@@ -155,10 +155,6 @@ importers:
         version: 5.0.3(@types/node@26.6.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2))
 
   packages/runtime:
-    dependencies:
-      h5p-standalone:
-        specifier: ^3.8.2
-        version: 3.8.2
     devDependencies:
       '@types/node':
         specifier: ^26.6.5

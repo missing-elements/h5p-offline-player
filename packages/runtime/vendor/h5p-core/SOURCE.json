@@ -1,0 +1,28 @@
+{
+  "repository": "https://github.com/h5p/h5p-php-library",
+  "commit": "cb64a1f3884408487c3178e31fc140f5d45ca165",
+  "date": "2026-08-11T10:42:38Z",
+  "coreApi": "1.28",
+  "scripts": [
+    "js/jquery.js",
+    "js/h5p.js",
+    "js/h5p-event-dispatcher.js",
+    "js/h5p-x-api-event.js",
+    "js/h5p-x-api.js",
+    "js/h5p-content-type.js",
+    "js/h5p-confirmation-dialog.js",
+    "js/h5p-action-bar.js",
+    "js/request-queue.js",
+    "js/h5p-tooltip.js"
+  ],
+  "styles": [
+    "styles/h5p-fonts.css",
+    "styles/h5p.css",
+    "styles/h5p-confirmation-dialog.css",
+    "styles/h5p-core-button.css",
+    "styles/h5p-theme.css",
+    "styles/h5p-theme-variables.css",
+    "styles/h5p-tooltip.css",
+    "styles/h5p-table.css"
+  ]
+}
