@@ -404,15 +404,25 @@ class VirtualServer {
    * for as any entry the frame asks for is. One that nothing answers for is named in the refusal.
    */
   private async serveBoot(load: LoadRef): Promise<Response> {
-    const reader = await this.refresh(load, await this.reader(load))
+    // `let`: a wait on a partial reader hands back the reader to go on with, which is a new one
+    // once the archive is whole, as in `serveEntry`.
+    let reader = await this.refresh(load, await this.reader(load))
     const manifest = reader.hasFallbacks ? await reader.mergedManifest() : reader.manifest
+    // A download that stops moving is a stall, answered with a retry as an entry's is, and not a
+    // library the package lacks: a lookup that found one ends the walk's waiting.
+    let stalled: string | undefined
     const walk = await walkLibraries(dependenciesIn(manifest), async (dependency) => {
       for (const folder of libraryFolderNames(dependency)) {
         const name = `${folder}/library.json`
         let located = reader.get(name)
-        if (!located && reader.partial) {
+        if (!located && reader.partial && !stalled) {
           const outcome = await this.awaitEntry(load, reader, name)
-          if (outcome !== 'stalled') located = outcome.located
+          if (outcome === 'stalled') {
+            stalled = name
+            return null
+          }
+          reader = outcome.reader
+          located = outcome.located
         }
         if (located) {
           const served = located.entry.name
@@ -421,6 +431,7 @@ class VirtualServer {
       }
       return null
     })
+    if (stalled) return retryLater(`The download has stalled before ${stalled}`)
     if (walk.missing.length > 0) {
       const missingLibraries = { mainLibrary: manifest.mainLibrary, folders: walk.missing.sort(), all: false }
       throw new PlayerError('bad-archive', explainMissingLibraries(missingLibraries), { missingLibraries })
