@@ -102,7 +102,7 @@ document.querySelector('h5p-player').pack = pack
 
 ```html
 <script type="module"
-  src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@0.9.5/dist/h5p-player.js"></script>
+  src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@0.10.0/dist/h5p-player.js"></script>
 <h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js"
             assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-runtime@0.2.4/dist/"></h5p-player>
 ```
