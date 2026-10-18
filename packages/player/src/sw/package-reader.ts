@@ -16,8 +16,9 @@ import { SourceReader } from '../shared/source-reader'
 import type { ByteRange } from '../shared/range'
 import { deferredStream, inflated } from '../shared/stream-utils'
 import type { ForwardEntry, ForwardIndexSnapshot } from '../shared/forward-index'
-import { indexFingerprint, revisionOf } from '../shared/revision'
+import { indexFingerprint, librariesFingerprint, revisionOf } from '../shared/revision'
 import { contentMetadata, type ContentMetadata } from '../shared/metadata'
+import type { OwnLibrary } from './pack-plan'
 
 /**
  * The package reader: a zip central directory turned into a name → entry index, plus the decision
@@ -100,6 +101,15 @@ function withholdCode(entries: Map<string, IndexedEntry>): Set<string> {
 }
 
 /**
+ * Whether a name lies in one of the package's own library folders that a part of the library pack
+ * replaces: such a folder is withheld whole, and requests for it resolve to the part's folder.
+ */
+function inSuperseded(name: string, superseded: ReadonlySet<string>): boolean {
+  const top = topFolderOf(name)
+  return top !== null && superseded.has(top)
+}
+
+/**
  * An entry together with the archive it lives in. A package may be served from more than one:
  * content from the one the user opened, libraries from a bundle attached to fill its gaps.
  */
@@ -138,9 +148,16 @@ export class PackageReader {
   readonly untrusted: boolean
   /** The names an untrusted reader withheld, kept to tell a host the package carries what it lacks. */
   private readonly withheld: Set<string>
+  /** The package's own library folders a part of the pack replaces; see `inSuperseded`. */
+  private readonly superseded: ReadonlySet<string>
 
   /** Archives consulted, in order, for an entry this one does not have. */
   private readonly fallbacks: PackageReader[] = []
+  /**
+   * With several archives attached, one fingerprint for all of them: see `settleRevision`. A
+   * single archive's own is used as it is.
+   */
+  private librariesFingerprint: string | undefined
   /** Library folders reachable from here, built on first use and dropped when `use()` adds more. */
   private librariesByName: Map<string, LibraryFolder[]> | null = null
   /** Data offsets of stored entries, each read from its local header once. */
@@ -154,7 +171,8 @@ export class PackageReader {
     manifest: PackageManifest,
     partial = false,
     /** For an untrusted reader, what was withheld so far; `null` for one that serves everything. */
-    withheld: Set<string> | null = null
+    withheld: Set<string> | null = null,
+    superseded: ReadonlySet<string> = new Set()
   ) {
     this.pkgId = pkgId
     this.entries = entries
@@ -162,6 +180,7 @@ export class PackageReader {
     this.partial = partial
     this.untrusted = withheld !== null
     this.withheld = withheld ?? new Set()
+    this.superseded = superseded
   }
 
   /** `h5p.json`'s title, when it is a string: the manifest is untrusted, and three things render it. */
@@ -178,7 +197,7 @@ export class PackageReader {
   static async open(
     pkgId: string,
     handle: SourceHandle,
-    options: { requireLibraries?: boolean; untrusted?: boolean } = {}
+    options: { requireLibraries?: boolean; untrusted?: boolean; superseded?: Iterable<string> } = {}
   ): Promise<PackageReader> {
     let zipEntries: Entry[]
     try {
@@ -210,11 +229,13 @@ export class PackageReader {
       throw new PlayerError('bad-archive', 'Archive has no h5p.json, so it is not an H5P package')
     }
     const withheld = options.untrusted ? withholdCode(entries) : null
+    const superseded = new Set(options.superseded ?? [])
+    for (const name of entries.keys()) if (inSuperseded(name, superseded)) entries.delete(name)
 
     const bare = new PackageReader(pkgId, handle, entries, {})
     const manifest = await readManifest(bare)
 
-    const reader = new PackageReader(pkgId, handle, entries, manifest, false, withheld)
+    const reader = new PackageReader(pkgId, handle, entries, manifest, false, withheld, superseded)
     // Every record, directories and dropped names included: the fingerprint is of the archive
     // as published, not of what the player chose to serve from it.
     reader.fingerprint = await indexFingerprint(
@@ -240,9 +261,9 @@ export class PackageReader {
     pkgId: string,
     handle: SourceHandle,
     snapshot: ForwardIndexSnapshot,
-    options: { untrusted?: boolean } = {}
+    options: { untrusted?: boolean; superseded?: Iterable<string> } = {}
   ): Promise<PackageReader> {
-    const reader = new PackageReader(pkgId, handle, new Map(), {}, true, options.untrusted ? new Set() : null)
+    const reader = new PackageReader(pkgId, handle, new Map(), {}, true, options.untrusted ? new Set() : null, new Set(options.superseded ?? []))
     await reader.absorb(snapshot)
     return reader
   }
@@ -272,6 +293,7 @@ export class PackageReader {
         this.withheld.add(name)
         continue
       }
+      if (inSuperseded(name, this.superseded)) continue
       this.entries.set(name, entryFromForward(name, forward))
       if (name === 'h5p.json') manifestArrived = true
     }
@@ -299,9 +321,102 @@ export class PackageReader {
     const available = this.availableLibraries()
     return dependencies.every((dependency) => {
       const folder = reachableFolder(dependency, names, available)
-      // An untrusted archive's own folders never serve, so the one found is a bundle's, and whole.
-      return folder !== undefined && (this.untrusted || this.folderComplete(folder))
+      if (folder === undefined) return false
+      // A folder an attached archive serves is whole; only the package's own may still be arriving.
+      // An untrusted archive's own folders never serve, so for it the one found is always a bundle's.
+      return this.untrusted || this.locate(`${folder}/library.json`)?.reader !== this || this.folderComplete(folder)
     })
+  }
+
+  /**
+   * The package's own library folders, as far as they can be told now: for a partial reader only
+   * those that have finished arriving. An untrusted reader has none, since it withholds them all.
+   */
+  ownLibraryFolders(): string[] {
+    const folders: string[] = []
+    for (const name of this.entries.keys()) {
+      const slash = name.indexOf('/')
+      if (slash < 0 || name.slice(slash + 1) !== 'library.json') continue
+      const folder = name.slice(0, slash)
+      if (!this.partial || this.folderComplete(folder)) folders.push(folder)
+    }
+    return folders
+  }
+
+  /**
+   * What the package carries of its libraries, for the pack's plan. With `read`, each folder's
+   * `library.json` gives the version, patch included, and the dependencies; without it — a
+   * `library.json` read would be two ranged requests — the folder's name gives the version and
+   * the rest is left unknown, which leaves the library as it is and its dependencies to the next
+   * look; a folder whose name gives no version, an unversioned one, is the library at a version
+   * unknown, which is how the runtime takes it too, falling back to the bare name. A
+   * `library.json` that does not parse, or a folder named for another library, is left out.
+   */
+  async ownLibraries(read?: (located: LocatedEntry) => Promise<unknown>): Promise<OwnLibrary[]> {
+    const libraries: OwnLibrary[] = []
+    for (const folder of this.ownLibraryFolders()) {
+      if (!read) {
+        const parsed = parseLibraryFolder(folder)
+        libraries.push(
+          parsed
+            ? { folder, machineName: parsed.machineName, major: parsed.major, minor: parsed.minor, patch: null, dependencies: null }
+            : { folder, machineName: folder, major: null, minor: null, patch: null, dependencies: null }
+        )
+        continue
+      }
+      const library = (await read({ reader: this, entry: this.entries.get(`${folder}/library.json`)! }).catch(() => null)) as Record<string, unknown> | null
+      const version = (part: unknown) => (typeof part === 'number' && Number.isInteger(part) && part >= 0 ? part : typeof part === 'string' && /^\d+$/.test(part) ? Number(part) : null)
+      const major = version(library?.majorVersion)
+      const minor = version(library?.minorVersion)
+      const machineName = library?.machineName
+      if (typeof machineName !== 'string' || major === null || minor === null) continue
+      const parsed = parseLibraryFolder(folder)
+      if (parsed ? parsed.machineName !== machineName || parsed.major !== major : folder !== machineName) continue
+      libraries.push({
+        folder,
+        machineName,
+        major,
+        minor,
+        patch: version(library?.patchVersion) ?? 0,
+        dependencies: dependenciesIn(library).map(({ machineName: name, majorVersion, minorVersion }) => ({
+          machineName: name,
+          majorVersion: Number(majorVersion),
+          minorVersion: Number(minorVersion)
+        }))
+      })
+    }
+    return libraries
+  }
+
+  /** The library folders the attached archives provide, a part's or a bundle's. */
+  providedLibraries(): Array<{ folder: string; machineName: string; major: number; minor: number }> {
+    const provided: Array<{ folder: string; machineName: string; major: number; minor: number }> = []
+    for (const fallback of this.fallbacks) {
+      for (const folders of fallback.availableLibraries().values()) provided.push(...folders)
+    }
+    return provided
+  }
+
+  /**
+   * The libraries the content asks for at its top: what `h5p.json` declares, and the sub-content
+   * its parameters name. A full export's list already has the second; a stripped one's does not.
+   */
+  async contentDependencies(): Promise<Array<{ machineName: string; majorVersion: number; minorVersion: number }>> {
+    return [...dependenciesIn(this.manifest), ...(await this.contentLibraries())].map(({ machineName, majorVersion, minorVersion }) => ({
+      machineName,
+      majorVersion: Number(majorVersion),
+      minorVersion: Number(minorVersion)
+    }))
+  }
+
+  /** The content's parameters, `content/content.json` parsed; `undefined` while it cannot be read. */
+  contentParameters(): Promise<unknown> {
+    return this.contentParams()
+  }
+
+  /** Whether `content/content.json` has arrived, for a partial reader; always for a whole one. */
+  get contentArrived(): boolean {
+    return !this.partial || this.forwardDone || this.entries.has('content/content.json')
   }
 
   /**
@@ -339,7 +454,19 @@ export class PackageReader {
   revision(): string | undefined {
     const libraries = this.fallbacks.map((reader) => reader.fingerprint)
     if (!this.fingerprint || libraries.some((fingerprint) => !fingerprint)) return undefined
+    if (libraries.length > 1) return this.librariesFingerprint && revisionOf(this.fingerprint, [this.librariesFingerprint])
     return revisionOf(this.fingerprint, libraries as string[])
+  }
+
+  /**
+   * Works out the one fingerprint several attached archives are named by in the revision — the
+   * parts of the pack a package needs, a dozen or more — from their own (`librariesFingerprint`).
+   * Call after the last `use()`; until then a reader with several attached has no revision.
+   */
+  async settleRevision(): Promise<void> {
+    const fingerprints = this.fallbacks.map((reader) => reader.fingerprint)
+    this.librariesFingerprint =
+      fingerprints.length > 1 && fingerprints.every(Boolean) ? await librariesFingerprint(fingerprints as string[]) : undefined
   }
 
   /** Adds an archive to consult for entries this one does not carry. */
@@ -347,6 +474,7 @@ export class PackageReader {
     if (reader === this || this.fallbacks.includes(reader)) return
     this.fallbacks.push(reader)
     this.librariesByName = null
+    this.librariesFingerprint = undefined
   }
 
   /**

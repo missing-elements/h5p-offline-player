@@ -14,8 +14,11 @@ Options:
                          default), and its content is checked against their semantics. What
                          the check removed is reported as warnings
   --libraries <sources>  where libraries come from, tried in order: pack (the published
-                         library pack; hub means the same), a bundle's URL, or a bundle on
-                         disk, such as a copy of the pack, which keeps the check offline
+                         library pack; hub means the same), a bundle's URL, a bundle on
+                         disk, or a copy of the pack's parts/ folder, which keeps the check
+                         offline. With the pack, a library the package carries plays at the
+                         pack's newer version, as on a site with the pack
+  --no-refresh-libraries play the libraries the package carries even where the pack has newer
   --out <dir>            where report.json and screenshot.png go
                          (default: <package>.verify/ beside the package)
   --browser <path>       a Chromium-based browser; Chrome, Edge or Playwright's found otherwise
@@ -33,6 +36,7 @@ try {
     options: {
       libraries: { type: 'string' },
       untrusted: { type: 'boolean' },
+      'no-refresh-libraries': { type: 'boolean' },
       out: { type: 'string' },
       browser: { type: 'string' },
       ready: { type: 'string' },
@@ -71,6 +75,7 @@ try {
     file,
     libraries: args.values.libraries,
     untrusted: args.values.untrusted,
+    refreshLibraries: !args.values['no-refresh-libraries'],
     out,
     browser: args.values.browser,
     readyTimeout: seconds(args.values.ready, 60_000),

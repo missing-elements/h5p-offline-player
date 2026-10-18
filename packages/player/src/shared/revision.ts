@@ -67,12 +67,24 @@ export async function indexFingerprint(entries: Iterable<FingerprintEntry>): Pro
 }
 
 /**
- * The revision of what was played: the package's fingerprint, and each attached library
- * bundle's after it. A bundle is part of what the learner saw — each pack release changes its
- * libraries — so the same package played against another bundle is another revision.
+ * The revision of what was played: the package's fingerprint, and what supplied its libraries
+ * after it — an attached bundle's fingerprint, or `librariesFingerprint` over the parts of the
+ * pack it used. The libraries are part of what the learner saw, so the same package played
+ * against others is another revision.
  */
 export function revisionOf(content: string, libraries: readonly string[] = []): string {
   return libraries.length === 0 ? content : `${content}; libraries ${libraries.join(', ')}`
+}
+
+/**
+ * One fingerprint for several archives' — the parts of the library pack a package used: SHA-256
+ * over their fingerprints, sorted, joined by a line feed, as UTF-8, written `sha256:<hex>`. Sorted,
+ * so it names the set and not the order the parts were attached in; a pack release that changes
+ * none of the parts a package uses leaves its revision, and the state saved against it, alone.
+ */
+export async function librariesFingerprint(fingerprints: readonly string[]): Promise<string> {
+  const text = new TextEncoder().encode([...fingerprints].sort().join('\n'))
+  return `sha256:${hex(new Uint8Array(await crypto.subtle.digest('SHA-256', text)))}`
 }
 
 /** What `context.platform` says: the player, and its version. */

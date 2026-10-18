@@ -22,8 +22,11 @@ otherwise run `npx playwright install chromium` once (about 150 MB). Headless, n
   `semantics.json`. Use it when the package goes to a site that accepts uploads or links from
   others, an LMS or an embed site among them; when unsure, run it both ways.
 - `--libraries pack` — for a package without library folders (what h5p.com and h5p.org export),
-  played against the library pack, the way a site with `libraries="pack"` supplies them.
-  `--libraries <url>` for another bundle, `--libraries <path>` for one on disk.
+  played against the library pack, the way a site with `libraries="pack"` supplies them. A library
+  the package carries then plays at the pack's newer version, as on that site, and the summary
+  says `refreshed from the pack: <library> <from> → <to>`; `--no-refresh-libraries` plays the
+  package's own as exported. `--libraries <url>` for another bundle, `--libraries <path>` for one
+  on disk or for a copy of the pack's `parts/` folder.
 - `--out <dir>` — where `report.json` and `screenshot.png` go; default `<package>.verify/`.
 - `--json` — the report as JSON instead of the summary.
 - `--browser <path>` — a Chromium executable, for CI or a sandbox where none is found.
@@ -51,6 +54,7 @@ Exit 2: the check could not run (no browser, no such file).
 | warning: `content check: <field>: markup removed: …` (with `--untrusted`) | the field holds tags, attributes or styles its library does not allow; the site will strip them | write the field in what `semantics.json` allows for it (its `tags` and `font`), or accept the loss if the text still reads right |
 | warning: `content check: <field>: removed`, `… became …` | a field the semantics do not name, or a value outside its options or range; or the libraries' upgrade moved it, when the pack is newer than what the content was written for | match the field to `semantics.json`, or build against the pack's versions |
 | `bad-archive` with `fix: the package carries … itself, but played untrusted …` | built against a library newer than the pack | build against the pack's versions, or the site must play it trusted |
+| `refreshed from the pack: <library> <from> → <to>` (with `--libraries pack` or a copy of it) | the package carries an older version of these libraries than the pack; a site with the pack plays the pack's, and so did the check | nothing to fix: the content was checked as that site will play it. Export against the current versions to ship them, or rerun with `--no-refresh-libraries` to see the package as exported |
 
 ## Look at the screenshot
 

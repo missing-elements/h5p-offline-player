@@ -11,11 +11,20 @@ export const MAJOR_VERSION = 0
 export const LIBRARY_PACK_VERSION = '0.2.0'
 
 /**
- * `libraries="pack"`: every H5P hub content type's runtime libraries in one bundle, on a CDN that
- * answers with CORS and honours `Range`. `hub` means the same: the H5P hub itself is not asked,
- * since the only host of it that sends CORS headers serves an outdated catalogue.
+ * `libraries="pack"` with no copy of the host's own: every H5P hub content type's runtime
+ * libraries, one archive per library folder under `parts/`, on a CDN that answers with CORS. The
+ * worker carries this version's index (`PACK_INDEX`) and names the parts a package needs. `hub`
+ * means the same: the H5P hub itself is not asked, since the only host of it that sends CORS
+ * headers serves an outdated catalogue.
  */
-export const LIBRARY_PACK_URL = `https://cdn.jsdelivr.net/npm/@missing-elements/h5p-libraries@${LIBRARY_PACK_VERSION}/libraries.h5p`
+export const LIBRARY_PACK_BASE = `https://cdn.jsdelivr.net/npm/@missing-elements/h5p-libraries@${LIBRARY_PACK_VERSION}/parts/`
+
+/**
+ * Where the element keeps the index of a pack copy named by `pack-base`, as last read, so a
+ * package that needs the pack can still be planned for with no network. Not under
+ * `CACHE_PREFIX`: eviction, which works by package, leaves it alone, and it is a few kilobytes.
+ */
+export const PACK_INDEX_CACHE = 'h5p-pack-index'
 
 /** One cache per package: `h5p-pkg-v<major>-<pkgId>`. */
 export const CACHE_PREFIX = `h5p-pkg-v${MAJOR_VERSION}-`

@@ -437,8 +437,10 @@ it('plays a link from another site untrusted, with the libraries it carries and 
   const { page, errors } = await openApp(`/app/?src=${elsewhere.origin}/quiz.h5p`)
   await playerIs(page, 'ready')
   expect(await untrusted(page)).toBe(true)
-  // The quiz carries its own libraries, and played with the pack's instead.
-  expect(await page.evaluate(() => (document.querySelector('h5p-player') as HTMLElement & { libraryBundle: { url: string } | null }).libraryBundle?.url)).toMatch(/libraries.*\.h5p$/)
+  // The quiz carries its own libraries, and played with the pack's instead: the parts the app
+  // carries, from its own origin.
+  const bundle = await page.evaluate(() => (document.querySelector('h5p-player') as HTMLElement & { libraryBundle: { origin: string } | null }).libraryBundle)
+  expect(bundle?.origin).toBe(new URL(page.url()).origin)
   expect(await page.isVisible('#confirm-src')).toBe(false)
   expect(errors).toEqual([])
   await page.close()

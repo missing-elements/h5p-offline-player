@@ -49,14 +49,15 @@ Each warning is a field the content will lose on such a site, measured by compar
 `content.json` with what the runtime was handed. They are warnings because the content still plays.
 A package built against a library newer than the pack is refused, with what to do. The libraries
 come from the pack on jsDelivr unless `--libraries` names another; name a copy on disk, such as
-`node_modules/@missing-elements/h5p-libraries/libraries.h5p`, to run the check offline.
+`node_modules/@missing-elements/h5p-libraries/parts`, to run the check offline.
 
 ## Options
 
 | | |
 |---|---|
 | `--untrusted` | play it as a site plays a package it did not make, and report what the content check removed |
-| `--libraries <sources>` | where libraries come from, tried in order: `pack` (the library pack; `hub` means the same), a bundle's URL, or a bundle on disk, which the verifier serves itself |
+| `--libraries <sources>` | where libraries come from, tried in order: `pack` (the library pack; `hub` means the same), a bundle's URL, a bundle on disk, or a copy of the pack's `parts/` folder, which plays as `pack`; the verifier serves what is on disk itself. With the pack, a library the package carries plays at the pack's newer version, as on a site with the pack, and the summary lists each under `refreshed from the pack` |
+| `--no-refresh-libraries` | play the libraries the package carries even where the pack has newer ones |
 | `--out <dir>` | where the report and screenshot go |
 | `--browser <path>` | a Chromium-based browser; otherwise Chrome, then Edge, then Playwright's Chromium |
 | `--ready <s>` | time allowed to reach `ready`, default 60 |

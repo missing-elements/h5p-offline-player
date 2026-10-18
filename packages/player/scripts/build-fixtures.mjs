@@ -1,6 +1,7 @@
-import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { cp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { BlobWriter, TextReader, Uint8ArrayReader, Uint8ArrayWriter, ZipReader, ZipWriter } from '@zip.js/zip.js'
+import { splitPack } from '../../libraries/scripts/parts.mjs'
 import { GENERATED_FIXTURES, LARGE_ENTRY_SIZE } from './lib/fixture-names.mjs'
 
 /**
@@ -505,6 +506,28 @@ const page = new TextEncoder().encode('<!doctype html>\n<html><head><title>Sign 
 await writeFile(resolve(outDir, 'html-page.h5p'), page)
 built.push(['html-page.h5p', page.length])
 
+// 11. A library pack, split the way the real one is (`splitPack` in packages/libraries): the
+//     fixture content type at 1.2 with its upgrade steps, the sub-content type at 1.1, and the
+//     extra library. A package carrying the content type at 1.0 plays the pack's 1.2 with the
+//     steps run, which its message shows. `pack-tampered/` is the same with one hash wrong in its
+//     index. Directories, not archives: neither is in the list below, and the demo ships neither.
+const packWriter = new ZipWriter(new BlobWriter('application/zip'))
+for (const { entryName, path } of baseFiles) {
+  if (!entryName.startsWith('H5P.OfflineTest-1.0/') || entryName.endsWith('/library.json')) continue
+  await packWriter.add(entryName.replace('H5P.OfflineTest-1.0/', 'H5P.OfflineTest-1.2/'), new Uint8ArrayReader(new Uint8Array(await readFile(path))))
+}
+await packWriter.add('H5P.OfflineTest-1.2/library.json', new TextReader(JSON.stringify({ ...offlineTestLibrary, minorVersion: 2 })))
+for (const { entryName, path } of [...upgradeLibFiles, ...extraLibFiles]) {
+  await packWriter.add(entryName, new Uint8ArrayReader(new Uint8Array(await readFile(path))))
+}
+const packIndex = await splitPack(new Uint8Array(await (await packWriter.close()).arrayBuffer()), resolve(outDir, 'pack'))
+await rm(resolve(outDir, 'pack-tampered'), { recursive: true, force: true })
+await cp(resolve(outDir, 'pack'), resolve(outDir, 'pack-tampered'), { recursive: true })
+await writeFile(
+  resolve(outDir, 'pack-tampered', 'index.json'),
+  JSON.stringify({ libraries: packIndex.map((entry) => (entry.machineName === 'H5P.OfflineTest' ? { ...entry, sha256: '0'.repeat(64) } : entry)) })
+)
+
 // The list in `fixture-names.mjs` is what the next run clears and the demo build ships: an
 // archive written here and not listed there would be neither, silently.
 const written = new Set(built.map(([name]) => name))
@@ -518,3 +541,4 @@ if (unlisted.length > 0 || unbuilt.length > 0) {
 for (const [name, size] of built) {
   console.log(`[fixtures] ${name.padEnd(22)} ${(size / 1024).toFixed(1)} kB`)
 }
+console.log(`[fixtures] ${'pack/'.padEnd(22)} ${packIndex.length} parts, and pack-tampered/`)

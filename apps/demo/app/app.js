@@ -13,7 +13,7 @@
  */
 
 import { foreignHost, messageIn, trustPrompt } from '../demo/page-common.js'
-import librariesPack from '@missing-elements/h5p-libraries/libraries.h5p?url'
+import { pack } from '@missing-elements/h5p-libraries'
 import librariesNotice from '@missing-elements/h5p-libraries/libraries.txt?url'
 import { copyOf, fileKey, forget, forgetAll, linkKey, recentFiles, remember } from './recent.js'
 
@@ -311,12 +311,15 @@ function offerNewVersion() {
 /* ---------------------------------------------------------------- opening a file */
 
 /**
- * Where a package missing its own libraries gets them: the pack the app carries — every content
- * type's runtime libraries from the H5P hub, `@missing-elements/h5p-libraries`, emitted by Vite
- * under `assets/` and precached with the app — so a stripped export plays offline. Nothing else
- * is asked: a newer pack arrives with the next version of the app.
+ * Where a package missing its own libraries gets them, and newer versions of those it carries:
+ * the pack the app carries — every content type's runtime libraries from the H5P hub,
+ * `@missing-elements/h5p-libraries`, one archive per library, emitted by Vite under `assets/` and
+ * precached with the app — so a stripped export plays offline. The player copies into its own
+ * cache only the archives a package uses. Nothing else is asked: a newer pack arrives with the
+ * next version of the app.
  */
-const PACK = librariesPack
+const PACK = 'pack'
+player.pack = pack
 
 /** Replays the last open with a library source, for Start over. */
 let reopen = null

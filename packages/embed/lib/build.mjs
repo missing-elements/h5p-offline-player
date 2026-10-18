@@ -7,8 +7,9 @@ import { fileURLToPath } from 'node:url'
  * Writes the embed page as a static site: one folder, deployable to any static host, that a site
  * frames from a player domain of its own. Everything comes from installed packages — the element
  * and its workers from the player's `dist/`, the H5P runtime from its own package as
- * `frame-assets/`, the library pack from `@missing-elements/h5p-libraries` — so the versions are
- * the ones this package was published with, and nothing is fetched.
+ * `frame-assets/`, the library pack's parts from `@missing-elements/h5p-libraries` as
+ * `libraries/` — so the versions are the ones this package was published with, and nothing is
+ * fetched.
  */
 
 export class EmbedError extends Error {}
@@ -149,7 +150,7 @@ function headerRules(csp) {
     { path: '/h5p-sw.js', headers: { 'Cache-Control': 'no-cache' } },
     { path: '/frame-assets/*', headers: { 'Cache-Control': revalidate } },
     { path: '/resizer.js', headers: { 'Cache-Control': revalidate } },
-    { path: '/libraries.h5p', headers: { 'Cache-Control': revalidate } }
+    { path: '/libraries/*', headers: { 'Cache-Control': revalidate } }
   ]
 }
 
@@ -255,8 +256,9 @@ function notice({ version, libraries }) {
   frame-assets/     @missing-elements/h5p-runtime, the H5P core runtime: GPL-3.0-only. Its
                     LICENSE.txt and NOTICE.txt say what it is and where its source is; keep them
                     with it.
-${libraries ? `  libraries.h5p     @missing-elements/h5p-libraries, the H5P hub's libraries, each under its
-                    own licence, listed in libraries.txt.
+${libraries ? `  libraries/        @missing-elements/h5p-libraries, the H5P hub's libraries, one archive per
+                    library and index.json, each under its own licence, listed in libraries.txt.
+                    The player downloads only the ones a package needs.
 ` : ''}
 Serve it from a domain that holds nothing else, and frame it:
 
@@ -287,7 +289,7 @@ async function occupied(dir) {
  *
  * @param {object} options
  * @param {string} options.out
- * @param {boolean} [options.libraries] include the library pack, for `libraries=pack` (default true)
+ * @param {boolean} [options.libraries] include the library pack's parts, for `libraries=pack` (default true)
  * @param {string[] | string | null} [options.packages] the only origins packages may come from
  * @param {string[] | string | null} [options.ancestors] the only origins that may frame the page
  * @param {string | null} [options.defaultLibraries] the `libraries` value for addresses that name none
@@ -308,7 +310,7 @@ export async function buildSite({ out, libraries = true, packages = null, ancest
 
   const player = dirname(installed('@missing-elements/h5p-offline-player/dist/h5p-player.js', 'Run `pnpm build` in the workspace, or reinstall this package.'))
   const runtime = dirname(installed('@missing-elements/h5p-runtime/dist/h5p.css', 'Run `pnpm build` in the workspace, or reinstall this package.'))
-  const pack = libraries ? installed('@missing-elements/h5p-libraries/libraries.h5p', 'Reinstall this package, or pass --no-libraries.') : null
+  const pack = libraries ? dirname(installed('@missing-elements/h5p-libraries/parts/index.json', 'Reinstall this package, or pass --no-libraries.')) : null
   const version = (await readFile(join(player, 'VERSION'), 'utf8').catch(() => 'unknown')).trim()
 
   await mkdir(target, { recursive: true })
@@ -316,11 +318,13 @@ export async function buildSite({ out, libraries = true, packages = null, ancest
   for (const name of PLAYER_FILES) await cp(join(player, name), join(target, name))
   await rm(join(target, 'frame-assets'), { recursive: true, force: true })
   await cp(runtime, join(target, 'frame-assets'), { recursive: true })
+  // A site written before the pack was split carried it whole; that file is gone either way.
+  await rm(join(target, 'libraries.h5p'), { force: true })
+  await rm(join(target, 'libraries'), { recursive: true, force: true })
   if (pack) {
-    await cp(pack, join(target, 'libraries.h5p'))
+    await cp(pack, join(target, 'libraries'), { recursive: true })
     await cp(join(dirname(pack), 'libraries.txt'), join(target, 'libraries.txt'))
   } else {
-    await rm(join(target, 'libraries.h5p'), { force: true })
     await rm(join(target, 'libraries.txt'), { force: true })
   }
 
