@@ -27,8 +27,8 @@ describe('supplying missing libraries', () => {
 
   it('takes several sources in order, asking the next only for what the one before left absent', async () => {
     // The first "bundle" is a content-only export, which supplies nothing; the second has the
-    // libraries. This is the shape the docs recommend — a bundle the site controls, then `hub` —
-    // with a fixture standing in for a bundle that lacks what the package needs.
+    // libraries: a fixture standing in for a bundle that lacks what the package needs, then one
+    // that has it.
     const player = await playWithLibraries(FIXTURES.needsLibraries, `${FIXTURES.contentOnly} ${FIXTURES.libraries}`)
 
     expect(player.state).toBe('ready')

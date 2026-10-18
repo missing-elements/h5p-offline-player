@@ -40,7 +40,7 @@ the [README](https://github.com/missing-elements/h5p-offline-player#which-setup)
 |---|---|---|
 | The package | The host in `src` | Every load from a URL. A picked file is not sent anywhere |
 | The player and runtime files | Your site, or a CDN if `assets-base` names one (jsDelivr in the README's example) | Every load |
-| Library pack | `cdn.jsdelivr.net` for `pack` (and `hub`, which means the same), unless `pack-base` or the `pack` property names your own copy | With `libraries="pack"`: the libraries a package lacks, and those the pack has newer versions of than the package carries, once each per device. The requests show which libraries, so which content types, are played. Serve the pack from your own domain to keep this on your hosting |
+| Library pack | `cdn.jsdelivr.net` for `pack`, unless `pack-base` or the `pack` property names your own copy | With `libraries="pack"`: the libraries a package lacks, and those the pack has newer versions of than the package carries, once each per device. The requests show which libraries, so which content types, are played. Serve the pack from your own domain to keep this on your hosting |
 | Library bundle | The `.h5p` URL in `libraries` | A package without its own libraries, once per bundle |
 | MathJax | `cdn.jsdelivr.net` or `cdnjs.cloudflare.com` | Only a package carrying an old `H5P.MathDisplay` that loads MathJax from a CDN. The pack's MathDisplay renders from its own folder, and sends nothing |
 | Web fonts | `ajax.googleapis.com`, `fonts.googleapis.com`, `fonts.gstatic.com` (Google) | Only content types that load Google Fonts |

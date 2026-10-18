@@ -13,9 +13,8 @@ export const LIBRARY_PACK_VERSION = '0.3.0'
 /**
  * `libraries="pack"` with no copy of the host's own: every H5P hub content type's runtime
  * libraries, one archive per library folder under `parts/`, on a CDN that answers with CORS. The
- * worker carries this version's index (`PACK_INDEX`) and names the parts a package needs. `hub`
- * means the same: the H5P hub itself is not asked, since the only host of it that sends CORS
- * headers serves an outdated catalogue.
+ * worker carries this version's index (`PACK_INDEX`) and names the parts a package needs. The H5P
+ * hub itself is not asked: the only host of it that sends CORS headers serves an outdated catalogue.
  */
 export const LIBRARY_PACK_BASE = `https://cdn.jsdelivr.net/npm/@missing-elements/h5p-libraries@${LIBRARY_PACK_VERSION}/parts/`
 

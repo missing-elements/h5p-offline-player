@@ -968,8 +968,10 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   never promised. `pack` is `@missing-elements/h5p-libraries` on jsDelivr at `LIBRARY_PACK_VERSION`
   (its parts under `LIBRARY_PACK_BASE` since 2026-10-18, next invariant but two), which
   `sync-h5p-assets` stamps from `packages/libraries/package.json`;
-  `hub` is read as `pack` with one console note (`parseLibrarySources`), and `pack hub` is not
-  tried twice. Pinned rather than `@0`, so a player release always plays against the same
+  `hub` was read as `pack`, with a console note, from 0.6 to 0.10, and went before 1.0
+  (2026-10-18, #44): an alias kept would have had to stay through 1.x, and a page still writing it
+  now fails on the address `hub`, named in the error, rather than playing something it did not
+  name. Pinned rather than `@0`, so a player release always plays against the same
   libraries, and `check-library-pack.mjs` in the player's `prepublishOnly` refuses a version not
   on npm, or one whose `parts/index.json` on jsDelivr is not this checkout's: the weekly refresh
   (`.github/workflows/libraries.yml`) bumps the pack on a branch and stamps the player — version
@@ -2028,8 +2030,8 @@ SPA-fallback trap described above cannot happen there.
   turns the default `connect-src 'self' https:` into exactly the hosts given, and `config.js`
   hands the same list to the page, which refuses an `src` or a library URL off it by name
   before fetching anything. (Until 2026-10-10 it also refused `hub` unless `https://api.h5p.org`
-  was listed; `hub` now means `pack`, and a site without its own pack needs
-  `https://cdn.jsdelivr.net` listed for it.) The page checks only the address it is
+  was listed; a site without its own pack needs `https://cdn.jsdelivr.net` listed for `pack`, and
+  `hub`, which meant `pack` from then to embed 0.8, is no longer a token.) The page checks only the address it is
   given; `connect-src` also applies to every redirect, so a listed host that redirects off the
   list fails as a plain network error — the README says to list every host on the way. With a list, a listed host plays as
   it is, never untrusted: the host vouched for it when it wrote the site. Without one, a package
@@ -2514,8 +2516,8 @@ deliberate additions to it, not drift:
   it; the GPL on the H5P core made that `(MIT AND GPL-3.0-only)`, and from 0.5 the runtime and
   the frame's boot script are `@missing-elements/h5p-runtime` so the player can be MIT alone.
 - A published library bundle, and `libraries` as an ordered list. The design has `hub` or one
-  URL; the hub's move put a bundle the project controls first, and since 0.6 `hub` means that
-  bundle and the hub is not asked at all. Since 0.10 the pack is split, a package downloads only
+  URL; the hub's move put a bundle the project controls first, and since 0.6 the hub is not asked
+  at all (`hub` meant the pack until it went before 1.0). Since 0.10 the pack is split, a package downloads only
   the parts it needs, and the pack's newer versions play in place of the older ones a package
   carries: the design plays what a package carries.
 - Content written for an older minor than the one served is upgraded in the frame with the

@@ -170,7 +170,7 @@ beforeAll(async () => {
   pages.set('/open-de.html', snippet(open.origin, `src=${open.origin}/quiz.h5p&lang=de`))
   pages.set('/locked.html', snippet(locked.origin, `src=${embedding.origin}/quiz.h5p`))
   pages.set('/locked-elsewhere.html', snippet(locked.origin, `src=${open.origin}/quiz.h5p`))
-  pages.set('/locked-hub.html', snippet(locked.origin, `src=${embedding.origin}/quiz.h5p&libraries=hub`))
+  pages.set('/locked-pack.html', snippet(locked.origin, `src=${embedding.origin}/quiz.h5p&libraries=pack`))
   pages.set('/fallback.html', snippet(fallback.origin, `src=${embedding.origin}/stripped.h5p`))
   pages.set('/fallback-none.html', snippet(fallback.origin, `src=${embedding.origin}/stripped.h5p&libraries=none`))
   pages.set('/lean-pack.html', snippet(lean.origin, `src=${embedding.origin}/quiz.h5p&libraries=pack`))
@@ -303,9 +303,9 @@ describe('a written site, framed from another site', () => {
     await page.close()
   })
 
-  it('takes libraries=hub as the pack, this site\'s own copy', async () => {
+  it('takes libraries=pack as this site\'s own copy', async () => {
     const page = await browser.newPage()
-    await page.goto(`${embedding.origin}/locked-hub.html`)
+    await page.goto(`${embedding.origin}/locked-pack.html`)
     const frame = await playerFrame(page, locked.origin)
     await frame.waitForFunction(() => document.querySelector('h5p-player')!.getAttribute('libraries') === 'pack')
     expect(await frame.evaluate(() => document.querySelector('h5p-player')!.getAttribute('pack-base'))).toBe(`${locked.origin}/libraries/`)

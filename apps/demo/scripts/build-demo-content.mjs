@@ -10,7 +10,7 @@ import { download, hubBundle as cachedBundle } from './lib/hub.mjs'
  * Builds the packages the hosted demo plays, from `demo/content/src/<name>/` into
  * `demo/content/<name>.h5p`. Each source is our own `content.json` plus a `manifest.json`
  * naming the content type; the libraries come from the H5P hub's bundle for that content type,
- * exactly as `libraries="hub"` fetches them at runtime, and the result is a self-contained
+ * as `libraries="hub"` fetched them at runtime up to player 0.5, and the result is a self-contained
  * package run through the normalizer, so it is also an example of what the normalizer produces.
  * A manifest with `"stripped": true` is written the way h5p.com and h5p.org export: `h5p.json`
  * naming the main library alone, `content/`, and no library folders — the package the player

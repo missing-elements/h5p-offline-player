@@ -42,8 +42,8 @@ every package is their own team's.
 `untrusted` (`<h5p-player untrusted src="…">`) plays a package as data: none of its own code runs,
 its libraries come from the library pack, and its content is checked against each library's field
 definitions before it is shown, as the H5P CMS plugins check an author's upload — as contained as
-in an H5P plugin on the same site. It needs the runtime at 0.2 or later, and refuses a package
-that needs a newer library than the pack has. Embed adds a separate origin on top.
+in an H5P plugin on the same site. It refuses a package that needs a newer library than the
+pack has. Embed adds a separate origin on top.
 
 ## 2. Do it
 
@@ -219,7 +219,7 @@ to whom: https://github.com/missing-elements/h5p-offline-player/blob/main/docs/p
 | `error: no-worker` | page on `http://` or `file://`; or `sw` points at another origin | serve over https; keep the worker same-origin |
 | `error: network`, "is an http: URL and this page is served over https:" | mixed content: an `http://` package or bundle on an `https://` page | use the `https://` URL; `http://localhost` is exempt |
 | `error: no-cors` | the package host sends no CORS headers | host the package where you control headers (GitHub Pages works as it comes), or offer a file picker: `player.file = input.files[0]` |
-| `error: bad-archive`, "contains no libraries" | an h5p.com / h5p.org export: `content/` only | set `libraries="pack"`: `@missing-elements/h5p-libraries`, every hub content type's libraries, of which the player downloads only those a package needs, from jsDelivr. If the site must not reach a CDN, serve a copy of the package's `parts/` with its `libraries.txt` of licences and name the folder with `pack-base`, or, with a bundler, set the `pack` property to the package's `pack` export. With `pack`, the libraries a package carries play at the pack's newer versions; `refresh-libraries="off"` keeps them as exported. `hub` means `pack`; the H5P hub itself is no longer asked |
+| `error: bad-archive`, "contains no libraries" | an h5p.com / h5p.org export: `content/` only | set `libraries="pack"`: `@missing-elements/h5p-libraries`, every hub content type's libraries, of which the player downloads only those a package needs, from jsDelivr. If the site must not reach a CDN, serve a copy of the package's `parts/` with its `libraries.txt` of licences and name the folder with `pack-base`, or, with a bundler, set the `pack` property to the package's `pack` export. With `pack`, the libraries a package carries play at the pack's newer versions; `refresh-libraries="off"` keeps them as exported. The H5P hub itself is not asked |
 | worker or runtime files 404 after a build | the bundler did not rewrite `new URL` (esbuild); or an install with a bundler but without `player.runtime`, so the element looked for `frame-assets/` beside a hashed bundle | set `runtime` from `@missing-elements/h5p-runtime`; or serve both packages' `dist/` statically and set `sw` and `assets-base` |
 | the frame renders the host page inside itself | an SPA fallback answered a virtual route with `index.html`: the worker is not registered | check the registration; after "clear site data" reload once |
 | content collapsed to 150 px | `auto-resize="off"` with no height from CSS; or the host's CSP has `style-src 'self'` and the browser lacks `adoptedStyleSheets`, so the fallback `<style>` is blocked | remove `auto-resize="off"`, or give the `h5p-player` tag a height; update the browser |

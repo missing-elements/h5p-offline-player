@@ -271,8 +271,8 @@ const PACK_ROUTE = '/__pack/'
 
 /**
  * `libraries` as the element reads it, with each bundle on disk given a route on the verifier's
- * own server, and a folder on disk — a copy of the pack's `parts/` — served as the pack: `pack`,
- * `hub` and URLs pass as they are. A path that names nothing is an error before anything starts.
+ * own server, and a folder on disk — a copy of the pack's `parts/` — served as the pack: `pack`
+ * and URLs pass as they are. A path that names nothing is an error before anything starts.
  * @param {string | undefined} value
  */
 function librarySources(value) {
@@ -282,7 +282,7 @@ function librarySources(value) {
   let packDir = null
   if (!value) return { attribute: null, files, packDir }
   const tokens = value.split(/\s+/).filter(Boolean).map((token) => {
-    if (token === 'pack' || token === 'hub' || /^https?:\/\//i.test(token)) return token
+    if (token === 'pack' || /^https?:\/\//i.test(token)) return token
     const path = resolve(token)
     if (!existsSync(path)) throw new VerifyError(`No such library bundle: ${path}`)
     if (statSync(path).isDirectory()) {

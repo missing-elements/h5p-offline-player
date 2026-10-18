@@ -244,12 +244,10 @@ export function startEmbed({ packBase = null, pack = null, librariesPack = null,
     const sources = []
     if (value === 'none') return { value: '' }
     for (const token of value.split(/\s+/).filter(Boolean)) {
-      if (token === 'pack' || token === 'hub') {
+      if (token === 'pack') {
         // This site's copy of the pack, which the element was pointed at above; without one, the
         // element's own `pack`, the copy on jsDelivr, where that may be reached, so a snippet
-        // written for `pack` keeps playing after a rebuild with --no-libraries. `hub` has meant
-        // `pack` since player 0.6: the one H5P hub host that answers a browser serves a
-        // catalogue older than current exports need.
+        // written for `pack` keeps playing after a rebuild with --no-libraries.
         if (ownPack || (!librariesPack && permitted(PACK_CDN_ORIGIN))) sources.push('pack')
         else if (librariesPack) sources.push(librariesPack)
         else return { error: 'This player was set up without the library pack, so libraries=pack is not available here.' }

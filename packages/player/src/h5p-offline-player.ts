@@ -1129,11 +1129,7 @@ export class H5PPlayerElement extends HTMLElement {
    * not count, so without the attribute it takes the pack: otherwise nothing could play it.
    */
   private librarySources(): LibrarySource[] {
-    return parseLibrarySources(this.getAttribute('libraries')?.trim() || (this.untrusted ? 'pack' : null), () => {
-      if (hubNoticeShown) return
-      hubNoticeShown = true
-      console.info('<h5p-player>: libraries="hub" now means libraries="pack", the library pack on jsDelivr.')
-    })
+    return parseLibrarySources(this.getAttribute('libraries')?.trim() || (this.untrusted ? 'pack' : null))
   }
 
   private async resolveSource(
@@ -2013,9 +2009,6 @@ async function readPackIndex(base: string): Promise<Array<PackLibrary & { url: s
   if (libraries.length === 0) throw new PlayerError('bad-archive', `${url} is not the index of a library pack`)
   return libraries
 }
-
-/** Whether the `hub` note has been logged on this page; once is enough. */
-let hubNoticeShown = false
 
 /** A statement from the frame in the shape `emitStatement` holds it. */
 function heldStatement(data: Extract<FromFrameMessage, { type: 'xapi' | 'finished' }>): HeldStatement {

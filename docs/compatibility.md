@@ -130,8 +130,7 @@ warning can come in any release.
 ## Deprecation
 
 A renamed attribute, value or option keeps working through the rest of its major and goes only
-in a major. Two are in that state now: `libraries="hub"`, read as `pack` with a console note, and
-a bare `auto-resize`, read as the default.
+in a major. None is in that state now.
 
 ## Browsers
 

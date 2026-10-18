@@ -57,7 +57,7 @@ const PACK_CDN_ORIGIN = 'https://cdn.jsdelivr.net'
 
 /**
  * A `libraries` value for addresses that name none, checked against the site it goes into: the
- * tokens the page understands (`pack`, `hub`, `none`, https URLs), and with a host list, nothing
+ * tokens the page understands (`pack`, `none`, https URLs), and with a host list, nothing
  * the page would then refuse on every load. Returns the value normalised to single spaces.
  *
  * @param {string | null | undefined} value
@@ -74,19 +74,19 @@ export function parseDefaultLibraries(value, { packages = null, libraries = true
     return null
   }
   // An exact match on a parsed origin, not a substring of a URL. Without its own copy, `pack` is
-  // the copy on jsDelivr that the element names; `hub` has meant `pack` since player 0.6.
+  // the copy on jsDelivr that the element names.
   const cdnAllowed = !packages || packages.some((origin) => origin === PACK_CDN_ORIGIN)
   for (const token of tokens) {
-    if (token === 'pack' || token === 'hub') {
+    if (token === 'pack') {
       if (!libraries && !cdnAllowed) {
-        throw new EmbedError(`--default-libraries names ${token}, but the site has no pack (--no-libraries) and --packages does not list ${PACK_CDN_ORIGIN}.`)
+        throw new EmbedError(`--default-libraries names pack, but the site has no pack (--no-libraries) and --packages does not list ${PACK_CDN_ORIGIN}.`)
       }
     } else {
       let url
       try {
         url = new URL(token)
       } catch {
-        throw new EmbedError(`--default-libraries: not pack, hub, none or a URL: ${token}`)
+        throw new EmbedError(`--default-libraries: not pack, none or a URL: ${token}`)
       }
       if (url.protocol !== 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) {
         throw new EmbedError(`--default-libraries: not an https URL: ${token}`)
