@@ -81,9 +81,9 @@ the ones before it lack. The pack refreshes wherever it is in the list, and supp
 missing once the sources before it have been tried. A `.h5p` URL only supplies what is missing.
 Nothing is on by default: a package is played as it is unless `libraries` names a source.
 
-`hub` means `pack`. Up to player 0.5 it asked the H5P hub itself, but the only hub host that
-answers a browser serves an outdated catalogue, so current exports could not get their libraries
-there anyway.
+The H5P hub itself is not asked: the only hub host that answers a browser serves an outdated
+catalogue, so current exports could not get their libraries there anyway. Up to player 0.10,
+`hub` was read as `pack`; it is now a word like any other, a URL relative to the page.
 
 ## When a source cannot be reached
 

@@ -179,11 +179,11 @@ allows one Service Worker, or must work offline, mounts the player in its own wo
 | `jobs` | attribute | The background worker's URL, for a CSP without `blob:` in `worker-src`. Default: `blob:`, then `h5p-jobs.js` beside the element |
 | `runtime` | property | The `runtime` export of `@missing-elements/h5p-runtime`. Set before `src` |
 | `assets-base` | attribute | Where the runtime's `dist/` is served. Default: `frame-assets/` beside the element |
-| `libraries` | attribute | Sources for a package's libraries, tried in order: `pack`, the library pack, of which only the libraries a package needs are downloaded, and whose newer versions play in place of those a package carries; a `.h5p` URL, which only fills gaps; or both. `hub` means `pack`. Default: a package plays as it is, and one without its libraries is refused |
+| `libraries` | attribute | Sources for a package's libraries, tried in order: `pack`, the library pack, of which only the libraries a package needs are downloaded, and whose newer versions play in place of those a package carries; a `.h5p` URL, which only fills gaps; or both. Default: a package plays as it is, and one without its libraries is refused |
 | `pack-base` | attribute | Where `pack` is: the folder of a copy of `@missing-elements/h5p-libraries`' `parts/` on your site. Default: jsDelivr, at the version this release pins |
 | `pack` | property | The `pack` export of `@missing-elements/h5p-libraries`, as a bundler emits it; wins over `pack-base`. Set before `src` |
 | `refresh-libraries` | attribute | `off` plays the libraries a package carries as exported, and `pack` only fills gaps. Default: the pack's newer versions play |
-| `untrusted` | attribute, property | Plays a package you did not make as data: its own library folders are ignored and the libraries come from `libraries` (default `pack`), `content/` serves only H5P's own file types, and the frame's script policy names exact paths. Its content is checked against each library's `semantics.json`, as the H5P CMS plugins check it. A package that needs its own copy of a library is refused, with `missingLibraries.carried` set. Needs the runtime at 0.2 or later |
+| `untrusted` | attribute, property | Plays a package you did not make as data: its own library folders are ignored and the libraries come from `libraries` (default `pack`), `content/` serves only H5P's own file types, and the frame's script policy names exact paths. Its content is checked against each library's `semantics.json`, as the H5P CMS plugins check it. A package that needs its own copy of a library is refused, with `missingLibraries.carried` set |
 | `allow-origins` | attribute | Extra origins for the frame's CSP, space separated |
 | `frame`, `copyright`, `export`, `icon`, `embed` | attribute | Show the H5P action bar and its buttons. `export` needs `download-url` or a package URL, `embed` needs `embed-code` |
 | `fullscreen` | attribute | `off` removes the fullscreen button |
@@ -196,7 +196,7 @@ allows one Service Worker, or must work offline, mounts the player in its own wo
 | `auto-resize` | attribute | `off` to size the element yourself. Default: follows the content's height |
 | `preload` | attribute, property | `auto` pulls large deflated media before it is asked for. Default: `none` |
 | `resume` | attribute, property | `device` keeps the content's saved state on this device; `host` hands it to the page. Default: `off` |
-| `save-interval` | attribute, property | Seconds between saves while the content runs, with `resume`; also saved after each completion and as the page closes. Default: `10` |
+| `save-interval` | attribute, property (`saveInterval`) | Seconds between saves while the content runs, with `resume`; also saved after each completion and as the page closes. Default: `10` |
 | `userData` | property | Under `resume="host"`, the state to restore, as `userdata` events carried it. Set before `src`. Not checked against the build: compare the `revision` you stored |
 | `state` | read-only | `idle`, `probing`, `downloading`, `indexing`, `ready` or `error` |
 | `pkgId`, `revision` | read-only | The loaded package's id and build fingerprint |

@@ -48,22 +48,21 @@ describe('the default library source', () => {
   it('takes what the parameter takes, and none as no default', () => {
     expect(parseDefaultLibraries(null)).toBeNull()
     expect(parseDefaultLibraries('none')).toBeNull()
-    expect(parseDefaultLibraries('  pack   hub ')).toBe('pack hub')
-    expect(parseDefaultLibraries('https://cdn.example.org/libraries.h5p hub')).toBe('https://cdn.example.org/libraries.h5p hub')
+    expect(parseDefaultLibraries('  https://cdn.example.org/libraries.h5p   pack ')).toBe('https://cdn.example.org/libraries.h5p pack')
   })
 
   it('refuses at build time what the page would refuse on every load', () => {
     const packages = ['https://cdn.example.org']
-    // `hub` means `pack` now: the site's own copy, or jsDelivr's when the site has none.
-    expect(parseDefaultLibraries('hub', { packages })).toBe('hub')
-    expect(() => parseDefaultLibraries('hub', { packages, libraries: false })).toThrow(/does not list https:\/\/cdn\.jsdelivr\.net/)
+    // `pack` is the site's own copy, or jsDelivr's when the site has none, which the list must name.
+    expect(parseDefaultLibraries('pack', { packages })).toBe('pack')
+    expect(() => parseDefaultLibraries('pack', { packages, libraries: false })).toThrow(/no pack .* does not list https:\/\/cdn\.jsdelivr\.net/)
     expect(parseDefaultLibraries('pack', { packages: [...packages, 'https://cdn.jsdelivr.net'], libraries: false })).toBe('pack')
     expect(() => parseDefaultLibraries('https://elsewhere.example/l.h5p', { packages })).toThrow(/which --packages does not list/)
-    expect(() => parseDefaultLibraries('pack', { packages, libraries: false })).toThrow(/no pack/)
-    expect(parseDefaultLibraries('pack', { packages })).toBe('pack')
-    expect(() => parseDefaultLibraries('none hub')).toThrow(/stands alone/)
+    expect(() => parseDefaultLibraries('none pack')).toThrow(/stands alone/)
     expect(() => parseDefaultLibraries('http://cdn.example.org/l.h5p')).toThrow(/not an https URL/)
-    expect(() => parseDefaultLibraries('libraries')).toThrow(/not pack, hub, none or a URL/)
+    expect(() => parseDefaultLibraries('libraries')).toThrow(/not pack, none or a URL/)
+    // `hub` meant `pack` up to embed 0.8; now it is a word like any other.
+    expect(() => parseDefaultLibraries('hub')).toThrow(/not pack, none or a URL: hub/)
   })
 })
 

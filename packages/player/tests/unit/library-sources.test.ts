@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { LIBRARY_PACK_BASE, LIBRARY_PACK_VERSION } from '../../src/shared/constants'
 import { PACK_INDEX } from '../../src/shared/pack-index'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { parseLibrarySources } from '../../src/shared/library-sources'
 
 describe('the libraries attribute', () => {
@@ -13,11 +13,12 @@ describe('the libraries attribute', () => {
     expect(parseLibrarySources(' /libraries.h5p   pack ')).toEqual([{ url: '/libraries.h5p' }, 'pack'])
   })
 
-  it('reads hub as pack, says so, and does not try the pack twice', () => {
-    const onHub = vi.fn()
-    expect(parseLibrarySources('hub', onHub)).toEqual(['pack'])
-    expect(onHub).toHaveBeenCalledTimes(1)
-    expect(parseLibrarySources('https://cdn.example.org/l.h5p pack hub')).toEqual([{ url: 'https://cdn.example.org/l.h5p' }, 'pack'])
+  it('does not try the pack twice', () => {
+    expect(parseLibrarySources('pack https://cdn.example.org/l.h5p pack')).toEqual(['pack', { url: 'https://cdn.example.org/l.h5p' }])
+  })
+
+  it('reads hub as any other word, a URL, since it no longer means pack', () => {
+    expect(parseLibrarySources('hub')).toEqual([{ url: 'hub' }])
   })
 })
 

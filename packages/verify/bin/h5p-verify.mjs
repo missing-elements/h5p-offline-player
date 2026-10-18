@@ -14,10 +14,10 @@ Options:
                          default), and its content is checked against their semantics. What
                          the check removed is reported as warnings
   --libraries <sources>  where libraries come from, tried in order: pack (the published
-                         library pack; hub means the same), a bundle's URL, a bundle on
-                         disk, or a copy of the pack's parts/ folder, which keeps the check
-                         offline. With the pack, a library the package carries plays at the
-                         pack's newer version, as on a site with the pack
+                         library pack), a bundle's URL, a bundle on disk, or a copy of the
+                         pack's parts/ folder, which keeps the check offline. With the
+                         pack, a library the package carries plays at the pack's newer
+                         version, as on a site with the pack
   --no-refresh-libraries play the libraries the package carries even where the pack has newer
   --out <dir>            where report.json and screenshot.png go
                          (default: <package>.verify/ beside the package)
