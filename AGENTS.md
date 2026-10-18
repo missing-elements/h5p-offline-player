@@ -364,9 +364,13 @@ to `packages/player/public/frame-assets/`, and builds the fixtures into
 
 Use Node 22 LTS or 24 LTS. Vitest's `engines` covers `^22.12 || ^24 || >=26`, so an odd-numbered
 release such as Node 23 prints an engine warning on install. It is only a warning — the suite
-runs — but it is not worth chasing, and no patched Vitest accepts Node 23. The packages' own
-`engines` stay at `>=20`: that is what the build scripts need, and nothing in `dist` runs on
-Node at all.
+runs — but it is not worth chasing, and no patched Vitest accepts Node 23. The workspace's own
+`engines` is `>=22.12`, the floor of the tools it builds and tests with. The three commands —
+normalize, verify and embed — need Node 22 from 2026-10-18 (embed 0.8.0, verify 0.3.0,
+normalize from its next release): Node 20 reached its end of life on 2026-04-30 and CI runs 22,
+so `>=20` was a claim nothing tested. The browser packages — the player, the runtime, the
+libraries and cmi5 — keep `>=20`: nothing in them runs on Node, and a higher floor would only
+fail the install of a host still building on 20 under Yarn 1 or `engine-strict`, for no gain.
 
 The browser provider is a package, not a name: `provider: playwright()` from
 `@vitest/browser-playwright`. Vitest 4 moved providers out of the core package, so a bare

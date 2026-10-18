@@ -472,7 +472,7 @@ label.file:has(input:focus-visible) { outline: 2px solid var(--accent); outline-
 /* The element's two modes, on a row of their own at the foot of the form: a two-part switch and
    what the chosen mode does. The radios stay real radios, out of sight, so arrows move between
    them and the label is the click target. */
-.mode-row { display: flex; flex: 1 1 100%; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.875rem; }
+.mode-row { display: flex; flex: 1 1 100%; flex-wrap: wrap; align-items: start; gap: 0.5rem 0.875rem; }
 .mode {
   display: inline-flex;
   flex: none;

@@ -25,6 +25,6 @@
     "cmi5:catapult": "pnpm --filter @missing-elements/h5p-demo cmi5:catapult"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12"
   }
 }

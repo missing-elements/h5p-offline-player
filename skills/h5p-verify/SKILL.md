@@ -14,7 +14,7 @@ until this passes and you have looked at the screenshot.
 
     npx @missing-elements/h5p-verify package.h5p
 
-Needs Node 20+ and a Chromium-based browser. Chrome or Edge on the machine is used if present;
+Needs Node 22+ and a Chromium-based browser. Chrome or Edge on the machine is used if present;
 otherwise run `npx playwright install chromium` once (about 150 MB). Headless, no display.
 
 - `--untrusted` — play it the way a site plays a package it did not make: none of its own code

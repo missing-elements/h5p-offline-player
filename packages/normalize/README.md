@@ -8,7 +8,7 @@ JSON are deflated. Everything else is copied byte for byte.
 
 ## Usage
 
-Needs Node 20 or later.
+Needs Node 22 or later.
 
 ```bash
 npx @missing-elements/h5p-normalize course.h5p               # writes course.normalized.h5p

@@ -66,7 +66,7 @@ come from the pack on jsDelivr unless `--libraries` names another; name a copy o
 | `-q`, `--quiet` | the verdict line only |
 | `-h`, `--help` | |
 
-Needs Node 20 or later and a Chromium-based browser; without Chrome or Edge, run
+Needs Node 22 or later and a Chromium-based browser; without Chrome or Edge, run
 `npx playwright install chromium`.
 
 ## From code

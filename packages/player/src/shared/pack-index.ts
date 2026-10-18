@@ -1,4 +1,4 @@
-// Written by scripts/sync-h5p-assets.mjs from @missing-elements/h5p-libraries 0.2.0's
+// Written by scripts/sync-h5p-assets.mjs from @missing-elements/h5p-libraries 0.3.0's
 // parts/index.json. Do not edit; run `pnpm sync:assets` in packages/player.
 import type { PackLibrary } from './protocol'
 

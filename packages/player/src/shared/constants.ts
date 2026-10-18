@@ -1,5 +1,5 @@
 /** Version of the element/worker pair. Kept in sync with package.json by scripts/sync-h5p-assets.mjs. */
-export const VERSION = '0.9.5'
+export const VERSION = '0.10.0'
 
 /** Major version. Cache names carry it, so a major bump discards every cached package. */
 export const MAJOR_VERSION = 0
@@ -8,7 +8,7 @@ export const MAJOR_VERSION = 0
  * The version of `@missing-elements/h5p-libraries` that `libraries="pack"` plays against. Stamped
  * from the checkout by scripts/sync-h5p-assets.mjs, so each player release pins one pack.
  */
-export const LIBRARY_PACK_VERSION = '0.2.0'
+export const LIBRARY_PACK_VERSION = '0.3.0'
 
 /**
  * `libraries="pack"` with no copy of the host's own: every H5P hub content type's runtime
