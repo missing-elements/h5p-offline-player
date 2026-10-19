@@ -242,7 +242,9 @@ describe('buildFrameDocument', () => {
     expect(html).toContain('<script nonce="deadbeef" src="https://site.example/frame-assets/main.bundle.js" charset="UTF-8"></script>')
     expect(html.indexOf('main.bundle.js')).toBeLessThan(html.indexOf('frame-boot.js'))
     expect(html).toContain('"upgrades":["H5P.QuestionSet-1.21","H5P.Summary-1.10"]')
-    expect(bootConfigOf(html).boot).toBeUndefined()
+    // The route too: on a host that serves the runtime at one path, the boot script named there is
+    // the new one once the host has upgraded, under a page from before still open.
+    expect(bootConfigOf(html).boot).toBe(options.bootUrl)
     expect(buildFrameDocument(legacy)).not.toContain('"upgrades"')
     expect(buildContentSecurityPolicy({ ...legacy, untrusted: true })).toContain(legacy.assets.mainJs)
   })

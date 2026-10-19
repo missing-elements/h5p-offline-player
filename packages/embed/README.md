@@ -65,7 +65,8 @@ The headers themselves, for a host not listed:
 |---|---|
 | every path | `Content-Security-Policy` (the policy the command prints, with `frame-ancestors` from `--ancestors`), `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` |
 | `/h5p-sw.js` | `Cache-Control: no-cache`, so an update reaches learners on their next visit |
-| `/frame-assets/*`, `/resizer.js`, `/libraries/*` | `Cache-Control: public, max-age=3600, stale-while-revalidate=86400` |
+| `/frame-assets/*`, `/libraries/*` | `Cache-Control: no-cache`: the runtime and the library pack keep their file names between versions, so a copy from before an update must not be used after it |
+| `/resizer.js` | `Cache-Control: public, max-age=3600, stale-while-revalidate=86400` |
 
 To update, run the command again with `--force` and redeploy.
 

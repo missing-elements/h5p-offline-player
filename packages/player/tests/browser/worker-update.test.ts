@@ -1,6 +1,6 @@
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import '../../src/h5p-offline-player'
-import { VERSION } from '../../src/shared/constants'
+import { MAJOR_VERSION, VERSION } from '../../src/shared/constants'
 import { FIXTURES, frameFetch, play } from './utils'
 
 /**
@@ -13,7 +13,24 @@ import { FIXTURES, frameFetch, play } from './utils'
 const SW = '/versioned/h5p-sw.js'
 const SCOPE = new URL('/versioned/h5p/', location.href).href
 
-const serveVersion = (version: string) => fetch(`/versioned/__version?v=${encodeURIComponent(version)}`)
+/** What `/versioned/h5p-sw.js` says it is from now on, and how late it is answered. */
+const serveVersion = (version: string, delay = 0) => fetch(`/versioned/__version?v=${encodeURIComponent(version)}&delay=${delay}`)
+
+/** The worker the scope runs brought to `version`, as an earlier visit would have left it. */
+async function installVersion(version: string) {
+  await serveVersion(version)
+  // Registered here when no test before has, so that each test stands on its own.
+  const registration = (await navigator.serviceWorker.getRegistration(SCOPE)) ?? (await navigator.serviceWorker.register(SW, { scope: SCOPE }))
+  await registration.update()
+  await activatedNewest(registration)
+}
+
+/** Resolves once nothing is installing or waiting in the scope. */
+async function activatedNewest(registration: ServiceWorkerRegistration) {
+  const worker = registration.installing ?? registration.waiting
+  if (!worker) return
+  await new Promise<void>((done) => worker.addEventListener('statechange', () => worker.state === 'activated' && done()))
+}
 
 /** The version the worker controlling the frame reports, over its own `_ping` route. */
 async function frameWorkerVersion(player: Parameters<typeof frameFetch>[0]): Promise<string> {
@@ -59,4 +76,33 @@ describe('a player update', () => {
     expect(replaced).toBe(false)
     expect(registration?.installing ?? registration?.waiting ?? null).toBeNull()
   })
+
+  it('waits for the update however slow the script, when the worker running is of another major', async () => {
+    // A worker of the major before cannot serve this element: from 0.10 to 1.0, a load that went
+    // ahead with it after three seconds never left `indexing` (#49).
+    await installVersion(`${MAJOR_VERSION - 1}.99.0`)
+    await serveVersion('', 4_000)
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const started = performance.now()
+    const player = await play(FIXTURES.basic, { sw: SW })
+
+    expect(performance.now() - started).toBeGreaterThan(4_000)
+    expect(await frameWorkerVersion(player)).toBe(VERSION)
+  }, 60_000)
+
+  it('goes ahead after three seconds within a major, where the worker running serves the element', async () => {
+    const older = `${MAJOR_VERSION}.0.0-older`
+    await installVersion(older)
+    // Slower than the wait, by a margin the load cannot use up before it is ready.
+    await serveVersion('', 8_000)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const player = await play(FIXTURES.basic, { sw: SW })
+
+    expect(await frameWorkerVersion(player)).toBe(older)
+    expect(warn.mock.calls.some(([line]) => String(line).includes(`Service Worker is ${older}`))).toBe(true)
+    // The update it gave up waiting for still lands, for the next load.
+    await activatedNewest((await navigator.serviceWorker.getRegistration(SCOPE))!)
+  }, 60_000)
 })

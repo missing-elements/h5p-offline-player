@@ -9,11 +9,13 @@ import { packLibrariesIn } from './shared/pack'
 import {
   CONTROL_TIMEOUT_MS,
   LIBRARY_PACK_BASE,
+  MAJOR_VERSION,
   PACK_INDEX_CACHE,
   SAVE_INTERVAL_S,
   SILENT_ANSWER_TIMEOUT_MS,
   VERSION,
   WARM_ENTRY,
+  WORKER_MAJOR_UPDATE_TIMEOUT_MS,
   WORKER_UPDATE_TIMEOUT_MS
 } from './shared/constants'
 import {
@@ -1450,13 +1452,16 @@ export class H5PPlayerElement extends HTMLElement {
    * into the boot, under a frame document the old version wrote. So a version that differs asks
    * for the update itself and waits for it, bounded: offline, or on a slow host, the load goes
    * ahead with the worker it has. A script that is still old after the update is the host's copy,
-   * which only the host can replace; that stays a warning.
+   * which only the host can replace; that stays a warning. A worker of another major cannot serve
+   * this element at all, so for one the load waits as long as the update takes, within
+   * `WORKER_MAJOR_UPDATE_TIMEOUT_MS`.
    */
   private async ensureCurrentWorker(registration: ServiceWorkerRegistration): Promise<void> {
     const before = await this.workerVersion()
     if (before === null || before === VERSION) return
 
-    await withTimeout(updateWorker(registration), WORKER_UPDATE_TIMEOUT_MS, undefined)
+    const wait = majorOf(before) === MAJOR_VERSION ? WORKER_UPDATE_TIMEOUT_MS : WORKER_MAJOR_UPDATE_TIMEOUT_MS
+    await withTimeout(updateWorker(registration, wait), wait, undefined)
     // Asked again rather than trusting what the update reported: with `skipWaiting`, a new
     // worker can be active before `update()` has resolved, leaving nothing in `installing`.
     warnIfDifferent((await this.workerVersion()) ?? before)
@@ -2052,7 +2057,7 @@ async function stillRegistered(registration: ServiceWorkerRegistration): Promise
  * wait with it. A newest worker that turns redundant falls back to the one running for the same
  * reason.
  */
-function activated(registration: ServiceWorkerRegistration): Promise<ServiceWorker> {
+function activated(registration: ServiceWorkerRegistration, wait = WORKER_UPDATE_TIMEOUT_MS): Promise<ServiceWorker> {
   const running = registration.active?.state === 'activated' ? registration.active : null
   const worker = registration.installing ?? registration.waiting ?? registration.active
   if (!worker) return Promise.reject(new PlayerError('no-worker', 'The registration has no worker'))
@@ -2071,18 +2076,18 @@ function activated(registration: ServiceWorkerRegistration): Promise<ServiceWork
     }
     worker.addEventListener('statechange', onChange)
   })
-  return running && running !== worker ? withTimeout(settled, WORKER_UPDATE_TIMEOUT_MS, running) : settled
+  return running && running !== worker ? withTimeout(settled, wait, running) : settled
 }
 
 /**
  * Fetches the registration's script and, when its bytes changed, waits for the new worker to
- * take over (`mountH5P` skips waiting). Settles without a word when nothing new was installed:
- * the network failed, or the script is the same bytes as before.
+ * take over (`mountH5P` skips waiting), for up to `wait`. Settles without a word when nothing new
+ * was installed: the network failed, or the script is the same bytes as before.
  */
-async function updateWorker(registration: ServiceWorkerRegistration): Promise<void> {
+async function updateWorker(registration: ServiceWorkerRegistration, wait: number): Promise<void> {
   try {
     await registration.update()
-    if (registration.installing || registration.waiting) await activated(registration)
+    if (registration.installing || registration.waiting) await activated(registration, wait)
   } catch {
     // Offline, a refused script, a worker that failed to install: the running one serves.
   }
@@ -2094,6 +2099,11 @@ function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T
     timer = setTimeout(() => resolve(fallback), ms)
   })
   return Promise.race([promise, late]).finally(() => clearTimeout(timer))
+}
+
+/** A version's major, `0` of `0.10.0`; `NaN` for what is not a version, which matches no major. */
+function majorOf(version: string): number {
+  return Number(/^(\d+)\./.exec(version)?.[1] ?? NaN)
 }
 
 function warnIfDifferent(workerVersion: string | undefined): void {
