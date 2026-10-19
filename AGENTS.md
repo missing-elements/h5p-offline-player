@@ -1018,7 +1018,13 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   requires, its entries copied from the pack as they are (zip.js `passThrough`), so a part's bytes
   change only when its library does and the weekly refresh commits only those; `parts/index.json`
   says each library's full version, dependencies and addon patterns and its archive's size and
-  SHA-256. Measured on the demo's packages: 2 to 16 parts, 0.04 to 1.5 MB, 4.0 MB for formulas
+  SHA-256. Every entry of the pack and its parts carries `FIXED_DATE` (`scripts/parts.mjs`), built
+  from local fields, since a zip records a wall-clock time and zip.js reads the Date's local ones:
+  built from UTC fields, it wrote 02:00 where the pack was built at UTC+2 and 00:00 on CI, whose
+  first refresh after the split rewrote all 106 archives with no library changed (#48, closed
+  unmerged; #51). `tests/unit/pack-bytes.test.ts` in the player builds in four zones, and the
+  workflow stops with an error when the files change and no library's line in `libraries.txt`
+  does. Measured on the demo's packages: 2 to 16 parts, 0.04 to 1.5 MB, 4.0 MB for formulas
   (MathDisplay is 2.8 MB), against 14 MB whole. **Planning is the worker's** (`planFromPack` in
   `mount.ts`, the rules in `sw/pack-plan.ts`): an `index` that offers the pack (`pack` on the
   message: `{ pinned: true }` for `LIBRARY_PACK_BASE`, whose index the worker carries compiled in
