@@ -34,6 +34,23 @@ describe('the runtime property', () => {
     expect(frameDocument(player).querySelector('style')?.textContent).toContain(runtime.fonts[0].url)
   })
 
+  it('plays a load that names the loader of runtime 0.2, on a host that has since upgraded', async () => {
+    // A page from before an upgrade, still open: its element registers its loads naming
+    // h5p-standalone's `main.bundle.js`, which the upgraded host no longer has, and the boot script
+    // at the URL it names is this runtime's by now. The worker writes the old kind of document for
+    // such a load, the route in it too, and this boot script boots from the route; without the
+    // route it stopped with "older than this runtime" (#49).
+    const player = createPlayer()
+    player.runtime = { ...runtime, mainJs: `${base}main.bundle.js` } as typeof runtime
+    const settled = waitForSettled(player)
+    player.setAttribute('src', FIXTURES.basic)
+
+    const result = await settled
+    if (!result.ok) expect.fail(`${result.detail.code} — ${result.detail.message}`)
+    const scripts = [...frameDocument(player).querySelectorAll('script[src]')].map((script) => script.getAttribute('src'))
+    expect(scripts).toContain(`${base}main.bundle.js`)
+  })
+
   it('refuses a value missing one of the three files, since that frame would never boot', () => {
     const player = createPlayer()
     player.runtime = { frameJs: 'b', frameCss: 'c' } as never

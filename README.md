@@ -127,7 +127,9 @@ cp -r node_modules/@missing-elements/h5p-libraries/parts public/h5p-libraries
 cp node_modules/@missing-elements/h5p-libraries/libraries.txt public/h5p-libraries/
 ```
 
-To upgrade, delete the folders and copy them again.
+To upgrade, delete the folders and copy them again. Serve them with `Cache-Control: no-cache`, or
+with no caching header at all: the file names stay the same from one version to the next, so a
+copy a browser kept from before an upgrade would run against the new Service Worker.
 
 Or load the element and the runtime from jsDelivr, and copy only the Service Worker:
 

@@ -17,7 +17,8 @@ Routes then live under `<hostScope>h5p/`, and the element uses them instead of r
 ## Upgrading
 
 - Cache names include the package major version; minor and patch updates reuse cached packages, and a worker update never invalidates them. A major starts the cache afresh, and each package is downloaded once more; saved state is kept.
-- After an upgrade, the element updates its own worker before the first load (waiting up to three seconds).
+- After an upgrade, the element updates its own worker before the first load, waiting up to three seconds, or up to thirty when the worker is from another major version, which cannot serve it.
+- Serve the runtime's folder and a copy of the library pack revalidated (`Cache-Control: no-cache`), or under a path with the version in it, as jsDelivr's addresses are. Their file names stay the same from one version to the next, and a copy the browser kept from before an upgrade runs against the new worker: from 0.10 to 1.0, kept for an hour, it failed every play for that hour.
 - Installed without a build step: re-download `h5p-sw.js` after upgrading. The element logs a warning when versions differ.
 - Single-worker hosts update their own worker; offer a reload on `controllerchange`, as the demo's app does.
 

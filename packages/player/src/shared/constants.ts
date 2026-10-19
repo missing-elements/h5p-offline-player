@@ -205,6 +205,15 @@ export const SAVE_INTERVAL_S = 10
  */
 export const WORKER_UPDATE_TIMEOUT_MS = 3_000
 
+/**
+ * The same, when the running worker is of another major. Within a major an older worker serves the
+ * element (docs/compatibility.md), so the load need not wait long; across one it cannot, and going
+ * ahead failed the load: from 0.10 to 1.0, measured with the script answered after four seconds,
+ * the load went ahead with the old worker, the new one took over halfway through, and it never
+ * left `indexing`. The new worker's activation deletes the old major's caches, about a second more.
+ */
+export const WORKER_MAJOR_UPDATE_TIMEOUT_MS = 30_000
+
 /** How long the element waits for the Service Worker to answer on the control channel. */
 export const CONTROL_TIMEOUT_MS = 30_000
 /**

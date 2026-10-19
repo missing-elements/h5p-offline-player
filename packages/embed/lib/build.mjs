@@ -137,6 +137,13 @@ export function contentSecurityPolicy({ packages = null, ancestors = null, meta 
 /** Header rules, one set for every host format: the policy everywhere, and the caching that matters. */
 function headerRules(csp) {
   const revalidate = 'public, max-age=3600, stale-while-revalidate=86400'
+  // Asked again on every load, a 304 when nothing changed. The runtime's files keep their names
+  // from one version to the next, and the worker's version decides which it needs: kept for an
+  // hour, the runtime of the version before ran under the new worker after an update, and every
+  // play failed until the hour was out (0.10 to 1.0, measured, #49). The pack the same way, for
+  // whatever reads it with the browser's defaults: the element itself asks for its index
+  // revalidated and for its parts past the HTTP cache, so for it the header changes nothing.
+  const current = 'no-cache'
   return [
     {
       path: '/*',
@@ -148,9 +155,9 @@ function headerRules(csp) {
     },
     // The worker is checked on every load, so an update reaches learners on their next visit.
     { path: '/h5p-sw.js', headers: { 'Cache-Control': 'no-cache' } },
-    { path: '/frame-assets/*', headers: { 'Cache-Control': revalidate } },
+    { path: '/frame-assets/*', headers: { 'Cache-Control': current } },
     { path: '/resizer.js', headers: { 'Cache-Control': revalidate } },
-    { path: '/libraries/*', headers: { 'Cache-Control': revalidate } }
+    { path: '/libraries/*', headers: { 'Cache-Control': current } }
   ]
 }
 

@@ -1128,9 +1128,13 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   `unversioned-pack.h5p` with `pack.test.ts` pins it; the walk tries each library both ways.
   **Across versions**: a record that names `mainJs` came from an element paired with the runtime
   up to 0.2, and the worker still writes that document — the loader, the upgrade list in the
-  config — so an element from before keeps playing against an updated worker; a later boot script
-  given a document without the `boot` URL, a worker from before, says to update the player and
-  `h5p-sw.js` together. An element of this player with a runtime up to 0.2 through `assets-base`
+  config — so an element from before keeps playing against an updated worker. It names the
+  `boot` route in that document too (#49): a page from before an upgrade, still open, registers
+  its loads naming the loader, and on a host that serves the runtime at one path — the demo, an
+  embed site, any copy of `dist/` — the boot script at that path is 1.0's by then, which boots
+  from the route and leaves the loader's 404 alone; without the route it stopped every such load.
+  A later boot script given a document without the `boot` URL, a worker from before, says to
+  update the player and `h5p-sw.js` together. An element of this player with a runtime up to 0.2 through `assets-base`
   cannot work and does not try: the peer range says which runtime it plays with.
 - **A 404 from the virtual server is load-bearing.** A library's `library.json` is looked for
   under the versioned folder name and then the bare one, and the first 404 is what sends the
@@ -1274,6 +1278,15 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   the control channel, and on a difference calls `registration.update()` and waits for the new
   worker, all bounded by `WORKER_UPDATE_TIMEOUT_MS`; offline or past it, the load goes ahead with
   the worker it has. Same bytes after the update is a host's stale `h5p-sw.js`, still a warning.
+  Going ahead is right within a major, whose older worker serves the element, and not across
+  one, which it cannot: from 0.10 to 1.0, measured with the published files under the same URLs
+  and `h5p-sw.js` answered after four seconds, the load went ahead with the 0.10 worker, the new
+  one took over halfway through, and it stayed in `indexing` (#49). So for a worker of another
+  major the wait is `WORKER_MAJOR_UPDATE_TIMEOUT_MS`, thirty seconds; the new worker's activation,
+  which deletes the old major's caches, took about a second of it with four caches or 124. One
+  setup at a time (`workerSetup`): the element keeps its routes before it asks the version, and a
+  load that began during the wait — a visitor choosing another package while the first still
+  loads — took them as kept and went ahead with the old worker; found reviewing the fix.
   `activated()` waits for the newest worker — installing, then waiting, then active — since a
   changed script URL (a bundler's hash) installs a new worker beside the old active one; that
   wait is bounded by the same timeout whenever an activated worker can serve, because a host's
@@ -2361,8 +2374,12 @@ SPA-fallback trap described above cannot happen there.
   longest prefix of the page's — so a page names no current link. The footers stay in the pages:
   each lists its own links. The per-page metadata — title, description, Open Graph and Twitter
   tags, each written two or three times — is the obvious next candidate and has not been done.
-- **Caching.** Hashed files under `/assets/` are immutable; `h5p-sw.js` is `no-cache`;
-  `frame-assets/` and `fixtures/` revalidate hourly. Fixtures also carry permissive CORS with
+- **Caching.** Hashed files under `/assets/` are immutable; `h5p-sw.js` and `frame-assets/` are
+  `no-cache`; `fixtures/` revalidate hourly. `frame-assets/` was hourly, with a day of
+  `stale-while-revalidate`, until #49: its file names stay the same from one runtime to the next,
+  and after the 1.0 deploy a returning browser ran runtime 0.2.5's boot script, kept from before,
+  under the new worker — "Cannot read properties of undefined (reading 'H5P')" on every play for
+  that hour. The embed command's headers changed the same way, for `/libraries/` as well. Fixtures also carry permissive CORS with
   `Range` allowed and `Content-Range` exposed, so another player instance can be pointed at them.
 - **The demo plays real content; the fixtures never ship.** The player's `public/fixtures/` is the test
   suite's stub library saying "Served from the archive, never extracted to disk", which is right

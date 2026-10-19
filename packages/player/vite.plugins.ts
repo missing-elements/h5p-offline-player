@@ -74,8 +74,10 @@ export function devServiceWorkerPlugin(): Plugin {
   // `/versioned/h5p-sw.js` is the worker as an older release would answer: the same script with
   // the version it reports replaced by the last `/versioned/__version?v=`, unset meaning the
   // real one. One URL with changing bytes is what a player update looks like to the browser,
-  // which is what `tests/browser/worker-update.test.ts` needs.
+  // which is what `tests/browser/worker-update.test.ts` needs. `&delay=` answers it that many
+  // milliseconds late, as a slow host does.
   let versionedAs: string | null = null
+  let versionedDelay = 0
   // The worker's `VERSION` constant, which a release keeps equal to the package's own.
   const { version } = JSON.parse(readFileSync(resolve(rootDir, 'package.json'), 'utf8')) as { version: string }
 
@@ -85,7 +87,9 @@ export function devServiceWorkerPlugin(): Plugin {
       server.middlewares.use((req, res, next) => {
         const url = req.url?.split('?')[0]
         if (url === '/versioned/__version') {
-          versionedAs = new URL(req.url ?? '', 'http://dev').searchParams.get('v') || null
+          const params = new URL(req.url ?? '', 'http://dev').searchParams
+          versionedAs = params.get('v') || null
+          versionedDelay = Number(params.get('delay')) || 0
           res.setHeader('cache-control', 'no-store')
           res.end(versionedAs ?? '')
           return
@@ -96,7 +100,8 @@ export function devServiceWorkerPlugin(): Plugin {
         if (!entry) return next()
 
         const as = url === '/versioned/h5p-sw.js' ? versionedAs : null
-        void bundleWorker(entry, false).then(
+        const late = url === '/versioned/h5p-sw.js' ? versionedDelay : 0
+        void new Promise((resolve) => setTimeout(resolve, late)).then(() => bundleWorker(entry, false)).then(
           (bundled) => {
             // By value, not by name: esbuild renames the constant (`VERSION2`) when names collide.
             const source = as ? bundled.replaceAll(JSON.stringify(version), JSON.stringify(as)) : bundled

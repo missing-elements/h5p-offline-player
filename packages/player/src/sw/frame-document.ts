@@ -373,7 +373,10 @@ export function buildFrameDocument(options: FrameDocumentOptions): string {
 
   // A runtime up to 0.2 boots through h5p-standalone's `main.bundle.js`, which the document loads
   // ahead of the boot script, and takes the upgrade list from here; a later one has no such file
-  // and asks the `boot` route for what to load.
+  // and asks the `boot` route for what to load. The route is named in every document, the older
+  // kind too: a page from before an upgrade, still open, registers its loads naming the loader,
+  // and on a host that serves the runtime at one path the boot script there is the new one by now,
+  // which boots from the route and leaves the loader's 404 alone. A 0.2 boot script ignores it.
   const loader = assets.mainJs
 
   // A JSON block, not a script: it is data, so it needs no nonce, and the boot script proper —
@@ -382,7 +385,7 @@ export function buildFrameDocument(options: FrameDocumentOptions): string {
   const bootConfig = JSON.stringify({
     pkgId,
     h5pJsonPath: virtualRoot,
-    boot: loader ? undefined : options.bootUrl,
+    boot: options.bootUrl,
     frameJs: assets.frameJs,
     frameCss: assets.frameCss,
     title: options.title,

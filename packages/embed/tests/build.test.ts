@@ -103,13 +103,17 @@ describe('the site', () => {
     const vercel = JSON.parse(await readFile(join(out, 'vercel.json'), 'utf8'))
     expect(vercel.headers[0]).toEqual({ source: '/(.*)', headers: expect.arrayContaining([{ key: 'Content-Security-Policy', value: site.csp }]) })
     expect(vercel.headers).toContainEqual({ source: '/h5p-sw.js', headers: [{ key: 'Cache-Control', value: 'no-cache' }] })
+    // The runtime and the pack keep their names between versions, so neither is kept unasked (#49).
+    for (const folder of ['/frame-assets/', '/libraries/']) {
+      expect(vercel.headers.find((rule: { source: string }) => rule.source.startsWith(folder)).headers).toEqual([{ key: 'Cache-Control', value: 'no-cache' }])
+    }
     expect(await readFile(join(out, 'config.js'), 'utf8')).toContain('{"libraries":true,"packages":["https://cdn.example.org"],"defaultLibraries":null}')
 
     // The three server formats say the same as the two host files, each in its own syntax.
     const caddy = await readFile(join(out, 'Caddyfile'), 'utf8')
     expect(caddy).toContain(`\theader Content-Security-Policy "${site.csp}"`)
     expect(caddy).toContain('\theader /h5p-sw.js Cache-Control "no-cache"')
-    expect(caddy).toContain('\theader /frame-assets/* Cache-Control "public, max-age=3600')
+    expect(caddy).toContain('\theader /frame-assets/* Cache-Control "no-cache"')
     const nginx = await readFile(join(out, 'nginx.conf'), 'utf8')
     expect(nginx).toContain(`add_header Content-Security-Policy "${site.csp}" always;`)
     expect(nginx).toContain('location = /h5p-sw.js {')
