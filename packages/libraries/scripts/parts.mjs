@@ -30,8 +30,15 @@ const packageDir = resolve(import.meta.dirname, '..')
  */
 const PART_MANIFEST = JSON.stringify({ title: 'H5P Offline Player library pack', language: 'und', mainLibrary: '', preloadedDependencies: [], embedTypes: ['div'] })
 
-/** A fixed date, as the pack has: the bytes change only when a library does. */
-const FIXED_DATE = new Date(Date.UTC(2000, 0, 1))
+/**
+ * The date every entry of the pack and its parts is written with, so the bytes change only when a
+ * library does. A zip records a wall-clock time with no zone, and zip.js takes it from the Date's
+ * local fields, so this is built from local fields too: the same bytes in any time zone. It was
+ * `Date.UTC(2000, 0, 1)` until #51, which wrote 02:00 at UTC+2, where the pack up to 1.0.0 was
+ * built, and 00:00 on CI, whose first weekly run rewrote all 106 archives with no library changed
+ * (#48). 02:00 is kept so the bytes stay those pack 1.0.0 shipped.
+ */
+export const FIXED_DATE = new Date(2000, 0, 1, 2)
 
 /**
  * The smallest a part is written. A bundler inlines a small asset named by `new URL` as a `data:`

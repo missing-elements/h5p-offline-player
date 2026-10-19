@@ -1,7 +1,8 @@
 name: Library pack
 
 # Rebuilds packages/libraries from the H5P hub every week and opens a pull request when a library
-# changed. The pack is built deterministically, so an unchanged hub leaves the tree clean.
+# changed. The pack is built deterministically, in any time zone, so an unchanged hub leaves the
+# tree clean.
 
 on:
   schedule:
@@ -39,7 +40,17 @@ jobs:
           fi
 
           branch=libraries/refresh
-          changes=$(git diff -U0 -- packages/libraries/libraries.txt | grep '^[-+]H5P' | sort -k1.2 || true)
+          # Every library's line, `<folder>  <version>  <licence>`, FontAwesome and jQuery.ui among them.
+          changes=$(git diff -U0 -- packages/libraries/libraries.txt | grep -E '^[-+][A-Za-z][^ ]*-[0-9]+\.[0-9]+  ' | sort -k1.2 || true)
+          if [ -z "$changes" ]; then
+            # The files changed and no library's version, licence or authors did: the build is not
+            # deterministic, as it was once in the builder's time zone (#51), or the hub changed a
+            # library's files without a new version. Either way a pull request would say the hub
+            # changed when no library did.
+            echo "::error::The pack's files changed, but no library in libraries.txt did. Rebuild with pnpm libraries and compare the archives' entries before releasing anything."
+            git status --short -- packages/libraries | head -20
+            exit 1
+          fi
 
           version=$(node -e "
             const fs = require('fs'), path = 'packages/libraries/package.json'

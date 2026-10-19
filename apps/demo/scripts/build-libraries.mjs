@@ -3,7 +3,7 @@ import { writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { BlobReader, BlobWriter, TextReader, Uint8ArrayReader, Uint8ArrayWriter, ZipReader, ZipWriter, configure } from '@zip.js/zip.js'
 import { formatBytes } from '@missing-elements/h5p-normalize'
-import { splitPack, writePackModule } from '../../../packages/libraries/scripts/parts.mjs'
+import { FIXED_DATE, splitPack, writePackModule } from '../../../packages/libraries/scripts/parts.mjs'
 import { HUB, download as cachedDownload, hubBundle as cachedBundle } from './lib/hub.mjs'
 
 /**
@@ -159,9 +159,10 @@ if (unknown.length > 0) {
 
 // A bundle registered to supply libraries is never held to its own manifest, but the player
 // refuses any archive without an h5p.json.
-// A fixed date, so the pack's bytes change only when a library does: the weekly refresh
-// (.github/workflows/libraries.yml) opens a pull request only on a real difference.
-const writer = new ZipWriter(new BlobWriter('application/zip'), { lastModDate: new Date(Date.UTC(2000, 0, 1)), extendedTimestamp: false })
+// A fixed date, the same in any time zone (see `FIXED_DATE`), so the pack's bytes change only when
+// a library does: the weekly refresh (.github/workflows/libraries.yml) opens a pull request only
+// on a real difference.
+const writer = new ZipWriter(new BlobWriter('application/zip'), { lastModDate: FIXED_DATE, extendedTimestamp: false })
 await writer.add(
   'h5p.json',
   new TextReader(
