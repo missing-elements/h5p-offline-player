@@ -1283,7 +1283,10 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   and `h5p-sw.js` answered after four seconds, the load went ahead with the 0.10 worker, the new
   one took over halfway through, and it stayed in `indexing` (#49). So for a worker of another
   major the wait is `WORKER_MAJOR_UPDATE_TIMEOUT_MS`, thirty seconds; the new worker's activation,
-  which deletes the old major's caches, took about a second of it with four caches or 124.
+  which deletes the old major's caches, took about a second of it with four caches or 124. One
+  setup at a time (`workerSetup`): the element keeps its routes before it asks the version, and a
+  load that began during the wait — a visitor choosing another package while the first still
+  loads — took them as kept and went ahead with the old worker; found reviewing the fix.
   `activated()` waits for the newest worker — installing, then waiting, then active — since a
   changed script URL (a bundler's hash) installs a new worker beside the old active one; that
   wait is bounded by the same timeout whenever an activated worker can serve, because a host's

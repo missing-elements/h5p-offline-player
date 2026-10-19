@@ -308,6 +308,8 @@ export class H5PPlayerElement extends HTMLElement {
   private jobs: JobsWorkerHandle | null = null
   private routes: Routes | null = null
   private registration: ServiceWorkerRegistration | null = null
+  /** The worker being found or brought up to date, while it is: every load meanwhile waits on it. */
+  private workerSetup: Promise<Routes> | null = null
   private currentFile: File | null = null
   private currentSource: SourceDescriptor | null = null
   private load: AbortController | null = null
@@ -1368,9 +1370,22 @@ export class H5PPlayerElement extends HTMLElement {
   /**
    * Finds the routes, registering our own worker unless a host has already mounted the handlers
    * into theirs. Registration uses an explicit `h5p/` sub-scope, so a host worker living in the
-   * same directory — or at `/`, for a root-placed `h5p-sw.js` — is never displaced.
+   * same directory — or at `/`, for a root-placed `h5p-sw.js` — is never displaced. One setup at
+   * a time: a load that starts while an earlier one is still bringing the worker up to the
+   * element's version — up to thirty seconds across a major, on a slow host — waits on that setup.
+   * The routes are kept before the version is asked, and a load that began meanwhile took them as
+   * kept and went ahead with the worker of the major before (#49, found in review).
    */
-  private async ensureWorker(): Promise<Routes> {
+  private ensureWorker(): Promise<Routes> {
+    if (!this.workerSetup) {
+      this.workerSetup = this.setUpWorker().finally(() => {
+        this.workerSetup = null
+      })
+    }
+    return this.workerSetup
+  }
+
+  private async setUpWorker(): Promise<Routes> {
     if (this.routes && this.registration) {
       if (await stillRegistered(this.registration)) return this.routes
 

@@ -1,7 +1,7 @@
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import '../../src/h5p-offline-player'
 import { MAJOR_VERSION, VERSION } from '../../src/shared/constants'
-import { FIXTURES, frameFetch, play } from './utils'
+import { FIXTURES, createPlayer, frameFetch, play, waitForSettled } from './utils'
 
 /**
  * The first load after a player update. Registering again with an unchanged script URL returns
@@ -91,6 +91,25 @@ describe('a player update', () => {
     expect(await frameWorkerVersion(player)).toBe(VERSION)
   }, 60_000)
 
+  it('holds a load that starts while the update is still on its way', async () => {
+    // The element keeps its routes before it asks the worker's version, and a load that began
+    // during the wait — a visitor choosing another package while the first still loads — took
+    // them as kept and went ahead with the worker of the major before.
+    await installVersion(`${MAJOR_VERSION - 1}.99.0`)
+    await serveVersion('', 4_000)
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const player = createPlayer({ sw: SW })
+    player.setAttribute('src', FIXTURES.basic)
+    await new Promise((resolve) => setTimeout(resolve, 1_000))
+    const settled = waitForSettled(player)
+    player.setAttribute('src', FIXTURES.streamed)
+
+    const result = await settled
+    if (!result.ok) expect.fail(`${result.detail.code} — ${result.detail.message}`)
+    expect(await frameWorkerVersion(player)).toBe(VERSION)
+  }, 60_000)
+
   it('goes ahead after three seconds within a major, where the worker running serves the element', async () => {
     const older = `${MAJOR_VERSION}.0.0-older`
     await installVersion(older)
@@ -102,7 +121,13 @@ describe('a player update', () => {
 
     expect(await frameWorkerVersion(player)).toBe(older)
     expect(warn.mock.calls.some(([line]) => String(line).includes(`Service Worker is ${older}`))).toBe(true)
-    // The update it gave up waiting for still lands, for the next load.
-    await activatedNewest((await navigator.serviceWorker.getRegistration(SCOPE))!)
+
+    // The update it gave up waiting for still lands, and takes the frame over.
+    const registration = (await navigator.serviceWorker.getRegistration(SCOPE))!
+    if (!registration.installing && !registration.waiting) {
+      await new Promise((found) => registration.addEventListener('updatefound', found, { once: true }))
+    }
+    await activatedNewest(registration)
+    expect(await frameWorkerVersion(player)).toBe(VERSION)
   }, 60_000)
 })
