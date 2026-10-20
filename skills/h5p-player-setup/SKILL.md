@@ -172,7 +172,8 @@ activity; `min-height` is for a platform that strips the script. Encode `&`, `#`
 spaces inside `src`. Parameters, by the element's attribute names: `libraries=pack` or
 `libraries=<url>` for a package without libraries (`libraries=none` turns off the site's default), `preload=auto`, `frame`, `copyright`,
 `export`, `icon`, `reporting`, `fullscreen=off`, `activity-id=<IRI>`, `custom-css=<URL>`,
-`lang=<the page's language>` for H5P's own buttons and dialogs, and `xapi=<the page's origin>` to
+`lang=<the page's language>` for H5P's own buttons and dialogs in a package that does not name its
+own language (one that does gets them in that language), and `xapi=<the page's origin>` to
 receive statements by `postMessage`. Not `custom-js` or `user`.
 
 Paste it into the platform's HTML block (Custom HTML in WordPress, Embed in Squarespace, Wix or

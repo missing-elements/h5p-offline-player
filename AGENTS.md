@@ -2620,8 +2620,9 @@ deliberate additions to it, not drift:
 - Content written for an older minor than the one served is upgraded in the frame with the
   libraries' own steps. The design serves what a package carries; a bundle that serves newer
   minors needs the step the platforms take when they install one.
-- The core's own strings follow the element's language, from translations the runtime carries.
-  The design's frame is English throughout.
+- The core's own strings follow the content's language, the one its `h5p.json` names, and the
+  element's for a package that names none, from translations the runtime carries. The design's
+  frame is English throughout.
 - A package can be played `untrusted`, with library code only from the host's bundle and its
   content checked against the libraries' semantics, as the CMS plugins check it. The design runs
   whatever a package carries.
