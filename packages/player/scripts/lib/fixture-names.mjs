@@ -8,6 +8,8 @@ export const LARGE_ENTRY_SIZE = 20 * 1024 * 1024
 
 export const GENERATED_FIXTURES = [
   'basic.h5p',
+  'german.h5p',
+  'english.h5p',
   'finished.h5p',
   'large-deflated.h5p',
   'large-stored.h5p',

@@ -266,7 +266,8 @@ export function startEmbed({ packBase = null, pack = null, librariesPack = null,
    * that one away, `&refresh-libraries=off` plays a package's own libraries even where the pack
    * has newer ones, `&activity-id=` names the statements' object and `&custom-css=` restyles the
    * content to the embedding site's taste. `&lang=` is the embedding page's language, which this
-   * page cannot read across origins: H5P's own buttons and dialogs follow it. Not `custom-js`,
+   * page cannot read across origins: H5P's own buttons and dialogs follow it for a package that
+   * does not name its own language, and follow the content's where it does. Not `custom-js`,
    * `embed-code` or `user`: a script is a capability on this origin that a link should not hand
    * out, the embed is the embed, and a learner's name has no place in a URL.
    */

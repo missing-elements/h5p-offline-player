@@ -124,8 +124,9 @@ element writes is an inline style and would beat the page's rule. Any CSS goes o
 **Coming from h5p-standalone:** its options carry over by name as attributes — `frame`,
 `copyright`, `export`, `icon`, `embed` (bare = on), `fullscreen="off"`, `download-url`,
 `embed-code`, `custom-css`, `custom-js`, `reporting`, `activity-id` — and `user` as a property.
-Its `translations` are `lang`: H5P's own buttons and dialogs follow the element's language, which
-it inherits from the page's `<html lang>` like any element, so a page in German shows them in German;
+Its `translations` are automatic: H5P's own buttons and dialogs are in the content's language, the
+one its `h5p.json` names, so a German package shows them in German on any page. `lang`, which the
+element inherits from the page's `<html lang>`, decides only for a package that names none;
 strings of the host's own cannot be passed. The guide's "Coming from h5p-standalone" table maps every option, including the ones the `.h5p`
 or the events replace. Formulas need `H5P.MathDisplay` in the package, not a `customJs` recipe.
 
@@ -171,7 +172,8 @@ activity; `min-height` is for a platform that strips the script. Encode `&`, `#`
 spaces inside `src`. Parameters, by the element's attribute names: `libraries=pack` or
 `libraries=<url>` for a package without libraries (`libraries=none` turns off the site's default), `preload=auto`, `frame`, `copyright`,
 `export`, `icon`, `reporting`, `fullscreen=off`, `activity-id=<IRI>`, `custom-css=<URL>`,
-`lang=<the page's language>` for H5P's own buttons and dialogs, and `xapi=<the page's origin>` to
+`lang=<the page's language>` for H5P's own buttons and dialogs in a package that does not name its
+own language (one that does gets them in that language), and `xapi=<the page's origin>` to
 receive statements by `postMessage`. Not `custom-js` or `user`.
 
 Paste it into the platform's HTML block (Custom HTML in WordPress, Embed in Squarespace, Wix or

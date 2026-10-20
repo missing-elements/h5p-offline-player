@@ -108,7 +108,7 @@ export interface FrameDocumentOptions {
    * one from the `boot` route.
    */
   upgrades?: string[]
-  /** The language tag the element was in, which H5P's own strings follow; English without one. */
+  /** The language tag the element was in: the frame's, for a package that names none of its own. */
   language?: string
   /** Played as data: scripts by exact path only. See `untrustedScriptSources`. */
   untrusted?: boolean
@@ -148,19 +148,16 @@ function recordedTag(value: unknown): string | undefined {
   return typeof value === 'string' && LANGUAGE_TAG.test(value) && value.toLowerCase() !== 'und' ? value : undefined
 }
 
-/** The language H5P's own buttons and dialogs are in: the element's, else English, the core's own. */
-function frameLanguage(language: string | undefined): string {
-  return recordedTag(language) ?? 'en'
-}
-
 /**
- * The document's language, which is the content's: `h5p.json`'s `defaultLanguage`, which H5P
- * writes as the `lang` of the iframe it makes, so that a screen reader reads the content in its
- * own language while the buttons around it follow the page's. A package that names none takes the
- * element's language, likelier its own than English is; with neither, the document is English.
+ * The frame's language, which is the content's, and H5P's own buttons and dialogs are in it too,
+ * so that the interface reads in the language of the content it surrounds: `h5p.json`'s
+ * `defaultLanguage`, which H5P writes as the `lang` of the iframe it makes. A package that names
+ * none takes the element's language, likelier its own than English is; with neither, English, the
+ * core's own. Until #55 the strings followed the element's language whatever the content's, so a
+ * German page put "Vollbild" and "Nutzungsrechte" around an English quiz's Check and Retry.
  */
-function documentLanguage(metadata: ContentMetadata | undefined, language: string | undefined): string {
-  return recordedTag(metadata?.defaultLanguage) ?? frameLanguage(language)
+function frameLanguage(options: Pick<FrameDocumentOptions, 'metadata' | 'language'>): string {
+  return recordedTag(options.metadata?.defaultLanguage) ?? recordedTag(options.language) ?? 'en'
 }
 
 /**
@@ -280,7 +277,7 @@ function sanitizeFrameOptions(options: FrameOptions | undefined): FrameOptions |
  * `'unsafe-eval'` makes worse.
  */
 function untrustedScriptSources(options: FrameDocumentOptions): string[] {
-  const strings = l10nScriptUrl(options.assets, frameLanguage(options.language))
+  const strings = l10nScriptUrl(options.assets, frameLanguage(options))
   const files = [
     ...(options.assets.mainJs ? [options.assets.mainJs] : []),
     options.assets.frameJs,
@@ -310,7 +307,7 @@ function pathSource(url: string, base: string): string | null {
 }
 
 export function buildContentSecurityPolicy(options: FrameDocumentOptions): string {
-  const origins = assetOrigins(options.assets, options.virtualRoot, frameLanguage(options.language))
+  const origins = assetOrigins(options.assets, options.virtualRoot, frameLanguage(options))
   const extra = sanitizeOrigins(options.allowOrigins)
   // The host's own stylesheets and scripts are the host's choice, like `assets-base`: their
   // origins join the directive they load under without an `allow-origins` entry.
@@ -368,7 +365,7 @@ export function buildContentSecurityPolicy(options: FrameDocumentOptions): strin
 export function buildFrameDocument(options: FrameDocumentOptions): string {
   const { pkgId, virtualRoot, assets, nonce } = options
   const csp = buildContentSecurityPolicy(options)
-  const language = frameLanguage(options.language)
+  const language = frameLanguage(options)
   const l10nJs = l10nScriptUrl(assets, language)
 
   // A runtime up to 0.2 boots through h5p-standalone's `main.bundle.js`, which the document loads
@@ -402,8 +399,8 @@ export function buildFrameDocument(options: FrameDocumentOptions): string {
 
   const fontFaces = fontFaceRules(assets.fonts)
   // The core's strings in every language the runtime has, a script that leaves them on `window`
-  // for the boot script, which picks the element's language and builds the core's settings with
-  // its strings: so it comes before it.
+  // for the boot script, which picks the frame's language and builds the core's settings with its
+  // strings: so it comes before it.
   const strings = l10nJs ? `<script nonce="${nonce}" src="${escapeHtml(l10nJs)}" charset="UTF-8"></script>\n` : ''
   const legacyLoader = loader ? `<script nonce="${nonce}" src="${escapeHtml(loader)}" charset="UTF-8"></script>\n` : ''
 
@@ -413,7 +410,7 @@ export function buildFrameDocument(options: FrameDocumentOptions): string {
   // line throws and the iframe flows below the box instead: a black picture with sound. The rule
   // says what that line meant; a fixed library (1.6.80, `getIframe()`) sets the same styles.
   return `<!DOCTYPE html>
-<html lang="${escapeHtml(documentLanguage(options.metadata, options.language))}" class="h5p-iframe">
+<html lang="${escapeHtml(language)}" class="h5p-iframe">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">

@@ -82,7 +82,7 @@ To update, run the command again with `--force` and redeploy.
 | `preload=auto` | Start fetching media at once |
 | `activity-id=<IRI>` | The xAPI object id, instead of the package URL |
 | `custom-css=<url>` | A stylesheet loaded into the content |
-| `lang=<tag>` | The language of H5P's own buttons and dialogs, such as `de` or `pt-BR`. Default: English |
+| `lang=<tag>` | The language of H5P's own buttons and dialogs, such as `de` or `pt-BR`, for a package that does not name its own. A package that names its language in `h5p.json` gets them in that language, matching its content. Default: English |
 | `xapi=<origin>` | Relay statements to the embedding page |
 
 A custom script and a learner's name cannot be set on the address. Opened unframed, the page plays

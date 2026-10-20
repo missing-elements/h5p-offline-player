@@ -4,11 +4,13 @@ import '../../src/h5p-offline-player'
 import { FIXTURES, createPlayer, frameDocument, frameWindow, play, waitForSettled } from './utils'
 
 /**
- * The core's own strings in the element's language: what the runtime answers for a key, and the
- * licence names it builds from them in its own ready handler — in the language too, so the
- * strings were in place before that handler ran. Read inside the frame, where the content's
- * buttons and dialogs get them. The element only passes the tag on; the runtime's `l10n.js`,
- * named for any language but English, and its boot script decide which strings that is.
+ * The core's own strings in the content's language, the one its `h5p.json` names, and in the
+ * element's for a package that names none: what the runtime answers for a key, and the licence
+ * names it builds from them in its own ready handler — in the language too, so the strings were
+ * in place before that handler ran. Read inside the frame, where the content's buttons and dialogs
+ * get them. The worker picks the tag; the runtime's `l10n.js`, named for any language but English,
+ * and its boot script decide which strings that is. The fixtures below name none, but for the
+ * first test's two.
  */
 
 interface Core {
@@ -31,6 +33,25 @@ afterEach(() => {
 })
 
 describe('the core’s strings', () => {
+  it('are in the language the package names, whatever the page’s, so the content and its interface match', async () => {
+    // A German package on an English page, and an English one in a German element (#55).
+    document.documentElement.setAttribute('lang', 'en')
+    const german = await play(FIXTURES.german)
+    expect(frameDocument(german).documentElement.lang).toBe('de')
+    expect(core(german).t('fullscreen')).toBe('Vollbild')
+    expect(core(german).copyrightLicenses['CC BY'].label).toBe('Namensnennung')
+    expect(strings(german)).toEqual([l10nJs])
+
+    const english = await play(FIXTURES.english, { lang: 'de' })
+    expect(frameDocument(english).documentElement.lang).toBe('en')
+    expect(core(english).t('fullscreen')).toBe('Fullscreen')
+    expect(strings(english)).toEqual([])
+
+    // From a host without Range too, where the frame boots before the download is whole.
+    const early = await play('/no-range/german.h5p')
+    expect(core(early).t('fullscreen')).toBe('Vollbild')
+  })
+
   it('are English, and the frame says so, when nothing declares a language', async () => {
     document.documentElement.removeAttribute('lang')
     const player = await play(FIXTURES.basic)

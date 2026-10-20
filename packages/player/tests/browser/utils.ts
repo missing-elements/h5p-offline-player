@@ -10,6 +10,9 @@ import type { H5PPlayerElement, PlayerErrorDetail } from '../../src/h5p-offline-
 
 export const FIXTURES = {
   basic: '/fixtures/basic.h5p',
+  /** `basic.h5p` naming its language in `h5p.json`, German and English: H5P's own strings follow it. */
+  german: '/fixtures/german.h5p',
+  english: '/fixtures/english.h5p',
   /** The content type with an Answer button, reporting `answered`, and a child of itself as a part. */
   finished: '/fixtures/finished.h5p',
   largeDeflated: '/fixtures/large-deflated.h5p',

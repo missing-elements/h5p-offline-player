@@ -474,7 +474,7 @@ describe('the frame’s language', () => {
     expect(bootLanguage(html)).toBeUndefined()
   })
 
-  it('names the runtime’s translations ahead of the boot script, and tells it the element’s language', () => {
+  it('names the runtime’s translations ahead of the boot script, and tells it the language', () => {
     const html = buildFrameDocument({ ...translated, language: 'de-AT' })
     const at = html.indexOf(`<script nonce="${options.nonce}" src="${l10nJs}" charset="UTF-8"></script>`)
     expect(at).toBeGreaterThan(0)
@@ -482,19 +482,31 @@ describe('the frame’s language', () => {
     expect(bootLanguage(html)).toBe('de-AT')
   })
 
-  it('declares the content’s own language as the document’s, as H5P does, whatever the buttons are in', () => {
-    // An English quiz on a German page: read in English, with German buttons around it.
-    const html = buildFrameDocument({ ...translated, language: 'de', metadata: { title: 'Quiz', defaultLanguage: 'en' } })
-    expect(htmlTag(html)).toBe('<html lang="en" class="h5p-iframe">')
-    expect(bootLanguage(html)).toBe('de')
-    // A package that names no language, or `und`, takes the element’s.
-    expect(htmlTag(buildFrameDocument({ ...translated, language: 'de' }))).toBe('<html lang="de" class="h5p-iframe">')
-    expect(htmlTag(buildFrameDocument({ ...translated, language: 'de', metadata: { defaultLanguage: 'und' } }))).toBe('<html lang="de" class="h5p-iframe">')
+  it('is the content’s own, H5P’s strings with it, whatever the element’s', () => {
+    // An English quiz on a German page: English throughout, as its own Check and Retry are (#55).
+    const english = buildFrameDocument({ ...translated, language: 'de', metadata: { title: 'Quiz', defaultLanguage: 'en' } })
+    expect(htmlTag(english)).toBe('<html lang="en" class="h5p-iframe">')
+    expect(english).not.toContain('l10n.js')
+    expect(bootLanguage(english)).toBeUndefined()
+
+    // A German quiz on an English page: German throughout.
+    const german = buildFrameDocument({ ...translated, language: 'en', metadata: { title: 'Quiz', defaultLanguage: 'de' } })
+    expect(htmlTag(german)).toBe('<html lang="de" class="h5p-iframe">')
+    expect(german).toContain(l10nJs)
+    expect(bootLanguage(german)).toBe('de')
+  })
+
+  it('is the element’s for a package that names no language, or `und`', () => {
+    for (const metadata of [undefined, { title: 'Quiz' }, { defaultLanguage: 'und' }]) {
+      const html = buildFrameDocument({ ...translated, language: 'de', metadata })
+      expect(htmlTag(html)).toBe('<html lang="de" class="h5p-iframe">')
+      expect(bootLanguage(html)).toBe('de')
+    }
   })
 
   it('needs no translations in any English', () => {
-    const html = buildFrameDocument({ ...translated, language: 'en-GB', metadata: { defaultLanguage: 'de' } })
-    expect(htmlTag(html)).toBe('<html lang="de" class="h5p-iframe">')
+    const html = buildFrameDocument({ ...translated, language: 'de', metadata: { defaultLanguage: 'en-GB' } })
+    expect(htmlTag(html)).toBe('<html lang="en-GB" class="h5p-iframe">')
     expect(html).not.toContain('l10n.js')
     expect(bootLanguage(html)).toBeUndefined()
   })
@@ -506,9 +518,14 @@ describe('the frame’s language', () => {
   })
 
   it('lets the translations load from their own origin, as the frame assets do', () => {
-    const csp = buildContentSecurityPolicy({ ...options, assets: { ...options.assets, l10nJs: 'https://cdn.example/runtime/l10n.js' }, language: 'de' })
-    const [scriptSrc] = csp.split('; ').filter((part) => part.startsWith('script-src'))
-    expect(scriptSrc).toContain('https://cdn.example')
+    const assets = { ...options.assets, l10nJs: 'https://cdn.example/runtime/l10n.js' }
+    const scriptSrc = (csp: string) => csp.split('; ').find((part) => part.startsWith('script-src'))
+    expect(scriptSrc(buildContentSecurityPolicy({ ...options, assets, language: 'de' }))).toContain('https://cdn.example')
+    // For the content's language too, on an English page, and by exact path when played as data.
+    expect(scriptSrc(buildContentSecurityPolicy({ ...options, assets, language: 'en', metadata: { defaultLanguage: 'de' } }))).toContain('https://cdn.example')
+    expect(scriptSrc(buildContentSecurityPolicy({ ...options, assets, untrusted: true, language: 'en', metadata: { defaultLanguage: 'de' } }))).toContain(
+      'https://cdn.example/runtime/l10n.js'
+    )
   })
 
   it('is held to its shape on the way out, since the record came back from storage', () => {
