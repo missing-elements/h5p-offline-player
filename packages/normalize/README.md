@@ -8,12 +8,13 @@ JSON are deflated. Everything else is copied byte for byte.
 
 ## Usage
 
-Needs Node 22 or later.
+Needs Node 22 or later. Write `@latest`: without it, npm on an older Node quietly installs the
+last version that supported it.
 
 ```bash
-npx @missing-elements/h5p-normalize course.h5p               # writes course.normalized.h5p
-npx @missing-elements/h5p-normalize course.h5p --dry-run     # report only
-npx @missing-elements/h5p-normalize https://host.example/course.h5p -o course.h5p
+npx @missing-elements/h5p-normalize@latest course.h5p               # writes course.normalized.h5p
+npx @missing-elements/h5p-normalize@latest course.h5p --dry-run     # report only
+npx @missing-elements/h5p-normalize@latest https://host.example/course.h5p -o course.h5p
 ```
 
 Installed (`npm install --save-dev @missing-elements/h5p-normalize`), the command is

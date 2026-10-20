@@ -12,10 +12,12 @@ until this passes and you have looked at the screenshot.
 
 ## Run it
 
-    npx @missing-elements/h5p-verify package.h5p
+    npx @missing-elements/h5p-verify@latest package.h5p
 
 Needs Node 22+ and a Chromium-based browser. Chrome or Edge on the machine is used if present;
-otherwise run `npx playwright install chromium` once (about 150 MB). Headless, no display.
+otherwise run `npx playwright install chromium` once (about 150 MB). Headless, no display. Keep
+`@latest` in the command: without it, npm on an older Node quietly installs the last version that
+supported it.
 
 - `--untrusted` — play it the way a site plays a package it did not make: none of its own code
   runs, the libraries come only from the pack, and the content is checked against each library's

@@ -20,9 +20,11 @@ Progress arrives as `progress` events with `phase: 'extract'`.
 The fix is to the package, with
 [`@missing-elements/h5p-normalize`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/normalize):
 
+It needs Node 22 or later.
+
 ```bash
-npx @missing-elements/h5p-normalize course.h5p                     # writes course.normalized.h5p beside it
-npx @missing-elements/h5p-normalize https://…/course.h5p --dry-run  # inspect only
+npx @missing-elements/h5p-normalize@latest course.h5p                     # writes course.normalized.h5p beside it
+npx @missing-elements/h5p-normalize@latest https://…/course.h5p --dry-run  # inspect only
 ```
 
 It rewrites the container and leaves the content alone: media stored, mp4 index moved to the

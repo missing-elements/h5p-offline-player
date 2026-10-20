@@ -13,9 +13,12 @@ index (`moov`) sits at the end of the file, so nothing decodes until the last by
 fixed by rewriting the container once, with the content left as it is. Do this where the
 package is published, never in the learner's browser.
 
+The command needs Node 22 or later. Keep `@latest` in it: without it, npm on an older Node
+quietly installs the last version that supported it.
+
 ## 1. Diagnose with a dry run
 
-    npx @missing-elements/h5p-normalize course.h5p --dry-run
+    npx @missing-elements/h5p-normalize@latest course.h5p --dry-run
 
 Read the summary at the end. The `media` line is the verdict:
 
@@ -35,8 +38,8 @@ for a file that size. Then it is a hosting question, not a package one.
 
 ## 2. Rewrite it
 
-    npx @missing-elements/h5p-normalize course.h5p                     # writes course.normalized.h5p beside it
-    npx @missing-elements/h5p-normalize course.h5p -o dist/course.h5p  # or where you say
+    npx @missing-elements/h5p-normalize@latest course.h5p                     # writes course.normalized.h5p beside it
+    npx @missing-elements/h5p-normalize@latest course.h5p -o dist/course.h5p  # or where you say
 
 It refuses to write over its input, so replacing the original is a rename afterwards.
 
@@ -49,7 +52,7 @@ files are deflated. The package grows by about 1% and every H5P host still accep
 ## 3. Check it
 
 - `unzip -t course.normalized.h5p` is an independent check that the archive is whole.
-- `npx @missing-elements/h5p-verify course.normalized.h5p` plays it; do this before handing it
+- `npx @missing-elements/h5p-verify@latest course.normalized.h5p` plays it; do this before handing it
   over, since a package that has been rewritten is a package that could have been broken.
 - A second dry run on the output reports every media file as "already as they should be".
 

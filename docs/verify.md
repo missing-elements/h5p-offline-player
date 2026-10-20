@@ -1,10 +1,11 @@
 # Checking that a package plays
 
 [`@missing-elements/h5p-verify`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/verify)
-plays a package through the player in a headless browser and says whether it worked:
+plays a package through the player in a headless browser and says whether it worked. It needs
+Node 22 or later:
 
 ```bash
-npx @missing-elements/h5p-verify course.h5p        # exit 0: it plays; 1: it does not; 2: it could not run. report.json and a screenshot in course.verify/
+npx @missing-elements/h5p-verify@latest course.h5p        # exit 0: it plays; 1: it does not; 2: it could not run. report.json and a screenshot in course.verify/
 ```
 
 It names missing libraries, fails on an uncaught error while the runtime boots, and checks that

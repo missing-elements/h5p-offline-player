@@ -383,6 +383,11 @@ normalize from its next release): Node 20 reached its end of life on 2026-04-30 
 so `>=20` was a claim nothing tested. The browser packages — the player, the runtime, the
 libraries and cmi5 — keep `>=20`: nothing in them runs on Node, and a higher floor would only
 fail the install of a host still building on 20 under Yarn 1 or `engine-strict`, for no gain.
+The floor had a cost, found auditing the README on 2026-10-20: given no version, npm installs the
+newest one whose `engines` match the running Node, so on Node 20 `npx @missing-elements/h5p-embed`
+quietly installed embed 0.7.0, which writes a site with player 0.9.5, and verify and normalize fell
+back to 0.2.0 and 0.1.3. Every documented command therefore names `@latest`, which npm installs on
+any Node with an `EBADENGINE` warning, and says Node 22 beside it.
 
 The browser provider is a package, not a name: `provider: playwright()` from
 `@vitest/browser-playwright`. Vitest 4 moved providers out of the core package, so a bare

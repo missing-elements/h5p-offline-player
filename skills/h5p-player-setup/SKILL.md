@@ -146,8 +146,11 @@ plugins do; the default is 10 seconds.
 The player page is a static site that `@missing-elements/h5p-embed` writes:
 
 ```bash
-npx @missing-elements/h5p-embed h5p-player --packages https://host.example
+npx @missing-elements/h5p-embed@latest h5p-player --packages https://host.example
 ```
+
+It needs Node 22 or later. Keep `@latest`: without it, npm on an older Node quietly installs the
+last version that supported it, which writes a player from before 1.0.
 
 `--packages` limits the hosts packages may come from (add `https://cdn.jsdelivr.net` for
 `libraries=pack` on a site built with `--no-libraries`), `--ancestors` the sites that may frame the page; leave both out to allow any.
@@ -241,7 +244,7 @@ only names its files. Results arrive
 only as `xapi` and `finished` events on the element, stored nowhere, so an LRS or their own
 backend has to listen; a learner's place in the content is kept only with the `resume`
 attribute, in the browser's storage on that device (or handed to the host with
-`resume="host"`), never sent. And if they generate or rewrite packages, `npx @missing-elements/h5p-verify
+`resume="host"`), never sent. And if they generate or rewrite packages, `npx @missing-elements/h5p-verify@latest
 course.h5p` checks a package plays before it is published.
 
 The element's API and events: https://github.com/missing-elements/h5p-offline-player/blob/main/README.md#api

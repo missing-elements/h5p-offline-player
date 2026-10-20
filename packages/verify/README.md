@@ -2,10 +2,11 @@
 
 Plays an `.h5p` package in a headless browser through
 [h5p-offline-player](https://github.com/missing-elements/h5p-offline-player) and reports whether
-it works.
+it works. Needs Node 22 or later; write `@latest`, since without it npm on an older Node quietly
+installs the last version that supported it.
 
 ```bash
-npx @missing-elements/h5p-verify course.h5p
+npx @missing-elements/h5p-verify@latest course.h5p
 ```
 
 ```
@@ -36,7 +37,7 @@ from the site's pack, and its content is checked against each library's `semanti
 `--untrusted` plays it that way:
 
 ```bash
-npx @missing-elements/h5p-verify course.h5p --untrusted
+npx @missing-elements/h5p-verify@latest course.h5p --untrusted
 ```
 
 ```

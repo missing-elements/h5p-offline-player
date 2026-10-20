@@ -3,8 +3,11 @@
 Writes the H5P embed page as a static site for a player domain of your own. Any site then embeds
 a package with an iframe and one script line. No H5P server, no backend, no third-party service.
 
+Needs Node 22 or later. Write `@latest`: without it, npm on an older Node quietly installs the
+last version that supported it, which writes a player from before 1.0.
+
 ```bash
-npx @missing-elements/h5p-embed h5p-player     # the folder defaults to ./h5p-player
+npx @missing-elements/h5p-embed@latest h5p-player     # the folder defaults to ./h5p-player
 ```
 
 Deploy it to any static host, then embed:
@@ -40,7 +43,7 @@ through:** the browser's policy applies to each hop, and a redirect off the list
 network error.
 
 ```bash
-npx @missing-elements/h5p-embed h5p-player \
+npx @missing-elements/h5p-embed@latest h5p-player \
   --packages https://cdn.example.org \
   --ancestors "https://www.example.org https://lms.example.org"
 ```

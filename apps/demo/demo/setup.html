@@ -223,8 +223,10 @@ cp node_modules/@missing-elements/h5p-libraries/libraries.txt public/h5p-librari
         <code>h5p-player.example.net</code>, not a subdomain of your site, which would receive its
         cookies — and keep nothing else on it.
       </p>
-      <pre class="code" data-lang="sh">npx @missing-elements/h5p-embed h5p-player</pre>
+      <pre class="code" data-lang="sh">npx @missing-elements/h5p-embed@latest h5p-player</pre>
       <p>
+        It needs Node 22 or later. Keep <code>@latest</code>: without it, npm on an older Node
+        quietly installs the last version that supported it, which writes a player from before 1.0.
         The folder holds the page, the player, the H5P runtime and the library pack, and the
         headers written for whatever serves it: a <code>Caddyfile</code>, an
         <code>nginx.conf</code> and an <code>.htaccess</code> for a server of your own, and the

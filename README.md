@@ -2,21 +2,43 @@
 
 [![npm](https://img.shields.io/npm/v/%40missing-elements%2Fh5p-offline-player)](https://www.npmjs.com/package/@missing-elements/h5p-offline-player)
 [![licence](https://img.shields.io/npm/l/%40missing-elements%2Fh5p-offline-player)](https://github.com/missing-elements/h5p-offline-player/blob/main/LICENSE)
-[![skills.sh](https://skills.sh/b/missing-elements/h5p-offline-player)](https://skills.sh/missing-elements/h5p-offline-player)
 
-Self-hosted H5P without an H5P server. A standalone player in one web component, on static
+Self-hosted [H5P](https://h5p.org) without an H5P server. A standalone player in one web component, on static
 hosting you control, that plays `.h5p` packages from your own URLs or from disk in any front end:
 no Moodle, WordPress or Lumi, no backend, no extraction step, no third-party service between your
 learners and your content.
+
+**Status:** stable since 1.0, released on 18 October 2026, and maintained.
+[Compatibility](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/compatibility.md) says what a version number promises,
+and the library pack is checked against the H5P hub and the translations against Moodle's every
+week. The player is MIT; the H5P runtime it loads is GPL-3.0 and published separately, as
+[Licence](#licence) explains. Report vulnerabilities privately, as [SECURITY.md](https://github.com/missing-elements/h5p-offline-player/blob/main/SECURITY.md) describes.
 
 - [Player](https://h5p-offline-player.vercel.app/) — paste a URL or pick a file
 - [Offline app (PWA)](https://h5p-offline-player.vercel.app/app/) — install it and play `.h5p` files with no network
 - [How it compares](https://h5p-offline-player.vercel.app/demo/compare.html) with h5p.com, the CMS plugins, Lumi and h5p-standalone
 
+Once the player's files are on your site, as [Which setup](#which-setup) describes, a package is
+one element:
+
 ```html
 <script type="module" src="h5p-player.js"></script>
 <h5p-player src="https://host.example/course.h5p"></h5p-player>
 ```
+
+## Why this player
+
+[h5p-standalone](https://github.com/tunapanda/h5p-standalone) plays a package you have unzipped
+onto a server. It is smaller and has been around longer, and for a few packages you are happy to
+unzip, it is enough. This player reads the `.h5p` file itself, from a URL or from disk, so a large
+package's video plays while the rest is still arriving, and a package you did not make can play
+without its own code running.
+
+It is a player, not an editor: author in Lumi, on h5p.com or in a site with the H5P plugin, and
+play the export here. It stores no results: the `xapi` and `finished` events go wherever your
+page, an LRS or cmi5 sends them.
+[How it compares](https://h5p-offline-player.vercel.app/demo/compare.html) says when to choose
+something else.
 
 ## What it does
 
@@ -42,8 +64,9 @@ learners and your content.
   and says whether it works, [`h5p-normalize`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/streaming-video.md) rewrites one so its
   video streams, and [`h5p-embed`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#readme)
   writes the embed site. The [agent skills](#agent-skills) cover all three.
-- **Is tested where it runs.** CI runs the browser tests in Chromium, Firefox and WebKit, and plays
-  every content type in the library pack, untrusted and trusted, on each change and every week.
+- **Is tested where it runs.** CI runs the browser tests in Chromium, Firefox and WebKit on every
+  change, and plays every content type in the library pack, untrusted and trusted, on each change to
+  the player, the runtime or the pack, and every week.
 
 ## Which setup
 
@@ -152,8 +175,11 @@ libraries unless `pack-base` names a copy of your own.
 writes the player page as a static site:
 
 ```bash
-npx @missing-elements/h5p-embed h5p-player --packages https://host.example
+npx @missing-elements/h5p-embed@latest h5p-player --packages https://host.example
 ```
+
+It needs Node 22 or later. Write `@latest`: without it, npm on an older Node quietly installs the
+last version that supported it, which writes a player from before 1.0.
 
 Deploy it to a separate registrable domain that holds nothing else (a subdomain would receive
 your site's cookies) and frame it:
@@ -253,6 +279,8 @@ is an example.
 - [Accessibility](https://github.com/missing-elements/h5p-offline-player/blob/main/ACCESSIBILITY.md)
 
 ## Agent skills
+
+[![skills.sh](https://skills.sh/b/missing-elements/h5p-offline-player)](https://skills.sh/missing-elements/h5p-offline-player)
 
 ```bash
 npx skills add missing-elements/h5p-offline-player

@@ -1,6 +1,6 @@
 # Troubleshooting
 
-`npx @missing-elements/h5p-normalize course.h5p` is "normalize" below: it rewrites a package once so its media streams, leaving the content untouched.
+`npx @missing-elements/h5p-normalize@latest course.h5p` is "normalize" below: it rewrites a package once so its media streams, leaving the content untouched. It needs Node 22 or later.
 
 | Symptom | Cause | Fix |
 |---|---|---|
