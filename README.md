@@ -34,8 +34,8 @@ learners and your content.
   [build it came from](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/revision.md), `finished` is the content's own result,
   [cmi5](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/cmi5.md) launches it from an LMS, and [resume](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/resume.md) keeps the
   learner's place.
-- **Works offline, in the learner's language.** The installable app plays with no network, on iOS
-  too, and H5P's own buttons follow `lang` in more than fifty languages. Results stay on your page
+- **Works offline, in the content's language.** The installable app plays with no network, on iOS
+  too, and H5P's own buttons match the language the content is written in, any of more than fifty. Results stay on your page
   unless your code sends them; [privacy](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/privacy.md)
   lists what the player fetches, and what it keeps on the device.
 - **Comes with tools for pipelines.** [`h5p-verify`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/verify.md) plays a package headless
@@ -193,7 +193,7 @@ allows one Service Worker, or must work offline, mounts the player in its own wo
 | `custom-css`, `custom-js` | attribute | Stylesheets and scripts loaded in the frame after the runtime's own |
 | `reporting` | attribute | Enables the submit button in content types that have one |
 | `activity-id` | attribute | The statements' object id. Default: the package URL |
-| `lang` | attribute | The language of H5P's own buttons and dialogs, such as "Fullscreen" and "Rights of use", in more than fifty languages. Inherited from the page like any element's language, and read at each load. Default: English |
+| `lang` | attribute | The language of H5P's own buttons and dialogs, such as "Fullscreen" and "Rights of use", for a package that does not name its own. A package that names its language in `h5p.json` (`defaultLanguage`), as H5P's exports do, gets them in that language, so they match the content's own text whatever the page's language. More than fifty languages. Inherited from the page like any element's language, and read at each load. Default: English |
 | `user` | property | `{ name, mail }`, the actor of every statement. Set before `src` |
 | `auto-resize` | attribute | `off` to size the element yourself. Default: follows the content's height |
 | `preload` | attribute, property | `auto` pulls large deflated media before it is asked for. Default: `none` |

@@ -1294,9 +1294,10 @@ export class H5PPlayerElement extends HTMLElement {
   }
 
   /**
-   * The language the frame is in, read by the load like the attributes the record keeps: the
-   * element's `lang`, or the one it inherits from the page. The worker writes it as the frame
-   * document's language, and the runtime's boot script picks its translation of the core's
+   * The element's language, read by the load like the attributes the record keeps: its `lang`,
+   * or the one it inherits from the page. The frame is in the content's own language, the one
+   * `h5p.json` names, and H5P's own strings with it; this one is the frame's only for a package
+   * that names none, and the runtime's boot script then picks its translation of the core's
    * strings for it, or leaves them English.
    */
   private frameLanguage(): string | undefined {

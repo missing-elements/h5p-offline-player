@@ -15,7 +15,7 @@ loaded it itself; the libraries load in the same order, and the options mean wha
 | `customCss`, `customJs` | `custom-css`, `custom-js` | Space separated; their origins are allowed by the frame's CSP |
 | `reportingIsEnabled` | `reporting` | |
 | `xAPIObjectIRI` | `activity-id` | Defaults to the package URL |
-| `translations` | `lang` | H5P's own strings in that language, from the runtime's translations; inherited from the page. Strings of your own cannot be passed |
+| `translations` | `lang` | H5P's own strings in the content's language, the one its `h5p.json` names, from the runtime's translations; `lang`, inherited from the page, for a package that names none. Strings of your own cannot be passed |
 | `user` | the `user` property | `{ name, mail }`; never stored |
 | `metadata`, `title` | — | Read from the package's `h5p.json` |
 | `contentUserData`, `saveFreq` | `resume`, `userData`, `save-interval` | |

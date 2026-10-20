@@ -785,16 +785,21 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   and upstream's checks against the parent's semantics. `packages/runtime/tests/` pins the rules;
   `tests/browser/upgrades.test.ts` plays exports written for 1.0, 1.1 and 1.2, sub-content
   included, against a bundle at 1.2, and one whose step throws.
-- **The core's strings follow the element's language.** Built on 2026-10-12, to match the CMS
+- **The core's strings follow the content's language.** Built on 2026-10-12, to match the CMS
   plugins, which show H5P's own strings — the fullscreen button, "Rights of use" and the licence
   names in it, the "this content has changed" dialog — in the site's language; h5p-standalone's
   are English. The element reads its `lang`, its own or inherited across a shadow root to its host
-  (`declaredLanguage`), and the record keeps the tag; unless it is English, the worker names the
-  runtime's `l10n.js` before the boot script and puts the tag in the boot configuration. The
-  frame's `<html lang>` is the content's, not that tag: `h5p.json`'s `defaultLanguage`, which H5P
-  writes into the iframe it makes, so a screen reader reads an English quiz on a German page in
-  English with German buttons around it — the first cut wrote the element's tag there, and review
-  caught it the same day — and the element's tag only for a package that names none. That one
+  (`declaredLanguage`), and the record keeps the tag. The frame's language is the content's:
+  `h5p.json`'s `defaultLanguage`, which H5P writes into the iframe it makes, and the element's tag
+  only for a package that names none (`frameLanguage` in `frame-document.ts`); unless it is
+  English, the worker names the runtime's `l10n.js` before the boot script and puts the tag in the
+  boot configuration. Until 2026-10-20 (#55) the strings followed the element's tag and only the
+  `<html lang>` the content's, so an English quiz on a German page had "Vollbild" and
+  "Nutzungsrechte" around its own Check and Retry, which its author wrote into the package. The
+  owner's rule: the interface and the content in one language. A select for the language, on the
+  player page and in the app, was built the same day and closed unmerged (#53, #54) for the same
+  reason: it could only make the two differ. `lang` is the fallback, and so is the embed page's
+  `&lang=`. `german.h5p` and `english.h5p`, `basic.h5p` naming its language, are the fixtures. That one
   file has every language and the aliases; the boot script picks one by RFC 4647 lookup through
   the aliases (`src/l10n.ts` in the runtime — `de-AT` gets `de`, `nb` Norwegian) and lays it over
   the core's own English, `getLocalization()` at the vendored commit (`vendor/h5p-core/strings.json`,
@@ -831,7 +836,8 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   Moodle's English added, "Attribution (CC BY)". `tests/l10n.test.ts` in the runtime holds every
   file and alias to those rules and pins the lookup; `tests/browser/l10n.test.ts` plays German,
   Brazilian Portuguese, Austrian German, Bokmål, Greek one string short, English and Thai, and a
-  `runtime` with and without `l10nJs`; the embed's `site.test.ts` an English quiz on a German page.
+  `runtime` with and without `l10nJs`, and a German and an English package each in their own
+  language whatever the page's; the embed's `site.test.ts` an English quiz on a German page, in English.
 - **An unreachable library source falls back to a bundle downloaded from it before.** When the
   probe of `libraries`' URL fails — offline, the hub down, a 5xx — the element asks the worker
   (`find-downloaded-libraries`) for the newest `role: 'libraries'` row with the same URL whose
@@ -2412,8 +2418,9 @@ SPA-fallback trap described above cannot happen there.
   like the site failing rather than a demonstration. Building it found
   `build-demo-content.mjs` failing for every package since the hub helpers moved: its loop ran as
   the module loaded, before the helpers below it were declared. The two-players example plays
-  `how-it-works.h5p` twice since the same day, the second `lang="de" frame copyright`, since
-  one package under two settings is what the per-load fix is for. The outputs
+  `how-it-works.h5p` twice since the same day, the second `frame copyright`, since one package
+  under two settings is what the per-load fix is for; it was `lang="de"` too until #55, when an
+  English package's strings became English whatever the element's language. The outputs
   are committed, 5.5 MB for the four, because a deploy should need neither the hub nor the video
   host; `pnpm demo:content` regenerates them. Provenance: the libraries are MIT, the text is
   ours under CC0, and the clip is Big Buck Bunny, © Blender Foundation, CC BY 3.0, credited in the

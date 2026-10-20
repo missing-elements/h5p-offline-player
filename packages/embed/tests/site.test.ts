@@ -249,19 +249,21 @@ describe('a written site, framed from another site', () => {
     await page.close()
   })
 
-  it('shows H5P\'s own strings in the language the address names', async () => {
+  it('hands the element the language the address names, and shows H5P\'s own strings in the content\'s', async () => {
     const page = await browser.newPage()
     await page.goto(`${embedding.origin}/open-de.html`)
     const frame = await playerFrame(page, open.origin)
     await frame.waitForFunction(() => (document.querySelector('h5p-player') as unknown as { state: string } | null)?.state === 'ready', null, { timeout: 60_000 })
     // The runtime's frame, inside the page's own: the same origin, so its window can be read.
     const seen = await frame.evaluate(() => {
-      const inner = document.querySelector('h5p-player')!.shadowRoot!.querySelector('iframe')!
+      const player = document.querySelector('h5p-player')!
+      const inner = player.shadowRoot!.querySelector('iframe')!
       const core = (inner.contentWindow as unknown as { H5P: { t(key: string): string } }).H5P
-      return { lang: inner.contentDocument!.documentElement.lang, fullscreen: core.t('fullscreen') }
+      return { element: player.getAttribute('lang'), lang: inner.contentDocument!.documentElement.lang, fullscreen: core.t('fullscreen') }
     })
-    // The quiz is in English, which stays the document's language for a screen reader; the buttons are German.
-    expect(seen).toEqual({ lang: 'en', fullscreen: 'Vollbild' })
+    // The quiz says it is English, so its buttons are too, on a German page: the address's
+    // language is for a package that names none (#55).
+    expect(seen).toEqual({ element: 'de', lang: 'en', fullscreen: 'Fullscreen' })
     await page.close()
   })
 

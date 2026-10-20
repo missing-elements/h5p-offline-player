@@ -105,6 +105,23 @@ built.push([
   })
 ])
 
+// 1c. The ordinary case saying which language it is in, as `h5p.json`'s `defaultLanguage` does:
+//     H5P's own strings follow it, whatever the page's language (#55). `basic.h5p` names none,
+//     so it plays in the element's.
+for (const [name, language] of [
+  ['german.h5p', 'de'],
+  ['english.h5p', 'en']
+]) {
+  built.push([
+    name,
+    await writeArchive(name, async (writer) => {
+      const manifest = JSON.parse(await readFile(resolve(sourceDir, 'h5p.json'), 'utf8'))
+      await writer.add('h5p.json', new TextReader(JSON.stringify({ ...manifest, language, defaultLanguage: language })))
+      await addBaseFiles(writer, { skip: ['h5p.json'] })
+    })
+  ])
+}
+
 // 2. A large deflated entry: the Jobs worker inflates it into chunks and the virtual server
 //    serves the prefix that exists as a shorter 206.
 built.push([

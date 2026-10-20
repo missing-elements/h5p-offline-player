@@ -124,8 +124,9 @@ element writes is an inline style and would beat the page's rule. Any CSS goes o
 **Coming from h5p-standalone:** its options carry over by name as attributes — `frame`,
 `copyright`, `export`, `icon`, `embed` (bare = on), `fullscreen="off"`, `download-url`,
 `embed-code`, `custom-css`, `custom-js`, `reporting`, `activity-id` — and `user` as a property.
-Its `translations` are `lang`: H5P's own buttons and dialogs follow the element's language, which
-it inherits from the page's `<html lang>` like any element, so a page in German shows them in German;
+Its `translations` are automatic: H5P's own buttons and dialogs are in the content's language, the
+one its `h5p.json` names, so a German package shows them in German on any page. `lang`, which the
+element inherits from the page's `<html lang>`, decides only for a package that names none;
 strings of the host's own cannot be passed. The guide's "Coming from h5p-standalone" table maps every option, including the ones the `.h5p`
 or the events replace. Formulas need `H5P.MathDisplay` in the package, not a `customJs` recipe.
 
