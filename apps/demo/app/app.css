@@ -118,6 +118,9 @@
 @supports not selector(:popover-open) { .app #menu-button { display: none; } }
 .app .menu button { justify-content: flex-start; min-height: 2.5rem; border: 0; background: transparent; font-weight: 400; }
 .app .menu button:hover { background: var(--surface-2); }
+/* The select keeps the shared sheet's width, or the menu would grow to the longest language's name. */
+.app .menu-language { display: grid; gap: 0.35rem; margin-top: 0.25rem; padding: 0.6rem 0.75rem 0; border-top: 1px solid var(--line); }
+.app .menu-note { max-width: 16rem; margin: 0; padding: 0.3rem 0.75rem 0.5rem; color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
 
 /* ---------------------------------------------------------------- the screens */
 

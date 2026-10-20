@@ -5,6 +5,7 @@
  */
 
 import { foreignHost, logInto, messageIn, trustPrompt } from './page-common.js'
+import { fillLanguages } from './languages.js'
 import { pack } from '@missing-elements/h5p-libraries'
 
 const player = document.querySelector('h5p-player')
@@ -18,6 +19,7 @@ const bar = document.querySelector('#progress')
 const message = document.querySelector('#message')
 const log = document.querySelector('#log')
 const refreshToggle = document.querySelector('#refresh')
+const languageSelect = document.querySelector('#language')
 const confirmBox = document.querySelector('#confirm-src')
 const modeNote = document.querySelector('#mode-note')
 const modeTag = document.querySelector('#mode-tag')
@@ -241,10 +243,12 @@ const REFRESH_NOTES = {
   on: ' Where the pack has a newer version of a library the package carries, that version plays.',
   off: ' The libraries the package carries play as exported.'
 }
+/** What the language select changes, and what it cannot: the content's text is in the package. */
+const LANGUAGE_NOTE = " The language is that of H5P's own buttons and dialogs; the content's text stays as its author wrote it."
 const playsUntrusted = () => form.elements.mode.value === 'untrusted'
 const describeMode = () => {
   const mode = form.elements.mode.value
-  modeNote.textContent = NOTES[mode] + (mode === 'trusted' ? REFRESH_NOTES[refreshToggle.checked ? 'on' : 'off'] : '')
+  modeNote.textContent = NOTES[mode] + (mode === 'trusted' ? REFRESH_NOTES[refreshToggle.checked ? 'on' : 'off'] : '') + LANGUAGE_NOTE
   // Untrusted, none of the package's own libraries play, so there is nothing to refresh.
   refreshToggle.disabled = mode === 'untrusted'
 }
@@ -254,12 +258,21 @@ const setMode = (mode) => {
 }
 setMode(form.elements.mode.value)
 
+/**
+ * The language of H5P's own strings: English, the page's own, until the visitor picks another.
+ * The element reads its `lang` when a load starts, as it reads the modes.
+ */
+fillLanguages(languageSelect, 'en')
+
+/** Puts the form's choices on the element, for the load about to start; returns them for the log. */
 const applyMode = () => {
   const untrusted = playsUntrusted()
   player.untrusted = untrusted
   if (refreshToggle.checked) player.removeAttribute('refresh-libraries')
   else player.setAttribute('refresh-libraries', 'off')
-  return untrusted ? '  (untrusted: none of its own code runs)' : refreshToggle.checked ? '' : '  (libraries as exported)'
+  player.setAttribute('lang', languageSelect.value)
+  const language = languageSelect.value === 'en' ? '' : `  (H5P's own strings: ${languageSelect.value})`
+  return (untrusted ? '  (untrusted: none of its own code runs)' : refreshToggle.checked ? '' : '  (libraries as exported)') + language
 }
 
 /** Plays a package at a URL, in the switch's mode. */
@@ -316,6 +329,9 @@ refreshToggle.addEventListener('change', () => {
   describeMode()
   reload?.()
 })
+
+// And in another language: the fullscreen button, Rights of use and the licence names change.
+languageSelect.addEventListener('change', () => reload?.())
 
 // A sample marked `data-untrusted` plays as data against this site's bundle: a content-only
 // export, as h5p.com and h5p.org make them, the way a site plays a package it did not make. The

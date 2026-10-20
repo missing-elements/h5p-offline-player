@@ -73,10 +73,11 @@ const nextReady = (page: Page) =>
  * unless a test brings its own: Playwright cannot answer it, and without it the app takes the path
  * Safari and Firefox take, the page's file input. `onDisk` opens it in a profile on disk, as a
  * browser window is (closed with `closePage`), and `installed` answers `display-mode` as an
- * installed window would; see `profileOnDisk`.
+ * installed window would; see `profileOnDisk`. `locale` is the browser's language, the
+ * `navigator.languages` the app picks its default language from.
  */
-async function openApp(path = '/app/', { keepPicker = false, onDisk = false, installed = false } = {}) {
-  const page = onDisk ? await profileOnDisk({ installed }) : await browser.newPage({ viewport: VIEWPORT })
+async function openApp(path = '/app/', { keepPicker = false, onDisk = false, installed = false, locale = undefined as string | undefined } = {}) {
+  const page = onDisk ? await profileOnDisk({ installed }) : await browser.newPage({ viewport: VIEWPORT, locale })
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   if (!keepPicker) {
@@ -514,6 +515,45 @@ it('has a menu and an About dialog that Escape closes', async () => {
   expect(await open('#menu')).toBe(false)
   await page.keyboard.press('Escape')
   expect(await open('#about-dialog')).toBe(false)
+  await page.close()
+})
+
+it('shows H5P’s own strings in the browser’s language, or the one picked in the menu, and remembers the pick', async () => {
+  const { page, errors } = await openApp('/app/', { locale: 'fr-FR' })
+  /** The language the element was given, the one the menu shows, and the frame's fullscreen label. */
+  const language = () =>
+    page.evaluate(() => {
+      const player = document.querySelector('h5p-player')!
+      const frame = player.shadowRoot!.querySelector('iframe')!.contentWindow as unknown as { H5P?: { t(key: string): string } } | null
+      return {
+        lang: player.getAttribute('lang'),
+        menu: document.querySelector<HTMLSelectElement>('#language')!.value,
+        fullscreen: frame?.H5P?.t('fullscreen') ?? null
+      }
+    })
+
+  // French by default, from the browser's own language, which the runtime has.
+  const choosing = page.waitForEvent('filechooser')
+  await page.click('#open')
+  await (await choosing).setFiles(QUIZ)
+  await playerIs(page, 'ready')
+  expect(await language()).toEqual({ lang: 'fr', menu: 'fr', fullscreen: 'Plein écran' })
+  const steps = await page.evaluate(() => history.length)
+
+  // Picked in the menu: the open file plays again in German, on the same screen and history step.
+  await page.click('#menu-button')
+  const again = nextReady(page)
+  await page.selectOption('#language', 'de')
+  await again
+  expect(await language()).toEqual({ lang: 'de', menu: 'de', fullscreen: 'Vollbild' })
+  expect(await seen(page)).toMatchObject({ screen: 'player', bar: 'Do you know what just happened?' })
+  expect(await page.evaluate(() => history.length)).toBe(steps)
+
+  // Remembered over the browser's own on the next visit.
+  await page.reload()
+  await workerChecked(page)
+  expect(await language()).toMatchObject({ lang: 'de', menu: 'de' })
+  expect(errors).toEqual([])
   await page.close()
 })
 

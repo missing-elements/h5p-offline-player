@@ -502,6 +502,27 @@ label.file:has(input:focus-visible) { outline: 2px solid var(--accent); outline-
 .mode label:has(input:disabled) input { cursor: default; }
 .mode-note { flex: 1 1 20rem; margin: 0; color: var(--muted); font-size: 0.85rem; line-height: 1.45; }
 
+/* The language of H5P's own strings, beside the modes and in the app's menu (demo/languages.js). */
+/* At most 16rem, and narrower where that does not fit. Sized by its longest name the select pushed
+   a phone's form past the screen's edge, and so did a fixed 16rem at 320 px, in all three engines:
+   a fixed width is also the narrowest a select will go. A percentage width is not. */
+.language { display: inline-flex; flex: 0 1 auto; align-items: center; gap: 0.5rem; min-width: 0; max-width: 100%; color: var(--muted); font-size: 0.875rem; font-weight: 500; }
+.language select {
+  flex: 0 1 auto;
+  width: 100%;
+  min-width: 0;
+  max-width: 16rem;
+  min-height: 2.5rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-weight: 400;
+}
+.language select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
 .samples { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.875rem 0 0; }
 
 .samples button {

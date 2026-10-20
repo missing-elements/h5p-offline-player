@@ -73,6 +73,9 @@
       <button type="button" id="menu-open">Open a file…</button>
       <button type="button" class="menu-install" id="menu-install" hidden>Install the app</button>
       <button type="button" id="menu-about">About this app</button>
+      <!-- Filled from the runtime's languages by app.js, and remembered on this device. -->
+      <label class="language menu-language">Language <select id="language" aria-describedby="language-note"></select></label>
+      <p class="menu-note" id="language-note">Of H5P's own buttons and dialogs. The content's text stays as its author wrote it.</p>
     </div>
 
     <main>
@@ -149,6 +152,7 @@
           <li>The files you opened are listed under it, the latest first. Choose one to open it again where you left off.</li>
           <li>Installed from Chrome or Edge, the app opens <code>.h5p</code> files from your file manager: double-click one, or use <em>Open with</em>. Safari and iOS do not hand files to installed apps; use <strong>Choose a file</strong> there.</li>
           <li>A link to <code>/app/?src=</code> and a package's address opens that package in the app, for a teacher sending a course by link.</li>
+          <li>H5P's own buttons and dialogs — full screen, the licence details, the notice when a file has changed — are in your browser's language where the app has it, and in English otherwise. <strong>Language</strong> in the menu changes it. The content's own text, its questions and buttons, stays in the language its author wrote it in.</li>
         </ul>
 
         <h3>What works offline</h3>

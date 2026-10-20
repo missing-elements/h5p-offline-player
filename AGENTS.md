@@ -194,6 +194,8 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             demo/page-common.js what the player page, the cmi5 page and the app share:
                             the message box, the log, `foreignHost` (whether a package is another
                             site's) and the trust prompt, one copy since 2026-10-15;
+                            demo/languages.js the language select's list for the player page
+                            and the app, read from the runtime's l10n/index.json (#53);
                             demo/theme.js the light/dark switch, a classic script every page
                             loads in its head before the stylesheet, since the CSP allows no
                             inline script and a pinned theme has to be on <html> before the
@@ -806,7 +808,13 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   page is not in English, Thai included, which finds nothing in it. A script rather than JSON
   because the frame's `script-src` names the runtime's origin and its `connect-src` does not. A
   `runtime` without `l10nJs`, or a runtime directory without the file (its 404 ignored: no
-  `data-h5p`), leaves the frame English. The embed page takes `&lang=`.
+  `data-h5p`), leaves the frame English. The embed page takes `&lang=`. The player page and the
+  app have a language select (2026-10-20, #53), filled from the runtime's `l10n/index.json`, each
+  language named in its own tongue only where the browser has that language's data — Chromium has
+  none for Albanian, Armenian and a dozen more, and answered in the browser's language — and set
+  as the element's `lang`, a change playing the current package again. The page starts on
+  English, its own; the app on the first of the browser's languages the runtime has, and keeps
+  the learner's pick in `localStorage`.
 
   The translations are Moodle's: H5P publishes none for the core, each platform translates it
   itself, and Moodle's translators (AMOS) are the most complete, under GPL-3.0-or-later; Lumi's set

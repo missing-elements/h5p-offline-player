@@ -13,6 +13,7 @@
  */
 
 import { foreignHost, messageIn, trustPrompt } from '../demo/page-common.js'
+import { fillLanguages, offered, preferredLanguage } from '../demo/languages.js'
 import { pack } from '@missing-elements/h5p-libraries'
 import librariesNotice from '@missing-elements/h5p-libraries/libraries.txt?url'
 import { copyOf, fileKey, forget, forgetAll, linkKey, recentFiles, remember } from './recent.js'
@@ -337,6 +338,36 @@ let current = null
  * Back during that moment opened into the home screen once the worker was ready.
  */
 let opens = 0
+
+/**
+ * The language of H5P's own strings, from the menu: by default the first of the browser's
+ * languages the runtime has, else English, and once the learner picks one, that, remembered on
+ * this device. The element reads its `lang` when a load starts, so a change opens the current
+ * file again, where the learner was: the content saves its state as its document goes. Set here,
+ * before anything opens, a launch's file and a link's `?src=` included.
+ */
+const LANGUAGE_KEY = 'h5p-app-language'
+const languageSelect = $('#language')
+{
+  let kept = null
+  try {
+    kept = localStorage.getItem(LANGUAGE_KEY)
+  } catch {
+    // Storage refused, as in some private windows: the browser's language, every time.
+  }
+  const browserLanguages = navigator.languages?.length ? navigator.languages : [navigator.language]
+  fillLanguages(languageSelect, kept && offered(kept) ? kept : preferredLanguage(browserLanguages))
+  player.setAttribute('lang', languageSelect.value)
+}
+languageSelect.addEventListener('change', () => {
+  try {
+    localStorage.setItem(LANGUAGE_KEY, languageSelect.value)
+  } catch {
+    // Not remembered: it holds for this visit.
+  }
+  player.setAttribute('lang', languageSelect.value)
+  void reopen?.(player.getAttribute('libraries'))
+})
 
 /** A file's name as a title until the package says its own: without the extension. */
 const fileTitle = (name) => name.replace(/\.h5p$/i, '') || name
