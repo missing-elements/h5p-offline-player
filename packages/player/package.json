@@ -68,7 +68,7 @@
     "prepublishOnly": "node scripts/check-library-pack.mjs && pnpm typecheck && pnpm test:unit && pnpm build"
   },
   "dependencies": {
-    "@zip.js/zip.js": "^2.23.0"
+    "@zip.js/zip.js": "^2.24.0"
   },
   "peerDependencies": {
     "@missing-elements/h5p-runtime": "^1.0.0"

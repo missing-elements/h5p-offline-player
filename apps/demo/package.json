@@ -26,7 +26,7 @@
     "@missing-elements/h5p-libraries": "workspace:*",
     "@missing-elements/h5p-normalize": "workspace:*",
     "@types/node": "^26.6.5",
-    "@zip.js/zip.js": "^2.23.0",
+    "@zip.js/zip.js": "^2.24.0",
     "playwright": "^1.64.0",
     "shiki": "4.5.0",
     "typescript": "^7.0.2",
