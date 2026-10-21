@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 import { configure } from '@zip.js/zip.js'
-import { mountH5P } from './mount'
+import { mountH5P } from './mount.js'
 
 /**
  * The standalone Service Worker. Built to `dist/h5p-sw.js` as a self-contained IIFE so it can be

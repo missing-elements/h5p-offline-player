@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "stripInternal": true,
+    "rootDir": ".",
+    "outDir": "types"
+  },
+  "include": ["lib/build.mjs", "site/embed.js"]
+}

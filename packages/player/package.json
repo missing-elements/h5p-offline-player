@@ -63,7 +63,7 @@
     "test:browser": "pnpm prepare:dev && vitest run --project browser --project browser-emulated",
     "test:engine": "pnpm prepare:dev && vitest run --project browser",
     "test:watch": "pnpm prepare:dev && vitest",
-    "typecheck": "tsc -b --force && tsc -p tsconfig.test.json",
+    "typecheck": "tsc -b --force && tsc -p tsconfig.test.json && tsc -p tsconfig.consumer.json",
     "prepack": "node scripts/prepack.mjs",
     "prepublishOnly": "node scripts/check-library-pack.mjs && pnpm typecheck && pnpm test:unit && pnpm build"
   },

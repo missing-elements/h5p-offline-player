@@ -1,4 +1,4 @@
-import type { PackDependency, PackLibrary } from './protocol'
+import type { PackDependency, PackLibrary } from './protocol.js'
 
 /**
  * The entries of a library pack's index that are well formed. The index of a copy the host names

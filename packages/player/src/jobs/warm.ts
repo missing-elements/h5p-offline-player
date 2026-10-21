@@ -1,10 +1,10 @@
-import { inflated } from '../shared/stream-utils'
-import { WARM_ENTRY, WARM_STALL_MS } from '../shared/constants'
-import { QuotaError, type ChunkStore } from '../shared/chunk-store'
-import { DEFLATE, LOCAL_HEADER_FIXED_SIZE, STORED, localHeaderDataStart } from '../shared/local-header'
-import { contentTypeOf } from '../shared/mime'
-import type { WarmSpan } from '../shared/protocol'
-import type { SourceHandle } from '../shared/source'
+import { inflated } from '../shared/stream-utils.js'
+import { WARM_ENTRY, WARM_STALL_MS } from '../shared/constants.js'
+import { QuotaError, type ChunkStore } from '../shared/chunk-store.js'
+import { DEFLATE, LOCAL_HEADER_FIXED_SIZE, STORED, localHeaderDataStart } from '../shared/local-header.js'
+import { contentTypeOf } from '../shared/mime.js'
+import type { WarmSpan } from '../shared/protocol.js'
+import type { SourceHandle } from '../shared/source.js'
 
 /**
  * Warming: pulls the spans the index named whole, one ranged request each, and lands every entry

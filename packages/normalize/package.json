@@ -20,12 +20,16 @@
     "h5p-normalize": "./bin/h5p-normalize.mjs"
   },
   "exports": {
-    ".": "./lib/normalize.mjs",
+    ".": {
+      "types": "./types/normalize.d.mts",
+      "default": "./lib/normalize.mjs"
+    },
     "./package.json": "./package.json"
   },
   "files": [
     "bin",
-    "lib"
+    "lib",
+    "types"
   ],
   "keywords": [
     "h5p",
@@ -39,9 +43,10 @@
   "scripts": {
     "test": "vitest run",
     "test:unit": "vitest run",
-    "typecheck": "tsc -p tsconfig.json",
-    "prepack": "node -e \"require('node:fs').copyFileSync('../../LICENSE', 'LICENSE')\"",
-    "prepublishOnly": "pnpm typecheck && pnpm test"
+    "typecheck": "pnpm types && tsc -p tsconfig.json",
+    "prepack": "node -e \"require('node:fs').copyFileSync('../../LICENSE', 'LICENSE')\" && pnpm types",
+    "prepublishOnly": "pnpm typecheck && pnpm test",
+    "types": "node -e \"require('node:fs').rmSync('types', { recursive: true, force: true })\" && tsc -p tsconfig.types.json"
   },
   "dependencies": {
     "@zip.js/zip.js": "^2.23.0"

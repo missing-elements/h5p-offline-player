@@ -1,9 +1,9 @@
-import { ARCHIVE_ENTRY, CACHE_PREFIX, CHUNK_KEY_ORIGIN, CHUNK_SIZE } from './constants'
-import type { ByteRange } from './range'
-import { sliceStream } from './stream-utils'
-import { busyPackages } from './locks'
-import type { ForwardIndexSnapshot } from './forward-index'
-import type { ErrorCode } from './protocol'
+import { ARCHIVE_ENTRY, CACHE_PREFIX, CHUNK_KEY_ORIGIN, CHUNK_SIZE } from './constants.js'
+import type { ByteRange } from './range.js'
+import { sliceStream } from './stream-utils.js'
+import { busyPackages } from './locks.js'
+import type { ForwardIndexSnapshot } from './forward-index.js'
+import type { ErrorCode } from './protocol.js'
 
 /**
  * The chunk store: one Cache API cache per package. Small entries are stored whole; archives and

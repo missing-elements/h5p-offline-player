@@ -1,5 +1,5 @@
-import { DB_NAME, DB_VERSION, PACKAGES_STORE } from './constants'
-import type { PackageRecord } from './protocol'
+import { DB_NAME, DB_VERSION, PACKAGES_STORE } from './constants.js'
+import type { PackageRecord } from './protocol.js'
 
 /**
  * The `packages` table. Both the page and the Service Worker open it: the page writes the

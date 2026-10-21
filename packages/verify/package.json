@@ -20,12 +20,16 @@
     "h5p-verify": "./bin/h5p-verify.mjs"
   },
   "exports": {
-    ".": "./lib/verify.mjs",
+    ".": {
+      "types": "./types/verify.d.mts",
+      "default": "./lib/verify.mjs"
+    },
     "./package.json": "./package.json"
   },
   "files": [
     "bin",
-    "lib"
+    "lib",
+    "types"
   ],
   "keywords": [
     "h5p",
@@ -39,9 +43,10 @@
   ],
   "scripts": {
     "test": "pnpm --filter @missing-elements/h5p-offline-player build && vitest run",
-    "typecheck": "tsc -p tsconfig.json",
-    "prepack": "node -e \"require('node:fs').copyFileSync('../../LICENSE', 'LICENSE')\"",
-    "prepublishOnly": "node -e \"if (!/^pnpm\\//.test(process.env.npm_config_user_agent || '')) { console.error('Publish with pnpm publish: npm would ship the workspace:^ dependency ranges as they are, and the package would not install.'); process.exit(1) }\" && pnpm typecheck && pnpm test"
+    "typecheck": "pnpm types && tsc -p tsconfig.json",
+    "prepack": "node -e \"require('node:fs').copyFileSync('../../LICENSE', 'LICENSE')\" && pnpm types",
+    "prepublishOnly": "node -e \"if (!/^pnpm\\//.test(process.env.npm_config_user_agent || '')) { console.error('Publish with pnpm publish: npm would ship the workspace:^ dependency ranges as they are, and the package would not install.'); process.exit(1) }\" && pnpm typecheck && pnpm test",
+    "types": "node -e \"require('node:fs').rmSync('types', { recursive: true, force: true })\" && tsc -p tsconfig.types.json"
   },
   "dependencies": {
     "@missing-elements/h5p-offline-player": "workspace:^",

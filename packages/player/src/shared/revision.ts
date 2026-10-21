@@ -7,7 +7,7 @@
  * Activity. *When* a build was the current one is not the statement's to say: that is the
  * publishing organisation's version record, which an audit compares these against.
  */
-import { hex } from './pkg-id'
+import { hex } from './pkg-id.js'
 
 
 /** One central-directory record, as much of it as the fingerprint covers. */

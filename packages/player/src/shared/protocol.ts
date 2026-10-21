@@ -1,4 +1,4 @@
-import type { ContentMetadata } from './metadata'
+import type { ContentMetadata } from './metadata.js'
 
 /**
  * The shapes crossing the three contexts: the page (element), the Service Worker and the Jobs

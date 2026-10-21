@@ -10,7 +10,8 @@
     "allowJs": true,
     "isolatedModules": true,
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "checkJs": true
   },
-  "include": ["tests/**/*.ts"]
+  "include": ["lib/**/*.mjs", "site/embed.js", "tests/**/*.ts"]
 }

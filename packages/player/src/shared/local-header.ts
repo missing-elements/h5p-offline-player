@@ -1,5 +1,5 @@
-import { PlayerError } from './protocol'
-import type { SourceHandle } from './source'
+import { PlayerError } from './protocol.js'
+import type { SourceHandle } from './source.js'
 /**
  * The zip local header, the thirty bytes in front of every entry's data. Three places read it —
  * the virtual server before slicing a stored entry, the warm as it walks a span, the Jobs worker

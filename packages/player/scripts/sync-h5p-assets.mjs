@@ -82,7 +82,7 @@ const packIndex = JSON.parse(await readFile(resolve(rootDir, '..', 'libraries', 
 const packIndexPath = resolve(rootDir, 'src', 'shared', 'pack-index.ts')
 const packIndexModule = `// Written by scripts/sync-h5p-assets.mjs from @missing-elements/h5p-libraries ${librariesJson.version}'s
 // parts/index.json. Do not edit; run \`pnpm sync:assets\` in packages/player.
-import type { PackLibrary } from './protocol'
+import type { PackLibrary } from './protocol.js'
 
 /**
  * The index of the library pack this release pins, \`LIBRARY_PACK_VERSION\`: each library's
