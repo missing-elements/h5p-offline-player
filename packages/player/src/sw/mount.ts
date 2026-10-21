@@ -902,7 +902,16 @@ class VirtualServer {
     }
 
     const snapshot = await store.getForwardIndex()
-    if (snapshot) await reader.absorb(snapshot)
+    if (!snapshot) return reader
+    const manifest = reader.manifest
+    await reader.absorb(snapshot)
+    // `h5p.json` has just arrived. The reader was opened before it, at the first progress report,
+    // so its title, metadata and language reach the record here or not until the download is
+    // whole — after the frame has booted early without them, in the element's language (#57).
+    if (reader.manifest !== manifest) {
+      const record = await db.getPackage(load.pkgId)
+      if (record) await this.rememberManifest(record, reader)
+    }
     return reader
   }
 

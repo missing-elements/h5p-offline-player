@@ -24,6 +24,24 @@ describe('reporting failures', () => {
     expect(detail.code).toBe('bad-archive')
   })
 
+  it('reports a frame sandboxed without allow-same-origin as having no worker', async () => {
+    // There `'serviceWorker' in navigator` holds, and Chromium and WebKit throw on reading it. The
+    // element used to throw in `connectedCallback` and never report anything (#57).
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      get() {
+        throw new DOMException('Service worker is disabled because the context is sandboxed', 'SecurityError')
+      }
+    })
+    try {
+      const { detail } = await failureFor(FIXTURES.basic)
+      expect(detail.code).toBe('no-worker')
+      expect(detail.message).toContain('sandboxed without allow-same-origin')
+    } finally {
+      delete (navigator as { serviceWorker?: unknown }).serviceWorker
+    }
+  })
+
   it('reports a URL that does not exist', async () => {
     const { detail } = await failureFor(FIXTURES.missing)
     expect(detail.code).toBe('network')

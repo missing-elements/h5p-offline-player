@@ -10,6 +10,7 @@ export const GENERATED_FIXTURES = [
   'basic.h5p',
   'german.h5p',
   'english.h5p',
+  'german-late-manifest.h5p',
   'finished.h5p',
   'large-deflated.h5p',
   'large-stored.h5p',

@@ -1,7 +1,7 @@
-import { type H5PPlayerElement } from '../../src/h5p-offline-player'
+import { type H5PPlayerElement, type PlayerProgressDetail } from '../../src/h5p-offline-player'
 import { afterEach, describe, expect, it } from 'vitest'
 import '../../src/h5p-offline-player'
-import { FIXTURES, createPlayer, frameDocument, frameWindow, play, waitForSettled } from './utils'
+import { FIXTURES, createPlayer, frameDocument, frameWindow, play, settle, waitForSettled } from './utils'
 
 /**
  * The core's own strings in the content's language, the one its `h5p.json` names, and in the
@@ -21,6 +21,8 @@ interface Core {
 }
 
 const core = (player: H5PPlayerElement) => (frameWindow(player) as unknown as Core).H5P
+const integration = (player: H5PPlayerElement) =>
+  (frameWindow(player) as unknown as { H5PIntegration: { contents: Record<string, { metadata?: { license?: string } }> } }).H5PIntegration
 const strings = (player: H5PPlayerElement) =>
   [...frameDocument(player).querySelectorAll('script[src]')].map((script) => script.getAttribute('src') ?? '').filter((src) => src.includes('l10n.js'))
 const l10nJs = new URL('/frame-assets/l10n.js', location.href).href
@@ -50,6 +52,29 @@ describe('the core’s strings', () => {
     // From a host without Range too, where the frame boots before the download is whole.
     const early = await play('/no-range/german.h5p')
     expect(core(early).t('fullscreen')).toBe('Vollbild')
+  })
+
+  it('are in the package’s language from a host without Range whose h5p.json arrives late', async () => {
+    // The worker opens its reader at the first progress report, here before `h5p.json` has
+    // arrived, and the frame boots from a later one while the media still arrives (#57). The
+    // record had none of the manifest then, so the frame took the element's language.
+    document.documentElement.setAttribute('lang', 'en')
+    let downloaded = 0
+    const { player, result } = await settle('/no-range/german-late-manifest.h5p?throttle=1000000', {}, (each) => {
+      each.addEventListener('progress', (event: Event) => {
+        const { phase, fraction } = (event as unknown as CustomEvent<PlayerProgressDetail>).detail
+        if (phase === 'download' && fraction !== null) downloaded = fraction
+      })
+    })
+    expect(result).toEqual({ ok: true })
+    expect(downloaded).toBeLessThan(1)
+
+    expect(frameDocument(player).documentElement.lang).toBe('de')
+    expect(core(player).t('fullscreen')).toBe('Vollbild')
+    // The rest of the manifest, which arrived with it: the title, and the licence behind the
+    // copyright dialog.
+    expect(frameDocument(player).title).toBe('Offline player test')
+    expect(Object.values(integration(player).contents)[0].metadata?.license).toBe('CC BY')
   })
 
   it('are English, and the frame says so, when nothing declares a language', async () => {

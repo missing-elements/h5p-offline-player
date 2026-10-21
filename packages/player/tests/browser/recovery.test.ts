@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import '../../src/h5p-offline-player'
+import type { H5PPlayerElement } from '../../src/h5p-offline-player'
 import { DB_NAME } from '../../src/shared/constants'
-import { FIXTURES, frameDocument, messageOf, play } from './utils'
+import { FIXTURES, frameDocument, messageOf, play, waitFor, waitForSettled } from './utils'
 
 /**
  * Surviving the storage going away underneath the player.
@@ -48,5 +49,31 @@ describe('recovering from cleared storage', () => {
     expect(messageOf(player)).toBe(
       'Served from the archive, never extracted to disk.'
     )
+  })
+
+  it('registers again when another player has taken the scope since', async () => {
+    // Site data cleared, then another player on the page, or another tab, registering first: the
+    // scope has a live registration again, but not the one this element holds (#57).
+    const first = await play(FIXTURES.basic)
+    const old = (await navigator.serviceWorker.getRegistration(first.scope!))!
+    // Emptied first, so that no client holds the registration and unregistering tears it down
+    // as clearing site data does. Unregistered under a client, Chromium revives the same
+    // registration for the next `register`, which is not the state this is about.
+    first.removeAttribute('src')
+    await old.unregister()
+    await waitFor(() => old.active === null)
+
+    const second = document.createElement('h5p-player') as H5PPlayerElement
+    second.style.height = '400px'
+    document.body.append(second)
+    const played = waitForSettled(second)
+    second.setAttribute('src', FIXTURES.german)
+    expect(await played).toEqual({ ok: true })
+    expect(await navigator.serviceWorker.getRegistration(first.scope!)).not.toBe(old)
+
+    const settled = waitForSettled(first)
+    first.setAttribute('src', FIXTURES.basic)
+    expect(await settled).toEqual({ ok: true })
+    expect(messageOf(first)).toBe('Served from the archive, never extracted to disk.')
   })
 })

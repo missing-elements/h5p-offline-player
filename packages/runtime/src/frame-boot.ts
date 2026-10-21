@@ -67,8 +67,9 @@ interface BootConfig {
   /** What the host asked for; the same shape as `FrameOptions` in shared/protocol.ts. */
   options?: FrameOptions
   /**
-   * The element's language, which H5P's own strings follow, when the worker named `l10n.js`. Not
-   * the document's `lang`: that is the content's, as H5P writes it.
+   * The frame's language, which H5P's own strings follow, when the worker named `l10n.js`: the
+   * content's, as `h5p.json` names it, or the element's for a package that names none. The same
+   * tag as the document's `lang`.
    */
   language?: string
   /**
@@ -216,7 +217,7 @@ var flag = function (value: boolean | undefined, otherwise: boolean) {
   return typeof value === 'boolean' ? value : otherwise;
 };
 
-// The core's own strings in the element's language, when this package has them: the worker names
+// The core's own strings in the frame's language, when this package has them: the worker names
 // `l10n.js` ahead of this script for any language but English, and the strings for the language
 // the configuration names are picked from it. They are laid over the core's English key by key,
 // so a string a language lacks stays English, and before the core's ready handler builds the
