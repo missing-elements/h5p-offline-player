@@ -1,5 +1,5 @@
-import { STORED } from './local-header'
-import type { ByteRange } from './range'
+import { STORED } from './local-header.js'
+import type { ByteRange } from './range.js'
 
 /**
  * Restricts a byte stream to an inclusive range without buffering it. Used to answer a `Range`

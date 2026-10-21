@@ -1,6 +1,6 @@
 // Written by scripts/sync-h5p-assets.mjs from @missing-elements/h5p-libraries 1.0.0's
 // parts/index.json. Do not edit; run `pnpm sync:assets` in packages/player.
-import type { PackLibrary } from './protocol'
+import type { PackLibrary } from './protocol.js'
 
 /**
  * The index of the library pack this release pins, `LIBRARY_PACK_VERSION`: each library's

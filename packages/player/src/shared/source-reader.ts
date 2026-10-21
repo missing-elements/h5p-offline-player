@@ -1,6 +1,6 @@
 import { Reader, type CreateReadableOptions } from '@zip.js/zip.js'
-import type { SourceHandle } from './source'
-import { streamSpan } from './span-stream'
+import type { SourceHandle } from './source.js'
+import { streamSpan } from './span-stream.js'
 
 /**
  * The zip.js side of a source: `SourceReader` presents a `SourceHandle` to zip.js. Kept apart

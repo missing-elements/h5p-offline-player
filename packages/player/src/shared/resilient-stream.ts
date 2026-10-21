@@ -1,6 +1,6 @@
-import { READ_RETRIES, READ_RETRY_DELAY_MS, READ_STALL_MS } from './constants'
-import { PlayerError } from './protocol'
-import type { ByteRange } from './range'
+import { READ_RETRIES, READ_RETRY_DELAY_MS, READ_STALL_MS } from './constants.js'
+import { PlayerError } from './protocol.js'
+import type { ByteRange } from './range.js'
 
 /**
  * A ranged read that survives the link: a request that stops delivering for `READ_STALL_MS`, or

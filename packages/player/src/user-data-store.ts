@@ -1,4 +1,4 @@
-import { USER_DATA_DB_NAME, USER_DATA_STORE } from './shared/constants'
+import { USER_DATA_DB_NAME, USER_DATA_STORE } from './shared/constants.js'
 
 /**
  * The learner's saved state on this device, one row per value the runtime saved: what H5P core

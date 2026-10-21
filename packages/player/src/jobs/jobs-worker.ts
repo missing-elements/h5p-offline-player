@@ -1,11 +1,11 @@
 /// <reference lib="webworker" />
-import { ARCHIVE_ENTRY, CHUNK_SIZE, INPUT_LIVENESS_MS, WARM_ENTRY } from '../shared/constants'
-import { ChunkStore, QuotaError, announceQueued, announceRunning, isQuotaError, type ChunkMeta } from '../shared/chunk-store'
-import { installEvictionPolicy } from '../shared/eviction'
-import { LocalHeaderScanner } from '../shared/forward-index'
-import { DEFLATE, STORED, readDataStart } from '../shared/local-header'
-import { packageLockName, packageLockPrefix } from '../shared/locks'
-import { hex } from '../shared/pkg-id'
+import { ARCHIVE_ENTRY, CHUNK_SIZE, INPUT_LIVENESS_MS, WARM_ENTRY } from '../shared/constants.js'
+import { ChunkStore, QuotaError, announceQueued, announceRunning, isQuotaError, type ChunkMeta } from '../shared/chunk-store.js'
+import { installEvictionPolicy } from '../shared/eviction.js'
+import { LocalHeaderScanner } from '../shared/forward-index.js'
+import { DEFLATE, STORED, readDataStart } from '../shared/local-header.js'
+import { packageLockName, packageLockPrefix } from '../shared/locks.js'
+import { hex } from '../shared/pkg-id.js'
 import {
   JOBS_READY,
   PlayerError,
@@ -15,14 +15,14 @@ import {
   type SourceDescriptor,
   type ToJobsMessage,
   type WarmSpan
-} from '../shared/protocol'
-import { openSource, type SourceHandle } from '../shared/source'
-import { streamSpan } from '../shared/span-stream'
-import { inflated } from '../shared/stream-utils'
-import { quotaMessage } from '../shared/storage'
-import { createChunkWriter } from './chunk-writer'
-import { JobQueue, type ExtractJob } from './job-queue'
-import { warmPackage } from './warm'
+} from '../shared/protocol.js'
+import { openSource, type SourceHandle } from '../shared/source.js'
+import { streamSpan } from '../shared/span-stream.js'
+import { inflated } from '../shared/stream-utils.js'
+import { quotaMessage } from '../shared/storage.js'
+import { createChunkWriter } from './chunk-writer.js'
+import { JobQueue, type ExtractJob } from './job-queue.js'
+import { warmPackage } from './warm.js'
 
 /**
  * The Jobs worker. Everything that takes longer than a Service Worker event is allowed to lives

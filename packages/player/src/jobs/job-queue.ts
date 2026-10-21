@@ -1,4 +1,4 @@
-import type { EntryLocation, SourceDescriptor } from '../shared/protocol'
+import type { EntryLocation, SourceDescriptor } from '../shared/protocol.js'
 
 /**
  * The order extractions run in. One at a time — two concurrent inflates halve the rate of

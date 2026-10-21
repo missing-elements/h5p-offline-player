@@ -1,5 +1,5 @@
-import { CHUNK_SIZE } from '../shared/constants'
-import type { ChunkStore } from '../shared/chunk-store'
+import { CHUNK_SIZE } from '../shared/constants.js'
+import type { ChunkStore } from '../shared/chunk-store.js'
 
 /**
  * Smallest partial chunk that is worth publishing. Chunks are the unit of storage, but waiting

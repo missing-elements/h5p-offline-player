@@ -1,5 +1,5 @@
-import type { PackDependency, PackLibrary, PackPart, PackPlan, RefreshedLibrary } from '../shared/protocol'
-import { addonPatterns, textMatches } from './package-reader'
+import type { PackDependency, PackLibrary, PackPart, PackPlan, RefreshedLibrary } from '../shared/protocol.js'
+import { addonPatterns, textMatches } from './package-reader.js'
 
 /**
  * Which parts of the library pack a package needs, and which of its own library folders the

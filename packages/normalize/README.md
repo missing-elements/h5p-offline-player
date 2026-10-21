@@ -46,6 +46,8 @@ const report = await normalizeArchive({
 })
 ```
 
+TypeScript declarations ship with the package: `Report` and `EntryResult` describe what it returns.
+
 Node only, not a browser. Why deflated video cannot stream: the demo's
 [normalize page](https://github.com/missing-elements/h5p-offline-player/blob/main/apps/demo/demo/normalize.html).
 

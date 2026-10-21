@@ -1,5 +1,5 @@
-import { WARM_ENTRY } from './shared/constants'
-import { JOBS_READY, type FromJobsMessage, type ToJobsMessage } from './shared/protocol'
+import { WARM_ENTRY } from './shared/constants.js'
+import { JOBS_READY, type FromJobsMessage, type ToJobsMessage } from './shared/protocol.js'
 
 /**
  * Where the Jobs worker's script can come from, tried in order. `url` is called once per

@@ -1,11 +1,11 @@
 import jobsWorkerSource from 'virtual:h5p-jobs-worker'
 import SHADOW_CSS from './shadow.css?inline'
-import { FRAME_FONTS } from './frame-fonts'
-import { languageTag } from './shared/language'
-import type { ContentMetadata } from './shared/metadata'
-import { JobsWorkerHandle, type JobsScript } from './jobs-worker-handle'
-import { parseLibrarySources } from './shared/library-sources'
-import { packLibrariesIn } from './shared/pack'
+import { FRAME_FONTS } from './frame-fonts.js'
+import { languageTag } from './shared/language.js'
+import type { ContentMetadata } from './shared/metadata.js'
+import { JobsWorkerHandle, type JobsScript } from './jobs-worker-handle.js'
+import { parseLibrarySources } from './shared/library-sources.js'
+import { packLibrariesIn } from './shared/pack.js'
 import {
   CONTROL_TIMEOUT_MS,
   LIBRARY_PACK_BASE,
@@ -17,7 +17,7 @@ import {
   WARM_ENTRY,
   WORKER_MAJOR_UPDATE_TIMEOUT_MS,
   WORKER_UPDATE_TIMEOUT_MS
-} from './shared/constants'
+} from './shared/constants.js'
 import {
   PlayerError,
   type ErrorCode,
@@ -44,13 +44,13 @@ import {
   type UserDataEntry,
   type UserDataPreload,
   type WorkerReply
-} from './shared/protocol'
-import { packageLockName } from './shared/locks'
-import { filePkgId, loadKey, partPkgId, randomHex, remotePkgId } from './shared/pkg-id'
-import { platformOf, withProvenance } from './shared/revision'
-import { probeSource } from './shared/source'
-import { loadSegment, routesFor, type LoadRef, type Routes } from './sw/routes'
-import { adoptRevision, clearUserData, readUserData, removeUserData, writeUserData } from './user-data-store'
+} from './shared/protocol.js'
+import { packageLockName } from './shared/locks.js'
+import { filePkgId, loadKey, partPkgId, randomHex, remotePkgId } from './shared/pkg-id.js'
+import { platformOf, withProvenance } from './shared/revision.js'
+import { probeSource } from './shared/source.js'
+import { loadSegment, routesFor, type LoadRef, type Routes } from './sw/routes.js'
+import { adoptRevision, clearUserData, readUserData, removeUserData, writeUserData } from './user-data-store.js'
 
 /**
  * `<h5p-player>` — the package's public surface. It plays a package and nothing else: no URL
@@ -166,7 +166,7 @@ function declaredLanguage(element: Element): string | undefined {
 
 export type PlayerState = 'idle' | 'probing' | 'downloading' | 'indexing' | 'ready' | 'error'
 
-export type { UserDataEntry } from './shared/protocol'
+export type { UserDataEntry } from './shared/protocol.js'
 
 /**
  * The package's own account of itself: `h5p.json`'s metadata as the runtime's copyright dialog
@@ -197,7 +197,7 @@ export interface LibraryBundle {
   refreshed?: RefreshedLibrary[]
 }
 
-export type { RefreshedLibrary } from './shared/protocol'
+export type { RefreshedLibrary } from './shared/protocol.js'
 
 /** Each library of a pack, with where its part is: the `pack` export of `@missing-elements/h5p-libraries`. */
 export interface LibraryPack {

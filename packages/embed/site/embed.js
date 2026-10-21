@@ -18,6 +18,10 @@
  * package shows under its preview.
  */
 
+/**
+ * @import { H5PPlayerElement, PlayerErrorDetail, PlayerStateChangeDetail, ReadyDetail } from '@missing-elements/h5p-offline-player'
+ */
+
 /** Where the element's `libraries="pack"` fetches the library pack from, for a site without its own copy. */
 const PACK_CDN_ORIGIN = 'https://cdn.jsdelivr.net'
 
@@ -25,7 +29,7 @@ const PACK_CDN_ORIGIN = 'https://cdn.jsdelivr.net'
  * @param {object} [options]
  * @param {string | null} [options.packBase] the folder of this site's copy of the library pack's
  *   parts (`parts/` of `@missing-elements/h5p-libraries`), which `libraries=pack` plays from
- * @param {{ libraries: object[] } | null} [options.pack] the same, as the `pack` export a bundler
+ * @param {H5PPlayerElement['pack']} [options.pack] the same, as the `pack` export a bundler
  *   resolves; it wins over `packBase`. Without either, `pack` is the element's copy on jsDelivr
  * @param {string | null} [options.librariesPack] the URL of a whole `libraries.h5p` on this site,
  *   for a page written before the pack was split: played as any bundle, with no refresh
@@ -35,7 +39,7 @@ const PACK_CDN_ORIGIN = 'https://cdn.jsdelivr.net'
  * @param {string | null} [options.defaultLibraries] the `libraries` value for an address that has
  *   none — `pack` or URLs, as the parameter — so a snippet without `&libraries=` still plays
  *   an export that carries no libraries; `&libraries=none` turns it off for one address
- * @param {object | null} [options.runtime] the `runtime` export of `@missing-elements/h5p-runtime`,
+ * @param {H5PPlayerElement['runtime']} [options.runtime] the `runtime` export of `@missing-elements/h5p-runtime`,
  *   for a page that bundles the element; without it the element looks for `frame-assets/` beside itself
  * @param {boolean} [options.askInOwnFrame] whether a package from another origin plays `untrusted`,
  *   with a click to play it with its own code when it needs that, when this page is framed by a
@@ -44,19 +48,24 @@ const PACK_CDN_ORIGIN = 'https://cdn.jsdelivr.net'
  */
 export function startEmbed({ packBase = null, pack = null, librariesPack = null, packages = null, defaultLibraries = null, runtime = null, askInOwnFrame = true } = {}) {
   const params = new URLSearchParams(location.search)
-  const player = document.querySelector('h5p-player')
+  const player = /** @type {H5PPlayerElement} */ (document.querySelector('h5p-player'))
   // Before `src`: the element resolves the runtime's files, and reads where the pack is, when a
   // package is set.
   if (runtime) player.runtime = runtime
   if (pack) player.pack = pack
   else if (packBase) player.setAttribute('pack-base', packBase)
   const ownPack = Boolean(pack || packBase)
-  const notice = document.querySelector('#notice')
-  const loader = document.querySelector('#loader')
+  const notice = /** @type {HTMLElement} */ (document.querySelector('#notice'))
+  const loader = /** @type {HTMLElement} */ (document.querySelector('#loader'))
   const framed = window.parent !== window
 
   /* ---------------------------------------------------------------- notices */
 
+  /**
+   * @param {string} text
+   * @param {string} [kind]
+   * @param {{ href: string, text: string } | null} [link]
+   */
   const say = (text, kind = '', link = null) => {
     notice.replaceChildren()
     if (text) {
@@ -75,6 +84,10 @@ export function startEmbed({ packBase = null, pack = null, librariesPack = null,
     requestAnimationFrame(announce)
   }
 
+  /**
+   * @param {string} text
+   * @param {string} [code]
+   */
   const refuse = (text, code = 'refused') => {
     loader.hidden = true
     say(text, 'error')
@@ -87,6 +100,8 @@ export function startEmbed({ packBase = null, pack = null, librariesPack = null,
    * A message to the page that frames this one: the height in the shape h5p-resizer.js expects,
    * and `report`, `error` and `xapi` in this page's own. To any parent unless a target is named,
    * since nothing in the height is secret; the xAPI relay names the origin that opted in.
+   * @param {object} message
+   * @param {string} [target]
    */
   const post = (message, target = '*') => {
     if (framed) window.parent.postMessage(message, target)
@@ -139,7 +154,7 @@ export function startEmbed({ packBase = null, pack = null, librariesPack = null,
   let startedAt = 0
 
   player.addEventListener('ready', (event) => {
-    const { source, metadata, libraryBundle } = event.detail
+    const { source, metadata, libraryBundle } = /** @type {CustomEvent<ReadyDetail>} */ (event).detail
     post({
       context: 'h5p-offline-player',
       action: 'report',
@@ -158,7 +173,10 @@ export function startEmbed({ packBase = null, pack = null, librariesPack = null,
 
   /* ---------------------------------------------------------------- xAPI, relayed on request */
 
-  /** An origin, or nothing: the parameter has to be exactly what `event.origin` will read. */
+  /**
+   * An origin, or nothing: the parameter has to be exactly what `event.origin` will read.
+   * @param {string | null} value
+   */
   const originOf = (value) => {
     if (!value) return null
     try {
@@ -173,18 +191,22 @@ export function startEmbed({ packBase = null, pack = null, librariesPack = null,
   if (relayTo && framed) {
     for (const type of ['xapi', 'finished']) {
       player.addEventListener(type, (event) => {
-        post({ context: 'h5p-offline-player', action: type, ...event.detail }, relayTo)
+        post({ context: 'h5p-offline-player', action: type, .../** @type {CustomEvent<object>} */ (event).detail }, relayTo)
       })
     }
   }
 
   /* ---------------------------------------------------------------- errors, and Safari */
 
-  /** Asks whether to play an untrusted package with its own code; set when one is played so. */
+  /**
+   * Asks whether to play an untrusted package with its own code; set when one is played so.
+   * @type {(() => void) | null}
+   */
   let askToTrust = null
 
   player.addEventListener('error', (event) => {
-    const { code, message, missingLibraries } = event.detail
+    // The element's own `error`, which the DOM's types take for a script's `ErrorEvent`.
+    const { code, message, missingLibraries } = /** @type {CustomEvent<PlayerErrorDetail>} */ (/** @type {unknown} */ (event)).detail
     // Played untrusted, it cannot do without its own copy of a library: a click decides.
     if (missingLibraries?.carried && player.untrusted && askToTrust) {
       askToTrust()
@@ -211,7 +233,7 @@ export function startEmbed({ packBase = null, pack = null, librariesPack = null,
   })
 
   player.addEventListener('statechange', (event) => {
-    const { state } = event.detail
+    const { state } = /** @type {CustomEvent<PlayerStateChangeDetail>} */ (event).detail
     if (state !== 'error') say('')
     // Shown from the HTML on, until the content is up or the load has failed.
     loader.hidden = state === 'ready' || state === 'error' || state === 'idle'
@@ -220,7 +242,10 @@ export function startEmbed({ packBase = null, pack = null, librariesPack = null,
 
   /* ---------------------------------------------------------------- which hosts */
 
-  /** The origin of a URL as this page resolves it, or `null` for what is not one. */
+  /**
+   * The origin of a URL as this page resolves it, or `null` for what is not one.
+   * @param {string} value
+   */
   const urlOrigin = (value) => {
     try {
       const url = new URL(value, location.href)
@@ -232,15 +257,21 @@ export function startEmbed({ packBase = null, pack = null, librariesPack = null,
   }
 
   const allowed = packages ? new Set(packages) : null
-  /** Whether this player was told it may fetch from `origin`. Always true without a list. */
+  /**
+   * Whether this player was told it may fetch from `origin`. Always true without a list.
+   * @param {string} origin
+   */
   const permitted = (origin) => origin === location.origin || !allowed || allowed.has(origin)
 
   /**
    * The `libraries` value with `pack` resolved to this site's copy, or an error to show. With a
    * list of hosts, every bundle's origin has to be on it, jsDelivr's included when the pack comes
    * from there; the CSP that `h5p-embed` wrote says the same, this only says it in words.
+   * @param {string} value
+   * @returns {{ value?: string, error?: string }}
    */
   const librarySources = (value) => {
+    /** @type {string[]} */
     const sources = []
     if (value === 'none') return { value: '' }
     for (const token of value.split(/\s+/).filter(Boolean)) {
@@ -287,6 +318,10 @@ export function startEmbed({ packBase = null, pack = null, librariesPack = null,
     if (lang && /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/.test(lang)) player.setAttribute('lang', lang)
   }
 
+  /**
+   * @param {string} value
+   * @param {string | undefined} libraries
+   */
   const start = (value, libraries) => {
     if (libraries) player.setAttribute('libraries', libraries)
     if (params.get('preload') === 'auto') player.setAttribute('preload', 'auto')

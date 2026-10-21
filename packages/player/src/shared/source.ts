@@ -1,9 +1,9 @@
-import { ARCHIVE_ENTRY } from './constants'
-import { ChunkStore } from './chunk-store'
-import { PlayerError, type RemoteSourceDescriptor, type SourceDescriptor } from './protocol'
-import type { ByteRange } from './range'
-import { resilientStream } from './resilient-stream'
-import { sliceStream } from './stream-utils'
+import { ARCHIVE_ENTRY } from './constants.js'
+import { ChunkStore } from './chunk-store.js'
+import { PlayerError, type RemoteSourceDescriptor, type SourceDescriptor } from './protocol.js'
+import type { ByteRange } from './range.js'
+import { resilientStream } from './resilient-stream.js'
+import { sliceStream } from './stream-utils.js'
 
 /**
  * Source adapters. One interface — a size and a byte-range read — over the three ways an archive

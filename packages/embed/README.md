@@ -138,6 +138,7 @@ export, which `libraries=pack` then plays from) or `packBase` (the folder of a c
 `@missing-elements/h5p-runtime` export, for a bundled element) and `askInOwnFrame` (default
 `true`; `false` plays a package from another origin as it is when a same-origin page frames it).
 `librariesPack`, the URL of a whole `libraries.h5p`, still works, as a bundle that only fills gaps.
+Both entries ship with TypeScript declarations.
 
 ```js
 import '@missing-elements/h5p-offline-player'
