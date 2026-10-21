@@ -122,6 +122,21 @@ for (const [name, language] of [
   ])
 }
 
+// 1d. The German package with its `h5p.json` behind a megabyte of media, as `boardgame.h5p` has
+//     it at entry 200: on a host without Range the worker opens its reader at the first progress
+//     report, before the manifest has arrived, and the frame still has to boot in German (#57).
+//     More media after it, so the frame boots while the download is still under way.
+built.push([
+  'german-late-manifest.h5p',
+  await writeArchive('german-late-manifest.h5p', async (writer) => {
+    const manifest = JSON.parse(await readFile(resolve(sourceDir, 'h5p.json'), 'utf8'))
+    await addBaseFiles(writer, { skip: ['h5p.json'] })
+    await writer.add('content/media/before.bin', new Uint8ArrayReader(randomBytes(1024 * 1024)), { level: 0 })
+    await writer.add('h5p.json', new TextReader(JSON.stringify({ ...manifest, language: 'de', defaultLanguage: 'de' })))
+    await writer.add('content/media/after.bin', new Uint8ArrayReader(randomBytes(4 * 1024 * 1024)), { level: 0 })
+  })
+])
+
 // 2. A large deflated entry: the Jobs worker inflates it into chunks and the virtual server
 //    serves the prefix that exists as a shorter 206.
 built.push([

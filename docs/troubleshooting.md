@@ -6,7 +6,7 @@
 |---|---|---|
 | `error: no-cors` | Package host sends no CORS headers | Ask the user to download the file and use `file` |
 | `error: network`, "is an http: URL and this page is served over https:" | `src` or `libraries` is `http://` on an `https://` page | Use the `https://` URL. `http://localhost` works as is |
-| `error: no-worker` | Page on `http://`, in-app browser without Service Workers, or `sw` cross-origin | Use `https://`; show "Open in Safari / Chrome"; serve `h5p-sw.js` from your origin |
+| `error: no-worker` | Page on `http://`, in-app browser without Service Workers, `sw` cross-origin, or a frame sandboxed without `allow-same-origin` | Use `https://`; show "Open in Safari / Chrome"; serve `h5p-sw.js` from your origin; add `allow-same-origin` to the frame's `sandbox`, or drop the attribute |
 | Worker or runtime files 404 after build | Bundler does not analyse `new URL(…, import.meta.url)` (esbuild), or the `runtime` property is not set | Set `player.runtime`; or serve both packages' `dist/` and set `sw` + `assets-base` |
 | Worker blocked by CSP | `sw` points at another origin | Keep the worker same-origin |
 | Console: creating a worker from `blob:` violates `worker-src` | The page refuses `blob:` workers; the element falls back to `h5p-jobs.js` | Set `jobs` to that file to skip the attempt. If `error: no-worker` follows, `h5p-jobs.js` is missing or not same-origin |

@@ -2,8 +2,9 @@
  * Which of this package's translations of the core's strings a frame gets. `dist/l10n.js` leaves
  * every language on `window.H5PRuntimeL10n`, with the aliases `scripts/build-l10n.mjs` derived;
  * the boot script picks one for the frame document's `lang`, which the player's worker writes
- * from the element's language. The player knows no list of languages: what is here, and which
- * tag gets which, is this package's alone, so a language added is a release of this package only.
+ * from the content's language, or the element's for a package that names none. The player knows
+ * no list of languages: what is here, and which tag gets which, is this package's alone, so a
+ * language added is a release of this package only.
  */
 
 /**

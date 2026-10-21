@@ -549,7 +549,7 @@ export class H5PPlayerElement extends HTMLElement {
     window.addEventListener('message', this.onWindowMessage)
     window.addEventListener('pagehide', this.onPageHidden)
     document.addEventListener('visibilitychange', this.onPageHidden)
-    navigator.serviceWorker?.addEventListener('message', this.onServiceWorkerMessage)
+    serviceWorkers()?.addEventListener('message', this.onServiceWorkerMessage)
     if (this.src || this.currentFile) void this.startLoad()
   }
 
@@ -559,7 +559,7 @@ export class H5PPlayerElement extends HTMLElement {
     window.removeEventListener('pagehide', this.onPageHidden)
     document.removeEventListener('visibilitychange', this.onPageHidden)
     window.removeEventListener('resize', this.onWindowResize)
-    navigator.serviceWorker?.removeEventListener('message', this.onServiceWorkerMessage)
+    serviceWorkers()?.removeEventListener('message', this.onServiceWorkerMessage)
     this.abortLoad()
     this.jobs?.terminate()
     this.jobs = null
@@ -1398,14 +1398,15 @@ export class H5PPlayerElement extends HTMLElement {
       this.registration = null
     }
 
-    if (!('serviceWorker' in navigator)) {
+    const container = serviceWorkers()
+    if (!container) {
       throw new PlayerError(
         'no-worker',
-        'This browser has no Service Worker support, or the page is not on https/localhost'
+        'This browser has no Service Worker support, the page is not on https/localhost, or it is in a frame sandboxed without allow-same-origin'
       )
     }
 
-    const mounted = await this.findMountedRoutes()
+    const mounted = await this.findMountedRoutes(container)
     if (mounted) {
       this.routes = mounted.routes
       this.registration = mounted.registration
@@ -1423,7 +1424,7 @@ export class H5PPlayerElement extends HTMLElement {
 
     let registration: ServiceWorkerRegistration
     try {
-      registration = await navigator.serviceWorker.register(resolved.href, { scope })
+      registration = await container.register(resolved.href, { scope })
     } catch (error) {
       throw new PlayerError('no-worker', `Could not register ${resolved.href}`, { cause: error })
     }
@@ -1439,13 +1440,13 @@ export class H5PPlayerElement extends HTMLElement {
   }
 
   /** A host that enforces one worker mounts our handlers in theirs; those routes answer `_ping`. */
-  private async findMountedRoutes(): Promise<
+  private async findMountedRoutes(container: ServiceWorkerContainer): Promise<
     { routes: Routes; registration: ServiceWorkerRegistration } | null
   > {
-    if (!navigator.serviceWorker.controller) return null
+    if (!container.controller) return null
 
     try {
-      const registration = await navigator.serviceWorker.ready
+      const registration = await container.ready
       const routes = routesFor(registration.scope)
       const response = await fetch(routes.ping, { cache: 'no-store' })
       if (!response.ok) return null
@@ -2053,11 +2054,28 @@ function createNonce(): string {
   return randomHex(16)
 }
 
-/** False once a registration has been torn down, which clearing site data does silently. */
+/**
+ * The page's Service Worker container, or `null` where it has none. Not `'serviceWorker' in
+ * navigator`: in a frame sandboxed without `allow-same-origin` the property is there, and Chromium
+ * and WebKit throw a `SecurityError` on reading it (#57).
+ */
+function serviceWorkers(): ServiceWorkerContainer | null {
+  try {
+    return navigator.serviceWorker ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * False once a registration has been torn down, which clearing site data does silently. Another
+ * registration at the scope does not count: another player on the page, or another tab, may have
+ * registered again first, and the one this element holds has no worker once its clients are gone.
+ */
 async function stillRegistered(registration: ServiceWorkerRegistration): Promise<boolean> {
   try {
-    const current = await navigator.serviceWorker.getRegistration(registration.scope)
-    return current?.active != null
+    const current = await serviceWorkers()?.getRegistration(registration.scope)
+    return current === registration && current.active != null
   } catch {
     // A registration that cannot be asked about is as good as gone: the load registers again.
     return false

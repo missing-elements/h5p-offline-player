@@ -804,7 +804,11 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   owner's rule: the interface and the content in one language. A select for the language, on the
   player page and in the app, was built the same day and closed unmerged (#53, #54) for the same
   reason: it could only make the two differ. `lang` is the fallback, and so is the embed page's
-  `&lang=`. `german.h5p` and `english.h5p`, `basic.h5p` naming its language, are the fixtures. That one
+  `&lang=`. `german.h5p` and `english.h5p`, `basic.h5p` naming its language, are the fixtures, and
+  `german-late-manifest.h5p` a host without `Range` whose `h5p.json` arrives after the worker
+  opened its reader: the frame route reads the language off the record, so `refresh` saves the
+  manifest there once a merged snapshot brings it in, which until #57 it did not, and such a
+  package booted early in the element's language, untitled and unlicensed. That one
   file has every language and the aliases; the boot script picks one by RFC 4647 lookup through
   the aliases (`src/l10n.ts` in the runtime — `de-AT` gets `de`, `nb` Norwegian) and lays it over
   the core's own English, `getLocalization()` at the vendored commit (`vendor/h5p-core/strings.json`,
@@ -1282,10 +1286,19 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   with `getRegistration` on every load instead of trusting its cached one; without that, the
   routes fall through to the origin, and a dev server or SPA host answers an unknown path with
   its own `index.html` — the frame then renders the host page inside itself, with no error
-  anywhere. The chunk store is emptied, which needs nothing: a cold package is the normal case.
+  anywhere. The registration found must be the one the element holds: another player on the page,
+  or another tab, may have registered again first, and the one held has no worker once its last
+  client has gone, so every load failed with `no-worker` until a reload (#57). The chunk store is
+  emptied, which needs nothing: a cold package is the normal case.
 - **The element waits for *its own* registration to reach `activated`**, not for
   `navigator.serviceWorker.ready` — that tracks the page's controller and may never resolve for a
   nested scope.
+- **`navigator.serviceWorker` is read through `serviceWorkers()`, never directly by the element.**
+  In a frame sandboxed without `allow-same-origin` the property is there and Chromium and WebKit
+  throw a `SecurityError` on reading it (Firefox returns the container, whose `register` then
+  fails). Read in `connectedCallback`, the throw stopped the element before its load began: no
+  `error`, so the embed page never offered to open the package in its own tab (#57). Now it is
+  `no-worker`.
 - **The first load after an upgrade is brought to the element's version before the frame
   boots.** Registering again with an unchanged script URL returns the existing registration
   without fetching the script — measured in Chromium on 2026-10-04 — so that load booted against
