@@ -96,6 +96,11 @@ export function planPack(input: PlanInput): PackPlan | null {
       if (library.patch === null || library.major === null) continue
       const candidate = byLibrary.get(libraryKey(library.machineName, library.major))
       if (!candidate || !newer(candidate, library)) continue
+      // A bundle listed before the pack has this major already, and would answer for the folder
+      // withheld: under the part's own folder name, which then is never planned, or at a lower
+      // minor, the first a request resolves to. The package keeps its own, as a bundle there
+      // fills gaps only, rather than playing the bundle's version reported as the pack's (#58).
+      if (input.provided.some((each) => each.machineName === library.machineName && each.major === library.major)) continue
       supersede(library, candidate)
       queue.push(...plan(candidate))
     }

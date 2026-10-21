@@ -35,7 +35,10 @@ function installed(specifier, hint) {
 /**
  * An origin as the CSP and the page compare it: `https://host[:port]`, or plain http on a loopback
  * address for trying it locally. Anything with a path, a query or a trailing slash is refused
- * rather than trimmed, so a typo is not silently a different policy.
+ * rather than trimmed, so a typo is not silently a different policy. The host is held to what a
+ * CSP host is, letters, digits and hyphens between dots: the URL parser takes `*`, `;` and `"` in
+ * a host, and a wildcard would allow what the page then refuses, by exact origin, on every load,
+ * while a quote would end the policy in the files that quote it (#58).
  */
 export function parseOrigin(value) {
   let url
@@ -47,6 +50,9 @@ export function parseOrigin(value) {
   const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
   if (url.protocol !== 'https:' && !(url.protocol === 'http:' && loopback)) {
     throw new EmbedError(`Not an https origin: ${value}`)
+  }
+  if (!loopback && !/^[a-z0-9-]+(?:\.[a-z0-9-]+)*$/.test(url.hostname)) {
+    throw new EmbedError(`Not an origin: ${value}. A host is letters, digits, hyphens and dots, and each host is listed on its own, with no wildcard`)
   }
   if (url.origin !== value) throw new EmbedError(`Not an origin: ${value}. Write it as ${url.origin}, with no path or trailing slash`)
   return url.origin

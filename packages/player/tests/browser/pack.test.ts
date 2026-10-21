@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import '../../src/h5p-offline-player'
 import type { H5PPlayerElement } from '../../src/h5p-offline-player'
+import { ChunkStore } from '../../src/shared/chunk-store'
+import { ARCHIVE_ENTRY } from '../../src/shared/constants'
 import * as db from '../../src/shared/idb'
 import { packageLockName } from '../../src/shared/locks'
+import { partPkgId } from '../../src/shared/pkg-id'
 import { FIXTURES, clearPackageCaches, createPlayer, frameWindow, messageOf, play, settle, waitForSettled } from './utils'
 
 /**
@@ -126,6 +129,26 @@ describe('the library pack, split into parts', () => {
     const player = await play(fresh(FIXTURES.basic, 'tampered'), tampered)
     expect(messageOf(player)).toBe(BASIC_MESSAGE)
     expect(player.libraryBundle).toBeNull()
+  })
+
+  it('checks a part kept whole but never checked, and downloads it again when it does not match', async () => {
+    // What a Jobs worker stopped between a part's last write and its check leaves behind: the
+    // part complete, under its hash's id, holding other bytes — here another part's. Taken as
+    // checked for being whole, it was attached as the library (#58).
+    const index = (await (await fetch(`${PACK}index.json`)).json()) as { libraries: Array<{ folder: string; sha256: string }> }
+    const part = index.libraries.find(({ folder }) => folder === 'H5P.OfflineTest-1.2')!
+    const other = index.libraries.find(({ folder }) => folder !== part.folder)!
+    const wrong = new Uint8Array(await (await fetch(`${PACK}${other.folder}.h5p`)).arrayBuffer())
+    const id = await partPkgId(part.sha256)
+    const store = new ChunkStore(id)
+    await store.destroy()
+    await store.putChunk(ARCHIVE_ENTRY, 0, wrong)
+    await store.setMeta(ARCHIVE_ENTRY, { size: wrong.length, available: wrong.length, complete: true })
+
+    const player = await play(fresh(FIXTURES.needsLibraries, 'unchecked'), withPack())
+    expect(messageOf(player)).toBe('Libraries came from somewhere else. [1.1] [1.2]')
+    // A store of its own: the worker deleted the cache this one holds, and wrote a new one.
+    expect((await new ChunkStore(id).getArchiveMeta())?.checked).toBe(part.sha256)
   })
 
   it("keeps what the package carries when the host's copy of the pack cannot be read", async () => {
