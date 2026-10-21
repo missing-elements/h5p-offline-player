@@ -34,6 +34,15 @@ describe('origins', () => {
     expect(() => parseOrigin('cdn.example.org')).toThrow(EmbedError)
   })
 
+  it('refuses a host the URL parser takes and a policy cannot: a wildcard, a quote, a semicolon', () => {
+    // A wildcard would allow what the page refuses by exact origin; a quote would end the policy
+    // in nginx.conf, the Caddyfile, .htaccess and the <meta> (#58).
+    expect(() => parseOrigin('https://*.cdn.example.org')).toThrow(/no wildcard/)
+    expect(() => parseOrigin('https://cdn.example.org"x')).toThrow(EmbedError)
+    expect(() => parseOrigin('https://cdn.example.org;x')).toThrow(EmbedError)
+    expect(parseOrigin('https://192.0.2.10')).toBe('https://192.0.2.10')
+  })
+
   it('reads a list given once, separated, or several times', () => {
     expect(parseOrigins(null)).toBeNull()
     expect(parseOrigins(['https://a.example,https://b.example', 'https://c.example https://a.example'])).toEqual([

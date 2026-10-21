@@ -30,7 +30,7 @@ a subdomain shares your site's cookies.
 
 | Option | Effect |
 |---|---|
-| `--packages <origins>` | Play packages and fetch library bundles only from these origins (the site's own is always allowed). Add `https://cdn.jsdelivr.net` for `libraries=pack` on a site built with `--no-libraries`. Default: any https host |
+| `--packages <origins>` | Play packages and fetch library bundles only from these origins (the site's own is always allowed). Each host on its own, with no wildcard: the page compares exact origins. Add `https://cdn.jsdelivr.net` for `libraries=pack` on a site built with `--no-libraries`. Default: any https host |
 | `--ancestors <origins>` | Only these sites may frame the page (`frame-ancestors`, header only). Default: any site |
 | `--default-libraries <sources>` | The `libraries` value for addresses that name none: `pack` or URLs. Checked against `--packages`. Default: none, so exports without libraries are refused unless the address asks |
 | `--no-libraries` | Leave out the library pack, 13.8 MB in `libraries/`, one archive per library, of which a learner's browser fetches only those a package needs; `libraries=pack` then fetches them from jsDelivr, where allowed |

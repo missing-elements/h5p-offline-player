@@ -106,6 +106,20 @@ describe('refreshing what a package carries', () => {
     expect(folders(result)).toEqual(['H5P.Question-1.5'])
     expect(result?.superseded).toEqual(['H5P.Question-1.4'])
   })
+
+  it('keeps the package\'s own where a bundle listed before the pack has the library already', () => {
+    // `libraries="/bundle.h5p pack"`: the bundle was attached for a gap and is consulted before
+    // the pack's parts, so it would answer for the folder a refresh withheld (#58).
+    const sameFolder = [{ folder: 'H5P.Video-1.6', machineName: 'H5P.Video', major: 1, minor: 6 }]
+    expect(plan({ own: [carried('H5P.Video', 1, 6, 66)], provided: sameFolder, roots: dependencies([['H5P.Video', 1, 6]]) })).toBeNull()
+
+    // At a minor between the package's and the pack's, the first a request for the package's
+    // resolves to: the part would download and never answer.
+    const between = [{ folder: 'H5P.Question-1.5', machineName: 'H5P.Question', major: 1, minor: 5 }]
+    const own = [carried('H5P.Question', 1, 4, 1)]
+    const pack = [...PACK.filter(({ machineName }) => machineName !== 'H5P.Question'), inPack('H5P.Question', 1, 6, 0)]
+    expect(plan({ own, provided: between, roots: dependencies([['H5P.Question', 1, 4]]), pack })).toBeNull()
+  })
 })
 
 describe('supplying what a package lacks', () => {

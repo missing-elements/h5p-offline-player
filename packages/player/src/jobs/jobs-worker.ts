@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 import { ARCHIVE_ENTRY, CHUNK_SIZE, INPUT_LIVENESS_MS, WARM_ENTRY } from '../shared/constants'
-import { ChunkStore, QuotaError, announceQueued, announceRunning, isQuotaError } from '../shared/chunk-store'
+import { ChunkStore, QuotaError, announceQueued, announceRunning, isQuotaError, type ChunkMeta } from '../shared/chunk-store'
 import { installEvictionPolicy } from '../shared/eviction'
 import { LocalHeaderScanner } from '../shared/forward-index'
 import { DEFLATE, STORED, readDataStart } from '../shared/local-header'
@@ -216,6 +216,17 @@ async function downloadArchive(
   const existing = await store.getArchiveMeta()
 
   if (existing?.complete) {
+    // A part kept whole but never checked — its worker stopped between the last write and the
+    // check, or a player from before parts were marked kept it — is checked now, and downloaded
+    // again if it fails.
+    if (sha256 && existing.checked !== sha256) {
+      try {
+        await checkHash(store, existing, sha256, source.url)
+      } catch {
+        await store.destroy()
+        return downloadArchive(pkgId, source, signal, afresh, sha256)
+      }
+    }
     send({ type: 'done', pkgId })
     return
   }
@@ -329,7 +340,7 @@ async function downloadArchive(
     return downloadArchive(pkgId, source, signal, true, sha256)
   }
   if (!meta?.complete) throw new PlayerError('bad-archive', 'The downloaded archive could not be kept in the browser storage')
-  if (sha256) await checkHash(store, meta.size ?? meta.available, sha256, source.url)
+  if (sha256) await checkHash(store, meta, sha256, source.url)
   send({ type: 'done', pkgId })
 }
 
@@ -338,11 +349,17 @@ async function downloadArchive(
  * the pack's index says, dropping what was stored: the part is library code the host's site will
  * run, and the index — the one this release pins, or the host's — is what names it. Read whole,
  * which is the one buffering here and is bounded by the pack's largest part, a few megabytes;
- * nothing streams SHA-256 in a browser. Once kept, a part is known by its hash and not checked again.
+ * nothing streams SHA-256 in a browser. A match is recorded on the part, which is then known by
+ * its hash and not checked again.
  */
-async function checkHash(store: ChunkStore, size: number, expected: string, url: string): Promise<void> {
+async function checkHash(store: ChunkStore, meta: ChunkMeta, expected: string, url: string): Promise<void> {
+  const size = meta.size ?? meta.available
   const bytes = await new Response(store.readRange(ARCHIVE_ENTRY, { start: 0, end: size - 1 })).arrayBuffer()
-  if (hex(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))) === expected) return
+  if (hex(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))) === expected) {
+    // Best-effort: a store too full to take the mark leaves the part to be checked on its next use.
+    await store.setMeta(ARCHIVE_ENTRY, { ...meta, checked: expected }).catch(() => {})
+    return
+  }
   await store.destroy()
   throw new PlayerError('bad-archive', `${url} is not the library the pack's index names: its bytes do not match the index's hash`)
 }

@@ -338,12 +338,13 @@ export function contentChanges(written, played) {
       }
       for (const key of Object.keys(a)) {
         const next = Array.isArray(a) ? `${path}[${key}]` : path ? `${path}.${key}` : key
-        if (!(key in b)) {
+        // Own keys only: `in` finds `constructor` and `toString` on every object (#58).
+        if (!Object.hasOwn(b, key)) {
           if (!isEmpty(a[key])) changes.push({ path: next, change: 'removed' })
         } else walk(a[key], b[key], next)
       }
       for (const key of Object.keys(b)) {
-        if (!(key in a)) changes.push({ path: Array.isArray(b) ? `${path}[${key}]` : path ? `${path}.${key}` : key, change: 'added' })
+        if (!Object.hasOwn(a, key)) changes.push({ path: Array.isArray(b) ? `${path}[${key}]` : path ? `${path}.${key}` : key, change: 'added' })
       }
       return
     }

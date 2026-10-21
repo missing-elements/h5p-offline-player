@@ -137,6 +137,16 @@ describe('contentChanges', () => {
       { path: 'html', change: 'text rewritten' }
     ])
   })
+
+  it('reports a removed or added field named as a member of every object as such', () => {
+    // `in` found `constructor` on the object it was removed from, and compared the text with
+    // Object itself (#58).
+    expect(contentChanges({ constructor: 'x', toString: 'y' }, {})).toEqual([
+      { path: 'constructor', change: 'removed' },
+      { path: 'toString', change: 'removed' }
+    ])
+    expect(contentChanges({}, { valueOf: 1 })).toEqual([{ path: 'valueOf', change: 'added' }])
+  })
 })
 
 describe('h5p-verify', () => {

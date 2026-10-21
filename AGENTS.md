@@ -1053,8 +1053,12 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   wherever the source is the pack, `refresh-libraries="off"` to turn it off: a library the package
   carries plays at the pack's version when the pack has the same major at a higher minor, or the
   same minor at a higher patch; equal, older or only another major keeps the package's own, with
-  nothing downloaded. The rule needs each own `library.json` for the patch, so on a host with
-  `Range` it waits for the deep index after the warm, where they are cached (before it, names give
+  nothing downloaded. So does a library that a bundle listed before the pack already has at that
+  major: the bundle would answer for the folder withheld, under the part's own folder name, which
+  then is never planned, or at a lower minor, which a request resolves to first. Until #58 it did:
+  the bundle's version played, and the pack's was reported. The rule needs each own
+  `library.json` for the patch, so on a host with `Range` it waits for the deep index after the
+  warm, where they are cached (before it, names give
   major and minor and nothing is refreshed). A refreshed folder is withheld from the package's own
   index whole (`superseded`, as `untrusted` withholds), so requests for it resolve to the part's
   folder by the compatible-version rule `get()` already applies — exact for a patch, the newer
@@ -1076,7 +1080,11 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   worker against the index's SHA-256 once downloaded (`checkHash`, read back from the store whole,
   bounded by the largest part, a few MB) and refused, its cache dropped, on a mismatch; a part's
   id is its hash (`partPkgId`), so a part kept before is used with no request, by any package,
-  online or not, and needs no probe. The pinned index is in the worker script, so jsDelivr cannot
+  online or not, and needs no probe. A match is recorded on the part (`ChunkMeta.checked`), and
+  complete without it is not enough: a Jobs worker stopped between the last write and the check
+  left a part whole and unchecked, which every later load took as checked (#58). A part without
+  the mark — that, or one a player from before kept — is checked on its next use and downloaded
+  again if it fails. The pinned index is in the worker script, so jsDelivr cannot
   change the code a host runs; a host's own copy is the host's choice. **Failure**: a refresh that
   cannot be had — a part that will not download, or does not match — is given up and the package
   plays as exported, never failing a load that would have played; a part needed for a gap that
@@ -2133,8 +2141,9 @@ SPA-fallback trap described above cannot happen there.
   because the European hosts a data protection officer accepts read none of the first two and
   the docs had named only US providers. nginx's `add_header` in a `location` replaces the
   inherited headers, so each location in the file repeats the policy. `--packages`
-  turns the default `connect-src 'self' https:` into exactly the hosts given, and `config.js`
-  hands the same list to the page, which refuses an `src` or a library URL off it by name
+  turns the default `connect-src 'self' https:` into exactly the hosts given — each a plain host,
+  since the URL parser takes `*` and `"` in one and the page compares exact origins (#58) — and
+  `config.js` hands the same list to the page, which refuses an `src` or a library URL off it by name
   before fetching anything. (Until 2026-10-10 it also refused `hub` unless `https://api.h5p.org`
   was listed; a site without its own pack needs `https://cdn.jsdelivr.net` listed for `pack`, and
   `hub`, which meant `pack` from then to embed 0.8, is no longer a token.) The page checks only the address it is

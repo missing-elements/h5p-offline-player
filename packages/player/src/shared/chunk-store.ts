@@ -28,6 +28,12 @@ export interface ChunkMeta {
    * the entry up again once the failure is old enough to be worth retesting.
    */
   error?: EntryFailure
+  /**
+   * For a part of the library pack, the SHA-256 its bytes were found to match. Complete is not
+   * enough: a Jobs worker stopped between the last write and the check leaves a part whole and
+   * unchecked, and it is library code (#58).
+   */
+  checked?: string
 }
 
 export interface EntryFailure {
