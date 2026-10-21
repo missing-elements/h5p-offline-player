@@ -52,7 +52,7 @@
     "@zip.js/zip.js": "^2.24.0",
     "esbuild": "^0.28.2",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.5"
   },
   "engines": {
     "node": ">=20"
