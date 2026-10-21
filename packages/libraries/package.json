@@ -47,7 +47,7 @@
     "test": "node -e \"const { statSync } = require('node:fs'); for (const file of ['libraries.h5p', 'parts/index.json', 'index.js']) if (statSync(file).size < 1e3) throw new Error(file + ' is missing or empty')\""
   },
   "devDependencies": {
-    "@zip.js/zip.js": "^2.23.0"
+    "@zip.js/zip.js": "^2.24.0"
   },
   "engines": {
     "node": ">=20"

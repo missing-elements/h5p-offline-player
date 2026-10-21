@@ -49,7 +49,7 @@
     "types": "node -e \"require('node:fs').rmSync('types', { recursive: true, force: true })\" && tsc -p tsconfig.types.json"
   },
   "dependencies": {
-    "@zip.js/zip.js": "^2.23.0"
+    "@zip.js/zip.js": "^2.24.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
