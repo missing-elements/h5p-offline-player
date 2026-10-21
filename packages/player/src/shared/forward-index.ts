@@ -23,7 +23,7 @@
  * normalisation as everything else, and the snapshot is replaced by the real index once the whole
  * archive is present.
  */
-import { LOCAL_HEADER_FIXED_SIZE, LOCAL_HEADER_SIGNATURE } from './local-header'
+import { LOCAL_HEADER_FIXED_SIZE, LOCAL_HEADER_SIGNATURE } from './local-header.js'
 
 
 export interface ForwardEntry {

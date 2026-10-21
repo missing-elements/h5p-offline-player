@@ -8,10 +8,10 @@ import {
   STREAM_KEEPALIVE_MS,
   VERSION,
   WATERMARK_POLL_MS
-} from '../shared/constants'
-import { PACK_INDEX } from '../shared/pack-index'
-import { packLibrariesIn } from '../shared/pack'
-import { planPack } from './pack-plan'
+} from '../shared/constants.js'
+import { PACK_INDEX } from '../shared/pack-index.js'
+import { packLibrariesIn } from '../shared/pack.js'
+import { planPack } from './pack-plan.js'
 import {
   ChunkStore,
   FORWARD_INDEX_ENTRY,
@@ -21,10 +21,10 @@ import {
   onWatermark,
   type ChunkMeta,
   type EntryFailure
-} from '../shared/chunk-store'
-import { installEvictionPolicy } from '../shared/eviction'
-import { normalizeRequestPath } from '../shared/entry-names'
-import { contentTypeOf } from '../shared/mime'
+} from '../shared/chunk-store.js'
+import { installEvictionPolicy } from '../shared/eviction.js'
+import { normalizeRequestPath } from '../shared/entry-names.js'
+import { contentTypeOf } from '../shared/mime.js'
 import {
   PlayerError,
   type FromWorkerMessage,
@@ -35,18 +35,18 @@ import {
   type PackageRecord,
   type ToWorkerMessage,
   type WorkerReply
-} from '../shared/protocol'
-import { contentRange, parseRange, type ByteRange } from '../shared/range'
-import { openSource } from '../shared/source'
-import * as db from '../shared/idb'
-import { type IndexedEntry, type LocatedEntry, PackageReader, dependenciesIn, explainMissingLibraries, libraryFolderNames, locationOf } from './package-reader'
-import { libraryLoad, walkLibraries } from './library-load'
-import { STORED } from '../shared/local-header'
-import { CONTENT_CHECK_HEADER, buildFrameDocument, createNonce } from './frame-document'
-import { loadSegment, matchRoute, routesFor, type LoadRef, type RouteMatch, type Routes } from './routes'
-import { sliceStream } from '../shared/stream-utils'
-import { waitForWatermark } from './watermark-wait'
-import { quotaMessage } from '../shared/storage'
+} from '../shared/protocol.js'
+import { contentRange, parseRange, type ByteRange } from '../shared/range.js'
+import { openSource } from '../shared/source.js'
+import * as db from '../shared/idb.js'
+import { type IndexedEntry, type LocatedEntry, PackageReader, dependenciesIn, explainMissingLibraries, libraryFolderNames, locationOf } from './package-reader.js'
+import { libraryLoad, walkLibraries } from './library-load.js'
+import { STORED } from '../shared/local-header.js'
+import { CONTENT_CHECK_HEADER, buildFrameDocument, createNonce } from './frame-document.js'
+import { loadSegment, matchRoute, routesFor, type LoadRef, type RouteMatch, type Routes } from './routes.js'
+import { sliceStream } from '../shared/stream-utils.js'
+import { waitForWatermark } from './watermark-wait.js'
+import { quotaMessage } from '../shared/storage.js'
 
 /**
  * The Service Worker half of the player: a virtual file server over a zip that is never

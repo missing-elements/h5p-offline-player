@@ -1,4 +1,4 @@
-import type { LibrarySource } from './protocol'
+import type { LibrarySource } from './protocol.js'
 
 /**
  * The `libraries` attribute: `pack` or a URL, or several separated by whitespace, in order.

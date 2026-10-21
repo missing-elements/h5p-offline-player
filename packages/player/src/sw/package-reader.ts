@@ -1,8 +1,8 @@
 import { ZipReader, type Entry, type FileEntry } from '@zip.js/zip.js'
-import { INLINE_MAX_SIZE, MEDIA_INLINE_MAX_SIZE, WARM_ENTRY_MAX_SIZE, WARM_GAP, WARM_MAX_BYTES } from '../shared/constants'
-import { indexEntryNames, normalizeEntryName } from '../shared/entry-names'
-import { extensionOf, isMediaEntry, isTextEntry } from '../shared/mime'
-import { DEFLATE, LOCAL_HEADER_FIXED_SIZE, STORED, readDataStart } from '../shared/local-header'
+import { INLINE_MAX_SIZE, MEDIA_INLINE_MAX_SIZE, WARM_ENTRY_MAX_SIZE, WARM_GAP, WARM_MAX_BYTES } from '../shared/constants.js'
+import { indexEntryNames, normalizeEntryName } from '../shared/entry-names.js'
+import { extensionOf, isMediaEntry, isTextEntry } from '../shared/mime.js'
+import { DEFLATE, LOCAL_HEADER_FIXED_SIZE, STORED, readDataStart } from '../shared/local-header.js'
 import {
   PlayerError,
   type EntryLocation,
@@ -10,15 +10,15 @@ import {
   type PrefetchEntry,
   type WarmEntry,
   type WarmSpan
-} from '../shared/protocol'
-import type { SourceHandle } from '../shared/source'
-import { SourceReader } from '../shared/source-reader'
-import type { ByteRange } from '../shared/range'
-import { deferredStream, inflated } from '../shared/stream-utils'
-import type { ForwardEntry, ForwardIndexSnapshot } from '../shared/forward-index'
-import { indexFingerprint, librariesFingerprint, revisionOf } from '../shared/revision'
-import { contentMetadata, type ContentMetadata } from '../shared/metadata'
-import type { OwnLibrary } from './pack-plan'
+} from '../shared/protocol.js'
+import type { SourceHandle } from '../shared/source.js'
+import { SourceReader } from '../shared/source-reader.js'
+import type { ByteRange } from '../shared/range.js'
+import { deferredStream, inflated } from '../shared/stream-utils.js'
+import type { ForwardEntry, ForwardIndexSnapshot } from '../shared/forward-index.js'
+import { indexFingerprint, librariesFingerprint, revisionOf } from '../shared/revision.js'
+import { contentMetadata, type ContentMetadata } from '../shared/metadata.js'
+import type { OwnLibrary } from './pack-plan.js'
 
 /**
  * The package reader: a zip central directory turned into a name → entry index, plus the decision

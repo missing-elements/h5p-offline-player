@@ -1,6 +1,6 @@
-import { setEvictionListener, setEvictionPolicy } from './chunk-store'
-import * as db from './idb'
-import { busyPackages } from './locks'
+import { setEvictionListener, setEvictionPolicy } from './chunk-store.js'
+import * as db from './idb.js'
+import { busyPackages } from './locks.js'
 
 /**
  * Which package a quota squeeze may drop: the coldest by `lastPlayed` that is neither the one

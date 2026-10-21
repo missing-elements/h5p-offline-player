@@ -12,5 +12,8 @@
     "types": ["vite/client", "node"]
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"],
+  // The published declarations as a caller sees them, beside the source they were written from,
+  // would be two of every type: tsconfig.consumer.json checks it on its own.
+  "exclude": ["tests/package-types.ts"],
   "references": []
 }

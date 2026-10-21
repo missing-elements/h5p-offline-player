@@ -1,7 +1,7 @@
-import { SEGMENT_CONCURRENCY, SEGMENT_MIN_SPAN, SEGMENT_SIZE } from './constants'
-import type { ByteRange } from './range'
-import type { SourceHandle } from './source'
-import { deferredStream } from './stream-utils'
+import { SEGMENT_CONCURRENCY, SEGMENT_MIN_SPAN, SEGMENT_SIZE } from './constants.js'
+import type { ByteRange } from './range.js'
+import type { SourceHandle } from './source.js'
+import { deferredStream } from './stream-utils.js'
 
 /**
  * How a span of the archive is pulled: one ranged request, or several at once when the span is

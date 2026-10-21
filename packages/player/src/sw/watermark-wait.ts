@@ -1,5 +1,5 @@
-import { COLD_ENTRY_WAIT_MS, WATERMARK_POLL_MS } from '../shared/constants'
-import { onWatermark, type ChunkMeta, type ChunkStore } from '../shared/chunk-store'
+import { COLD_ENTRY_WAIT_MS, WATERMARK_POLL_MS } from '../shared/constants.js'
+import { onWatermark, type ChunkMeta, type ChunkStore } from '../shared/chunk-store.js'
 
 /**
  * Waits until the entry has at least `needed` bytes, is complete, or carries a recorded failure.

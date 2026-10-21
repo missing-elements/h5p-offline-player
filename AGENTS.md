@@ -93,6 +93,8 @@ packages/player/          @missing-elements/h5p-offline-player — the published
                             utils.ts its helpers — play and settle, waitForEvent with a filter, inject,
                             the fixture's message and button — which a test uses rather than retyping
   tests/fixtures/src/       the source of the generated .h5p archives
+  tests/package-types.ts    the published declarations as a caller on `nodenext` sees them, checked by
+                            tsconfig.consumer.json (see *Types for the plain-JS packages*)
   public/                   generated, not in git: the runtime's dist/ as frame-assets/, and the test fixtures
   NOTICE.md                 zip.js's notice, and where the runtime went; shipped with the package
 
@@ -1729,12 +1731,20 @@ went; `typecheck` and `prepack` both run it. Three things learned writing them, 
   `types` condition. Without `types/`, TypeScript falls back to the JavaScript through `default`
   and finds the internal helper, so the file's `@ts-expect-error` on that import fails: the check
   cannot pass on anything but the published declarations.
-- **The player's own declarations lose types under `nodenext`**: its `types/` imports its sibling
-  files without extensions (`./shared/protocol`), which `node16`/`nodenext` resolution cannot
-  follow, so with `skipLibCheck` what comes through them — `PlayerErrorDetail['code']`,
-  `missingLibraries`, `ReadyDetail['source']` — is `any`. Found on 2026-10-21 installing the
-  packed tarballs into a fresh project: under `bundler` resolution everything is typed, and the
-  verifier's and embed's own types are complete either way. Not fixed here; it is the player's.
+- **The player's relative imports name their file, `./shared/protocol.js`**, as cmi5's do.
+  `tsc` copies a specifier into the declarations as written, and `node16`/`nodenext` resolution
+  follows only one that names its file, so up to 1.1.0 what came through `types/`'s own imports —
+  `PlayerErrorDetail['code']`, `missingLibraries`, `ReadyDetail['source']` — was `any` to such a
+  caller with `skipLibCheck`, and an error without it; under `bundler` everything was typed.
+  Found on 2026-10-21 installing the packed tarballs into a fresh project, and fixed in #65.
+  Vite and esbuild take `.js` to the `.ts` beside it, so the bundles are the same code (only the
+  minifier's names moved, since it picks them by the source's character frequency).
+  `tests/package-types.ts` is the player's check, compiled by `tsconfig.consumer.json` on
+  `nodenext` with `skipLibCheck` off — `skipDefaultLibCheck` on, since the DOM and WebWorker libs
+  clash when checked together — and kept out of `tsconfig.test.json`, where the source's
+  `H5PPlayerElement` would meet the declarations' one. `sync-h5p-assets` writes the `.js` into
+  the generated `pack-index.ts` too. The player's bundler resolution says nothing about a new
+  import without one: the check catches it only where the public types reach it.
 
 ## The content-type sweep
 

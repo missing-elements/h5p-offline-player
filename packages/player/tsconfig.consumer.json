@@ -1,0 +1,17 @@
+{
+  // tests/package-types.ts as a caller on `nodenext` compiles it, against `types/` alone: run
+  // after `tsc -b` has written them. `skipLibCheck` off, so a declaration that names a module
+  // the caller cannot resolve is an error here rather than an `any` there.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
+    "types": [],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": false,
+    "skipDefaultLibCheck": true
+  },
+  "files": ["tests/package-types.ts"]
+}

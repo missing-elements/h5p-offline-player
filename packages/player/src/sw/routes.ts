@@ -5,7 +5,7 @@
  * base.
  */
 
-import { LOAD_KEY_BYTES, PKG_ID_LENGTH } from '../shared/pkg-id'
+import { LOAD_KEY_BYTES, PKG_ID_LENGTH } from '../shared/pkg-id.js'
 
 export interface Routes {
   /** Absolute URL prefix, always ending in `h5p/`. */

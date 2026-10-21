@@ -1,7 +1,7 @@
-import { randomHex } from '../shared/pkg-id'
-import type { FrameAssets, FrameFont, FrameOptions } from '../shared/protocol'
-import { contentMetadata, type ContentMetadata } from '../shared/metadata'
-import { isEnglish, LANGUAGE_TAG } from '../shared/language'
+import { randomHex } from '../shared/pkg-id.js'
+import type { FrameAssets, FrameFont, FrameOptions } from '../shared/protocol.js'
+import { contentMetadata, type ContentMetadata } from '../shared/metadata.js'
+import { isEnglish, LANGUAGE_TAG } from '../shared/language.js'
 
 /**
  * The frame document, generated per request. H5P core assumes it owns the page — it plants
