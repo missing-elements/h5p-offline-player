@@ -6,6 +6,8 @@ import { basename, dirname, extname, join, normalize, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium, errors as playwrightErrors } from 'playwright-core'
 
+/** @import { H5PPlayerElement, PlayerErrorDetail, PlayerState, RefreshedLibrary } from '@missing-elements/h5p-offline-player' */
+
 /**
  * Plays a package the way a learner would — the real element, the real Service Worker, a real
  * browser — and reports what happened. The package is handed to the element as a picked file,
@@ -31,6 +33,7 @@ const CHECK_NOTES = "<h5p-player>: the content was checked against its libraries
 /** The header the Service Worker wants before it hands an untrusted package's `content.json` over as written. */
 const CONTENT_CHECK_HEADER = 'X-H5P-Content-Check'
 
+/** @type {Record<string, string>} */
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -63,9 +66,83 @@ const MIME = {
  */
 
 /**
+ * What `verifyPackage` found, as `report.json` holds it. Fields may be added in a minor release,
+ * none taken away or changed (docs/compatibility.md).
+ * @typedef {object} VerifyReport
+ * @property {string} tool `h5p-verify` and its version
+ * @property {string} file the package, as an absolute path
+ * @property {number} size its size in bytes
+ * @property {string | null} libraries the libraries asked for; `pack` when played untrusted and none were named
+ * @property {boolean} untrusted whether the element played it untrusted, read back from it
+ * @property {RefreshedLibrary[]} refreshed the libraries the package carries that played at the pack's newer version
+ * @property {'pass' | 'fail'} verdict
+ * @property {string[]} reasons why it failed; empty on a pass
+ * @property {string[]} warnings what is worth reading either way
+ * @property {PlayerState} state the element's state when the check ended
+ * @property {number | null} readyMs from handing the file over to `ready`, in ms
+ * @property {string | null} revision the build, as the element stamps it on every statement
+ * @property {ReportedError[]} errors every error the element reported
+ * @property {RenderedContent | null} rendered what the content drew; `null` when the frame could not be measured
+ * @property {(string | null)[]} xapi the verbs of the statements the content sent, each once
+ * @property {BlockedLoad[]} csp what the frame's policy blocked
+ * @property {FailedRequest[]} failedRequests requests to the player's own server that failed
+ * @property {string[]} console console errors not already among `errors`, the first twenty
+ * @property {ContentCheck | null} contentCheck played untrusted: what the content check changed
+ * @property {string | null} screenshot where `screenshot.png` was written, with `out` and a package that reached `ready`
+ */
+
+/**
+ * An `error` event of the element.
+ * @typedef {object} ReportedError
+ * @property {PlayerErrorDetail['code']} code
+ * @property {string} message
+ * @property {PlayerErrorDetail['missingLibraries'] | null} missingLibraries
+ * @property {boolean} afterReady whether the content was up: an error then leaves it running
+ */
+
+/**
+ * @typedef {object} RenderedContent
+ * @property {number} height of the content, in CSS pixels
+ * @property {number} elements in the content's root
+ * @property {number} text characters of text in it
+ * @property {number | null} instances the H5P instances the runtime made
+ */
+
+/**
+ * @typedef {object} BlockedLoad
+ * @property {string} directive the frame's CSP directive that refused it
+ * @property {string} blocked what it refused
+ */
+
+/**
+ * @typedef {object} FailedRequest
+ * @property {string} url the path asked for
+ * @property {number} [status] the HTTP status, for an answer of 400 or more
+ * @property {string} [error] the browser's reason, for a request that got no answer
+ */
+
+/**
+ * @typedef {object} ContentCheck
+ * @property {string[]} notes what the runtime's content check wrote that it changed
+ * @property {ContentChange[] | null} changes the content as played against the package's own; `null` when they could not be compared
+ */
+
+/**
+ * @typedef {object} ContentChange
+ * @property {string} path the field, as a JSON path; empty for the content as a whole
+ * @property {string} change what happened to it
+ */
+
+/**
  * @param {VerifyOptions} options
+ * @returns {Promise<VerifyReport>}
  */
 export async function verifyPackage(options) {
+  /**
+   * What `page.html` keeps of the element's events, read back from the page.
+   * @typedef {{ started: number | null, states: { state: PlayerState, at: number }[], errors: (ReportedError & { at: number })[], xapi: (string | null)[] }} PageReport
+   * @typedef {Window & typeof globalThis & { __verify: PageReport, __csp?: BlockedLoad[], H5P?: { instances?: unknown[] }, H5PIntegration?: { contents?: Record<string, { jsonContent?: unknown }> } }} PageWindow
+   */
   const file = resolve(options.file)
   let size
   try {
@@ -87,6 +164,7 @@ export async function verifyPackage(options) {
     // Runs in every document, the frame included: a CSP violation fires an event in the document
     // it happens in, and nothing else reports it.
     await context.addInitScript(() => {
+      /** @type {BlockedLoad[]} */
       const list = []
       Object.defineProperty(window, '__csp', { value: list })
       document.addEventListener('securitypolicyviolation', (event) => {
@@ -95,8 +173,11 @@ export async function verifyPackage(options) {
     })
     const page = await context.newPage()
 
+    /** @type {string[]} */
     const consoleErrors = []
+    /** @type {FailedRequest[]} */
     const failedRequests = []
+    /** @type {string[]} */
     const checkNotes = []
     page.on('console', (message) => {
       // The content check's own account of what it changed, one note to a line.
@@ -131,7 +212,7 @@ export async function verifyPackage(options) {
 
     let timedOut = false
     await page
-      .waitForFunction(() => window.__verify.states.some((s) => s.state === 'ready' || s.state === 'error'), null, { timeout: readyTimeout })
+      .waitForFunction(() => /** @type {PageWindow} */ (window).__verify.states.some((s) => s.state === 'ready' || s.state === 'error'), null, { timeout: readyTimeout })
       .catch((error) => {
         // Only the time running out says something about the package. A browser that crashed
         // or a page that went away is the check failing to run, and is reported as that.
@@ -143,27 +224,34 @@ export async function verifyPackage(options) {
     if (!timedOut) await page.waitForTimeout(settle)
 
     const collected = await page.evaluate(() => {
-      const player = document.querySelector('h5p-player')
-      return { ...window.__verify, state: player.state, revision: player.revision, untrusted: player.untrusted === true, libraryBundle: player.libraryBundle }
+      const player = /** @type {H5PPlayerElement} */ (document.querySelector('h5p-player'))
+      return {
+        .../** @type {PageWindow} */ (window).__verify,
+        state: player.state,
+        revision: player.revision,
+        untrusted: player.untrusted === true,
+        libraryBundle: player.libraryBundle
+      }
     })
     const frame = page.frames().find((candidate) => candidate.url().includes('/h5p/frame/'))
     const rendered = frame
       ? await frame
           .evaluate(() => {
-            const root = document.querySelector('#h5p-root')
+            const root = /** @type {HTMLElement | null} */ (document.querySelector('#h5p-root'))
             const rect = root?.getBoundingClientRect()
             return {
               height: rect ? Math.round(rect.height) : 0,
               elements: root ? root.querySelectorAll('*').length : 0,
               text: (root?.innerText ?? '').trim().length,
-              instances: window.H5P?.instances?.length ?? null
+              instances: /** @type {PageWindow} */ (window).H5P?.instances?.length ?? null
             }
           })
           // A frame that has navigated away, or was never reachable, has nothing to measure:
           // the verdict rules read that as nothing drawn.
           .catch(() => null)
       : null
-    const csp = frame ? await frame.evaluate(() => window.__csp ?? []).catch(() => []) : []
+    /** @type {BlockedLoad[]} */
+    const csp = frame ? await frame.evaluate(() => /** @type {PageWindow} */ (window).__csp ?? []).catch(() => []) : []
     // Untrusted, the package's `content.json` beside what the runtime was handed: the Service
     // Worker gives the file as written to a request that names the check, and the boot script
     // leaves the checked parameters in `H5PIntegration`.
@@ -172,7 +260,7 @@ export async function verifyPackage(options) {
         ? await frame
             .evaluate(async (header) => {
               const config = JSON.parse(document.getElementById('h5p-boot-config')?.textContent ?? 'null')
-              const content = Object.values(window.H5PIntegration?.contents ?? {})[0]
+              const content = Object.values(/** @type {PageWindow} */ (window).H5PIntegration?.contents ?? {})[0]
               if (!config?.h5pJsonPath || typeof content?.jsonContent !== 'string') return null
               const response = await fetch(`${config.h5pJsonPath}/content/content.json`, { headers: { [header]: 'semantics' } })
               return response.ok ? { written: await response.text(), checked: content.jsonContent } : null
@@ -188,6 +276,7 @@ export async function verifyPackage(options) {
     }
 
     const ready = collected.states.find((s) => s.state === 'ready')
+    /** @type {VerifyReport} */
     const report = {
       tool: `h5p-verify ${version}`,
       file,
@@ -308,19 +397,31 @@ function librarySources(value) {
  * of the markup it strips. The content upgrade runs first and can move fields too, when the
  * libraries served are newer than the ones the content was written for; a change that is not
  * markup may be its.
+ * @internal
  * @param {unknown} written
  * @param {unknown} played
- * @returns {{ path: string, change: string }[]}
+ * @returns {ContentChange[]}
  */
 export function contentChanges(written, played) {
-  /** @type {{ path: string, change: string }[]} */
+  /** @type {ContentChange[]} */
   const changes = []
+  /**
+   * @param {unknown} value
+   * @returns {value is Record<string, unknown>}
+   */
   const isContainer = (value) => value !== null && typeof value === 'object'
+  /** @param {unknown} value */
   const isEmpty = (value) => value === '' || (isContainer(value) && Object.keys(value).length === 0)
+  /** @param {unknown} value */
   const show = (value) => {
     const text = JSON.stringify(value) ?? String(value)
     return text.length > 40 ? `${text.slice(0, 40)}…` : text
   }
+  /**
+   * @param {unknown} a
+   * @param {unknown} b
+   * @param {string} path
+   */
   const walk = (a, b, path) => {
     if (a === b) return
     if (typeof a === 'string' && typeof b === 'string') {
@@ -330,7 +431,7 @@ export function contentChanges(written, played) {
       return
     }
     if (isContainer(a) && isContainer(b) && Array.isArray(a) === Array.isArray(b)) {
-      if (Array.isArray(a) && a.length !== b.length) {
+      if (Array.isArray(a) && Array.isArray(b) && a.length !== b.length) {
         // Items cannot be paired once one is gone, so the list is reported whole.
         const gone = a.length - b.length
         changes.push({ path, change: gone > 0 ? `${gone} of ${a.length} items removed` : `${-gone} items added` })
@@ -361,15 +462,24 @@ export function contentChanges(written, played) {
  * @param {string} after
  */
 function lostMarkup(before, after) {
+  /**
+   * @param {string[]} names
+   * @returns {Map<string, number>}
+   */
   const counted = (names) => names.reduce((map, name) => map.set(name, (map.get(name) ?? 0) + 1), new Map())
+  /** @param {string} tag */
   const tagName = (tag) => /^<([a-z][a-z0-9]*)/i.exec(tag)?.[1].toLowerCase() ?? ''
+  /** @param {string} html */
   const tags = (html) => counted([...html.matchAll(/<([a-z][a-z0-9]*)\b/gi)].map((match) => match[1].toLowerCase()))
   // Attributes and styles are counted on the kinds of tag that are still there, so a tag removed
   // whole is reported once, as a tag, and not again through everything it carried.
   const kept = tags(after)
+  /** @param {string} html */
   const openings = (html) => openingTags(html).filter((tag) => kept.has(tagName(tag)))
+  /** @param {string} html */
   const attributes = (html) =>
     counted(openings(html).flatMap((tag) => [...tag.slice(1).matchAll(/\s([a-z][a-z0-9:-]*)\s*=/gi)].map((match) => match[1].toLowerCase())))
+  /** @param {string} html */
   const styles = (html) =>
     counted(
       openings(html).flatMap((tag) =>
@@ -378,10 +488,20 @@ function lostMarkup(before, after) {
         )
       )
     )
-  /** Each name `before` has more of than `after`, with how many more. */
+  /**
+   * Each name `before` has more of than `after`, with how many more.
+   * @param {Map<string, number>} before
+   * @param {Map<string, number>} after
+   * @returns {[string, number][]}
+   */
   const lost = (before, after) =>
     [...before].flatMap(([name, count]) => (count > (after.get(name) ?? 0) ? [[name, count - (after.get(name) ?? 0)]] : []))
+  /**
+   * @param {[string, number][]} pairs
+   * @param {(name: string) => string} [shown]
+   */
   const listed = (pairs, shown = (name) => name) => pairs.map(([name, gone]) => (gone > 1 ? `${shown(name)} ×${gone}` : shown(name))).join(', ')
+  /** @type {string[]} */
   const parts = []
   const tagsLost = lost(tags(before), tags(after))
   if (tagsLost.length) parts.push(`markup removed: ${listed(tagsLost, (name) => `<${name}>`)}`)
@@ -400,6 +520,7 @@ function lostMarkup(before, after) {
  * @param {string} html
  */
 function openingTags(html) {
+  /** @type {string[]} */
   const found = []
   for (let start = html.indexOf('<'); start !== -1; start = html.indexOf('<', start + 1)) {
     if (!/[a-z]/i.test(html[start + 1] ?? '')) continue
@@ -411,8 +532,12 @@ function openingTags(html) {
   return found
 }
 
-/** The distinct messages, each with how often it occurred: `… (×4)`. */
+/**
+ * The distinct messages, each with how often it occurred: `… (×4)`.
+ * @param {string[]} messages
+ */
 function dedupe(messages) {
+  /** @type {Map<string, number>} */
   const counts = new Map()
   for (const message of messages) counts.set(message, (counts.get(message) ?? 0) + 1)
   return [...counts].map(([message, count]) => (count > 1 ? `${message} (×${count})` : message))
@@ -442,12 +567,17 @@ async function playerDist() {
  * @param {{ dist: string, runtime: string }} roots
  * @param {Map<string, string>} bundles routes to bundle files
  * @param {string | null} packDir a copy of the pack's `parts/`, served under `PACK_ROUTE`
+ * @returns {Promise<{ url: string, close: () => void }>}
  */
 function serve({ dist, runtime }, bundles = new Map(), packDir = null) {
   const page = join(here, 'page.html')
   const ASSETS = '/frame-assets/'
   const server = createServer(async (request, response) => {
     const path = decodeURIComponent(new URL(request.url ?? '/', 'http://localhost').pathname)
+    /**
+     * @param {string} root
+     * @param {string} rest
+     */
     const safe = (root, rest) => join(root, normalize(rest).replace(/^(\.\.[/\\])+/, ''))
     const bundle = bundles.get(path)
     const inPack = packDir !== null && path.startsWith(PACK_ROUTE)
@@ -481,11 +611,14 @@ function serve({ dist, runtime }, bundles = new Map(), packDir = null) {
 /**
  * A Chromium: the one named, else Chrome or Edge installed on the machine, else Playwright's
  * own. Chrome and Edge first because they are usually there and cost no download.
+ * @param {string | undefined} executablePath
  */
 async function launch(executablePath) {
+  /** @type {import('playwright-core').LaunchOptions[]} */
   const attempts = executablePath
     ? [{ executablePath }]
     : [{ channel: 'chrome' }, { channel: 'msedge' }, {}]
+  /** @type {string[]} */
   const failures = []
   for (const attempt of attempts) {
     try {
@@ -500,7 +633,11 @@ async function launch(executablePath) {
   )
 }
 
-/** A one-line, human-readable account of a report, for the command and for logs. */
+/**
+ * A one-line, human-readable account of a report, for the command and for logs.
+ * @param {VerifyReport} report
+ * @returns {string}
+ */
 export function summarize(report) {
   const name = basename(report.file)
   const took = report.readyMs !== null ? `ready in ${(report.readyMs / 1000).toFixed(2)} s` : `state ${report.state}`

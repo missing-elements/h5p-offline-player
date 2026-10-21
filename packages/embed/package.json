@@ -20,8 +20,14 @@
     "h5p-embed": "./bin/h5p-embed.mjs"
   },
   "exports": {
-    ".": "./lib/build.mjs",
-    "./embed.js": "./site/embed.js",
+    ".": {
+      "types": "./types/lib/build.d.mts",
+      "default": "./lib/build.mjs"
+    },
+    "./embed.js": {
+      "types": "./types/site/embed.d.ts",
+      "default": "./site/embed.js"
+    },
     "./embed.css": "./site/embed.css",
     "./resizer.js": "./site/resizer.js",
     "./package.json": "./package.json"
@@ -29,7 +35,8 @@
   "files": [
     "bin",
     "lib",
-    "site"
+    "site",
+    "types"
   ],
   "keywords": [
     "h5p",
@@ -44,9 +51,10 @@
   ],
   "scripts": {
     "test": "pnpm --filter @missing-elements/h5p-offline-player build && vitest run",
-    "typecheck": "tsc -p tsconfig.json",
-    "prepack": "node -e \"require('node:fs').copyFileSync('../../LICENSE', 'LICENSE')\"",
-    "prepublishOnly": "node -e \"if (!/^pnpm\\//.test(process.env.npm_config_user_agent || '')) { console.error('Publish with pnpm publish: npm would ship the workspace:^ dependency ranges as they are, and the package would not install.'); process.exit(1) }\" && pnpm typecheck && pnpm test"
+    "typecheck": "pnpm types && tsc -p tsconfig.json",
+    "prepack": "node -e \"require('node:fs').copyFileSync('../../LICENSE', 'LICENSE')\" && pnpm types",
+    "prepublishOnly": "node -e \"if (!/^pnpm\\//.test(process.env.npm_config_user_agent || '')) { console.error('Publish with pnpm publish: npm would ship the workspace:^ dependency ranges as they are, and the package would not install.'); process.exit(1) }\" && pnpm typecheck && pnpm test",
+    "types": "node -e \"require('node:fs').rmSync('types', { recursive: true, force: true })\" && tsc -p tsconfig.types.json"
   },
   "dependencies": {
     "@missing-elements/h5p-libraries": "workspace:^",

@@ -88,6 +88,7 @@ const CONTROL_CHARS = /[\u0000-\u001f\u007f]/
 
 /**
  * The form an entry of this name should end up in.
+ * @internal
  * @param {string} name
  * @returns {TargetForm}
  */
@@ -109,6 +110,7 @@ function extensionOf(name) {
  * The same rule the player applies: the canonical form of a zip entry name, or `null` where
  * the name cannot be a plain relative path under the package root. Such an entry is dropped
  * rather than repaired, because the player would refuse it anyway.
+ * @internal
  * @param {string} raw
  */
 export function plainRelativeName(raw) {
@@ -130,6 +132,7 @@ export function plainRelativeName(raw) {
  * media last. Library folders are kept intact rather than having their images pulled to the
  * end: the player treats a folder as complete once a later folder has begun, and a straggler
  * would then be reported missing.
+ * @internal
  *
  * @template {{ name: string, target: TargetForm }} T
  * @param {T[]} entries in source order
@@ -195,7 +198,7 @@ export async function normalizeArchive({ input, output, onEntry }) {
 
     /** @type {Report['dropped']} */
     const dropped = { directories: 0, rejected: [] }
-    /** @type {Array<{ entry: import('@zip.js/zip.js').Entry, name: string, target: TargetForm }>} */
+    /** @type {Array<{ entry: import('@zip.js/zip.js').FileEntry, name: string, target: TargetForm }>} */
     const planned = []
     const seen = new Set()
     for (const entry of all) {
@@ -269,7 +272,7 @@ export async function normalizeArchive({ input, output, onEntry }) {
 }
 
 /**
- * @param {{ entry: import('@zip.js/zip.js').Entry, name: string, target: TargetForm }} item
+ * @param {{ entry: import('@zip.js/zip.js').FileEntry, name: string, target: TargetForm }} item
  * @param {{ source: import('node:fs/promises').FileHandle, tempDir: string, writer: StreamingZipWriter | null, index: number }} context
  * @returns {Promise<EntryResult>}
  */
@@ -281,10 +284,10 @@ async function processEntry({ entry, name, target }, { source, tempDir, writer, 
   const dosDateTime = typeof entry.rawLastModDate === 'number' ? entry.rawLastModDate : undefined
   const base = { name, size, target, from }
 
-  /** @param {string} [warning] */
   /** The header of this entry stored as it is, byte for byte: the source's own size and CRC. */
   const storedMeta = { name, method: STORE, crc32: entry.signature ?? 0, compressedSize: size, uncompressedSize: size, dosDateTime }
 
+  /** @param {string} [warning] */
   const copyRaw = async (warning) => {
     await writer?.add(
       {
@@ -413,7 +416,10 @@ async function pump(chunks, sink) {
   }
 }
 
-/** Opens the finished archive the way any reader would, and counts what it lists. */
+/**
+ * Opens the finished archive the way any reader would, and counts what it lists.
+ * @param {string} path
+ */
 async function verifyArchive(path) {
   const blob = await openAsBlob(path)
   const reader = new ZipReader(new BlobReader(blob))

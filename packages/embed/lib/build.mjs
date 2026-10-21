@@ -23,7 +23,11 @@ const PAGE_FILES = ['embed.js', 'embed.css', 'main.js', 'resizer.js']
 /** The player's files, by the names the element looks for beside itself. */
 const PLAYER_FILES = ['h5p-player.js', 'h5p-sw.js', 'h5p-jobs.js']
 
-/** Where an installed package's file is, or a message that says which one is missing. */
+/**
+ * Where an installed package's file is, or a message that says which one is missing.
+ * @param {string} specifier
+ * @param {string} hint
+ */
 function installed(specifier, hint) {
   try {
     return require.resolve(specifier)
@@ -39,6 +43,9 @@ function installed(specifier, hint) {
  * CSP host is, letters, digits and hyphens between dots: the URL parser takes `*`, `;` and `"` in
  * a host, and a wildcard would allow what the page then refuses, by exact origin, on every load,
  * while a quote would end the policy in the files that quote it (#58).
+ * @internal
+ * @param {string} value
+ * @returns {string}
  */
 export function parseOrigin(value) {
   let url
@@ -65,6 +72,7 @@ const PACK_CDN_ORIGIN = 'https://cdn.jsdelivr.net'
  * A `libraries` value for addresses that name none, checked against the site it goes into: the
  * tokens the page understands (`pack`, `none`, https URLs), and with a host list, nothing
  * the page would then refuse on every load. Returns the value normalised to single spaces.
+ * @internal
  *
  * @param {string | null | undefined} value
  * @param {object} [site]
@@ -103,7 +111,12 @@ export function parseDefaultLibraries(value, { packages = null, libraries = true
   return tokens.join(' ')
 }
 
-/** Origins given as a list, or as one string separated by commas or whitespace. */
+/**
+ * Origins given as a list, or as one string separated by commas or whitespace.
+ * @internal
+ * @param {string[] | string | null | undefined} values
+ * @returns {string[] | null}
+ */
 export function parseOrigins(values) {
   if (values == null) return null
   const list = (Array.isArray(values) ? values : [values]).flatMap((value) => String(value).split(/[\s,]+/)).filter(Boolean)
@@ -117,6 +130,7 @@ export function parseOrigins(values) {
  * it — and names who may frame the page; without it any site may.
  */
 /**
+ * @internal
  * @param {object} [options]
  * @param {string[] | null} [options.packages]
  * @param {string[] | null} [options.ancestors]
@@ -140,7 +154,11 @@ export function contentSecurityPolicy({ packages = null, ancestors = null, meta 
   return directives.join('; ')
 }
 
-/** Header rules, one set for every host format: the policy everywhere, and the caching that matters. */
+/**
+ * Header rules, one set for every host format: the policy everywhere, and the caching that matters.
+ * @param {string} csp
+ * @returns {{ path: string, headers: Record<string, string> }[]}
+ */
 function headerRules(csp) {
   const revalidate = 'public, max-age=3600, stale-while-revalidate=86400'
   // Asked again on every load, a 304 when nothing changed. The runtime's files keep their names
@@ -167,13 +185,20 @@ function headerRules(csp) {
   ]
 }
 
-/** Netlify's and Cloudflare Pages' `_headers`. */
+/**
+ * Netlify's and Cloudflare Pages' `_headers`.
+ * @param {ReturnType<typeof headerRules>} rules
+ */
 function netlifyHeaders(rules) {
   return rules.map(({ path, headers }) => `${path}\n${Object.entries(headers).map(([key, value]) => `  ${key}: ${value}`).join('\n')}`).join('\n') + '\n'
 }
 
-/** Vercel's `vercel.json`, for deploying the folder as a project of its own. */
+/**
+ * Vercel's `vercel.json`, for deploying the folder as a project of its own.
+ * @param {ReturnType<typeof headerRules>} rules
+ */
 function vercelConfig(rules) {
+  /** @param {string} path */
   const source = (path) => (path === '/*' ? '/(.*)' : path.replace(/\*$/, '(.*)'))
   return JSON.stringify(
     { headers: rules.map(({ path, headers }) => ({ source: source(path), headers: Object.entries(headers).map(([key, value]) => ({ key, value })) })) },
@@ -190,13 +215,19 @@ function vercelConfig(rules) {
  * in every format, which is safe because the policy carries only single quotes.
  */
 
-/** The rule for every path, and the ones for a single path or prefix. */
+/**
+ * The rule for every path, and the ones for a single path or prefix.
+ * @param {ReturnType<typeof headerRules>} rules
+ */
 function splitRules(rules) {
-  const all = rules.find((rule) => rule.path === '/*')
+  const all = /** @type {ReturnType<typeof headerRules>[number]} */ (rules.find((rule) => rule.path === '/*'))
   return { all, specific: rules.filter((rule) => rule !== all) }
 }
 
-/** Caddy's `Caddyfile`: a site block to run as it is, or to paste into one. */
+/**
+ * Caddy's `Caddyfile`: a site block to run as it is, or to paste into one.
+ * @param {ReturnType<typeof headerRules>} rules
+ */
 function caddyfile(rules) {
   const { all, specific } = splitRules(rules)
   const lines = [
@@ -216,10 +247,13 @@ function caddyfile(rules) {
  * nginx: a file to `include` inside the `server` block that serves the folder. nginx's
  * `add_header` in a `location` replaces every `add_header` inherited from the server level
  * rather than adding to it, so each location repeats the headers that apply everywhere.
+ * @param {ReturnType<typeof headerRules>} rules
  */
 function nginxConf(rules) {
   const { all, specific } = splitRules(rules)
+  /** @param {[string, string]} entry */
   const header = ([key, value]) => `add_header ${key} "${value}" always;`
+  /** @param {string} path */
   const matcher = (path) => (path.endsWith('/*') ? `^~ ${path.slice(0, -1)}` : `= ${path}`)
   const lines = [
     '# Written by h5p-embed. Include this file inside the server block that serves the folder:',
@@ -235,10 +269,15 @@ function nginxConf(rules) {
   return lines.join('\n') + '\n'
 }
 
-/** Apache's `.htaccess`, for a folder under a vhost that allows it. */
+/**
+ * Apache's `.htaccess`, for a folder under a vhost that allows it.
+ * @param {ReturnType<typeof headerRules>} rules
+ */
 function htaccess(rules) {
   const { all, specific } = splitRules(rules)
+  /** @param {[string, string]} entry */
   const header = ([key, value]) => `Header always set ${key} "${value}"`
+  /** @param {ReturnType<typeof headerRules>[number]} rule */
   const block = ({ path, headers }) => {
     const body = Object.entries(headers).map((entry) => `\t${header(entry)}`).join('\n')
     // <Files> matches a name in any directory; a prefix needs the request URI, with no anchor at
@@ -256,6 +295,7 @@ function htaccess(rules) {
   return lines.join('\n') + '\n'
 }
 
+/** @param {{ version: string, libraries: boolean }} site */
 function notice({ version, libraries }) {
   return `This folder is the H5P embed page, written by @missing-elements/h5p-embed.
 
@@ -283,7 +323,10 @@ https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed
 `
 }
 
-/** Whether a directory exists and has anything in it. A path that is a file is an error. */
+/**
+ * Whether a directory exists and has anything in it. A path that is a file is an error.
+ * @param {string} dir
+ */
 async function occupied(dir) {
   let info
   try {
@@ -294,6 +337,19 @@ async function occupied(dir) {
   if (!info.isDirectory()) throw new EmbedError(`${dir} is a file, not a folder.`)
   return (await readdir(dir)).length > 0
 }
+
+/**
+ * What `buildSite` wrote, for a summary.
+ * @typedef {object} BuiltSite
+ * @property {string} out the folder, as an absolute path
+ * @property {string} version the player's version, as its `dist/VERSION` says
+ * @property {string} csp the policy the headers carry
+ * @property {boolean} libraries whether the site carries the library pack's parts
+ * @property {string[] | null} packages the origins packages may come from; `null` for any
+ * @property {string[] | null} ancestors the origins that may frame the page; `null` for any
+ * @property {string | null} defaultLibraries the `libraries` value for addresses that name none
+ * @property {number} size the folder's size in bytes
+ */
 
 /**
  * Writes the site into `out`. Refuses a folder that already has files in it unless `force`, and
@@ -307,6 +363,7 @@ async function occupied(dir) {
  * @param {string[] | string | null} [options.ancestors] the only origins that may frame the page
  * @param {string | null} [options.defaultLibraries] the `libraries` value for addresses that name none
  * @param {boolean} [options.force]
+ * @returns {Promise<BuiltSite>}
  */
 export async function buildSite({ out, libraries = true, packages = null, ancestors = null, defaultLibraries = null, force = false }) {
   if (!out) throw new EmbedError('No output folder given.')
@@ -372,6 +429,7 @@ export async function buildSite({ out, libraries = true, packages = null, ancest
 /**
  * The folder's size in bytes, for the summary. Paths from a recursive `readdir` rather than
  * `Dirent.parentPath`, which Node 20 has only from 20.12.
+ * @param {string} dir
  */
 async function sizeOf(dir) {
   let total = 0

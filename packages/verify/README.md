@@ -80,6 +80,8 @@ console.log(summarize(report))
 if (report.verdict !== 'pass') process.exit(1)
 ```
 
+TypeScript declarations ship with the package: `VerifyReport` is `report.json`'s shape.
+
 An [agent skill](https://agentskills.io) for it ships in the repository:
 `npx skills add missing-elements/h5p-offline-player --skill h5p-verify`.
 

@@ -88,7 +88,7 @@ What is covered of the pack itself: the `pack` export, `parts/` with its `index.
   [README](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#readme)
   lists them: what a snippet, or a page that reads `report`, is built on.
 - **`buildSite()`**, the command as a function, and **`startEmbed()`**, the page as one, with
-  their options; and `resizer.js`, which speaks H5P's own resizer protocol.
+  their options and their types; and `resizer.js`, which speaks H5P's own resizer protocol.
 
 A written site is a folder of copies and changes only when it is written again: upgrading is
 running the new version of the command and deploying the folder.
@@ -102,14 +102,15 @@ with the specification is a conformance fix.
 
 ### The normalizer, `@missing-elements/h5p-normalize`
 
-The command's options, and `normalizeArchive()`, `formatBytes()` and `archiveFingerprint()`. The
-content of a package it rewrites never changes. How it lays out the zip may change in a minor, as
+The command's options, and `normalizeArchive()`, `formatBytes()` and `archiveFingerprint()`, with
+their types. The content of a package it rewrites never changes. How it lays out the zip may change in a minor, as
 long as the player streams the result at least as well.
 
 ### The verifier, `@missing-elements/h5p-verify`
 
 The command's options, its exit codes — 0 plays, 1 does not, 2 could not run — `report.json`, to
-which fields may be added, and `verifyPackage()` and `summarize()`. The verifier is a step in other
+which fields may be added, and `verifyPackage()` and `summarize()`, with their types: `VerifyReport`
+is `report.json`'s shape, and gains fields the same way. The verifier is a step in other
 people's pipelines, so a check that turns a pass into a fail comes in a minor, never a patch; a new
 warning can come in any release.
 

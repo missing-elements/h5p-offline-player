@@ -145,12 +145,17 @@ packages/normalize/       @missing-elements/h5p-normalize — the package rewrit
   bin/h5p-normalize.mjs     the command
   lib/                      normalize.mjs (the policy), mp4-faststart.mjs (the remux), zip-writer.mjs,
                             crc32.mjs, format.mjs, fingerprint.mjs (the player's `indexFingerprint` for Node)
-  tests/                    node tests; tests/helpers/mp4.ts builds structurally honest mp4s
+  tests/                    node tests; tests/helpers/mp4.ts builds structurally honest mp4s;
+                            package-types.ts the package by its name as a TypeScript caller sees it
+  types/                    generated, not in git: the declarations, from the JSDoc (`pnpm types`;
+                            see *Types for the plain-JS packages*)
 
 packages/verify/          @missing-elements/h5p-verify — plays a package headless and reports whether it works
   bin/h5p-verify.mjs        the command
   lib/verify.mjs            the static server, the browser run and the report; lib/page.html the page it drives
-  tests/                    node tests that run the real thing against the demo's committed content
+  tests/                    node tests that run the real thing against the demo's committed content;
+                            package-types.ts as for the normalizer
+  types/                    generated, not in git: the declarations, `VerifyReport` among them
 
 packages/cmi5/            @missing-elements/h5p-cmi5 — cmi5 for the element, published as a library
   src/index.ts              startCmi5(player): the launch, the outcome, terminate; its pure parts
@@ -174,7 +179,9 @@ packages/embed/           @missing-elements/h5p-embed — the embed page as a st
                             page, the headers for five kinds of host and NOTICE.txt
   bin/h5p-embed.mjs         the command
   tests/                    build.test.ts, no browser; site.test.ts, a written site on 127.0.0.1
-                            framed by a page on localhost, as deployed
+                            framed by a page on localhost, as deployed; package-types.ts as for the
+                            normalizer
+  types/                    generated, not in git: the declarations of both entries
 
 apps/demo/                the demo app: the dev server for the whole repository, and the hosted site
   index.html                the hosted player page
@@ -1701,6 +1708,33 @@ checks them against the pack's, which follows the hub weekly.
 The tests need the player built (`pnpm build`); the package's `test` script does that first.
 The repository's own sweep does click through content and read its statements (next section),
 for packages it makes; the verifier, which is handed a stranger's, still does not.
+
+## Types for the plain-JS packages
+
+The normalizer, the verifier and the embed package are JavaScript with JSDoc, and since #60 their
+documented API ships with declarations generated from it: `tsconfig.json` checks `lib/` (and
+`site/embed.js`) with `checkJs`, `tsconfig.types.json` emits the entries' declarations into
+`types/` with `stripInternal`, and each `exports` entry names them under `types`. `pnpm types`
+writes them, deleting the folder first, since `tsc` never removes a declaration whose source
+went; `typecheck` and `prepack` both run it. Three things learned writing them, with TypeScript 7:
+
+- **A top-level `@typedef` is always exported**, and `@internal` on one does not strip it. Worse,
+  its comment counts among the leading comments of the next declaration, which `stripInternal`
+  then drops: an `@internal` typedef above a public function took the function out of the
+  declarations and left the typedef in. A type only the code needs is written inline, derived
+  (`ReturnType<typeof headerRules>`), or declared inside the function that uses it, where it is
+  local. `@internal` goes on functions and classes only: the helpers each entry exports for its
+  tests (`contentChanges`, `parseOrigin`, `orderEntries` and the rest).
+- **`tests/package-types.ts` imports the package by its own name**, so it resolves through the
+  `types` condition. Without `types/`, TypeScript falls back to the JavaScript through `default`
+  and finds the internal helper, so the file's `@ts-expect-error` on that import fails: the check
+  cannot pass on anything but the published declarations.
+- **The player's own declarations lose types under `nodenext`**: its `types/` imports its sibling
+  files without extensions (`./shared/protocol`), which `node16`/`nodenext` resolution cannot
+  follow, so with `skipLibCheck` what comes through them — `PlayerErrorDetail['code']`,
+  `missingLibraries`, `ReadyDetail['source']` — is `any`. Found on 2026-10-21 installing the
+  packed tarballs into a fresh project: under `bundler` resolution everything is typed, and the
+  verifier's and embed's own types are complete either way. Not fixed here; it is the player's.
 
 ## The content-type sweep
 
