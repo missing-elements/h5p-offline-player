@@ -96,113 +96,17 @@ script, and the worker always matches the element's version. For `libraries="pac
 beside them, and set `pack-base="/h5p-libraries/"`. On an upgrade, delete the folders and copy
 them again: `cp -r` into a folder that exists nests the copy inside it.
 
-If the user prefers a CDN, load the element and the runtime from jsDelivr and copy only the
-worker, and tell them that every learner's browser then reaches jsDelivr, as it does for the
-pack unless `pack-base` names a copy:
+If the user prefers a CDN to copying the files, read `references/cdn.md`: the worker still has
+to be copied onto the site.
 
-```html
-<script type="module"
-  src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@<player version>/dist/h5p-player.js"></script>
-<h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js"
-            assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-runtime@<runtime version>/dist/"></h5p-player>
-```
+**Embed:** read `references/embed.md`. It writes the player page with
+`npx @missing-elements/h5p-embed@latest`, deploys it to a separate domain the organisation runs,
+and gives the site an iframe snippet.
 
-Download `https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@<player version>/dist/h5p-sw.js`
-and place it on the site; `sw` points at it. `assets-base` names the runtime package's `dist/`
-on the CDN, since the player's own package does not carry the runtime. The root is fine: its scope becomes `/h5p/`, not
-`/`, so an existing site worker is untouched. Pin an explicit version in each URL; the two
-packages have their own version numbers (`npm view @missing-elements/h5p-offline-player version`
-and `npm view @missing-elements/h5p-runtime version` for the latest). Unpinned, the CDN moves and
-the copied worker does not. Re-download `h5p-sw.js` on every upgrade of the player; the console
-warns when the two differ.
-
-**Sizing:** the element follows the content's own height by default. Set `auto-resize="off"`
-only when the page sizes it itself, from CSS or from the `resize` event, because the height the
-element writes is an inline style and would beat the page's rule. Any CSS goes on the
-`h5p-player` tag itself; the inside is shadow DOM.
-
-**Coming from h5p-standalone:** its options carry over by name as attributes — `frame`,
-`copyright`, `export`, `icon`, `embed` (bare = on), `fullscreen="off"`, `download-url`,
-`embed-code`, `custom-css`, `custom-js`, `reporting`, `activity-id` — and `user` as a property.
-Its `translations` are automatic: H5P's own buttons and dialogs are in the content's language, the
-one its `h5p.json` names, so a German package shows them in German on any page. `lang`, which the
-element inherits from the page's `<html lang>`, decides only for a package that names none;
-strings of the host's own cannot be passed. The guide's "Coming from h5p-standalone" table maps every option, including the ones the `.h5p`
-or the events replace. Formulas need `H5P.MathDisplay` in the package, not a `customJs` recipe.
-
-**Resume, only when asked for.** By default a reload starts the content over and nothing is
-stored. `resume` keeps the content's own saved state — the slide reached, the answers so far, the
-position in a video — in the browser's storage on that device and hands it back on the next
-load; `resume="host"` keeps nothing on the device and gives the host page a `userdata` event on
-every save, to hand back through `userData` before the next load. Ask before setting it: on a
-shared machine the state one person leaves is what the next one finds, so a site with accounts
-takes `host`, a kiosk or a classroom device takes neither, and a learner's own device takes
-`resume`. Either way nothing is sent anywhere, and xAPI statements are still not stored. With
-`resume="host"` and each save sent to a server, `save-interval="30"` spaces the saves as the H5P
-plugins do; the default is 10 seconds.
-
-**Embed**
-
-The player page is a static site that `@missing-elements/h5p-embed` writes:
-
-```bash
-npx @missing-elements/h5p-embed@latest h5p-player --packages https://host.example
-```
-
-It needs Node 22 or later. Keep `@latest`: without it, npm on an older Node quietly installs the
-last version that supported it, which writes a player from before 1.0.
-
-`--packages` limits the hosts packages may come from (add `https://cdn.jsdelivr.net` for
-`libraries=pack` on a site built with `--no-libraries`), `--ancestors` the sites that may frame the page; leave both out to allow any.
-Deploy the folder to a domain of the organisation's own: a separate registrable domain
-(`h5p-player.example.net`, not a subdomain of the site, which would receive its cookies) that
-holds nothing else — no accounts, no cookies. The folder carries the headers for whatever
-serves it: a `Caddyfile`, an `nginx.conf` and an `.htaccess` for a server of the organisation's
-own (a Hetzner or OVH box, a university's Apache), `_headers` for Netlify and Cloudflare Pages,
-`vercel.json` for Vercel; on GitHub Pages or object storage, which set no headers, the page's
-own `<meta>` policy applies and `--ancestors` does not. The site's page then carries:
-
-```html
-<iframe src="https://h5p-player.example.net/?src=https://host.example/activities/week-1-quiz.h5p&frame&copyright&export"
-        title="Week 1 knowledge check" loading="lazy" allow="fullscreen; microphone; camera"
-        style="width: 100%; min-height: 540px; border: 0"></iframe>
-<script src="https://h5p-player.example.net/resizer.js"></script>
-```
-
-The script line sizes the iframe to the content; a page that already has h5p.org's
-`h5p-resizer.js` needs no second one. `title` is what screen readers announce, so name the
-activity; `min-height` is for a platform that strips the script. Encode `&`, `#`, `+`, `%` and
-spaces inside `src`. Parameters, by the element's attribute names: `libraries=pack` or
-`libraries=<url>` for a package without libraries (`libraries=none` turns off the site's default), `preload=auto`, `frame`, `copyright`,
-`export`, `icon`, `reporting`, `fullscreen=off`, `activity-id=<IRI>`, `custom-css=<URL>`,
-`lang=<the page's language>` for H5P's own buttons and dialogs in a package that does not name its
-own language (one that does gets them in that language), and `xapi=<the page's origin>` to
-receive statements by `postMessage`. Not `custom-js` or `user`.
-
-Paste it into the platform's HTML block (Custom HTML in WordPress, Embed in Squarespace, Wix or
-Google Sites, HTML view in Moodle). The embedding page must be https (or localhost); the frame
-registers its own worker there, in Safari and on iOS too. A CSP on the site needs `frame-src
-https://h5p-player.example.net`. With `xapi=`, listen for the relay and check where it came from:
-
-```js
-const frame = document.querySelector('iframe')
-addEventListener('message', ({ source, origin, data }) => {
-  if (source !== frame.contentWindow || origin !== 'https://h5p-player.example.net') return
-  if (data?.context !== 'h5p-offline-player') return
-  if (data.action === 'xapi') send(data.statement)      // every statement
-  if (data.action === 'finished') send(data.statement)  // the result, with result.score; the last one counts
-})
-```
-
-Those checks prove the sender, not the score: any package can post any statement, so relayed
-results are the learner's report, not proof for a grade.
-
-Do not embed from the demo site, or from any public service, in production: every learner's
-browser would connect to an origin the organisation has no data processing agreement with, which
-a GDPR or security review will not pass.
-
-For the site's privacy notice, or a reviewer's questions about what is stored, what is sent and
-to whom: https://github.com/missing-elements/h5p-offline-player/blob/main/docs/privacy.md
+**Options:** the element follows the content's height by default; set `auto-resize="off"` only
+when the page sizes it itself. Do not set `resume` unless the user asks for it. For sizing, the
+display options (`frame`, `copyright`, `export`, `custom-css`, `activity-id`, `user` and the
+rest), the language and `resume`, read `references/options.md`.
 
 ## 3. Check it
 
@@ -211,28 +115,18 @@ to whom: https://github.com/missing-elements/h5p-offline-player/blob/main/docs/p
    (`document.querySelector('h5p-player').state`, or listen for `statechange`).
 3. In DevTools → Application → Service Workers there is a registration whose scope ends in
    `/h5p/`, on the page's own origin.
-4. The frame is not 150 px tall with content inside it; if it is, see the table.
-5. `curl -sI -H 'Range: bytes=0-0' <package url>` shows an `access-control-allow-origin`
-   header — without it no browser can read the file and the element reports `no-cors` — and
-   ideally `206`, which lets a large package start after a few kilobytes instead of downloading
-   whole.
+4. The frame is not 150 px tall with content inside it; if it is, see `references/troubleshooting.md`.
+5. `curl -sI -H 'Range: bytes=0-0' <package url>` answers, ideally, `206`, which lets a large
+   package start after a few kilobytes instead of downloading whole. For a package on another
+   origin than the page, it also shows an `access-control-allow-origin` header — without it no
+   browser can read the file and the element reports `no-cors`; a package on the page's own
+   origin needs none.
 
 ## 4. When it does not work
 
-| Report | Cause | Fix |
-|---|---|---|
-| `error: no-worker` | page on `http://` or `file://`; or `sw` points at another origin | serve over https; keep the worker same-origin |
-| `error: network`, "is an http: URL and this page is served over https:" | mixed content: an `http://` package or bundle on an `https://` page | use the `https://` URL; `http://localhost` is exempt |
-| `error: no-cors` | the package host sends no CORS headers | host the package where you control headers (GitHub Pages works as it comes), or offer a file picker: `player.file = input.files[0]` |
-| `error: bad-archive`, "contains no libraries" | an h5p.com / h5p.org export: `content/` only | set `libraries="pack"`: `@missing-elements/h5p-libraries`, every hub content type's libraries, of which the player downloads only those a package needs, from jsDelivr. If the site must not reach a CDN, serve a copy of the package's `parts/` with its `libraries.txt` of licences and name the folder with `pack-base`, or, with a bundler, set the `pack` property to the package's `pack` export. With `pack`, the libraries a package carries play at the pack's newer versions; `refresh-libraries="off"` keeps them as exported. The H5P hub itself is not asked |
-| worker or runtime files 404 after a build | the bundler did not rewrite `new URL` (esbuild); or an install with a bundler but without `player.runtime`, so the element looked for `frame-assets/` beside a hashed bundle | set `runtime` from `@missing-elements/h5p-runtime`; or serve both packages' `dist/` statically and set `sw` and `assets-base` |
-| the frame renders the host page inside itself | an SPA fallback answered a virtual route with `index.html`: the worker is not registered | check the registration; after "clear site data" reload once |
-| content collapsed to 150 px | `auto-resize="off"` with no height from CSS; or the host's CSP has `style-src 'self'` and the browser lacks `adoptedStyleSheets`, so the fallback `<style>` is blocked | remove `auto-resize="off"`, or give the `h5p-player` tag a height; update the browser |
-| `error` while `state` stays `ready` | a content type threw a non-fatal exception (`runtime`, common on resize), or one media file failed to extract | log it; hide the player only when `state` is `error` |
-| Vite dev only: worker or assets 404 | the packages are hoisted somewhere Vite does not serve (a monorepo); their own fallback for `.vite/deps/` covers the normal layout | add both packages to `optimizeDeps.exclude`, or set `sw` and `assets-base` |
-| a video takes minutes to start, then plays | the package, not the player: the video is compressed inside the zip and its index is at the end | the `h5p-normalize` skill; `preload="auto"` only moves the wait earlier |
-| the content starts over on every reload | `resume` is not set, which is the default | set `resume` (or `resume="host"`) if the user wants that, see section 2 |
-| "This content has changed since you last used it. You'll be starting over." | the package at that URL was replaced since the state was saved; the state is keyed by the build | expected, H5P's own dialog; OK drops the old state and the content saves afresh under the new build |
+Read `references/troubleshooting.md`: every error the element reports, and the usual symptoms
+(the frame at 150 px, the host page inside the frame, a video that takes minutes to start), with
+cause and fix.
 
 ## 5. Hand over
 

@@ -83,5 +83,6 @@ package that behaves at start-up can still read and send what other packages sav
 plays it. Run the tool only on packages you would open yourself, or with `--untrusted`, which runs
 none of the package's own scripts.
 
-Give the user the `revision` from the report with the file — it is the build identifier every
-xAPI statement from this package will carry.
+Give the user the `revision` with the file — it is the build identifier every xAPI statement
+from this package will carry. Take it from `report.json` (or `--json`): the summary line shows
+only its first characters, ending in `…`.
