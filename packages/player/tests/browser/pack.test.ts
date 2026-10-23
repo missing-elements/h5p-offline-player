@@ -192,8 +192,12 @@ describe('the library pack, split into parts', () => {
     // Paced, the archive's library folder arrives seconds before its media: the parts are
     // planned and attached then, and the frame boots with them before the download ends. The
     // pack's 1.2 needs nothing the package's own 1.0 did, so the extra library stays out.
+    // The server sends 64 kB at a time and the download first publishes its index at 256 kB, so the
+    // frame may boot from the fourth slice and has until the fifth, one slice's interval, to plan,
+    // fetch and attach the parts: half a second at 128 kB/s, which a slow runner did not make
+    // (#75), and two at 32 kB/s.
     const states: string[] = []
-    const { player, result } = await settle(fresh(`${FIXTURES.needsDependencyNoRange}?throttle=131072`, 'paced'), withPack(), (each) =>
+    const { player, result } = await settle(fresh(`${FIXTURES.needsDependencyNoRange}?throttle=32768`, 'paced'), withPack(), (each) =>
       each.addEventListener('statechange', (event) => states.push((event as CustomEvent<{ state: string }>).detail.state))
     )
     if (!result.ok) expect.fail(`${result.detail.code} — ${result.detail.message}`)
