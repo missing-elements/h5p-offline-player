@@ -1772,9 +1772,12 @@ driver along and the normalizer should not.
 
   The check's own options are refused with it, not ignored. The browser opener is `open`,
   `cmd /c start` or `xdg-open`, and the address is printed either way; it has not been tried on
-  Windows. The page sets `src` from the parsed URL's `href`, `http` or `https` only, as every page
-  that takes a package address from outside does (#71): its own route needs no check, but CodeQL
-  flagged the text going in, as `js/xss-through-dom`.
+  Windows. Its SIGINT and SIGTERM listeners go in before it prints anything and stay for its whole
+  life: through npx one Ctrl+C arrives twice, from the terminal to the process group and from npm
+  passing it on, and 1.2.0, listening once, was killed by the second before its closing line, so
+  never exited with 0 there (#79). The page sets `src` from the parsed URL's `href`, `http` or
+  `https` only, as every page that takes a package address from outside does (#71): its own route
+  needs no check, but CodeQL flagged the text going in, as `js/xss-through-dom`.
 
 Not built, deliberately: steps that click through the content and check the xAPI it sends, and a
 content digest for reviewing what was generated. A check of library versions against the hub's

@@ -170,6 +170,32 @@ describe('h5p-verify --preview', () => {
     }
   }, 30_000)
 
+  // npm runs the command as its child and passes on the signals it gets, while a terminal sends
+  // Ctrl+C to the whole process group, so through npx the command gets SIGINT twice (#79). The
+  // script stands in for npm, in a process group of its own, and the signal goes to the group.
+  it.skipIf(process.platform === 'win32')('ends with exit code 0 when Ctrl+C arrives twice, as through npx', async () => {
+    const npm = `
+      const command = require('node:child_process').spawn(process.execPath, process.argv.slice(1), { stdio: 'inherit' })
+      for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => command.kill(signal))
+      command.on('exit', (code, signal) => { console.log('[command exit ' + code + ' ' + signal + ']'); process.exit(0) })
+    `
+    const group = spawn(process.execPath, ['-e', npm, bin, quiz, '--preview', '--no-open'], { detached: true, stdio: ['ignore', 'pipe', 'inherit'] })
+    try {
+      let output = ''
+      group.stdout.setEncoding('utf8').on('data', (text: string) => (output += text))
+      await new Promise<void>((resolveStarted, reject) => {
+        group.stdout.on('data', () => output.includes('Ctrl+C') && resolveStarted())
+        group.once('exit', () => reject(new Error(`ended before it started: ${output}`)))
+      })
+      process.kill(-group.pid!, 'SIGINT')
+      await once(group, 'close')
+      expect(output).toContain('The preview ended.')
+      expect(output).toContain('[command exit 0 null]')
+    } finally {
+      if (group.exitCode === null) process.kill(-group.pid!, 'SIGKILL')
+    }
+  }, 30_000)
+
   it("refuses the check's own options, and --no-open without --preview", async () => {
     expect(await run(quiz, '--preview', '--json', '--out', dir)).toEqual({ code: 2, stderr: '--preview does not take --out, --json\n' })
     expect(await run(quiz, '--no-open')).toEqual({ code: 2, stderr: '--no-open goes with --preview\n' })
