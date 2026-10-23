@@ -108,7 +108,8 @@ long as the player streams the result at least as well.
 
 ### The verifier, `@missing-elements/h5p-verify`
 
-The command's options, its exit codes — 0 plays, 1 does not, 2 could not run — `report.json`, to
+The command's options, its exit codes — 0 plays, 1 does not, 2 could not run; with `--preview`,
+0 when the preview ends and 2 when it could not start — `report.json`, to
 which fields may be added, and `verifyPackage()` and `summarize()`, with their types: `VerifyReport`
 is `report.json`'s shape, and gains fields the same way. The verifier is a step in other
 people's pipelines, so a check that turns a pass into a fail comes in a minor, never a patch; a new

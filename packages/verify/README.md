@@ -52,10 +52,39 @@ A package built against a library newer than the pack is refused, with what to d
 come from the pack on jsDelivr unless `--libraries` names another; name a copy on disk, such as
 `node_modules/@missing-elements/h5p-libraries/parts`, to run the check offline.
 
+## Preview
+
+The check says whether a package starts. Whether it is right — the answers, a scenario's paths,
+what happens at a video's timestamps — is for a person to judge, by playing it. `--preview`
+checks nothing and opens the package in the real player in your browser, served from your
+computer:
+
+```bash
+npx @missing-elements/h5p-verify@latest course.h5p --preview
+```
+
+```
+Previewing course.h5p at http://127.0.0.1:4645/
+The package stays on this computer. The preview ends when its tab is closed, or with Ctrl+C.
+```
+
+It plays any content type the player plays, with the same player, runtime and library sources
+as the check, so `--untrusted`, `--libraries` and `--no-refresh-libraries` mean the same.
+
+The package is served with `Range`, as a static host serves it. The libraries take a few
+requests, and a video is read by the ranges the player asks for, so a large one starts at once
+and nothing is read whole or extracted to disk.
+
+The preview ends a few seconds after its last tab closes, so an agent can start it in the
+background and leave it. `--no-open` prints the address instead of opening your default browser.
+Exit code 0 when it ends, 2 when it could not start.
+
 ## Options
 
 | | |
 |---|---|
+| `--preview` | check nothing: open the package in the real player in your browser, served from your computer, until its tab is closed |
+| `--no-open` | with `--preview`, print the address instead of opening a browser |
 | `--untrusted` | play it as a site plays a package it did not make, and report what the content check removed |
 | `--libraries <sources>` | where libraries come from, tried in order: `pack` (the library pack), a bundle's URL, a bundle on disk, or a copy of the pack's `parts/` folder, which plays as `pack`; the verifier serves what is on disk itself. With the pack, a library the package carries plays at the pack's newer version, as on a site with the pack, and the summary lists each under `refreshed from the pack` |
 | `--no-refresh-libraries` | play the libraries the package carries even where the pack has newer ones |

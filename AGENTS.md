@@ -155,8 +155,11 @@ packages/normalize/       @missing-elements/h5p-normalize — the package rewrit
 packages/verify/          @missing-elements/h5p-verify — plays a package headless and reports whether it works
   bin/h5p-verify.mjs        the command
   lib/verify.mjs            the static server, the browser run and the report; lib/page.html the page it drives
+  lib/preview.mjs           `--preview`: the package in the person's own browser, served by range
+                            until its last tab has closed; lib/preview.html its page
   tests/                    node tests that run the real thing against the demo's committed content;
-                            package-types.ts as for the normalizer
+                            package-types.ts as for the normalizer; preview.test.ts the preview's
+                            ranges, a browser playing from it, its ending and its command line
   types/                    generated, not in git: the declarations, `VerifyReport` among them
 
 packages/cmi5/            @missing-elements/h5p-cmi5 — cmi5 for the element, published as a library
@@ -1716,6 +1719,32 @@ driver along and the normalizer should not.
   content was checked as the site will play it. Writing the test found the demo's own quiz, built
   in March, older than the pack by a patch or two in four libraries, H5P.Video 1.6.68 against
   1.6.79 among them.
+- **`--preview` is the person's half of the check** (2026-10-23, #69). The check says whether a
+  package starts. Whether it is right, a person judges by playing it, the same way for every content
+  type; an answer key or scripted screenshots would be one more thing to write per type. So
+  `--preview` checks nothing. It serves the package and a page of its own from the verifier's
+  server, with the same player, runtime and library sources, and opens the default browser on
+  it. Three choices in it:
+  - **The package is served with `Range`, as a static host serves it**, not handed over as a
+    picked file, which a page cannot get without a click. That means `206`, `Content-Range`, and an
+    `ETag` from the file's size and time, so a file written again is a new package to the element.
+    The element reads it `range-http`: the libraries in the warm's few requests, media by the
+    ranges asked for. Measured on 2026-10-23 with a 32 MB stored video added beside the demo's
+    clip: of 36.1 MB, 1.58 MB in 9 requests reached `ready`, and a range of that video cost a
+    kilobyte. Every request was ranged. In Chrome, Firefox and WebKit the clip played.
+  - **It ends by itself.** The page holds an event stream open. The server ends ten seconds after
+    the last stream closes, which a reload reconnects within, or ten minutes after starting if
+    none ever opened. The page stops reconnecting once its server has gone, so a stale tab cannot
+    keep a later preview on the same port alive.
+  - **It takes port 4645 when that port is free.** Every preview then shares one origin's worker
+    and caches, instead of leaving a new origin's behind for each run. When another preview or
+    another program holds the port, it takes any free one.
+
+  The check's own options are refused with it, not ignored. The browser opener is `open`,
+  `cmd /c start` or `xdg-open`, and the address is printed either way; it has not been tried on
+  Windows. The page sets `src` from the parsed URL's `href`, `http` or `https` only, as every page
+  that takes a package address from outside does (#71): its own route needs no check, but CodeQL
+  flagged the text going in, as `js/xss-through-dom`.
 
 Not built, deliberately: steps that click through the content and check the xAPI it sends, and a
 content digest for reviewing what was generated. A check of library versions against the hub's
