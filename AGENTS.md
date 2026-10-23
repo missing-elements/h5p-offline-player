@@ -155,8 +155,11 @@ packages/normalize/       @missing-elements/h5p-normalize — the package rewrit
 packages/verify/          @missing-elements/h5p-verify — plays a package headless and reports whether it works
   bin/h5p-verify.mjs        the command
   lib/verify.mjs            the static server, the browser run and the report; lib/page.html the page it drives
+  lib/preview.mjs           `--preview`: the package in the person's own browser, served by range
+                            until its last tab has closed; lib/preview.html its page
   tests/                    node tests that run the real thing against the demo's committed content;
-                            package-types.ts as for the normalizer
+                            package-types.ts as for the normalizer; preview.test.ts the preview's
+                            ranges, a browser playing from it, its ending and its command line;
                             author.test.mjs also builds both quiz kinds with h5p-author and plays
                             each trusted and untrusted against the local pack, with no warnings
   types/                    generated, not in git: the declarations, `VerifyReport` among them
@@ -204,7 +207,8 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             demo/element.js is the one import of the element every page loads;
                             demo/page-common.js what the player page, the cmi5 page and the app share:
                             the message box, the log, `foreignHost` (whether a package is another
-                            site's) and the trust prompt, one copy since 2026-10-15;
+                            site's), `packageUrl` (the address the element is given) and the
+                            trust prompt, one copy since 2026-10-15;
                             demo/theme.js the light/dark switch, a classic script every page
                             loads in its head before the stylesheet, since the CSP allows no
                             inline script and a pinned theme has to be on <html> before the
@@ -357,6 +361,20 @@ event open*, *An untrusted package plays as data* (the worker's own script in it
 downloaded archive is read back before it is reported done*. Playwright's WebKit is WebKit's
 desktop port and not iOS Safari: the app's menu filled an iPhone's screen in Safari on 2026-10-13
 and drew correctly in Playwright's WebKit at every phone size.
+
+CI installs Chromium and Firefox without their system packages (#73, 2026-10-23): the runner image
+ships both browsers, so the libraries they link against are there, and what `--with-deps` adds —
+fonts, Xvfb, FFmpeg's codecs — a headless suite that decodes no video does not use. WebKit needs
+its packages, GStreamer and GTK 4 among them, 117 MB from Ubuntu's mirror, and the `engines` job
+keeps them in the Actions cache (#77): `/var/cache/apt/archives`, keyed by ISO week with any
+earlier week as the fallback, and `apt-get autoclean` after the install so one version of each
+package stays. Measured that morning: `azure.archive.ubuntu.com` served the package lists at
+12 MB/s and the packages at 40 kB/s — 115 MB in 47 minutes, in three runs of three, against 30 to
+60 seconds in the eight `main` runs before. The image's apt failover (actions/runner-images#14594)
+fires on a stall, not on a trickle, which is actions/runner-images#14823, open; the cache restores
+from GitHub's storage instead, 111 MB in 3 seconds, and the install then took 26 seconds. A cache
+saved by a pull request's run is that pull request's: `main`'s first run after the merge fills the
+one every later pull request reads.
 
 **What is tested, by the owner's rule of 2026-10-17: the packages and their source, and of the
 demo app only the installable app.** The demo's pages — the player page, the examples, `/embed`,
@@ -1714,6 +1732,32 @@ driver along and the normalizer should not.
   content was checked as the site will play it. Writing the test found the demo's own quiz, built
   in March, older than the pack by a patch or two in four libraries, H5P.Video 1.6.68 against
   1.6.79 among them.
+- **`--preview` is the person's half of the check** (2026-10-23, #69). The check says whether a
+  package starts. Whether it is right, a person judges by playing it, the same way for every content
+  type; an answer key or scripted screenshots would be one more thing to write per type. So
+  `--preview` checks nothing. It serves the package and a page of its own from the verifier's
+  server, with the same player, runtime and library sources, and opens the default browser on
+  it. Three choices in it:
+  - **The package is served with `Range`, as a static host serves it**, not handed over as a
+    picked file, which a page cannot get without a click. That means `206`, `Content-Range`, and an
+    `ETag` from the file's size and time, so a file written again is a new package to the element.
+    The element reads it `range-http`: the libraries in the warm's few requests, media by the
+    ranges asked for. Measured on 2026-10-23 with a 32 MB stored video added beside the demo's
+    clip: of 36.1 MB, 1.58 MB in 9 requests reached `ready`, and a range of that video cost a
+    kilobyte. Every request was ranged. In Chrome, Firefox and WebKit the clip played.
+  - **It ends by itself.** The page holds an event stream open. The server ends ten seconds after
+    the last stream closes, which a reload reconnects within, or ten minutes after starting if
+    none ever opened. The page stops reconnecting once its server has gone, so a stale tab cannot
+    keep a later preview on the same port alive.
+  - **It takes port 4645 when that port is free.** Every preview then shares one origin's worker
+    and caches, instead of leaving a new origin's behind for each run. When another preview or
+    another program holds the port, it takes any free one.
+
+  The check's own options are refused with it, not ignored. The browser opener is `open`,
+  `cmd /c start` or `xdg-open`, and the address is printed either way; it has not been tried on
+  Windows. The page sets `src` from the parsed URL's `href`, `http` or `https` only, as every page
+  that takes a package address from outside does (#71): its own route needs no check, but CodeQL
+  flagged the text going in, as `js/xss-through-dom`.
 
 Not built, deliberately: steps that click through the content and check the xAPI it sends, and a
 content digest for reviewing what was generated. A check of library versions against the hub's
@@ -2431,8 +2475,25 @@ SPA-fallback trap described above cannot happen there.
   partitioned by the embedding site, so a page only reaches what was played under its own embed;
   framed by this origin, or opened on its own, it plays untrusted like the rest, and a page that
   passes `askInOwnFrame: false` — a site's own preview — plays as it is. Every check fails closed: a
-  `data:` URL, with no host, counts as another site's. The rule stays: any package whose own code
-  runs on an origin can read every other package's data there.
+  `data:` URL, with no host, counts as another site's, and no page gives the element one (next
+  bullet). The rule stays: any package whose own code runs on an origin can read every other
+  package's data there.
+- **A package address from a link, a field or a launch reaches `src` parsed, and only as `http`
+  or `https`** (2026-10-23, #71). `packageUrl` in `demo/page-common.js` for the player page, the cmi5
+  page and the app; its copy in the embed page's `embed.js`; `webAddress` in
+  `@missing-elements/h5p-cmi5`, with the page's address as its base, which reports what it passes
+  over as `unsafe-src`. Each resolves the text with `new URL`, refuses any other scheme with a
+  message, and sets the parsed URL's `href`, never the text. The element fetches its `src` and
+  never navigates to it, so a `javascript:` address could not have run. But CodeQL cannot know
+  what the element does with `src`: it flagged every
+  `setAttribute('src', …)` fed by a link, a field or the launch under `js/xss`,
+  `js/xss-through-dom` and `js/client-side-unvalidated-url-redirection`, 22 alerts dismissed as
+  false positives from 2026-10-06 to -18, each filed again once a line around it moved. Its model of
+  `new URL(x)` carries taint into `search`, `hash` and `searchParams` alone, so the parsed URL's
+  `href` is clean to all three queries. A check on the text, such as `startsWith('https:')`,
+  satisfies `js/xss` only, and the redirect query accepts nothing short of a fixed host, which a
+  player of any host's packages cannot have. New code that sets `src` from outside takes the same
+  path, rather than another dismissal.
 - **Page views are counted by Vercel Web Analytics**, through `demo/analytics.js` in every
   page's head, including `/embed` and the app: `inject()` from `@vercel/analytics`, which loads
   `/_vercel/insights/script.js` from the site's own origin and reports to it, so the CSP needs no

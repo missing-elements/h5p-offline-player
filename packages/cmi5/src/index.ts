@@ -129,6 +129,8 @@ export type Cmi5Event =
   | { type: 'skipped'; reason: string }
   | { type: 'terminated' }
   | { type: 'unsafe-return-url'; value: string }
+  /** A package named by the address or the launch that is not an http or https address: not played. */
+  | { type: 'unsafe-src'; value: string }
 
 /** The element, or anything that dispatches its `xapi` and `finished` events and takes `src`. */
 export type PlayerLike = Pick<EventTarget, 'addEventListener' | 'removeEventListener'> & {
@@ -143,7 +145,9 @@ export interface Cmi5Options {
   client?: Cmi5Client
   /**
    * The package to play. By default the `src` parameter of the page's address, then the AU's
-   * `launchParameters` from the launch data. `false` leaves the element's `src` alone.
+   * `launchParameters` from the launch data. `false` leaves the element's `src` alone. Only an
+   * http or https address reaches the element, resolved against `url`; anything else is an
+   * `unsafe-src` event, and the next source is tried.
    */
   src?: string | false
   /** The page's address, for `src`; `location.href` by default. */
@@ -161,7 +165,7 @@ export interface Cmi5Session {
   readonly learnerPreferences: LearnerPreferences
   /** A reload picked this session up. */
   readonly resumed: boolean
-  /** The package the element was given, or null when neither the address nor the launch named one. */
+  /** The package the element was given, as an absolute address; null when neither the address nor the launch named one it plays. */
   readonly src: string | null
   /** The launch data's `returnURL`, when it is an http or https address. */
   readonly returnURL: string | null
@@ -208,11 +212,15 @@ export function cmi5Score(score: Statement | undefined | null): Cmi5Score | unde
   return { scaled, ...(hasRange ? { raw: score.raw, min: typeof score.min === 'number' ? score.min : 0, max: score.max } : {}) }
 }
 
-/** An absolute http or https address, or null: all a page may send a learner to. A `javascript:` return URL would run in the page. */
-export function webAddress(value: unknown): string | null {
+/**
+ * An absolute http or https address, or null: all a page may send a learner to, or give the element
+ * as its package. A `javascript:` return URL would run in the page. With `base`, a relative address
+ * is resolved against it.
+ */
+export function webAddress(value: unknown, base?: string): string | null {
   if (typeof value !== 'string' || !value.trim()) return null
   try {
-    const url = new URL(value.trim())
+    const url = new URL(value.trim(), base)
     return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : null
   } catch {
     return null
@@ -422,9 +430,17 @@ export async function startCmi5(player: PlayerLike, options: Cmi5Options = {}): 
     readyPhase.stop()
   }
 
+  /** The package as the element is given it, resolved against the page's address; anything else is reported. */
+  const playable = (value: string) => {
+    const address = webAddress(value, url || undefined)
+    if (!address) emit({ type: 'unsafe-src', value })
+    return address
+  }
+
   let src: string | null = null
   if (options.src !== false) {
-    src = options.src ?? readSrc(url)
+    const named = options.src ?? readSrc(url)
+    src = named ? playable(named) : null
     if (src) player.setAttribute('src', src)
   }
 
@@ -446,8 +462,8 @@ export async function startCmi5(player: PlayerLike, options: Cmi5Options = {}): 
     if (options.src !== false && !src) {
       const fromLaunch = data.launchParameters?.trim()
       if (fromLaunch) {
-        src = fromLaunch
-        player.setAttribute('src', src)
+        src = playable(fromLaunch)
+        if (src) player.setAttribute('src', src)
       }
     }
 

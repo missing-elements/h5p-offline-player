@@ -27,10 +27,13 @@ if (isCmi5Launch()) {
 The options of `startCmi5(player, options)`, detailed in the package's README:
 
 - `onEvent(event)` — told about each step: `initialized`, `sent`, `rejected` (with the LMS's
-  reason), `recorded`, `skipped`, `registration-unread`, `terminated`, `unsafe-return-url`.
+  reason), `recorded`, `skipped`, `registration-unread`, `terminated`, `unsafe-return-url`,
+  `unsafe-src`.
 - `src` — the package to play; by default the address's `?src=`, then the AU's
-  `launchParameters`. Pass `false` to set the element's `src` yourself, which a page anyone can
-  link to should do after checking the package's origin.
+  `launchParameters`. Only an `http` or `https` address is played, resolved against the page's;
+  anything else is an `unsafe-src` event, and the next source is tried. Pass `false` to set the
+  element's `src` yourself, which a page anyone can link to should do after checking the
+  package's origin.
 - `storage` — where the session is kept across a reload; default `null`. See *Credentials*.
 - `url` — the page's address, which the launch parameters and the default `src` are read from;
   default `location.href`.

@@ -136,6 +136,8 @@ describe('the pure parts', () => {
     expect(webAddress('javascript:alert(1)')).toBeNull()
     expect(webAddress('/relative')).toBeNull()
     expect(webAddress(undefined)).toBeNull()
+    expect(webAddress('quiz.h5p', 'https://au.example/au/')).toBe('https://au.example/au/quiz.h5p')
+    expect(webAddress('data:application/zip;base64,UEsFBg==', 'https://au.example/')).toBeNull()
   })
 
   it('reads the LMS\'s reason out of a refusal', () => {
@@ -360,6 +362,24 @@ describe('startCmi5', () => {
     const session = await startCmi5(player, { client, storage: null, url: 'https://au.example/' })
     expect(player.src).toBe('https://host/from-launch.h5p')
     expect(session.src).toBe('https://host/from-launch.h5p')
+  })
+
+  it('gives the element only an http or https package, resolved against the page', async () => {
+    const relative = new FakePlayer()
+    await startCmi5(relative, { client: fakeClient().client, storage: null, url: 'https://au.example/au/?src=quiz.h5p' })
+    expect(relative.src).toBe('https://au.example/au/quiz.h5p')
+
+    // The address's is reported and passed over; the launch's is held to the same rule.
+    const { client } = fakeClient({ launchParameters: 'javascript:alert(2)' })
+    const player = new FakePlayer()
+    const events: Cmi5Event[] = []
+    const session = await startCmi5(player, { client, storage: null, url: 'https://au.example/?src=javascript:alert(1)', onEvent: (e) => events.push(e) })
+    expect(events.filter((e) => e.type === 'unsafe-src')).toEqual([
+      { type: 'unsafe-src', value: 'javascript:alert(1)' },
+      { type: 'unsafe-src', value: 'javascript:alert(2)' }
+    ])
+    expect(player.src).toBeNull()
+    expect(session.src).toBeNull()
   })
 
   it('passes the content\'s own verdict on when the launch has no mastery score', async () => {

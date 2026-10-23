@@ -69,8 +69,8 @@ window, and a framed page stays, so tell the learner to go back to the course.
 
 | Option | Default | What it is for |
 |---|---|---|
-| `onEvent(event)` | none | Each step: `initialized`, `sent`, `rejected` (with the LMS's reason), `recorded`, `skipped` (Browse or Review mode, or already recorded), `registration-unread`, `terminated`, `unsafe-return-url` |
-| `src` | the address's `src`, then `launchParameters` | The package; `false` leaves `src` to you. On a page anyone can link to, pass `false` and check the package's origin before setting `src` |
+| `onEvent(event)` | none | Each step: `initialized`, `sent`, `rejected` (with the LMS's reason), `recorded`, `skipped` (Browse or Review mode, or already recorded), `registration-unread`, `terminated`, `unsafe-return-url`, `unsafe-src` |
+| `src` | the address's `src`, then `launchParameters` | The package; `false` leaves `src` to you. Only an `http` or `https` address is played, resolved against the page's; anything else is an `unsafe-src` event. On a page anyone can link to, pass `false` and check the package's origin before setting `src` |
 | `storage` | `null` | Keeps the session across a reload; only for a trusted package and origin |
 | `client` | `createCmi5Client()` | A client of your own, such as a simulated LMS |
 

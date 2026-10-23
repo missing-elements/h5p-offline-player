@@ -4,7 +4,7 @@
  * no URL field, no file picker, no progress bar and no "open in another browser" banner.
  */
 
-import { foreignHost, logInto, messageIn, trustPrompt } from './page-common.js'
+import { foreignHost, logInto, messageIn, packageUrl, trustPrompt } from './page-common.js'
 import { pack } from '@missing-elements/h5p-libraries'
 
 const player = document.querySelector('h5p-player')
@@ -264,6 +264,11 @@ const applyMode = () => {
 
 /** Plays a package at a URL, in the switch's mode. */
 const loadUrl = (url) => {
+  const address = packageUrl(url)
+  if (!address) {
+    show(`That is not an http or https address: ${url}`, 'error')
+    return
+  }
   log.textContent = ''
   trust.dismiss()
   reload = () => loadUrl(url)
@@ -275,7 +280,7 @@ const loadUrl = (url) => {
   // player at once, through `idle`, which stops the clock: so the clock starts after it.
   player.removeAttribute('src')
   startClock()
-  player.setAttribute('src', url)
+  player.setAttribute('src', address.href)
 }
 
 const loadFile = (file) => {

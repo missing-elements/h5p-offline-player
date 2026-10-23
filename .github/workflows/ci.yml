@@ -23,7 +23,11 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @missing-elements/h5p-offline-player exec playwright install --with-deps chromium
+      # Without --with-deps: the runner image ships Chrome and Firefox, so the libraries they link
+      # against are there, and what apt would add (fonts, Xvfb, FFmpeg's codecs) a headless suite that
+      # decodes no video does not use. Some runners reach Ubuntu's mirror at 40 kB/s, where that took
+      # up to 20 minutes (#73).
+      - run: pnpm --filter @missing-elements/h5p-offline-player exec playwright install chromium
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
@@ -41,6 +45,11 @@ jobs:
       fail-fast: false
       matrix:
         browser: [firefox, webkit]
+        # WebKit needs its system packages, GStreamer among them. Firefox, like Chromium above, has its
+        # libraries from the runner image.
+        include:
+          - browser: webkit
+            deps: --with-deps
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v6
@@ -49,7 +58,26 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @missing-elements/h5p-offline-player exec playwright install --with-deps ${{ matrix.browser }}
+      # WebKit's packages are 117 MB from Ubuntu's mirror, which some runners reach at 40 kB/s (#77).
+      # apt keeps what it fetches in its archive folder, cached here, so a run fetches only what
+      # Ubuntu has updated since. The folder is made writable for the restore, which runs as the
+      # runner's user; a new key each week keeps the cache from going stale.
+      - if: matrix.deps
+        id: apt
+        run: |
+          sudo chmod a+w /var/cache/apt/archives
+          echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+      - if: matrix.deps
+        uses: actions/cache@v6
+        with:
+          path: /var/cache/apt/archives/*.deb
+          key: apt-${{ matrix.browser }}-${{ steps.apt.outputs.week }}
+          restore-keys: apt-${{ matrix.browser }}-
+      - run: pnpm --filter @missing-elements/h5p-offline-player exec playwright install ${{ matrix.deps }} ${{ matrix.browser }}
+      # Drops the versions Ubuntu has since replaced, so the cache holds one copy of each package
+      # rather than every week's.
+      - if: matrix.deps
+        run: sudo apt-get autoclean
       - run: pnpm test:engine
         env:
           H5P_TEST_BROWSER: ${{ matrix.browser }}

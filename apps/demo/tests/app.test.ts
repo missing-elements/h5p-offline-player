@@ -536,6 +536,15 @@ it('plays a file dropped on it, and says what went wrong with a link that fails'
   await page.close()
 })
 
+it('refuses a link that is not http or https, and plays nothing', async () => {
+  const { page, errors } = await openApp(`/app/?src=${encodeURIComponent('javascript:alert(1)')}`)
+  await page.waitForFunction(() => !document.querySelector<HTMLElement>('#message')!.hidden)
+  expect(await seen(page)).toMatchObject({ screen: 'home', message: 'That is not an http or https address: javascript:alert(1)' })
+  expect(await page.evaluate(() => document.querySelector('h5p-player')!.hasAttribute('src'))).toBe(false)
+  expect(errors).toEqual([])
+  await page.close()
+})
+
 it('gives the window’s title bar the page’s colour, in either theme', async () => {
   const { page } = await openApp()
   const color = () => page.evaluate(() => [...document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')].map((meta) => meta.content))

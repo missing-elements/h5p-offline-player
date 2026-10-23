@@ -17,6 +17,15 @@ at the pack's newer version, as a site with the pack will, and says which. It is
 rewrites packages; the skill in `skills/h5p-verify/` tells an agent when to run it and how to
 read the result.
 
+The check cannot say whether the content is right; a person decides that by playing it.
+`--preview` checks nothing and opens the package in the real player in the person's own
+browser, served from their computer with `Range`, as a static host serves it. It works for any
+content type, and a large video starts at once. It ends a few seconds after its last tab closes:
+
+```bash
+npx @missing-elements/h5p-verify@latest course.h5p --preview
+```
+
 For authoring, the
 [`h5p-author` skill](https://github.com/missing-elements/h5p-offline-player/tree/main/skills/h5p-author)
 adds a prompt-to-quiz workflow and a portable packaging helper for text-only Multiple Choice
