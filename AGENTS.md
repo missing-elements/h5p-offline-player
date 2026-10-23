@@ -157,6 +157,8 @@ packages/verify/          @missing-elements/h5p-verify — plays a package headl
   lib/verify.mjs            the static server, the browser run and the report; lib/page.html the page it drives
   tests/                    node tests that run the real thing against the demo's committed content;
                             package-types.ts as for the normalizer
+                            author.test.mjs also builds both quiz kinds with h5p-author and plays
+                            each trusted and untrusted against the local pack, with no warnings
   types/                    generated, not in git: the declarations, `VerifyReport` among them
 
 packages/cmi5/            @missing-elements/h5p-cmi5 — cmi5 for the element, published as a library
@@ -213,6 +215,13 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             server; engine.ts and harness.ts its helpers. The demo's other pages
                             have no tests (see *Commands*)
   tests/sweep-content.test.ts  the sweep's content generator, in Node
+  tests/author.test.ts       the portable h5p-author helper, its quiz validation, archives and
+                            execution from an installed skill outside the checkout, in Node;
+                            corrupt library parts must fail their SHA-256 before publication,
+                            and a zip.js older than 2.24 must stop it with the install command
+  tests/author-playback.test.ts  the eight-scenario example through the app, trusted and untrusted:
+                            every question's feedback, 75% failing and 83.3% passing an 80% threshold, retry to 100%,
+                            and only the parent Question Set finishing
   cmi5-catapult/            docker-compose.yml for ADL's CATAPULT player, MySQL and the SQL LRS;
                             scripts/cmi5-catapult.mjs clones CATAPULT into it (ignored) and proves
                             the cmi5 page against the player
@@ -262,6 +271,10 @@ skills/                   agent skills, one directory per skill, at the root bec
                           `npx skills add <owner/repo>` looks: h5p-verify (when to run the verifier and how
                           to read its report), h5p-player-setup (putting the player on a site), h5p-normalize (when
                           a package needs rewriting to stream, and how to read the dry run)
+                          and h5p-author (text-only Multiple Choice and Question Set from a prompt:
+                          a quiz JSON source, the installed pack's semantics and runtime dependency
+                          closure, then the existing verifier and screenshot review; its bundled
+                          scripts/build-quiz.mjs resolves dependencies from the caller's project)
 
 api/no-range.js           the Vercel function that stands in for a host without Range on the demo
 vercel.json               the deployment: build command, the /no-range rewrite, caching and security headers

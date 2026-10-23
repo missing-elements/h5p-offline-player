@@ -16,3 +16,12 @@ With `--libraries pack`, or a copy of the pack's `parts/`, it plays a library th
 at the pack's newer version, as a site with the pack will, and says which. It is meant as the last step of a pipeline that generates or
 rewrites packages; the skill in `skills/h5p-verify/` tells an agent when to run it and how to
 read the result.
+
+For authoring, the
+[`h5p-author` skill](https://github.com/missing-elements/h5p-offline-player/tree/main/skills/h5p-author)
+adds a prompt-to-quiz workflow and a portable packaging helper for text-only Multiple Choice
+and Question Set. It takes a small quiz JSON file, fills the installed libraries' defaults,
+includes their runtime dependencies, then requires this playback check and screenshot review.
+The source JSON remains editable; the `.h5p` and full revision from the verification report
+identify what was checked. Answer accuracy and a complete question-by-question interaction
+check remain separate from the verifier's startup verdict.

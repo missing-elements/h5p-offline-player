@@ -1,0 +1,48 @@
+{
+  "kind": "question-set",
+  "title": "Practice: recognizing phishing",
+  "language": "en",
+  "license": "CC0 1.0",
+  "authors": [{ "name": "Example author", "role": "Author" }],
+  "passPercentage": 100,
+  "questions": [
+    {
+      "title": "An unexpected sign-in link",
+      "prompt": "An unexpected email asks you to sign in urgently using its link. What is the safest next step?",
+      "answers": [
+        {
+          "text": "Open the service using a known bookmark or its official app.",
+          "correct": true,
+          "feedback": "Use a route you already trust instead of the link in the unexpected message."
+        },
+        {
+          "text": "Use the link because the message includes the company's logo.",
+          "correct": false,
+          "feedback": "Logos can be copied. Branding alone does not establish that a message is genuine."
+        }
+      ]
+    },
+    {
+      "title": "Warning signs",
+      "prompt": "Which features of an unexpected email are reasons to verify it independently? Select all that apply.",
+      "multipleAnswers": true,
+      "answers": [
+        {
+          "text": "It asks for your password by email.",
+          "correct": true,
+          "feedback": "Do not send passwords by email. Check the request through your organization's established channel."
+        },
+        {
+          "text": "It pressures you to act immediately to avoid losing access.",
+          "correct": true,
+          "feedback": "Pressure and urgency can be used to stop you checking a request carefully."
+        },
+        {
+          "text": "It uses correct spelling.",
+          "correct": false,
+          "feedback": "Correct spelling does not prove a message is genuine or fraudulent."
+        }
+      ]
+    }
+  ]
+}
