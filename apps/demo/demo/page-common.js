@@ -42,6 +42,21 @@ export const foreignHost = (src) => {
 }
 
 /**
+ * A package's address as the element is given it: resolved against this page, and only when it
+ * is `http` or `https`. `null` for anything else, a `javascript:` or `data:` URL or text that is
+ * not a URL, which the caller reports. The element gets the parsed URL's `href`, never the text,
+ * so `src` holds what was checked.
+ */
+export const packageUrl = (src) => {
+  try {
+    const url = new URL(src, location.href)
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url : null
+  } catch {
+    return null
+  }
+}
+
+/**
  * The question before a package from another site plays with its own code. `ask(host, go)` shows
  * the box naming the host and runs `go` on the one click; a later `ask` replaces what was
  * pending, and `dismiss()` hides the box for a load that makes the question moot. One listener,

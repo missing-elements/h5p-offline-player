@@ -12,7 +12,7 @@
  * browser's or Android's, closes the file rather than leaving the app.
  */
 
-import { foreignHost, messageIn, trustPrompt } from '../demo/page-common.js'
+import { foreignHost, messageIn, packageUrl, trustPrompt } from '../demo/page-common.js'
 import { pack } from '@missing-elements/h5p-libraries'
 import librariesNotice from '@missing-elements/h5p-libraries/libraries.txt?url'
 import { copyOf, fileKey, forget, forgetAll, linkKey, recentFiles, remember } from './recent.js'
@@ -388,11 +388,9 @@ function linkName(url) {
  * another site plays untrusted unless the learner said otherwise: see `foreignHost`.
  */
 async function openUrl(src, { libraries = PACK, title = null, trusted = !foreignHost(src) } = {}) {
-  let url
-  try {
-    url = new URL(src, location.href)
-  } catch {
-    show(`That is not a URL: ${src}`, 'error')
+  const url = packageUrl(src)
+  if (!url) {
+    show(`That is not an http or https address: ${src}`, 'error')
     return
   }
   const token = ++opens

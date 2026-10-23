@@ -77,7 +77,7 @@ To update, run the command again with `--force` and redeploy.
 
 | Parameter | Effect |
 |---|---|
-| `src=<url>` | The package, required. Encode `&`, `#`, `+`, `%` and spaces |
+| `src=<url>` | The package, required: an `http` or `https` URL, or a path on the player domain. Encode `&`, `#`, `+`, `%` and spaces |
 | `libraries=pack`, `<url>` or `none` | Where libraries come from; several are tried in order. `pack` is this domain's copy, or jsDelivr's without one: a package gets the libraries it lacks from it, and those it carries at the pack's newer versions. `none` turns off `--default-libraries` |
 | `refresh-libraries=off` | Play the libraries a package carries as exported; `pack` then only fills gaps |
 | `frame`, `copyright`, `export`, `icon`, `reporting` | H5P's action bar and its buttons |

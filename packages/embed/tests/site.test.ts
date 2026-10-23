@@ -357,6 +357,17 @@ describe('a written site, framed from another site', () => {
     await page.close()
   })
 
+  it('refuses a package address that is not http or https, and gives the element nothing', async () => {
+    const page = await browser.newPage()
+    for (const src of ['javascript:alert(1)', 'data:application/zip;base64,UEsFBg==']) {
+      await page.goto(`${open.origin}/?src=${encodeURIComponent(src)}`)
+      await page.waitForSelector('#notice:not([hidden])')
+      expect(await page.textContent('#notice')).toBe('The package address is not an http or https URL.')
+      expect(await page.evaluate(() => document.querySelector('h5p-player')!.getAttribute('src'))).toBeNull()
+    }
+    await page.close()
+  })
+
   it('plays a package from elsewhere untrusted when opened on its own, with no question', async () => {
     const page = await browser.newPage()
     await page.goto(`${open.origin}/?src=${embedding.origin}/quiz.h5p`)

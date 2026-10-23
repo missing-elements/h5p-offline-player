@@ -202,7 +202,8 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             demo/element.js is the one import of the element every page loads;
                             demo/page-common.js what the player page, the cmi5 page and the app share:
                             the message box, the log, `foreignHost` (whether a package is another
-                            site's) and the trust prompt, one copy since 2026-10-15;
+                            site's), `packageUrl` (the address the element is given) and the
+                            trust prompt, one copy since 2026-10-15;
                             demo/theme.js the light/dark switch, a classic script every page
                             loads in its head before the stylesheet, since the CSP allows no
                             inline script and a pinned theme has to be on <html> before the
@@ -2418,8 +2419,25 @@ SPA-fallback trap described above cannot happen there.
   partitioned by the embedding site, so a page only reaches what was played under its own embed;
   framed by this origin, or opened on its own, it plays untrusted like the rest, and a page that
   passes `askInOwnFrame: false` — a site's own preview — plays as it is. Every check fails closed: a
-  `data:` URL, with no host, counts as another site's. The rule stays: any package whose own code
-  runs on an origin can read every other package's data there.
+  `data:` URL, with no host, counts as another site's, and no page gives the element one (next
+  bullet). The rule stays: any package whose own code runs on an origin can read every other
+  package's data there.
+- **A package address from a link, a field or a launch reaches `src` parsed, and only as `http`
+  or `https`** (2026-10-23, #71). `packageUrl` in `demo/page-common.js` for the player page, the cmi5
+  page and the app; its copy in the embed page's `embed.js`; `webAddress` in
+  `@missing-elements/h5p-cmi5`, with the page's address as its base, which reports what it passes
+  over as `unsafe-src`. Each resolves the text with `new URL`, refuses any other scheme with a
+  message, and sets the parsed URL's `href`, never the text. The element fetches its `src` and
+  never navigates to it, so a `javascript:` address could not have run. But CodeQL cannot know
+  what the element does with `src`: it flagged every
+  `setAttribute('src', …)` fed by a link, a field or the launch under `js/xss`,
+  `js/xss-through-dom` and `js/client-side-unvalidated-url-redirection`, 22 alerts dismissed as
+  false positives from 2026-10-06 to -18, each filed again once a line around it moved. Its model of
+  `new URL(x)` carries taint into `search`, `hash` and `searchParams` alone, so the parsed URL's
+  `href` is clean to all three queries. A check on the text, such as `startsWith('https:')`,
+  satisfies `js/xss` only, and the redirect query accepts nothing short of a fixed host, which a
+  player of any host's packages cannot have. New code that sets `src` from outside takes the same
+  path, rather than another dismissal.
 - **Page views are counted by Vercel Web Analytics**, through `demo/analytics.js` in every
   page's head, including `/embed` and the app: `inject()` from `@vercel/analytics`, which loads
   `/_vercel/insights/script.js` from the site's own origin and reports to it, so the CSP needs no

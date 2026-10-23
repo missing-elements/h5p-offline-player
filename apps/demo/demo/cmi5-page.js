@@ -11,7 +11,7 @@
  * lands in the log instead.
  */
 
-import { foreignHost, logInto, trustPrompt } from './page-common.js'
+import { foreignHost, logInto, packageUrl, trustPrompt } from './page-common.js'
 import { createCmi5Client, isCmi5Launch, startCmi5 } from '@missing-elements/h5p-cmi5'
 import { pack } from '@missing-elements/h5p-libraries'
 
@@ -51,8 +51,13 @@ const play = (src) => {
     say('No package to play: add ?src=<url of a .h5p> to the AU URL, or set launchParameters.')
     return
   }
+  const address = packageUrl(src)
+  if (!address) {
+    say(`That is not an http or https address: ${src}`)
+    return
+  }
   player.untrusted = foreignHost(src) !== null
-  player.setAttribute('src', src)
+  player.setAttribute('src', address.href)
 }
 
 /** Played untrusted, a package from another site needs its own code: the learner decides. */
