@@ -75,6 +75,9 @@ The package is served with `Range`, as a static host serves it. The libraries ta
 requests, and a video is read by the ranges the player asks for, so a large one starts at once
 and nothing is read whole or extracted to disk.
 
+The page has a Download button beside the package's name, so whoever reviews the package can
+keep the file they played.
+
 The preview ends a few seconds after its last tab closes, so an agent can start it in the
 background and leave it. `--no-open` prints the address instead of opening your default browser.
 Exit code 0 when it ends, 2 when it could not start.

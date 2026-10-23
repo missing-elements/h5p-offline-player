@@ -10,6 +10,7 @@
       body { margin: 0; background: Canvas; color: CanvasText; font: 15px/1.4 system-ui, sans-serif; }
       header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; padding: 12px 16px; border-bottom: 1px solid GrayText; }
       h1 { margin: 0; font-size: 1em; overflow-wrap: anywhere; }
+      #download { padding: 1px 10px; border: 1px solid ButtonBorder; border-radius: 4px; background: ButtonFace; color: ButtonText; text-decoration: none; }
       #status { color: GrayText; }
       main { max-width: 1024px; margin: 16px auto; padding: 0 16px; }
       h5p-player { display: block; min-height: 240px; }
@@ -18,6 +19,7 @@
   <body>
     <header>
       <h1 id="name">Preview</h1>
+      <a id="download" aria-describedby="name" hidden>Download</a>
       <span id="status" role="status">Opening…</span>
     </header>
     <main><h5p-player></h5p-player></main>
@@ -26,6 +28,7 @@
       const settings = JSON.parse(document.getElementById('settings').textContent)
       const player = document.querySelector('h5p-player')
       const status = document.getElementById('status')
+      const download = document.getElementById('download')
       document.title = `${settings.name} · preview`
       document.getElementById('name').textContent = settings.name
       // The element as the check sets it: the same libraries, played the same way.
@@ -46,11 +49,15 @@
         // An error once the content is up leaves it running; before that, the package did not open.
         if (player.state !== 'ready') status.textContent = event.detail.message
       })
-      // Only a web address becomes `src`: never a `javascript:` or `data:` URL.
+      // Only a web address becomes `src`: never a `javascript:` or `data:` URL. The Download link
+      // takes the same address, so that whoever reviews the package can keep the file they played.
       try {
         const src = new URL(settings.src, window.location.href)
         if (src.protocol === 'http:' || src.protocol === 'https:') {
           player.setAttribute('src', src.href)
+          download.href = src.href
+          download.download = settings.name
+          download.hidden = false
         } else {
           status.textContent = 'Invalid preview source.'
         }
@@ -63,6 +70,8 @@
       const presence = new EventSource('/__preview/events')
       presence.addEventListener('error', () => {
         presence.close()
+        // Its server, which the link downloads from, has gone with it.
+        download.hidden = true
         status.textContent = 'The preview has ended. Run the command again to open it.'
       })
     </script>

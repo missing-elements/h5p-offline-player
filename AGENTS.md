@@ -1777,7 +1777,12 @@ driver along and the normalizer should not.
   passing it on, and 1.2.0, listening once, was killed by the second before its closing line, so
   never exited with 0 there (#79). The page sets `src` from the parsed URL's `href`, `http` or
   `https` only, as every page that takes a package address from outside does (#71): its own route
-  needs no check, but CodeQL flagged the text going in, as `js/xss-through-dom`.
+  needs no check, but CodeQL flagged the text going in, as `js/xss-through-dom`. A Download link
+  beside the name (#81, the owner's request of 2026-10-23, so that whoever reviews a package can
+  keep the file they played) takes the same parsed address, and hides once the presence stream
+  fails, since the server it downloads from has gone. H5P's own Reuse button (`frame export
+  download-url`) was the other way: it changes how the content looks, takes two clicks, and its
+  dialog's button is English whatever the content's language.
 
 Not built, deliberately: steps that click through the content and check the xAPI it sends, and a
 content digest for reviewing what was generated. A check of library versions against the hub's
