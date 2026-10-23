@@ -20,7 +20,8 @@ read the result.
 The check cannot say whether the content is right; a person decides that by playing it.
 `--preview` checks nothing and opens the package in the real player in the person's own
 browser, served from their computer with `Range`, as a static host serves it. It works for any
-content type, and a large video starts at once. It ends a few seconds after its last tab closes:
+content type, and a large video starts at once. Its page has a Download button for the file. It
+ends a few seconds after its last tab closes:
 
 ```bash
 npx @missing-elements/h5p-verify@latest course.h5p --preview
