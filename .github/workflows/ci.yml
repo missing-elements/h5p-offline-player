@@ -74,6 +74,10 @@ jobs:
           key: apt-${{ matrix.browser }}-${{ steps.apt.outputs.week }}
           restore-keys: apt-${{ matrix.browser }}-
       - run: pnpm --filter @missing-elements/h5p-offline-player exec playwright install ${{ matrix.deps }} ${{ matrix.browser }}
+      # Drops the versions Ubuntu has since replaced, so the cache holds one copy of each package
+      # rather than every week's.
+      - if: matrix.deps
+        run: sudo apt-get autoclean
       - run: pnpm test:engine
         env:
           H5P_TEST_BROWSER: ${{ matrix.browser }}

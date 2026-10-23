@@ -346,6 +346,20 @@ downloaded archive is read back before it is reported done*. Playwright's WebKit
 desktop port and not iOS Safari: the app's menu filled an iPhone's screen in Safari on 2026-10-13
 and drew correctly in Playwright's WebKit at every phone size.
 
+CI installs Chromium and Firefox without their system packages (#73, 2026-10-23): the runner image
+ships both browsers, so the libraries they link against are there, and what `--with-deps` adds —
+fonts, Xvfb, FFmpeg's codecs — a headless suite that decodes no video does not use. WebKit needs
+its packages, GStreamer and GTK 4 among them, 117 MB from Ubuntu's mirror, and the `engines` job
+keeps them in the Actions cache (#77): `/var/cache/apt/archives`, keyed by ISO week with any
+earlier week as the fallback, and `apt-get autoclean` after the install so one version of each
+package stays. Measured that morning: `azure.archive.ubuntu.com` served the package lists at
+12 MB/s and the packages at 40 kB/s — 115 MB in 47 minutes, in three runs of three, against 30 to
+60 seconds in the eight `main` runs before. The image's apt failover (actions/runner-images#14594)
+fires on a stall, not on a trickle, which is actions/runner-images#14823, open; the cache restores
+from GitHub's storage instead, 111 MB in 3 seconds, and the install then took 26 seconds. A cache
+saved by a pull request's run is that pull request's: `main`'s first run after the merge fills the
+one every later pull request reads.
+
 **What is tested, by the owner's rule of 2026-10-17: the packages and their source, and of the
 demo app only the installable app.** The demo's pages — the player page, the examples, `/embed`,
 the cmi5 page, the code blocks, the shared markup — have no tests and are checked by hand, the
