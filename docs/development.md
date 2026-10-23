@@ -1,8 +1,9 @@
 # Development
 
 A pnpm workspace: `packages/player`, `packages/runtime`, `packages/libraries`,
-`packages/normalize`, `packages/verify`, `packages/cmi5`, `packages/embed`, and the demo site in
-`apps/demo`.
+`packages/normalize`, `packages/verify`, `packages/cmi5`, `packages/embed`, the demo site in
+`apps/demo`, and in `apps/skills` the tests of the agent skills' scripts, run from a project the
+way a skill's user runs them.
 
 ```bash
 pnpm install

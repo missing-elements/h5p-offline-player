@@ -25,3 +25,12 @@ content type, and a large video starts at once. It ends a few seconds after its 
 ```bash
 npx @missing-elements/h5p-verify@latest course.h5p --preview
 ```
+
+For authoring, the
+[`h5p-author` skill](https://github.com/missing-elements/h5p-offline-player/tree/main/skills/h5p-author)
+adds a prompt-to-quiz workflow and a portable packaging helper for text-only Multiple Choice
+and Question Set. It takes a small quiz JSON file, fills the installed libraries' defaults,
+includes their runtime dependencies, then requires this playback check and screenshot review.
+The source JSON remains editable; the `.h5p` and full revision from the verification report
+identify what was checked. Answer accuracy and a complete question-by-question interaction
+check remain separate from the verifier's startup verdict.

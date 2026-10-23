@@ -63,7 +63,7 @@ something else.
 - **Comes with tools for pipelines.** [`h5p-verify`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/verify.md) plays a package headless
   and says whether it works, [`h5p-normalize`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/streaming-video.md) rewrites one so its
   video streams, and [`h5p-embed`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#readme)
-  writes the embed site. The [agent skills](#agent-skills) cover all three.
+  writes the embed site. The [agent skills](#agent-skills) cover those workflows and quiz authoring.
 - **Is tested where it runs.** CI runs the browser tests in Chromium, Firefox and WebKit on every
   change, and plays every content type in the library pack, untrusted and trusted, on each change to
   the player, the runtime or the pack, and every week.
@@ -286,8 +286,17 @@ is an example.
 npx skills add missing-elements/h5p-offline-player
 ```
 
+[`h5p-author`](https://github.com/missing-elements/h5p-offline-player/tree/main/skills/h5p-author)
+turns a prompt or lesson into a text-only Multiple Choice or Question Set: a portable helper
+builds the `.h5p` against the installed library pack, and the agent verifies it in the real
+player and reviews the screenshot before handing it over. Works with Claude Code and other
+agents with filesystem and command access; no provider API key or H5P server is needed.
+For example: "Create five practice questions from this lesson for new employees, with
+explanatory feedback. Use h5p-author and verify the result." Needs Node 22 or later.
+
 `h5p-player-setup` puts H5P on a site, `h5p-normalize` fixes packages whose video will not
-stream, `h5p-verify` checks a generated package plays.
+stream, and `h5p-verify` checks a generated package plays. A verifier pass checks startup and
+rendering, not whether the answers are right or the activity is accessible.
 
 ## Development
 

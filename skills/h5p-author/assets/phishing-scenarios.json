@@ -1,0 +1,222 @@
+{
+  "kind": "question-set",
+  "title": "Inbox decisions: a phishing response simulation",
+  "language": "en",
+  "license": "CC0 1.0",
+  "authors": [{ "name": "missing-elements", "role": "Author" }],
+  "passPercentage": 80,
+  "questions": [
+    {
+      "title": "An urgent benefits deadline",
+      "prompt": "You receive: \"Benefits & Payroll: your access ends in 30 minutes. Sign in using this link.\"\nThe demo policy says to open account services through a known bookmark or official app, not an unexpected message's link.\nWhat should you do first?",
+      "answers": [
+        {
+          "text": "Use the email's link because the deadline is close.",
+          "correct": false,
+          "feedback": "Urgency does not change the verification rule. The email is asking you to use a route you have not established as trustworthy."
+        },
+        {
+          "text": "Reply with your password so Payroll can restore access.",
+          "correct": false,
+          "feedback": "Do not send passwords in a reply. The demo policy uses an established route to the service, not a message asking for credentials."
+        },
+        {
+          "text": "Open the benefits service using your existing bookmark or official app.",
+          "correct": true,
+          "feedback": "A route you already know lets you check the account without relying on the unexpected message's link."
+        },
+        {
+          "text": "Forward the link to a colleague and ask them to try signing in.",
+          "correct": false,
+          "feedback": "Asking someone else to try the unverified link transfers the risk instead of verifying the request."
+        }
+      ]
+    },
+    {
+      "title": "Evidence, not appearance",
+      "prompt": "A message has a familiar logo, correct spelling, a request to send a password, and a threat that your account will close in ten minutes.\nFor this exercise, credential requests and pressure to bypass normal checks are warning signs; branding and spelling do not establish authenticity.\nWhich TWO features are warning signs? Select all that apply.",
+      "multipleAnswers": true,
+      "answers": [
+        {
+          "text": "The request to send a password.",
+          "correct": true,
+          "feedback": "A request to disclose a password is a reason to stop and verify through the established support channel."
+        },
+        {
+          "text": "The familiar logo.",
+          "correct": false,
+          "feedback": "A logo can be copied. Its presence alone neither proves authenticity nor establishes that a message is fraudulent."
+        },
+        {
+          "text": "The correct spelling.",
+          "correct": false,
+          "feedback": "Fraudulent messages can be well written. Correct spelling alone does not tell you who sent a message."
+        },
+        {
+          "text": "The pressure to act before the account supposedly closes.",
+          "correct": true,
+          "feedback": "Pressure to skip ordinary checks is a warning sign, not a reason to trust the request."
+        }
+      ]
+    },
+    {
+      "title": "A supplier changes bank details",
+      "prompt": "An email in an existing invoice conversation asks you to change the supplier's bank details. It includes a new telephone number for confirmation.\nThe demo payment policy requires a callback using the supplier number already held in the approved vendor record.\nWhich action follows that policy?",
+      "answers": [
+        {
+          "text": "Call the supplier using the number in the approved vendor record before changing anything.",
+          "correct": true,
+          "feedback": "An independently held contact route checks the change without trusting contact details supplied by the request itself."
+        },
+        {
+          "text": "Call the new telephone number written in the email.",
+          "correct": false,
+          "feedback": "The new number is part of the unverified request. It is not the independent contact route required by the demo policy."
+        },
+        {
+          "text": "Accept the change because it appears in an existing email conversation.",
+          "correct": false,
+          "feedback": "An existing conversation does not replace the required independent callback for a payment-detail change."
+        },
+        {
+          "text": "Send a small payment to the new account to see whether it arrives.",
+          "correct": false,
+          "feedback": "A test transfer is still a transfer to unverified details. It does not satisfy the callback rule."
+        }
+      ]
+    },
+    {
+      "title": "A sign-in approval you did not request",
+      "prompt": "Your phone asks you to approve a work-account sign-in, but you are not signing in on any device.\nThe demo account policy says to reject unsolicited approvals and report them through the established security channel.\nWhich TWO actions follow the policy? Select all that apply.",
+      "multipleAnswers": true,
+      "answers": [
+        {
+          "text": "Approve it once so the repeated notifications stop.",
+          "correct": false,
+          "feedback": "Approving an unrequested sign-in can authorize access you did not initiate. Repeated prompts are not a reason to approve."
+        },
+        {
+          "text": "Reject the sign-in request.",
+          "correct": true,
+          "feedback": "Rejecting the request avoids approving a sign-in you did not initiate."
+        },
+        {
+          "text": "Contact the established security channel to report the unsolicited approval request.",
+          "correct": true,
+          "feedback": "Reporting through the established channel lets the team investigate without trusting a contact route supplied by the unexpected request."
+        },
+        {
+          "text": "Send the approval code to someone who calls claiming to be support.",
+          "correct": false,
+          "feedback": "An unexpected caller has not been verified. Sharing an approval code can defeat the account's sign-in protection."
+        }
+      ]
+    },
+    {
+      "title": "The QR-code shortcut",
+      "prompt": "An unexpected email shows a QR code and says: \"Scan on your phone to bypass the usual sign-in checks.\"\nThe demo rule applies equally to links and QR codes: use the known service route to check an unexpected account request.\nWhat is the best next step?",
+      "answers": [
+        {
+          "text": "Scan it because a QR code is safer than a clickable link.",
+          "correct": false,
+          "feedback": "A QR code is another way to provide a destination. Its format does not establish that the destination or request is trustworthy."
+        },
+        {
+          "text": "Use a personal phone so the work account cannot be affected.",
+          "correct": false,
+          "feedback": "Changing devices does not make an unverified sign-in request trustworthy. You could still disclose work-account credentials."
+        },
+        {
+          "text": "Ask a colleague to scan it first.",
+          "correct": false,
+          "feedback": "Passing the request to a colleague does not verify it and may expose another person to the same risk."
+        },
+        {
+          "text": "Open the service through the known bookmark or official app instead.",
+          "correct": true,
+          "feedback": "The same independent-route rule applies whether an unexpected message supplies a link or a QR code."
+        }
+      ]
+    },
+    {
+      "title": "After entering a password",
+      "prompt": "You used an email's link and entered your work password. You now suspect the page was false.\nThe demo incident procedure says to report promptly and change an exposed password through the genuine service's known route. Do not send passwords or one-time codes in the report.\nWhich TWO actions follow the procedure? Select all that apply.",
+      "multipleAnswers": true,
+      "answers": [
+        {
+          "text": "Report what happened promptly through the established security channel.",
+          "correct": true,
+          "feedback": "Prompt reporting gives the team a chance to investigate and contain the incident. Describe the actions you took without sharing secrets."
+        },
+        {
+          "text": "Wait until you can prove that someone used the account.",
+          "correct": false,
+          "feedback": "The demo procedure calls for a prompt report of suspected exposure, not a wait for proof of account misuse."
+        },
+        {
+          "text": "Change the exposed password through the genuine service's known bookmark or official app.",
+          "correct": true,
+          "feedback": "Use the genuine service's established route, not the original email link, to change the exposed password."
+        },
+        {
+          "text": "Include the password and a current one-time code in the report.",
+          "correct": false,
+          "feedback": "A report should not disclose authentication secrets. The procedure explicitly excludes passwords and one-time codes."
+        }
+      ]
+    },
+    {
+      "title": "A sender name is not a verification method",
+      "prompt": "A message displays your manager's name and asks for an urgent purchase outside the usual approval process.\nThe demo purchasing rule requires you to confirm unusual requests using the manager's contact details already held in the staff directory.\nWhat should you do?",
+      "answers": [
+        {
+          "text": "Make the purchase because the display name matches your manager.",
+          "correct": false,
+          "feedback": "A display name is not the independent confirmation required for a request outside the usual process."
+        },
+        {
+          "text": "Contact your manager through the staff directory details before proceeding.",
+          "correct": true,
+          "feedback": "Using contact details you already hold independently checks the request before you bypass the ordinary purchasing process."
+        },
+        {
+          "text": "Reply to the message and accept any confirmation sent in the same conversation.",
+          "correct": false,
+          "feedback": "A reply in the same unverified conversation is not the independent contact route specified by the demo rule."
+        },
+        {
+          "text": "Use the new contact number supplied in the urgent message.",
+          "correct": false,
+          "feedback": "A contact number supplied by the unverified request cannot independently establish who made that request."
+        }
+      ]
+    },
+    {
+      "title": "A useful incident report",
+      "prompt": "You are reporting a suspicious message through the established security channel.\nThe demo reporting procedure asks for when and where it arrived and what you did, including whether you opened a link or entered credentials. It excludes passwords and one-time codes.\nWhich TWO items belong in that report? Select all that apply.",
+      "multipleAnswers": true,
+      "answers": [
+        {
+          "text": "Your current password, so the team can test whether it still works.",
+          "correct": false,
+          "feedback": "The report must not contain a password. The team does not need you to disclose it to understand what happened."
+        },
+        {
+          "text": "A one-time sign-in code copied from your phone.",
+          "correct": false,
+          "feedback": "One-time codes are authentication secrets and are explicitly excluded from the demo reporting procedure."
+        },
+        {
+          "text": "When and where the message arrived, with its sender and subject.",
+          "correct": true,
+          "feedback": "These details help identify the message and establish a timeline without disclosing an authentication secret."
+        },
+        {
+          "text": "Whether you opened a link, approved a sign-in, or entered credentials.",
+          "correct": true,
+          "feedback": "A factual description of your actions helps the team assess possible exposure. State that credentials were entered without including their values."
+        }
+      ]
+    }
+  ]
+}
