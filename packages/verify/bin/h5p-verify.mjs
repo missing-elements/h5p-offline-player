@@ -92,11 +92,16 @@ if (args.values.preview) {
     console.error(error instanceof VerifyError ? error.message : error)
     process.exit(2)
   }
+  // Listened to before anything is printed, so that a Ctrl+C as soon as the address shows finds the
+  // listener, and for as long as the process runs, not once: through npx one Ctrl+C arrives twice,
+  // from the terminal to the whole process group and from npm passing it on, and a second signal
+  // with no listener left took Node's default and killed the process before its last line (#79).
+  // Ending the preview again does nothing.
+  for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => preview.close())
   const address = `${preview.url}/`
   console.log(`Previewing ${basename(file)} at ${address}`)
   if (args.values['no-open'] || !(await openBrowser(address))) console.log('Open that address in a browser.')
   console.log('The package stays on this computer. The preview ends when its tab is closed, or with Ctrl+C.')
-  for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => preview.close())
   const ended = await preview.closed
   console.log(ended === 'unopened' ? 'No tab opened the preview in time; it ended.' : 'The preview ended.')
   process.exit(0)
