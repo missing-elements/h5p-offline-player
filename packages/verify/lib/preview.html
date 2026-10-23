@@ -46,7 +46,17 @@
         // An error once the content is up leaves it running; before that, the package did not open.
         if (player.state !== 'ready') status.textContent = event.detail.message
       })
-      player.setAttribute('src', settings.src)
+      // Only a web address becomes `src`: never a `javascript:` or `data:` URL.
+      try {
+        const src = new URL(settings.src, window.location.href)
+        if (src.protocol === 'http:' || src.protocol === 'https:') {
+          player.setAttribute('src', src.href)
+        } else {
+          status.textContent = 'Invalid preview source.'
+        }
+      } catch {
+        status.textContent = 'Invalid preview source.'
+      }
 
       // Held open while this tab shows the preview: the command ends once no tab does. Once its
       // server has gone the page stops asking, so that it cannot keep a later preview alive.

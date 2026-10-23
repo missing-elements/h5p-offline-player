@@ -98,7 +98,8 @@ describe('h5p-verify --preview', () => {
       expect(Buffer.from(await tail.arrayBuffer())).toEqual(bytes.subarray(bytes.length - 22))
       const whole = await fetch(archive)
       expect(whole.status).toBe(200)
-      expect(Buffer.from(await whole.arrayBuffer())).toEqual(bytes)
+      // Buffer's own comparison: toEqual walks 1.5 MB a byte at a time, past the timeout on CI.
+      expect(Buffer.from(await whole.arrayBuffer()).equals(bytes)).toBe(true)
       const past = await fetch(archive, { headers: { Range: `bytes=${bytes.length}-` } })
       expect(past.status).toBe(416)
       expect(past.headers.get('content-range')).toBe(`bytes */${bytes.length}`)
