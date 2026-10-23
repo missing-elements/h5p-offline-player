@@ -1,6 +1,6 @@
 ---
 name: h5p-verify
-description: Check that an H5P package (.h5p) actually plays before handing it over. Use after generating, editing or repackaging an H5P file, and before claiming any H5P package works. Plays it in a real H5P runtime in a headless browser and reports start-up, errors, missing libraries and a screenshot.
+description: Check that an H5P package (.h5p) actually plays before handing it over. Use after generating, editing or repackaging an H5P file, and before claiming any H5P package works. Plays it in a real H5P runtime in a headless browser and reports start-up, errors, missing libraries and a screenshot, then opens it in the user's own browser for them to play.
 license: MIT
 ---
 
@@ -36,6 +36,8 @@ supported it.
   on a slow link before reading a timeout as a failure.
 - `--settle <seconds>` — time watched after `ready` for late errors, default 3.
 - `-q` — the verdict line only.
+- `--preview` — open the package in the user's browser for them to play, instead of checking it;
+  see *Let the user play it*.
 
 Exit 0: it plays (possibly with warnings). Exit 1: it does not; the summary says why.
 Exit 2: the check could not run (no browser, no such file).
@@ -62,7 +64,8 @@ Exit 2: the check could not run (no browser, no such file).
 
 Layout mistakes raise no error: sizes in the wrong unit, elements overlapping or off-canvas, an
 empty slide. If it looks wrong, it is wrong. The screenshot shows the state after start-up; for
-a multi-slide or multi-chapter package it shows the first one.
+a multi-slide or multi-chapter package it shows the first one. The rest is for the user to see in
+the preview, below.
 
 ## Loop
 
@@ -86,3 +89,23 @@ none of the package's own scripts.
 Give the user the `revision` with the file — it is the build identifier every xAPI statement
 from this package will carry. Take it from `report.json` (or `--json`): the summary line shows
 only its first characters, ending in `…`.
+
+## Let the user play it
+
+The check proves that the package starts, not that it is right. After it passes, open the package
+for the user to play in the real player, in their own browser:
+
+    npx @missing-elements/h5p-verify@latest package.h5p --preview
+
+Pass the same `--untrusted` and `--libraries` as the check, so that they play what was checked. It
+checks nothing and works for every content type; a large video starts at once. Start it in the
+background: it serves the package from this machine and ends about ten seconds after its last tab
+closes. Then tell the user what to try, such as a wrong answer and a right one for each question,
+every branch of a scenario, or the interactions at a video's timestamps.
+
+- `--no-open` prints the address instead of opening their default browser, for when you drive a
+  browser yourself or none opens.
+- The address is `127.0.0.1` on the machine that runs the command. If that is not the user's
+  computer, as in a cloud sandbox, they cannot reach it: hand over the file and the command for
+  them to run.
+- Exit 2: the preview could not start, and the message says why.

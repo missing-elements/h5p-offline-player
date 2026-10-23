@@ -289,14 +289,16 @@ npx skills add missing-elements/h5p-offline-player
 [`h5p-author`](https://github.com/missing-elements/h5p-offline-player/tree/main/skills/h5p-author)
 turns a prompt or lesson into a text-only Multiple Choice or Question Set: a portable helper
 builds the `.h5p` against the installed library pack, and the agent verifies it in the real
-player and reviews the screenshot before handing it over. Works with Claude Code and other
-agents with filesystem and command access; no provider API key or H5P server is needed.
+player, reviews the screenshot, and opens the quiz in your browser for you to play before
+handing it over. Works with Claude Code and other agents with filesystem and command access;
+no provider API key or H5P server is needed.
 For example: "Create five practice questions from this lesson for new employees, with
 explanatory feedback. Use h5p-author and verify the result." Needs Node 22 or later.
 
 `h5p-player-setup` puts H5P on a site, `h5p-normalize` fixes packages whose video will not
-stream, and `h5p-verify` checks a generated package plays. A verifier pass checks startup and
-rendering, not whether the answers are right or the activity is accessible.
+stream, and `h5p-verify` checks a generated package plays, then opens it in your browser for you
+to judge the rest. A verifier pass checks startup and rendering, not whether the answers are
+right or the activity is accessible.
 
 ## Development
 

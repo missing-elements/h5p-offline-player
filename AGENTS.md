@@ -285,9 +285,9 @@ skills/                   agent skills, one directory per skill, at the root bec
                           a package needs rewriting to stream, and how to read the dry run)
                           and h5p-author (text-only Multiple Choice and Question Set from a prompt:
                           a quiz JSON source, the installed pack's semantics and runtime dependency
-                          closure, then the existing verifier and screenshot review; its bundled
-                          scripts/build-quiz.mjs resolves dependencies from the caller's project,
-                          and is tested from apps/skills)
+                          closure, then the verifier's check, its screenshot and its preview for
+                          the user; its bundled scripts/build-quiz.mjs resolves dependencies from
+                          the caller's project, and is tested from apps/skills)
 
 api/no-range.js           the Vercel function that stands in for a host without Range on the demo
 vercel.json               the deployment: build command, the /no-range rewrite, caching and security headers
@@ -1721,7 +1721,9 @@ driver along and the normalizer should not.
 - **`skills/h5p-verify/SKILL.md` at the repository root is the contract with an agent.** It says when to run the tool, what each verdict
   and warning means and what to do about it, to look at the screenshot because layout mistakes
   raise no error, never to make the check pass by removing what fails, and what a pass does not
-  claim: nothing about the content's correctness, level, licensing or accessibility.
+  claim: nothing about the content's correctness, level, licensing or accessibility. After a pass
+  it opens the preview for the user, as h5p-author's does, since verify 1.2.0 reached npm
+  (2026-10-23): a skill is installed from `main`, so neither named `--preview` before the release.
 - **`--untrusted` plays a package as a site that did not make it does** (2026-10-18, #38): the
   element's `untrusted`, read back from it for the report rather than taken from the option, the
   libraries from `--libraries` or the element's own `pack`. What the content check changed is

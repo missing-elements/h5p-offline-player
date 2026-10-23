@@ -100,7 +100,7 @@ npx @missing-elements/h5p-verify@latest course.h5p --untrusted --libraries pack
 Use `--libraries /path/to/parts` to check offline against a specific local pack.
 Read `report.json` and open `screenshot.png` in the reported output folder. An exit
 code of zero is not enough: read warnings and check the picture. The screenshot
-shows startup, not every question or the final result.
+shows startup, not every question or the final result; the preview in step 5 does.
 
 If `h5p-verify` is installed as a skill, follow its detailed troubleshooting loop.
 Fix the source or helper, rebuild to a new output path, and verify again. Never
@@ -109,15 +109,28 @@ or hiding an error. If a browser cannot run, report the package as **unverified*
 
 ## 5. Review and hand over
 
-- Check the answer key and feedback against the source, not the verifier's verdict.
-- Open the activity in the intended player, answer every question, and inspect
-  feedback, navigation, score, retry, and completion. With browser tools, record
-  this evidence; without them, explicitly leave this check to the user.
+Check the answer key and feedback against the source, not the verifier's verdict.
+Then open the quiz for the user to play in the real player, in their own browser,
+adding `--untrusted --libraries pack` if the check used them:
+
+```bash
+npx @missing-elements/h5p-verify@latest course.h5p --preview
+```
+
+Start it in the background; it ends about ten seconds after its tab closes. Ask the
+user to answer every question, a wrong answer included, and to check the feedback,
+navigation, score, retry, and the result. With browser tools of your own, add
+`--no-open`, play the printed address yourself, and record what you saw. The
+preview is served from the machine that runs the command: if that is not the
+user's computer, as in a cloud sandbox, hand over the file and the command for
+them to run instead.
+
 - A verifier pass means startup/rendering only. Do not claim pedagogical accuracy,
   accessibility conformance, full interaction testing, or compatibility with every
   LMS. The pack's versions may be newer than those installed in the destination.
-- Deliver the `.h5p`, source JSON, the verification report and screenshot, and the
-  **full `revision` from the report**, with any remaining warnings and limits.
-- For a web preview, use `h5p-player-setup`. Prefer `untrusted` with a host-chosen
-  pack on sites with accounts or packages from other authors. No player page,
-  deployment, results collection, or AI calls are added by this helper.
+- Deliver the `.h5p`, source JSON, the verification report and screenshot, the
+  **full `revision` from the report**, and the preview command, with any remaining
+  warnings and limits.
+- To put the quiz on a website, use `h5p-player-setup`. Prefer `untrusted` with a
+  host-chosen pack on sites with accounts or packages from other authors. No player
+  page, deployment, results collection, or AI calls are added by this helper.
