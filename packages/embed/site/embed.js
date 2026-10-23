@@ -256,6 +256,22 @@ export function startEmbed({ packBase = null, pack = null, librariesPack = null,
     }
   }
 
+  /**
+   * A package's address as the element is given it: resolved against this page, and only when it
+   * is `http` or `https`. `null` for anything else, a `javascript:` or `data:` URL or text that is
+   * not a URL. The element gets the parsed URL's `href`, never the text, so `src` holds what was
+   * checked.
+   * @param {string} value
+   */
+  const packageUrl = (value) => {
+    try {
+      const url = new URL(value, location.href)
+      return url.protocol === 'http:' || url.protocol === 'https:' ? url : null
+    } catch {
+      return null
+    }
+  }
+
   const allowed = packages ? new Set(packages) : null
   /**
    * Whether this player was told it may fetch from `origin`. Always true without a list.
@@ -355,11 +371,12 @@ export function startEmbed({ packBase = null, pack = null, librariesPack = null,
     refuse('No package given. Add ?src=<url of a .h5p file> to the address.', 'no-src')
     return
   }
-  const origin = urlOrigin(src)
-  if (!origin) {
-    refuse('The package address is not a URL.')
+  const address = packageUrl(src)
+  if (!address) {
+    refuse('The package address is not an http or https URL.')
     return
   }
+  const { origin } = address
   if (!permitted(origin)) {
     refuse(`This player does not play packages from ${origin}.`)
     return
@@ -375,14 +392,14 @@ export function startEmbed({ packBase = null, pack = null, librariesPack = null,
   // A host on the list was vouched for when the site was set up, and in another site's frame the
   // storage is that site's own: those play as they are.
   if (origin === location.origin || allowed || !sharesOriginStorage()) {
-    start(src, sources.value)
+    start(address.href, sources.value)
     return
   }
 
   // Anything else from another origin would share this origin's storage. It plays untrusted, as
   // data with the library pack's code and none of its own, and waits for a click that names the
   // host only when it cannot play without its own, or there is no pack to play it with.
-  const host = new URL(src, location.href).host || origin
+  const { host } = address
   askToTrust = () => {
     loader.hidden = true
     const button = document.createElement('button')
@@ -393,7 +410,7 @@ export function startEmbed({ packBase = null, pack = null, librariesPack = null,
       loader.hidden = false
       player.untrusted = false
       player.removeAttribute('src')
-      start(src, sources.value)
+      start(address.href, sources.value)
     })
     say(
       `This package from ${host} plays only with its own scripts. They would run on this site and ` +
@@ -411,5 +428,5 @@ export function startEmbed({ packBase = null, pack = null, librariesPack = null,
     return
   }
   player.untrusted = true
-  start(src, sitesSources)
+  start(address.href, sitesSources)
 }
