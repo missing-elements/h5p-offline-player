@@ -28,7 +28,7 @@ The hard constraints that shape every file here:
 
 ## Layout
 
-A pnpm workspace of eight parts: seven packages and the demo app. Paths elsewhere in this file are relative to the part they
+A pnpm workspace of nine parts: seven packages and two apps, the demo and the skills' test project. Paths elsewhere in this file are relative to the part they
 belong to — `src/…` and `scripts/…` mean the player's unless a section says otherwise.
 
 ```
@@ -159,9 +159,7 @@ packages/verify/          @missing-elements/h5p-verify — plays a package headl
                             until its last tab has closed; lib/preview.html its page
   tests/                    node tests that run the real thing against the demo's committed content;
                             package-types.ts as for the normalizer; preview.test.ts the preview's
-                            ranges, a browser playing from it, its ending and its command line;
-                            author.test.mjs also builds both quiz kinds with h5p-author and plays
-                            each trusted and untrusted against the local pack, with no warnings
+                            ranges, a browser playing from it, its ending and its command line
   types/                    generated, not in git: the declarations, `VerifyReport` among them
 
 packages/cmi5/            @missing-elements/h5p-cmi5 — cmi5 for the element, published as a library
@@ -219,13 +217,6 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             server; engine.ts and harness.ts its helpers. The demo's other pages
                             have no tests (see *Commands*)
   tests/sweep-content.test.ts  the sweep's content generator, in Node
-  tests/author.test.ts       the portable h5p-author helper, its quiz validation, archives and
-                            execution from an installed skill outside the checkout, in Node;
-                            corrupt library parts must fail their SHA-256 before publication,
-                            and a zip.js older than 2.24 must stop it with the install command
-  tests/author-playback.test.ts  the eight-scenario example through the app, trusted and untrusted:
-                            every question's feedback, 75% failing and 83.3% passing an 80% threshold, retry to 100%,
-                            and only the parent Question Set finishing
   cmi5-catapult/            docker-compose.yml for ADL's CATAPULT player, MySQL and the SQL LRS;
                             scripts/cmi5-catapult.mjs clones CATAPULT into it (ignored) and proves
                             the cmi5 page against the player
@@ -256,6 +247,23 @@ apps/demo/                the demo app: the dev server for the whole repository,
   vite.config.ts            the dev server and the hosted demo: the pages plus dist/'s layout at the
                             site root -> dist-demo/
 
+apps/skills/              the skills' test project, a project of the kind a skill's user runs it in:
+                          it installs what h5p-author tells its user to install, the library pack and
+                          zip.js, which the script resolves from it, and the verifier the skill runs
+                          with npx; nothing in it ships. Out of the demo since 2026-10-23, by the
+                          owner's choice
+  tests/author.test.ts      h5p-author's helper in Node: its quiz validation, its archives, a damaged
+                            library part refused by its SHA-256 before anything is published, a zip.js
+                            older than 2.24 stopped with the install command, and the skill copied
+                            outside the checkout, resolving its dependencies from the calling project
+  tests/author-verify.test.ts  both quiz kinds and the eight-scenario example through the verifier's
+                            published API, trusted and untrusted against the installed pack: each a
+                            pass with no warnings
+  tests/author-playback.test.ts  the eight-scenario example in the verifier's preview, the review the
+                            skill hands a person, trusted and untrusted: every question's feedback,
+                            75% failing and 83.3% passing an 80% threshold, retry to 100%, and only
+                            the parent Question Set finishing; Chromium only
+
 README.md                 what npm shows; ACCESSIBILITY.md, SECURITY.md, CONTRIBUTING.md, GLOSSARY.md,
                           CODE_OF_CONDUCT.md beside it
 
@@ -278,7 +286,8 @@ skills/                   agent skills, one directory per skill, at the root bec
                           and h5p-author (text-only Multiple Choice and Question Set from a prompt:
                           a quiz JSON source, the installed pack's semantics and runtime dependency
                           closure, then the existing verifier and screenshot review; its bundled
-                          scripts/build-quiz.mjs resolves dependencies from the caller's project)
+                          scripts/build-quiz.mjs resolves dependencies from the caller's project,
+                          and is tested from apps/skills)
 
 api/no-range.js           the Vercel function that stands in for a host without Range on the demo
 vercel.json               the deployment: build command, the /no-range rewrite, caching and security headers
@@ -383,6 +392,12 @@ cmi5 page also against CATAPULT (`pnpm cmi5:catapult`). Where a page's test was 
 package's behaviour, the test moved into the package: the embed page asking before it plays a
 package that needs its own code, and `resizer.js` answering a frame that loaded before it, are in
 `packages/embed/tests/site.test.ts`; the cmi5 page's were already in `packages/cmi5/tests/`.
+The skills' scripts are source too, tested from `apps/skills`, a project of their own (2026-10-23,
+the owner's choice). h5p-author's tests were first in the demo, which had the pack and zip.js
+installed, and in the verifier's tests, and the playback test played the quiz through the
+installable app. It plays it in the verifier's preview now, the page the skill hands a person to
+review it in, and in Chromium only, where in the demo the `engines` job ran it in Firefox and
+WebKit too; the player's own suite covers the engines.
 
 The app's tests follow the same variable (`apps/demo/tests/engine.ts`; `tests/harness.ts`
 starts the dev server and the second-origin package host and waits on the element for all of

@@ -1,37 +1,31 @@
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import type { Browser, Page } from 'playwright'
-import type { ViteDevServer } from 'vite'
+import { chromium, type Browser, type Page } from 'playwright'
 import { afterAll, beforeAll, expect, it } from 'vitest'
+import { previewPackage } from '../../../packages/verify/lib/preview.mjs'
 import { buildQuiz, type Quiz } from '../../../skills/h5p-author/scripts/build-quiz.mjs'
-import { browserType } from './engine'
-import { packageHost, playerIs, startSite } from './harness'
 
 const project = resolve(import.meta.dirname, '..')
+// The pack this project installed, named to the preview as `--libraries` names a copy of its parts.
+const parts = resolve(project, 'node_modules/@missing-elements/h5p-libraries/parts')
 const source: Quiz = JSON.parse(await readFile(resolve(project, '../../skills/h5p-author/assets/phishing-scenarios.json'), 'utf8'))
 let dir: string
 let file: string
-let vite: ViteDevServer
-let origin: string
 let browser: Browser
-let elsewhere: Awaited<ReturnType<typeof packageHost>>
 
 beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), 'h5p-author-interaction-'))
   file = join(dir, 'scenarios.h5p')
   await buildQuiz(source, file, project)
-  ;({ vite, origin } = await startSite())
-  browser = await browserType.launch()
-  elsewhere = await packageHost({ '/scenarios.h5p': file })
+  browser = await chromium.launch()
 })
 afterAll(async () => {
   await browser?.close()
-  await vite?.close()
-  await elsewhere?.close()
   if (dir) await rm(dir, { recursive: true, force: true })
 })
 
+type Player = HTMLElement & { state: string; untrusted: boolean }
 type ResultsWindow = Window & typeof globalThis & { authorFinished: unknown[] }
 
 async function finished(page: Page, count: number) {
@@ -59,16 +53,17 @@ async function attempt(page: Page, correctQuestions: number, previousResults: nu
   }
 }
 
-it.each([false, true])('plays every scenario across the 80% threshold and retries to 100% (untrusted: %s)', async untrusted => {
+// In the verifier's preview, the page the skill's review hands a person: trusted, and untrusted
+// against the installed pack, as a site that did not make the quiz plays it.
+it.each([false, true])('plays every scenario in the preview across the 80% threshold and retries to 100% (untrusted: %s)', async untrusted => {
+  const preview = await previewPackage({ file, port: 0, untrusted, libraries: untrusted ? parts : undefined })
   const page = await browser.newPage({ viewport: { width: 1100, height: 850 } })
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   try {
-    const path = untrusted ? `/app/?src=${encodeURIComponent(`${elsewhere.origin}/scenarios.h5p`)}` : '/app/'
-    await page.goto(`${origin}${path}`)
-    if (!untrusted) await page.locator('input[type=file]').setInputFiles(file)
-    await playerIs(page, 'ready', 'error')
-    expect(await page.locator('h5p-player').evaluate(player => player.hasAttribute('untrusted'))).toBe(untrusted)
+    await page.goto(`${preview.url}/`)
+    await page.waitForFunction(() => ['ready', 'error'].includes((document.querySelector('h5p-player') as Player).state), null, { timeout: 60_000 })
+    expect(await page.locator('h5p-player').evaluate(player => [(player as Player).state, (player as Player).untrusted])).toEqual(['ready', untrusted])
     await page.locator('h5p-player').evaluate(player => {
       const results: unknown[] = []
       Object.defineProperty(window, 'authorFinished', { value: results })
@@ -100,5 +95,6 @@ it.each([false, true])('plays every scenario across the 80% threshold and retrie
     expect(errors).toEqual([])
   } finally {
     await page.close()
+    preview.close()
   }
 })
