@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { chromium, errors as playwrightErrors } from 'playwright-core'
 
 /** @import { H5PPlayerElement, PlayerErrorDetail, PlayerState, RefreshedLibrary } from '@missing-elements/h5p-offline-player' */
+/** @import { IncomingMessage, ServerResponse } from 'node:http' */
 
 /**
  * Plays a package the way a learner would — the real element, the real Service Worker, a real
@@ -143,21 +144,17 @@ export async function verifyPackage(options) {
    * @typedef {{ started: number | null, states: { state: PlayerState, at: number }[], errors: (ReportedError & { at: number })[], xapi: (string | null)[] }} PageReport
    * @typedef {Window & typeof globalThis & { __verify: PageReport, __csp?: BlockedLoad[], H5P?: { instances?: unknown[] }, H5PIntegration?: { contents?: Record<string, { jsonContent?: unknown }> } }} PageWindow
    */
-  const file = resolve(options.file)
-  let size
-  try {
-    size = (await stat(file)).size
-  } catch (error) {
-    // Only a missing file is "no such file"; a file that cannot be read says why.
-    const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined
-    throw new VerifyError(code === 'ENOENT' ? `No such file: ${file}` : `Cannot read ${file}: ${error instanceof Error ? error.message : String(error)}`)
-  }
+  const { path: file, size } = await packageFile(options.file)
   const readyTimeout = options.readyTimeout ?? 60_000
   const settle = options.settle ?? 3_000
   const untrusted = options.untrusted === true
   const sources = librarySources(options.libraries)
 
-  const server = await serve(await playerDist(), sources.files, sources.packDir)
+  const server = await serve(await playerDist(), sources, async (path, _request, response) => {
+    if (path !== '/') return false
+    await sendFile(join(here, 'page.html'), response)
+    return true
+  })
   const browser = await launch(options.browser)
   try {
     const context = await browser.newContext({ viewport: { width: 1100, height: 800 } })
@@ -204,7 +201,7 @@ export async function verifyPackage(options) {
 
     const query = new URLSearchParams()
     if (sources.attribute) query.set('libraries', sources.attribute)
-    if (sources.packDir) query.set('pack-base', PACK_ROUTE)
+    if (sources.packBase) query.set('pack-base', sources.packBase)
     if (options.refreshLibraries === false) query.set('refresh-libraries', 'off')
     if (untrusted) query.set('untrusted', '')
     await page.goto(`${server.url}/${query.size ? `?${query}` : ''}`)
@@ -355,21 +352,44 @@ export async function verifyPackage(options) {
 
 export class VerifyError extends Error {}
 
+/**
+ * The package's absolute path and size. A missing file, a folder, or a file that cannot be read
+ * says which, before anything starts.
+ * @internal
+ * @param {string} file
+ * @returns {Promise<{ path: string, size: number }>}
+ */
+export async function packageFile(file) {
+  const path = resolve(file)
+  let found
+  try {
+    found = await stat(path)
+  } catch (error) {
+    // Only a missing file is "no such file"; a file that cannot be read says why.
+    const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined
+    throw new VerifyError(code === 'ENOENT' ? `No such file: ${path}` : `Cannot read ${path}: ${error instanceof Error ? error.message : String(error)}`)
+  }
+  if (!found.isFile()) throw new VerifyError(`Not a file: ${path}`)
+  return { path, size: found.size }
+}
+
 /** Where the verifier serves a copy of the pack named on disk, which the element's `pack-base` names. */
 const PACK_ROUTE = '/__pack/'
 
 /**
  * `libraries` as the element reads it, with each bundle on disk given a route on the verifier's
- * own server, and a folder on disk — a copy of the pack's `parts/` — served as the pack: `pack`
- * and URLs pass as they are. A path that names nothing is an error before anything starts.
+ * own server, and a folder on disk — a copy of the pack's `parts/` — served as the pack, which
+ * `packBase` then names: `pack` and URLs pass as they are. A path that names nothing is an error
+ * before anything starts.
+ * @internal
  * @param {string | undefined} value
  */
-function librarySources(value) {
+export function librarySources(value) {
   /** @type {Map<string, string>} */
   const files = new Map()
   /** @type {string | null} */
   let packDir = null
-  if (!value) return { attribute: null, files, packDir }
+  if (!value) return { attribute: null, files, packDir, packBase: null }
   const tokens = value.split(/\s+/).filter(Boolean).map((token) => {
     if (token === 'pack' || /^https?:\/\//i.test(token)) return token
     const path = resolve(token)
@@ -384,7 +404,7 @@ function librarySources(value) {
     files.set(route, path)
     return route
   })
-  return { attribute: [...new Set(tokens)].join(' '), files, packDir }
+  return { attribute: [...new Set(tokens)].join(' '), files, packDir, packBase: packDir ? PACK_ROUTE : null }
 }
 
 /**
@@ -547,8 +567,9 @@ function dedupe(messages) {
  * The player's `dist/` and the runtime's, from the installed packages; the workspace needs both
  * built first. The runtime is a package of its own (`@missing-elements/h5p-runtime`, GPL) and is
  * served at `/frame-assets/`, which is where the element looks beside its own script.
+ * @internal
  */
-async function playerDist() {
+export async function playerDist() {
   const element = require.resolve('@missing-elements/h5p-offline-player')
   const dist = dirname(element)
   if (!existsSync(join(dist, 'h5p-sw.js'))) {
@@ -562,58 +583,94 @@ async function playerDist() {
 }
 
 /**
- * A static server for the player, the runtime, the test page and any library bundle named on
- * disk, on a free localhost port.
+ * A server on localhost for the player, the runtime and any library bundle named on disk. `own`
+ * answers first, for the paths its caller adds — the check's page; a preview's page, package and
+ * presence — and says whether it did.
+ * @internal
  * @param {{ dist: string, runtime: string }} roots
- * @param {Map<string, string>} bundles routes to bundle files
- * @param {string | null} packDir a copy of the pack's `parts/`, served under `PACK_ROUTE`
+ * @param {{ files: Map<string, string>, packDir: string | null }} sources bundles on disk by route, and a
+ *   copy of the pack's `parts/`, served under `PACK_ROUTE`
+ * @param {(path: string, request: IncomingMessage, response: ServerResponse) => boolean | Promise<boolean>} own
+ * @param {number} [port] the port to take; any free one when it is taken, or with 0
  * @returns {Promise<{ url: string, close: () => void }>}
  */
-function serve({ dist, runtime }, bundles = new Map(), packDir = null) {
-  const page = join(here, 'page.html')
+export function serve({ dist, runtime }, { files: bundles, packDir }, own, port = 0) {
   const ASSETS = '/frame-assets/'
   const server = createServer(async (request, response) => {
-    const path = decodeURIComponent(new URL(request.url ?? '/', 'http://localhost').pathname)
-    /**
-     * @param {string} root
-     * @param {string} rest
-     */
-    const safe = (root, rest) => join(root, normalize(rest).replace(/^(\.\.[/\\])+/, ''))
-    const bundle = bundles.get(path)
-    const inPack = packDir !== null && path.startsWith(PACK_ROUTE)
-    const target =
-      bundle ??
-      (path === '/' ? page : inPack ? safe(packDir, path.slice(PACK_ROUTE.length)) : path.startsWith(ASSETS) ? safe(runtime, path.slice(ASSETS.length)) : safe(dist, path))
-    if (target !== page && !bundle && !target.startsWith(dist) && !target.startsWith(runtime) && !(inPack && target.startsWith(packDir))) {
-      response.writeHead(403).end()
-      return
-    }
     try {
-      const body = await readFile(target)
-      response.writeHead(200, {
-        'Content-Type': MIME[extname(target)] ?? 'application/octet-stream',
-        'Content-Length': body.length,
-        'Cache-Control': 'no-store'
-      })
-      response.end(body)
-    } catch {
-      response.writeHead(404, { 'Content-Type': 'text/plain' }).end('not found')
+      const path = decodeURIComponent(new URL(request.url ?? '/', 'http://localhost').pathname)
+      if (await own(path, request, response)) return
+      /**
+       * @param {string} root
+       * @param {string} rest
+       */
+      const safe = (root, rest) => join(root, normalize(rest).replace(/^(\.\.[/\\])+/, ''))
+      const bundle = bundles.get(path)
+      const inPack = packDir !== null && path.startsWith(PACK_ROUTE)
+      const target =
+        bundle ?? (inPack ? safe(packDir, path.slice(PACK_ROUTE.length)) : path.startsWith(ASSETS) ? safe(runtime, path.slice(ASSETS.length)) : safe(dist, path))
+      if (!bundle && !target.startsWith(dist) && !target.startsWith(runtime) && !(inPack && target.startsWith(packDir))) {
+        response.writeHead(403).end()
+        return
+      }
+      await sendFile(target, response)
+    } catch (error) {
+      // A path that does not decode, or a file that went away mid-answer: the server goes on.
+      if (!response.headersSent) response.writeHead(error instanceof URIError ? 400 : 500).end()
+      else response.destroy()
     }
   })
-  return new Promise((resolveServer) => {
-    server.listen(0, '127.0.0.1', () => {
-      const { port } = /** @type {import('node:net').AddressInfo} */ (server.address())
-      resolveServer({ url: `http://127.0.0.1:${port}`, close: () => server.close() })
+  return new Promise((resolveServer, rejectServer) => {
+    server.on('error', (error) => {
+      // The port asked for is taken, by another preview or another program: any free one will do.
+      if (/** @type {NodeJS.ErrnoException} */ (error).code === 'EADDRINUSE' && port !== 0) {
+        port = 0
+        server.listen(0, '127.0.0.1')
+      } else rejectServer(error)
     })
+    server.once('listening', () => {
+      const { port: bound } = /** @type {import('node:net').AddressInfo} */ (server.address())
+      resolveServer({
+        url: `http://127.0.0.1:${bound}`,
+        // A connection left open — a browser's keep-alive, a preview tab's presence — would hold it.
+        close: () => {
+          server.closeAllConnections()
+          server.close()
+        }
+      })
+    })
+    server.listen(port, '127.0.0.1')
   })
+}
+
+/**
+ * A file whole, with its type and no caching, or a 404.
+ * @param {string} target
+ * @param {ServerResponse} response
+ */
+async function sendFile(target, response) {
+  let body
+  try {
+    body = await readFile(target)
+  } catch {
+    response.writeHead(404, { 'Content-Type': 'text/plain' }).end('not found')
+    return
+  }
+  response.writeHead(200, {
+    'Content-Type': MIME[extname(target)] ?? 'application/octet-stream',
+    'Content-Length': body.length,
+    'Cache-Control': 'no-store'
+  })
+  response.end(body)
 }
 
 /**
  * A Chromium: the one named, else Chrome or Edge installed on the machine, else Playwright's
  * own. Chrome and Edge first because they are usually there and cost no download.
+ * @internal
  * @param {string | undefined} executablePath
  */
-async function launch(executablePath) {
+export async function launch(executablePath) {
   /** @type {import('playwright-core').LaunchOptions[]} */
   const attempts = executablePath
     ? [{ executablePath }]

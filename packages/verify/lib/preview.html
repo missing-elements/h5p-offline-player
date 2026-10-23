@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Preview</title>
+    <script type="module" src="/h5p-player.js"></script>
+    <style>
+      :root { color-scheme: light dark; }
+      body { margin: 0; background: Canvas; color: CanvasText; font: 15px/1.4 system-ui, sans-serif; }
+      header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; padding: 12px 16px; border-bottom: 1px solid GrayText; }
+      h1 { margin: 0; font-size: 1em; overflow-wrap: anywhere; }
+      #status { color: GrayText; }
+      main { max-width: 1024px; margin: 16px auto; padding: 0 16px; }
+      h5p-player { display: block; min-height: 240px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1 id="name">Preview</h1>
+      <span id="status" role="status">Opening…</span>
+    </header>
+    <main><h5p-player></h5p-player></main>
+    <script type="application/json" id="settings">{{settings}}</script>
+    <script>
+      const settings = JSON.parse(document.getElementById('settings').textContent)
+      const player = document.querySelector('h5p-player')
+      const status = document.getElementById('status')
+      document.title = `${settings.name} · preview`
+      document.getElementById('name').textContent = settings.name
+      // The element as the check sets it: the same libraries, played the same way.
+      if (settings.libraries) player.setAttribute('libraries', settings.libraries)
+      if (settings.packBase) player.setAttribute('pack-base', settings.packBase)
+      if (!settings.refreshLibraries) player.setAttribute('refresh-libraries', 'off')
+      if (settings.untrusted) player.untrusted = true
+
+      player.addEventListener('statechange', (event) => {
+        const { state } = event.detail
+        if (state === 'ready') {
+          status.textContent = settings.untrusted
+            ? 'Played untrusted, as a site that did not make it plays it. Close this tab to end the preview.'
+            : 'Close this tab to end the preview.'
+        } else if (state !== 'error') status.textContent = 'Opening…'
+      })
+      player.addEventListener('error', (event) => {
+        // An error once the content is up leaves it running; before that, the package did not open.
+        if (player.state !== 'ready') status.textContent = event.detail.message
+      })
+      player.setAttribute('src', settings.src)
+
+      // Held open while this tab shows the preview: the command ends once no tab does. Once its
+      // server has gone the page stops asking, so that it cannot keep a later preview alive.
+      const presence = new EventSource('/__preview/events')
+      presence.addEventListener('error', () => {
+        presence.close()
+        status.textContent = 'The preview has ended. Run the command again to open it.'
+      })
+    </script>
+  </body>
+</html>

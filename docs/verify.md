@@ -16,3 +16,12 @@ With `--libraries pack`, or a copy of the pack's `parts/`, it plays a library th
 at the pack's newer version, as a site with the pack will, and says which. It is meant as the last step of a pipeline that generates or
 rewrites packages; the skill in `skills/h5p-verify/` tells an agent when to run it and how to
 read the result.
+
+The check cannot say whether the content is right; a person decides that by playing it.
+`--preview` checks nothing and opens the package in the real player in the person's own
+browser, served from their computer with `Range`, as a static host serves it. It works for any
+content type, and a large video starts at once. It ends a few seconds after its last tab closes:
+
+```bash
+npx @missing-elements/h5p-verify@latest course.h5p --preview
+```

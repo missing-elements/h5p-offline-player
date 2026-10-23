@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util'
 import { basename, dirname, join, resolve } from 'node:path'
+import { openBrowser, previewPackage } from '../lib/preview.mjs'
 import { VerifyError, summarize, verifyPackage } from '../lib/verify.mjs'
 
 const HELP = `Usage: h5p-verify <package.h5p> [options]
@@ -8,7 +9,14 @@ const HELP = `Usage: h5p-verify <package.h5p> [options]
 Plays the package in a headless browser through h5p-offline-player and reports whether it
 works. Exit code 0: it plays (warnings possible). 1: it does not. 2: could not run.
 
+With --preview it checks nothing: it opens the package in the real player in your browser,
+served from this computer, until its tab is closed. Exit code 0 when the preview ends, 2 when
+it could not start.
+
 Options:
+  --preview              open the package in your browser instead of checking it; it takes
+                         --untrusted, --libraries and --no-refresh-libraries
+  --no-open              with --preview, print the address instead of opening a browser
   --untrusted            play it as a site plays a package it did not make: none of its own
                          code runs, its libraries come only from --libraries (pack by
                          default), and its content is checked against their semantics. What
@@ -34,6 +42,8 @@ try {
   args = parseArgs({
     allowPositionals: true,
     options: {
+      preview: { type: 'boolean' },
+      'no-open': { type: 'boolean' },
       libraries: { type: 'string' },
       untrusted: { type: 'boolean' },
       'no-refresh-libraries': { type: 'boolean' },
@@ -56,6 +66,40 @@ const [file] = args.positionals
 if (args.values.help || !file) {
   console.log(HELP)
   process.exit(args.values.help ? 0 : 2)
+}
+
+if (args.values['no-open'] && !args.values.preview) {
+  console.error('--no-open goes with --preview')
+  process.exit(2)
+}
+
+if (args.values.preview) {
+  // What only the check reads is refused rather than ignored, so a mistaken call says so.
+  const unsupported = ['out', 'browser', 'ready', 'settle', 'json', 'quiet'].filter((name) => args.values[name] !== undefined)
+  if (unsupported.length) {
+    console.error(`--preview does not take ${unsupported.map((name) => `--${name}`).join(', ')}`)
+    process.exit(2)
+  }
+  let preview
+  try {
+    preview = await previewPackage({
+      file,
+      libraries: args.values.libraries,
+      untrusted: args.values.untrusted,
+      refreshLibraries: !args.values['no-refresh-libraries']
+    })
+  } catch (error) {
+    console.error(error instanceof VerifyError ? error.message : error)
+    process.exit(2)
+  }
+  const address = `${preview.url}/`
+  console.log(`Previewing ${basename(file)} at ${address}`)
+  if (args.values['no-open'] || !(await openBrowser(address))) console.log('Open that address in a browser.')
+  console.log('The package stays on this computer. The preview ends when its tab is closed, or with Ctrl+C.')
+  for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => preview.close())
+  const ended = await preview.closed
+  console.log(ended === 'unopened' ? 'No tab opened the preview in time; it ended.' : 'The preview ended.')
+  process.exit(0)
 }
 
 const seconds = (value, fallback) => {
