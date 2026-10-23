@@ -5,7 +5,6 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { BlobReader, BlobWriter, Uint8ArrayReader, Uint8ArrayWriter, ZipReader, ZipWriter } from '@zip.js/zip.js'
 import type { H5PPlayerElement } from '@missing-elements/h5p-offline-player'
-import type { Browser } from 'playwright-core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { byteRange, previewPackage } from '../lib/preview.mjs'
 import { launch } from '../lib/verify.mjs'
@@ -23,14 +22,11 @@ const bin = resolve(import.meta.dirname, '../bin/h5p-verify.mjs')
 const UNWATCHED = 'content/videos/unwatched.mp4'
 const UNWATCHED_SIZE = 32 * 1024 * 1024
 let dir: string
-let browser: Browser
 
 beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), 'h5p-preview-'))
-  browser = await launch(undefined)
 })
 afterAll(async () => {
-  await browser?.close()
   await rm(dir, { recursive: true, force: true })
 })
 
@@ -114,28 +110,36 @@ describe('h5p-verify --preview', () => {
     const file = await withUnwatchedVideo()
     const answers: { range: string | null, bytes: number }[] = []
     const preview = await previewPackage({ file, port: 0, closeGrace: 200, onArchiveRequest: (answer) => answers.push(answer) })
-    const page = await browser.newPage()
-    await page.goto(`${preview.url}/`)
-    await page.waitForFunction(() => document.querySelector<H5PPlayerElement>('h5p-player')?.state === 'ready', null, { timeout: 60_000 })
-    // Read as a site that honours Range is: in pieces, not downloaded whole first.
-    expect(await page.evaluate(() => document.querySelector<H5PPlayerElement>('h5p-player')?.source?.type)).toBe('range-http')
-    const frame = page.frames().find((candidate) => candidate.url().includes('/h5p/frame/'))
-    expect(frame).toBeDefined()
-    expect(await frame!.evaluate(() => document.querySelector('#h5p-root')?.querySelectorAll('*').length ?? 0)).toBeGreaterThan(0)
-    // A range of the large video, asked for as a media element asks: answered, and read alone.
-    const asked = await frame!.evaluate(async (path) => {
-      const config = JSON.parse(document.getElementById('h5p-boot-config')?.textContent ?? 'null')
-      const response = await fetch(`${config.h5pJsonPath}/${path}`, { headers: { Range: 'bytes=1000000-1000999' } })
-      return { status: response.status, length: (await response.arrayBuffer()).byteLength }
-    }, UNWATCHED)
-    expect(asked).toEqual({ status: 206, length: 1000 })
-    expect(answers.length).toBeGreaterThan(0)
-    expect(answers.filter((answer) => answer.range === null)).toEqual([])
-    expect(answers.reduce((sum, answer) => sum + answer.bytes, 0)).toBeLessThan(UNWATCHED_SIZE / 4)
+    // Started here, under this test's timeout: beside the other file's browsers on CI, Chrome
+    // took longer than a hook's ten seconds to start.
+    const browser = await launch(undefined)
+    try {
+      const page = await browser.newPage()
+      await page.goto(`${preview.url}/`)
+      await page.waitForFunction(() => document.querySelector<H5PPlayerElement>('h5p-player')?.state === 'ready', null, { timeout: 60_000 })
+      // Read as a site that honours Range is: in pieces, not downloaded whole first.
+      expect(await page.evaluate(() => document.querySelector<H5PPlayerElement>('h5p-player')?.source?.type)).toBe('range-http')
+      const frame = page.frames().find((candidate) => candidate.url().includes('/h5p/frame/'))
+      expect(frame).toBeDefined()
+      expect(await frame!.evaluate(() => document.querySelector('#h5p-root')?.querySelectorAll('*').length ?? 0)).toBeGreaterThan(0)
+      // A range of the large video, asked for as a media element asks: answered, and read alone.
+      const asked = await frame!.evaluate(async (path) => {
+        const config = JSON.parse(document.getElementById('h5p-boot-config')?.textContent ?? 'null')
+        const response = await fetch(`${config.h5pJsonPath}/${path}`, { headers: { Range: 'bytes=1000000-1000999' } })
+        return { status: response.status, length: (await response.arrayBuffer()).byteLength }
+      }, UNWATCHED)
+      expect(asked).toEqual({ status: 206, length: 1000 })
+      expect(answers.length).toBeGreaterThan(0)
+      expect(answers.filter((answer) => answer.range === null)).toEqual([])
+      expect(answers.reduce((sum, answer) => sum + answer.bytes, 0)).toBeLessThan(UNWATCHED_SIZE / 4)
 
-    await page.close()
-    expect(await preview.closed).toBe('closed')
-  }, 90_000)
+      await page.close()
+      expect(await preview.closed).toBe('closed')
+    } finally {
+      preview.close()
+      await browser.close()
+    }
+  }, 120_000)
 
   it('ends by itself when no tab opens it in time', async () => {
     const preview = await previewPackage({ file: quiz, port: 0, openWait: 100 })
@@ -170,5 +174,5 @@ describe('h5p-verify --preview', () => {
     expect(await run(quiz, '--preview', '--json', '--out', dir)).toEqual({ code: 2, stderr: '--preview does not take --out, --json\n' })
     expect(await run(quiz, '--no-open')).toEqual({ code: 2, stderr: '--no-open goes with --preview\n' })
     expect((await run(join(dir, 'missing.h5p'), '--preview', '--no-open')).code).toBe(2)
-  })
+  }, 30_000)
 })
