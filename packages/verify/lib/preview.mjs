@@ -4,7 +4,7 @@ import { readFile, stat } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { fileURLToPath } from 'node:url'
-import { librarySources, packageFile, playerDist, serve } from './verify.mjs'
+import { librarySources, packageFile, playerDist, serve } from './serve.mjs'
 
 /** @import { IncomingMessage, ServerResponse } from 'node:http' */
 
@@ -39,6 +39,8 @@ const HEARTBEAT_MS = 15_000
  * @property {boolean} [untrusted] play it as a site that did not make it plays it
  * @property {boolean} [refreshLibraries] with the pack, play its newer versions of the libraries the
  *   package carries; default true
+ * @property {{ dist: string, runtime: string }} [roots] the player's `dist/` and the runtime's, for a host
+ *   that ships them itself, as the VS Code extension does; the installed packages' otherwise
  * @property {number} [port] the port to take; default 4645, and any free one when that is taken
  * @property {number} [openWait] ms to wait for a tab before stopping; default ten minutes
  * @property {number} [closeGrace] ms the preview outlives its last tab, so that a reload does not end
@@ -86,7 +88,7 @@ export async function previewPackage(options) {
   })
 
   const server = await serve(
-    await playerDist(),
+    options.roots ?? (await playerDist()),
     sources,
     async (path, request, response) => {
       if (path === '/') {
@@ -143,12 +145,13 @@ export async function previewPackage(options) {
  * The package as a static host with `Range` serves it: `206` with the bytes asked for, `200` whole
  * otherwise, streamed from disk. Its validator is the file's size and time, so the package written
  * again at the same path is a new package to the element rather than its old caches.
+ * @internal
  * @param {string} file
  * @param {IncomingMessage} request
  * @param {ServerResponse} response
- * @param {PreviewOptions['onArchiveRequest']} report
+ * @param {PreviewOptions['onArchiveRequest']} [report]
  */
-async function sendArchive(file, request, response, report) {
+export async function sendArchive(file, request, response, report) {
   const { size, mtimeMs } = await stat(file)
   const headers = {
     'Content-Type': 'application/zip',
