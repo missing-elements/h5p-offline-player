@@ -141,6 +141,25 @@ describe('h5p-verify --preview', () => {
     }
   }, 120_000)
 
+  it('offers the package for download, until its server has gone', async () => {
+    const preview = await previewPackage({ file: quiz, port: 0 })
+    const browser = await launch(undefined)
+    try {
+      const page = await browser.newPage()
+      await page.goto(`${preview.url}/`)
+      const link = page.getByRole('link', { name: 'Download' })
+      const [download] = await Promise.all([page.waitForEvent('download'), link.click()])
+      expect(download.suggestedFilename()).toBe('quiz.h5p')
+      expect((await readFile(await download.path())).equals(await readFile(quiz))).toBe(true)
+      preview.close()
+      await link.waitFor({ state: 'hidden' })
+      expect(await page.locator('#status').textContent()).toContain('The preview has ended.')
+    } finally {
+      preview.close()
+      await browser.close()
+    }
+  }, 60_000)
+
   it('ends by itself when no tab opens it in time', async () => {
     const preview = await previewPackage({ file: quiz, port: 0, openWait: 100 })
     expect(await preview.closed).toBe('unopened')
