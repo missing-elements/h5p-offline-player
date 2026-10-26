@@ -1,0 +1,141 @@
+{
+  "name": "h5p-preview",
+  "displayName": "H5P Preview by Missing Elements",
+  "description": "Open .h5p files in VS Code and play them in the real player: no H5P server, offline, and nothing leaves your computer.",
+  "version": "0.1.0",
+  "publisher": "missing-elements",
+  "private": true,
+  "license": "MIT",
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/missing-elements/h5p-offline-player.git",
+    "directory": "packages/vscode"
+  },
+  "homepage": "https://github.com/missing-elements/h5p-offline-player/tree/main/packages/vscode#readme",
+  "bugs": {
+    "url": "https://github.com/missing-elements/h5p-offline-player/issues"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Visualization",
+    "Education"
+  ],
+  "keywords": [
+    "h5p",
+    "h5p player",
+    "interactive content",
+    "interactive video",
+    "quiz",
+    "elearning",
+    "e-learning",
+    "preview"
+  ],
+  "extensionKind": [
+    "ui",
+    "workspace"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "In Restricted Mode every package plays untrusted: none of its own code runs, its libraries come from the library pack the extension carries, and its content is checked against their semantics."
+    },
+    "virtualWorkspaces": true
+  },
+  "main": "./dist/extension.cjs",
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "missingElements.h5pPreview",
+        "displayName": "H5P Preview",
+        "selector": [
+          {
+            "filenamePattern": "*.h5p"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
+    "commands": [
+      {
+        "command": "h5pPreview.reload",
+        "title": "Reload",
+        "category": "H5P Preview",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "h5pPreview.openInBrowser",
+        "title": "Open in Browser",
+        "category": "H5P Preview",
+        "icon": "$(link-external)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "h5pPreview.reload",
+          "when": "activeCustomEditorId == missingElements.h5pPreview",
+          "group": "navigation@1"
+        },
+        {
+          "command": "h5pPreview.openInBrowser",
+          "when": "activeCustomEditorId == missingElements.h5pPreview",
+          "group": "navigation@2"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "h5pPreview.openInBrowser",
+          "when": "resourceExtname == .h5p",
+          "group": "navigation@9"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "h5pPreview.reload",
+          "when": "activeCustomEditorId == missingElements.h5pPreview"
+        },
+        {
+          "command": "h5pPreview.openInBrowser",
+          "when": "activeCustomEditorId == missingElements.h5pPreview"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "H5P Preview",
+      "properties": {
+        "h5pPreview.untrusted": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Play packages `untrusted`, as a site plays packages it did not make: none of their own code runs, their libraries come only from the library pack the extension carries, and their content is checked against the libraries' semantics. In Restricted Mode every package plays this way."
+        },
+        "h5pPreview.newestLibraries": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Play the library pack's newer version of a library a package carries, as a site with the pack plays it. Off: each package plays with its own libraries."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "package": "node scripts/build.mjs && node scripts/package.mjs",
+    "test": "pnpm --filter @missing-elements/h5p-offline-player build && vitest run",
+    "test:vscode": "node scripts/build.mjs && node tests/vscode/run.mjs",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@missing-elements/h5p-libraries": "workspace:^",
+    "@missing-elements/h5p-offline-player": "workspace:^",
+    "@missing-elements/h5p-runtime": "workspace:^",
+    "@types/node": "^26.6.5",
+    "@types/vscode": "1.90.0",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.0.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}

@@ -1,0 +1,11 @@
+# The .vsix carries the bundle, the files the server serves, and what the Marketplace shows. The
+# sources are bundled into dist/, and no node_modules is shipped (vsce package --no-dependencies).
+**
+!dist/**
+!assets/**
+!package.json
+!README.md
+!CHANGELOG.md
+!LICENSE
+!NOTICE.txt
+!icon.png

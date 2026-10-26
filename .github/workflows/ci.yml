@@ -81,3 +81,33 @@ jobs:
       - run: pnpm test:engine
         env:
           H5P_TEST_BROWSER: ${{ matrix.browser }}
+
+  # The VS Code extension in a real VS Code, on a display Xvfb gives it, and the .vsix the owner
+  # publishes, built from what the tests ran against. The unit tests run in the job above.
+  vscode:
+    name: VS Code extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # The player and the runtime, which the extension carries.
+      - run: pnpm build
+      # The editor the tests download, about 150 MB, a new stable a month: kept a week at a time.
+      - id: week
+        run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        with:
+          path: packages/vscode/.vscode-test
+          key: vscode-test-${{ steps.week.outputs.week }}
+          restore-keys: vscode-test-
+      - run: xvfb-run -a pnpm --filter h5p-preview test:vscode
+      - run: pnpm --filter h5p-preview package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: h5p-preview-vsix
+          path: packages/vscode/*.vsix

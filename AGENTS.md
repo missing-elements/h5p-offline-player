@@ -28,8 +28,10 @@ The hard constraints that shape every file here:
 
 ## Layout
 
-A pnpm workspace of nine parts: seven packages and two apps, the demo and the skills' test project. Paths elsewhere in this file are relative to the part they
-belong to — `src/…` and `scripts/…` mean the player's unless a section says otherwise.
+A pnpm workspace of ten parts: eight packages and two apps, the demo and the skills' test project.
+Seven of the packages are published to npm; the eighth, the VS Code extension, is a `.vsix`. Paths
+elsewhere in this file are relative to the part they belong to — `src/…` and `scripts/…` mean the
+player's unless a section says otherwise.
 
 ```
 packages/player/          @missing-elements/h5p-offline-player — the published package
@@ -154,7 +156,10 @@ packages/normalize/       @missing-elements/h5p-normalize — the package rewrit
 
 packages/verify/          @missing-elements/h5p-verify — plays a package headless and reports whether it works
   bin/h5p-verify.mjs        the command
-  lib/verify.mjs            the static server, the browser run and the report; lib/page.html the page it drives
+  lib/verify.mjs            the browser run and the report; lib/page.html the page it drives
+  lib/serve.mjs             what the check and the preview share, and no Playwright: the package on
+                            disk, the library sources, the static server for the player and the
+                            runtime; the VS Code extension bundles it (2026-10-26)
   lib/preview.mjs           `--preview`: the package in the person's own browser, served by range
                             until its last tab has closed; lib/preview.html its page
   tests/                    node tests that run the real thing against the demo's committed content;
@@ -187,6 +192,23 @@ packages/embed/           @missing-elements/h5p-embed — the embed page as a st
                             framed by a page on localhost, as deployed; package-types.ts as for the
                             normalizer
   types/                    generated, not in git: the declarations of both entries
+
+packages/vscode/          h5p-preview, "H5P Preview by Missing Elements" — the VS Code extension, a .vsix
+                          for the Visual Studio Marketplace and Open VSX, not on npm (see *The VS Code
+                          extension*)
+  src/extension.mjs         activate(): the custom editor, the commands, the settings and trust events
+  src/previews.mjs          the editor provider: documents (a copy for a remote file), previews, the
+                            window's server, Open in Browser, playing again when the file changes
+  src/server.mjs            the window's preview server: the verifier's `serve` and `sendArchive`,
+                            a page per package at /view/<id>, the package at /__package/<id>/<name>
+  src/page.mjs              the page the webview frames: the element, and what it reached posted up
+  src/webview.mjs           the webview: the bar (status, Untrusted, Newest libraries) and the frame
+  scripts/build.mjs         dist/extension.cjs (esbuild, the verifier's modules bundled, Playwright
+                            refused), assets/ (the player's files, the runtime, the pack's parts),
+                            NOTICE.txt; scripts/package.mjs the .vsix (vsce, --no-dependencies)
+  tests/                    server.test.ts and html.test.ts in Node; vscode/ the suite that runs in a
+                            real VS Code (run.mjs downloads it, suite.cjs runs in its extension host)
+  README.md, CHANGELOG.md   the Marketplace page and its changelog; icon.png the app's icon at 128 px
 
 apps/demo/                the demo app: the dev server for the whole repository, and the hosted site
   index.html                the hosted player page
@@ -326,6 +348,8 @@ pnpm typecheck         # every package
 pnpm build             # the player: types, element, both workers; builds the runtime package on the way
 pnpm normalize course.h5p          # rewrite a package so it streams: media stored, mp4 index first
 pnpm verify course.h5p             # play a package in a headless browser and report whether it works
+pnpm --filter h5p-preview package  # the VS Code extension's .vsix, from the player as pnpm build left it
+pnpm --filter h5p-preview test:vscode  # its suite in a VS Code it downloads; under xvfb-run on Linux
 pnpm build:demo        # the hosted demo into apps/demo/dist-demo/, what Vercel runs
 pnpm demo:content      # rebuild apps/demo/demo/content/*.h5p from their sources; needs the H5P hub
 pnpm demo:og           # re-render the social card, apps/demo/demo/og-image.png
@@ -1793,6 +1817,70 @@ The tests need the player built (`pnpm build`); the package's `test` script does
 The repository's own sweep does click through content and read its statements (next section),
 for packages it makes; the verifier, which is handed a stranger's, still does not.
 
+## The VS Code extension
+
+`packages/vscode` is **H5P Preview by Missing Elements** (`missing-elements.h5p-preview`): a `.h5p`
+opens in a read-only custom editor that plays it. Built on 2026-10-26 (#83), the first of the
+plugins weighed in the owner's notes: the Marketplace had one H5P extension, for developing content
+types, and nothing that played a package. It is not on npm. The owner publishes the `.vsix` to the
+Visual Studio Marketplace (publisher `missing-elements`) and to Open VSX, for Cursor and VSCodium.
+The name is the owner's, under H5P Group's trademark policy (h5p.org/trademark, 2.5): open-source
+code may lead with "H5P" only beside its author, "Acme's H5P interactive Quiz" being its example.
+
+- **A webview frames a page from a server on 127.0.0.1.** A webview's own origin,
+  `vscode-webview://`, cannot register a Service Worker, since the spec takes `http` and `https`
+  script URLs only; a page it frames from a local server can. Measured in VS Code 1.143.1
+  (Electron 43, Chrome 150) on macOS, 2026-10-26: the frame's worker registers and controls it, the
+  demo quiz reaches `ready` in 0.5 s, and the Interactive Video's H.264 clip decodes (`canPlayType`
+  says "probably", `readyState` 4).
+- **One server per window, on port 4646 when it is free.** Every preview in the window shares it,
+  so one origin keeps one copy of the player's worker and caches from session to session; the
+  command's 4645 is left to Open in Browser. A package is served under a hash of its URI,
+  `/view/<id>` its page and `/__package/<id>/<name>` the archive, the same in every session, and
+  stops being served with its last preview. The server stops with the last preview and starts
+  again with the next. Not the command's `previewPackage`, which serves one package for as long as
+  a tab holds it.
+- **The verifier's server, bundled from this checkout.** `src/server.mjs` imports `serve` from
+  `lib/serve.mjs` and `sendArchive` from `lib/preview.mjs` by relative path, as the skills' playback
+  test imports `previewPackage`. They are `@internal`, so a change to them is a change to the
+  extension, and its tests are where it shows. `lib/serve.mjs` was split out of `lib/verify.mjs` the
+  same day, because `verify.mjs` imports Playwright at its top and the preview needs none of it;
+  `scripts/build.mjs` refuses `playwright-core` with an esbuild plugin, so it stays out. The bundle
+  is CommonJS, which VS Code's `require` loads, and the verifier's modules find their files by
+  `import.meta.url`, which CommonJS has not: the build defines it as the bundle's own URL and puts
+  `preview.html` beside the bundle, for Open in Browser.
+- **The extension carries everything it serves.** `assets/` is copied at build from the installed
+  packages, as the embed builder takes them: the player's three files, the runtime, the library
+  pack's parts and `libraries.txt`. Content-only exports play offline and nothing leaves the
+  machine. `vsce package --no-dependencies` ships `dist/` and `assets/` and no node_modules: 13.8 MB
+  in 141 files on 2026-10-26. `--baseContentUrl` and `--baseImagesUrl` point the README's relative
+  links at `packages/vscode/`, where vsce's default would point them at the repository's root.
+- **Trust follows the workspace.** In Restricted Mode every package plays `untrusted`, the switch
+  disabled. A trusted workspace plays as the settings say (`h5pPreview.untrusted`,
+  `h5pPreview.newestLibraries`), with a switch for each in every editor. A change of setting, or
+  trust granted, plays the open previews again as the settings now say.
+- **Messages are taken from one sender each.** The page posts what the element reached to its first
+  ancestor origin only (`location.ancestorOrigins[0]`, the webview). The webview takes the frame's
+  messages by its window and the server's origin, and the extension's by its own origin. A
+  package's own code runs in a frame below the page, on the server's origin, so what it posts upward
+  is neither and is dropped: it cannot reload the preview or switch its trust.
+- **A file that is not on this computer is copied first.** `extensionKind` prefers `ui`, so the
+  extension runs beside the webview, which reaches only this computer's loopback; a remote or
+  virtual workspace's file is copied to a temporary folder through `workspace.fs`, and copied again
+  when it changes. Not tested.
+- **A file written again plays again**, 500 ms after it last changed. A watcher on the file sends
+  the reload, and the validator, the file's size and time, makes it a new package to the element.
+
+Tests. `tests/*.test.ts` run in Node with the rest of `pnpm test`: the server against the built
+player, runtime and pack, and the two HTML builders. `tests/vscode/run.mjs` downloads VS Code into
+`.vscode-test/` and runs `suite.cjs` in its extension host. The suite opens the demo's packages and
+waits on the extension's `onDidChangeState`, the one thing `activate` exports: the quiz, the
+Interactive Video, a content-only export played from the pack, Reload, untrusted by setting and
+live, and a file written again. CI runs it on Linux under `xvfb-run`, in the `vscode` job, which
+also uploads the `.vsix`. Started from a terminal inside VS Code, the downloaded editor ran as plain
+Node, because `ELECTRON_RUN_AS_NODE` is inherited; `run.mjs` deletes it. Not covered: Restricted
+Mode (the suite opens a trusted folder), Open in Browser, remote copies, and Windows.
+
 ## Types for the plain-JS packages
 
 The normalizer, the verifier and the embed package are JavaScript with JSDoc, and since #60 their
@@ -2719,6 +2807,10 @@ libraries.txt` and that file lists every one. Moving our code to the GPL was con
 GPL dependency is what corporate policies and scanners refuse. MPL-2.0 remains the middle ground
 if closed forks ever matter.
 
+The VS Code extension is MIT and carries the runtime and the libraries as separate files beside its
+bundle, as the embed package's site does; its `NOTICE.txt`, written by its build, says which file is
+what, with the versions carried.
+
 **The setups are named, both are self-hosting, and Install comes first.** Decided on
 2026-10-09, after the owner's public site was repositioned as a test tool: the player's main benefit is that a
 host runs H5P on its own infrastructure — no H5P server, no backend, no third-party service in
@@ -2765,6 +2857,8 @@ deliberate additions to it, not drift:
   is how they get the layout the player streams best.
 - A verifier command. The design has the player play packages; the command has it judge them,
   headless, for whoever produces packages by machine.
+- A VS Code extension. The design has the player on websites; the extension plays a package in
+  the editor, from a server on the author's own computer.
 - The libraries are warmed into the cache before the frame boots on a `Range` host. The design
   reads every entry on demand; on a high-latency host that made the boot a matter of minutes.
 - A library source that cannot be reached falls back to a bundle downloaded whole from the same
