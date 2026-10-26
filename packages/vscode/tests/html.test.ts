@@ -24,7 +24,8 @@ describe('the webview', () => {
       "script-src 'nonce-n0nce'"
     ])
     // Every script and style carries the nonce, but the configuration, which is data.
-    for (const tag of html.match(/<(script|style)\b[^>]*>/g) ?? []) {
+    // In any case: `<SCRIPT>` is a script as much as `<script>` is.
+    for (const tag of html.match(/<(script|style)\b[^>]*>/gi) ?? []) {
       if (!tag.includes('type="application/json"')) expect(tag).toContain('nonce="n0nce"')
     }
   })
