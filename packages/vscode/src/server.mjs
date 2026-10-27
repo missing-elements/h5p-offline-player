@@ -56,9 +56,11 @@ export function languageTag(value) {
  * @param {string} options.packDir the library pack's parts, served as the pack
  * @param {number | number[]} [options.port] the port, or the ports in order, before any free one;
  *   0 for any free one at once
+ * @param {() => boolean} [options.restricted] whether the workspace is in Restricted Mode, asked at
+ *   each page: while it is, every page plays untrusted, whatever its address says
  * @returns {Promise<PreviewServer>}
  */
-export async function startServer({ roots, packDir, port = PORTS }) {
+export async function startServer({ roots, packDir, port = PORTS, restricted = () => false }) {
   const sources = librarySources(packDir)
   /** @type {Map<string, { file: string, name: string, previews: number }>} */
   const packages = new Map()
@@ -79,7 +81,10 @@ export async function startServer({ roots, packDir, port = PORTS }) {
           name: entry.name,
           src: `/__package/${view[1]}/${encodeURIComponent(entry.name)}`,
           packBase: sources.packBase,
-          untrusted: query.get('untrusted') === '1',
+          // Restricted Mode is the server's to keep, not the address's: an untrusted package's
+          // content keeps its links, and one to its own page without the flag, clicked, would
+          // otherwise play it trusted. The tab's switch in a trusted workspace is the address's.
+          untrusted: restricted() || query.get('untrusted') === '1',
           newest: query.get('newest') !== '0',
           lang: languageTag(query.get('lang'))
         })

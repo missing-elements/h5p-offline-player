@@ -100,6 +100,22 @@ describe('the preview server', () => {
     expect((await fetch(`${server.url}/__package/${id}/quiz.h5p`)).status).toBe(404)
   })
 
+  it('plays every page untrusted in Restricted Mode, whatever its address says', async () => {
+    let restricted = true
+    const guarded = await startServer({ roots, packDir, port: 0, restricted: () => restricted })
+    try {
+      const id = guarded.add(quiz, 'quiz.h5p', 'file:///courses/quiz.h5p')
+      const untrusted = async (query: string) => settingsOf(await (await fetch(`${guarded.url}/view/${id}${query}`)).text()).untrusted
+      // A link in a package's content to its own page, without the flag, plays it untrusted too.
+      expect([await untrusted(''), await untrusted('?untrusted=0'), await untrusted('?untrusted=1')]).toEqual([true, true, true])
+      // Asked at each page: with the workspace trusted, the address says again.
+      restricted = false
+      expect([await untrusted(''), await untrusted('?untrusted=1')]).toEqual([false, true])
+    } finally {
+      guarded.close()
+    }
+  })
+
   it('serves the player, the runtime and the pack, and nothing beside them', async () => {
     const element = await fetch(`${server.url}/h5p-player.js`)
     expect([element.status, element.headers.get('content-type')]).toEqual([200, 'text/javascript; charset=utf-8'])

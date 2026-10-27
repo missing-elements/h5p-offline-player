@@ -119,7 +119,17 @@ export class Previews {
       if (basename(changedUri.path) !== document.name) return
       clearTimeout(timer)
       timer = setTimeout(async () => {
-        if (document.folder) await writeFile(document.file, await vscode.workspace.fs.readFile(uri)).catch(() => {})
+        // A copy is made again first, the file read whole before the copy is touched: a read that
+        // fails leaves the copy as it was, and its previews go on playing it.
+        if (document.folder) {
+          try {
+            await writeFile(document.file, await vscode.workspace.fs.readFile(uri))
+          } catch (error) {
+            const reason = error instanceof Error ? error.message : String(error)
+            vscode.window.showWarningMessage(`H5P Preview could not read ${document.name} again, and goes on playing the copy it has: ${reason}`)
+            return
+          }
+        }
         for (const preview of this.previews) {
           if (preview.document === document) preview.panel.webview.postMessage({ type: 'reload' })
         }
@@ -180,7 +190,7 @@ export class Previews {
   /** The server, started if no preview has it running. A failed start is not kept: the next preview tries again. */
   serverReady() {
     if (!this.server) {
-      const starting = startServer({ roots: this.roots, packDir: this.packDir })
+      const starting = startServer({ roots: this.roots, packDir: this.packDir, restricted: () => !vscode.workspace.isTrusted })
       this.server = starting
       starting.catch(() => {
         if (this.server === starting) this.server = null

@@ -1869,7 +1869,13 @@ code may lead with "H5P" only beside its author, "Acme's H5P interactive Quiz" b
   untrusted, because every read in the element goes through `this.untrusted`, which found the stray
   property; but the attribute was never there, and an element reading it would have played
   Restricted Mode's packages trusted while the bar said untrusted. The page's report reads the
-  attribute, so the suite's untrusted tests check what the element plays by.
+  attribute, so the suite's untrusted tests check what the element plays by. Restricted Mode is the
+  server's to keep, not the address's: `startServer` asks the workspace's trust at each page and,
+  while it is restricted, plays every page untrusted whatever the address says. An untrusted
+  package's content keeps its links, http and relative, and until 2026-10-27 one to its own page
+  without the flag, clicked, played it trusted; the page's id, a hash of the file's path, was all
+  that stood in the way. The tab's switch in a trusted workspace is still the address's alone, a
+  convenience rather than a boundary.
 - **Messages are taken from one sender each.** The page posts what the element reached to its first
   ancestor origin only (`location.ancestorOrigins[0]`, the webview). The webview takes the frame's
   messages by its window and the server's origin, and relays a state, `ready` and an error and
@@ -1882,8 +1888,12 @@ code may lead with "H5P" only beside its author, "Acme's H5P interactive Quiz" b
 - **A file that is not on this computer is copied first.** `extensionKind` is `ui` alone, so the
   extension runs beside the webview, which reaches only this computer's loopback; a remote or
   virtual workspace's file is copied to a temporary folder through `workspace.fs`, and copied again
-  when it changes. The suite plays a package from a file system of its own, a scheme over a folder,
-  which takes this path; a real remote, SSH or a container, is not tested. `workspace` was in the
+  when it changes. Copied again, the file is read whole before the copy is touched, so a read that
+  fails leaves the copy, and its previews, as they were, with a warning that names the reason; until
+  2026-10-27 the read sat outside its `catch`, the failure went unhandled and nothing said so. The
+  suite plays a package from a file system of its own, a scheme over a folder that can say a file
+  changed and can fail its reads, which takes this path: played, changed while it cannot be read,
+  changed again. A real remote, SSH or a container, is not tested. `workspace` was in the
   list until 2026-10-27. VS Code for the Web with Codespaces then runs the extension on the remote
   machine, as the desktop does when it is installed only there, and the server listened on that
   machine's loopback while the webview framed this one's. Having no `browser` entry, the extension
@@ -1895,16 +1905,17 @@ code may lead with "H5P" only beside its author, "Acme's H5P interactive Quiz" b
   previews never played again. The suite's file is named `package [v2] {draft}.h5p` for that.
 
 Tests. `tests/*.test.ts` run in Node with the rest of `pnpm test`: the server against the built
-player, runtime and pack, with its run of ports, and the webview's and the page's scripts run
-against stand-ins. `tests/vscode/run.mjs` downloads VS Code into
+player, runtime and pack, with its run of ports and Restricted Mode, and the webview's and the
+page's scripts run against stand-ins. `tests/vscode/run.mjs` downloads VS Code into
 `.vscode-test/` and runs `suite.cjs` in its extension host. The suite opens the demo's packages and
 waits on the extension's `onDidChangeState`, the one thing `activate` exports: the quiz, the
 Interactive Video, a content-only export played from the pack, Reload, untrusted by setting and
-live, a package on a file system of the suite's own, and a file written again under a name with
-brackets and braces. CI runs it on Linux under `xvfb-run`, in the `vscode` job, which
+live, a package on a file system of the suite's own, copied again when it changes and kept when it
+cannot be read, and a file written again under a name with brackets and braces. CI runs it on Linux under `xvfb-run`, in the `vscode` job, which
 also uploads the `.vsix`. Started from a terminal inside VS Code, the downloaded editor ran as plain
 Node, because `ELECTRON_RUN_AS_NODE` is inherited; `run.mjs` deletes it. Not covered: Restricted
-Mode (the suite opens a trusted folder), Open in Browser, a real remote, and Windows.
+Mode in a real editor (the suite opens a trusted folder; the server's side of it is a Node test),
+Open in Browser, a real remote, and Windows.
 
 ## Types for the plain-JS packages
 

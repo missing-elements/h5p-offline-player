@@ -18,7 +18,18 @@ class DiskView {
   /** @param {string} root */
   constructor(root) {
     this.root = root
-    this.onDidChangeFile = new vscode.EventEmitter().event
+    this.changes = new vscode.EventEmitter()
+    this.onDidChangeFile = this.changes.event
+    /** While set, every read fails, as over a connection that has dropped. */
+    this.failing = false
+  }
+
+  /**
+   * Says that the file changed, as a remote file system does.
+   * @param {import('vscode').Uri} uri
+   */
+  changed(uri) {
+    this.changes.fire([{ type: vscode.FileChangeType.Changed, uri }])
   }
 
   /** @param {import('vscode').Uri} uri */
@@ -52,6 +63,7 @@ class DiskView {
 
   /** @param {import('vscode').Uri} uri */
   readFile(uri) {
+    if (this.failing) throw vscode.FileSystemError.Unavailable(uri)
     try {
       return readFileSync(this.file(uri))
     } catch {
@@ -98,13 +110,13 @@ exports.run = async function run() {
     }
   }
 
-  /** The next state the preview of `uri` reports that `accept` takes. */
-  function next(uri, accept) {
+  /** The next state the preview of `uri` reports that `accept` takes, within `wait` ms. */
+  function next(uri, accept, wait = WAIT_MS) {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         listener.dispose()
-        reject(new Error(`no state for ${uri.path} within ${WAIT_MS / 1000} s`))
-      }, WAIT_MS)
+        reject(new Error(`no state for ${uri.path} within ${wait / 1000} s`))
+      }, wait)
       const listener = api.onDidChangeState((state) => {
         if (state.uri.toString() !== uri.toString() || !accept(state)) return
         clearTimeout(timer)
@@ -176,15 +188,45 @@ exports.run = async function run() {
     }
   })
 
-  await test('a package on another file system is copied to this computer, and plays', async () => {
-    const registration = vscode.workspace.registerFileSystemProvider('h5p-test', new DiskView(content.fsPath), { isReadonly: true })
+  await test('a package on another file system is copied here, played, and copied again when it changes', async () => {
+    const folder = mkdtempSync(path.join(tmpdir(), 'h5p-preview-view-'))
+    const view = new DiskView(folder)
+    const registration = vscode.workspace.registerFileSystemProvider('h5p-test', view, { isReadonly: true })
+    // The suite runs inside the extension's folder, so VS Code gives it the extension's own API
+    // object, and the extension's warnings land here.
+    const warnings = []
+    const showWarningMessage = vscode.window.showWarningMessage
+    vscode.window.showWarningMessage = (message) => {
+      warnings.push(message)
+      return Promise.resolve(undefined)
+    }
     try {
-      const state = await open(vscode.Uri.from({ scheme: 'h5p-test', path: '/quiz.h5p' }))
-      assert.equal(state.type, 'ready', state.message)
-      assert.equal(state.title, 'Do you know what just happened?')
+      const file = path.join(folder, 'package.h5p')
+      copyFileSync(path.join(content.fsPath, 'quiz.h5p'), file)
+      const uri = vscode.Uri.from({ scheme: 'h5p-test', path: '/package.h5p' })
+      const first = await open(uri)
+      assert.equal(first.type, 'ready', first.message)
+      assert.equal(first.title, 'Do you know what just happened?')
+
+      // A change that cannot be read: a warning, and the preview goes on with the copy it has.
+      view.failing = true
+      copyFileSync(path.join(content.fsPath, 'glossary.h5p'), file)
+      const quiet = next(uri, () => true, 3000)
+      view.changed(uri)
+      await assert.rejects(quiet, /no state/)
+      assert.equal(warnings.length, 1, 'one warning')
+      assert.match(warnings[0], /could not read package\.h5p again/)
+
+      // Once it can be read, the next change plays what it says.
+      view.failing = false
+      const again = next(uri, (state) => state.type === 'ready')
+      view.changed(uri)
+      assert.equal((await again).title, 'Words this player uses')
     } finally {
+      vscode.window.showWarningMessage = showWarningMessage
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
       registration.dispose()
+      rmSync(folder, { recursive: true, force: true })
     }
   })
 
