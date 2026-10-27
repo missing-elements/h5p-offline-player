@@ -205,10 +205,12 @@ packages/vscode/          h5p-preview, "H5P Preview by Missing Elements" — the
   src/webview.mjs           the webview: the bar (status, Untrusted, Newest libraries) and the frame
   scripts/build.mjs         dist/extension.cjs (esbuild, the verifier's modules bundled, Playwright
                             refused), assets/ (the player's files, the runtime, the pack's parts),
-                            NOTICE.txt; scripts/package.mjs the .vsix (vsce, --no-dependencies)
+                            NOTICE.txt; scripts/package.mjs the .vsix (vsce, --no-dependencies);
+                            scripts/icon.mjs icon.png from the logo (`pnpm --filter h5p-preview icon`)
   tests/                    server.test.ts and html.test.ts in Node; vscode/ the suite that runs in a
                             real VS Code (run.mjs downloads it, suite.cjs runs in its extension host)
-  README.md, CHANGELOG.md   the Marketplace page and its changelog; icon.png the app's icon at 128 px
+  README.md, CHANGELOG.md   the Marketplace page and its changelog; icon.png the project's logo at
+                            256 px, rendered in Chromium from the demo's demo/favicon.svg, committed
 
 apps/demo/                the demo app: the dev server for the whole repository, and the hosted site
   index.html                the hosted player page
@@ -1826,6 +1828,14 @@ types, and nothing that played a package. It is not on npm. The owner publishes 
 Visual Studio Marketplace (publisher `missing-elements`) and to Open VSX, for Cursor and VSCodium.
 The name is the owner's, under H5P Group's trademark policy (h5p.org/trademark, 2.5): open-source
 code may lead with "H5P" only beside its author, "Acme's H5P interactive Quiz" being its example.
+The icon is the project's logo, a play triangle with a hand tapping it, which the owner made on
+2026-10-27 in place of the "H5P" tile, which was close to H5P Group's own mark. Its hand is filled,
+pale on a dark ground as on a light one: in the first version, the same day, it was cut out of the
+triangle and took the ground's colour. One file holds it, the demo's
+`demo/favicon.svg`, and everything else is drawn from that: the site's tab and the bar's mark, on
+the pages and in the installable app, read it as it is; the app's icons (`pnpm demo:icons`), the
+social card (`pnpm demo:og`) and this icon (`pnpm --filter h5p-preview icon`) are rendered from it
+and committed, as are the app's install screenshots (`pnpm demo:screenshots`), which show the bar.
 
 - **A webview frames a page from a server on 127.0.0.1.** A webview's own origin,
   `vscode-webview://`, cannot register a Service Worker, since the spec takes `http` and `https`

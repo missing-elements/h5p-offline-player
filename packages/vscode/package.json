@@ -120,6 +120,7 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
+    "icon": "node scripts/icon.mjs",
     "package": "node scripts/build.mjs && node scripts/package.mjs",
     "test": "pnpm --filter @missing-elements/h5p-offline-player build && vitest run",
     "test:vscode": "node scripts/build.mjs && node tests/vscode/run.mjs",
@@ -134,6 +135,7 @@
     "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^4.0.0",
     "esbuild": "^0.28.2",
+    "playwright-core": "^1.64.1",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"
   }
