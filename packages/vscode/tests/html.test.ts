@@ -17,7 +17,8 @@ const WEBVIEW_ORIGIN = 'vscode-webview://webview'
 
 /** The inline script of `html` whose opening tag's attributes `attributes` matches. */
 function inlineScript(html: string, attributes: RegExp) {
-  for (const [, opening, body] of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
+  // An end tag ends at its own `>`: `</script >` and `</script foo>` end a script as `</script>` does.
+  for (const [, opening, body] of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\b[^>]*>/gi)) {
     if (attributes.test(opening)) return body
   }
   throw new Error(`no script with attributes ${attributes}`)
