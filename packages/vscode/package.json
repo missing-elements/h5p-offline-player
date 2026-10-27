@@ -122,6 +122,7 @@
     "build": "node scripts/build.mjs",
     "icon": "node scripts/icon.mjs",
     "package": "node scripts/build.mjs && node scripts/package.mjs",
+    "screenshot": "node scripts/build.mjs && node scripts/screenshot.mjs",
     "test": "pnpm --filter @missing-elements/h5p-offline-player build && vitest run",
     "test:vscode": "node scripts/build.mjs && node tests/vscode/run.mjs",
     "typecheck": "tsc -p tsconfig.json"

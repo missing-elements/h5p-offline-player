@@ -206,11 +206,14 @@ packages/vscode/          h5p-preview, "H5P Preview by Missing Elements" — the
   scripts/build.mjs         dist/extension.cjs (esbuild, the verifier's modules bundled, Playwright
                             refused), assets/ (the player's files, the runtime, the pack's parts),
                             NOTICE.txt; scripts/package.mjs the .vsix (vsce, --no-dependencies);
-                            scripts/icon.mjs icon.png from the logo (`pnpm --filter h5p-preview icon`)
+                            scripts/icon.mjs icon.png from the logo (`pnpm --filter h5p-preview icon`);
+                            scripts/screenshot.mjs images/preview.png, the listing's screenshot, with
+                            screenshot-open.cjs (`pnpm --filter h5p-preview screenshot`)
   tests/                    server.test.ts and html.test.ts in Node; vscode/ the suite that runs in a
                             real VS Code (run.mjs downloads it, suite.cjs runs in its extension host)
   README.md, CHANGELOG.md   the Marketplace page and its changelog; icon.png the project's logo at
-                            256 px, rendered in Chromium from the demo's demo/favicon.svg, committed
+                            256 px, rendered in Chromium from the demo's demo/favicon.svg, committed;
+                            images/preview.png the page's screenshot, committed, loaded from `main`
 
 apps/demo/                the demo app: the dev server for the whole repository, and the hosted site
   index.html                the hosted player page
@@ -352,6 +355,7 @@ pnpm normalize course.h5p          # rewrite a package so it streams: media stor
 pnpm verify course.h5p             # play a package in a headless browser and report whether it works
 pnpm --filter h5p-preview package  # the VS Code extension's .vsix, from the player as pnpm build left it
 pnpm --filter h5p-preview test:vscode  # its suite in a VS Code it downloads; under xvfb-run on Linux
+pnpm --filter h5p-preview screenshot  # its listing's screenshot, images/preview.png, in that VS Code
 pnpm build:demo        # the hosted demo into apps/demo/dist-demo/, what Vercel runs
 pnpm demo:content      # rebuild apps/demo/demo/content/*.h5p from their sources; needs the H5P hub
 pnpm demo:og           # re-render the social card, apps/demo/demo/og-image.png
@@ -1869,6 +1873,25 @@ and committed, as are the app's install screenshots (`pnpm demo:screenshots`), w
   machine. `vsce package --no-dependencies` ships `dist/` and `assets/` and no node_modules: 13.8 MB
   in 141 files on 2026-10-26. `--baseContentUrl` and `--baseImagesUrl` point the README's relative
   links at `packages/vscode/`, where vsce's default would point them at the repository's root.
+- **The listing's screenshot is rendered, not taken by hand** (2026-10-27). `scripts/screenshot.mjs`
+  starts the VS Code the suite downloads through Playwright's Electron driver, which takes the window
+  from inside, so it needs neither the screen nor macOS's recording permission: a fresh profile, the
+  demo's quiz, video and glossary in a folder, the quiz's first question answered and checked, 1200
+  by 750 at the screen's scale, since the Marketplace shrinks a picture to its column and a larger
+  window leaves the quiz unreadable. Four things keep it plain and the same from run to run. The
+  quiz is opened in the extension host by `screenshot-open.cjs` (`--extensionTestsPath`, as the
+  suite opens packages): a fresh profile resolves a file opened from the command line or the
+  Explorer without waiting for the extensions, and opened before the extension's editor was
+  registered, `quiz.h5p` fell back to the text editor, which shows a zip as binary, in 2 of 11 runs
+  from the command line and in both logged runs from the Explorer. The extension is loaded from its
+  folder, so the window is an Extension Development Host, which the title bar VS Code draws under the
+  native one says: `window.customTitleBarVisibility: never` takes it out, and the native one is not
+  part of the page. Multiple Choice shuffles its answers, so `Math.random` is seeded in the preview's
+  frames on 127.0.0.1 and nowhere else. And the score bar's star animates, so animations are
+  finished before the capture. `--disable-extensions`, which the suite passes, is left out: its
+  notification sat over the content. Two runs give the same bytes. The README names the image by a
+  relative path that `--baseImagesUrl` turns into the file on `main`, so it reaches `main` before a
+  package naming it is published.
 - **Trust follows the workspace.** In Restricted Mode every package plays `untrusted`, the switch
   disabled. A trusted workspace plays as the settings say (`h5pPreview.untrusted`,
   `h5pPreview.newestLibraries`), with a switch for each in every editor. A change of setting, or

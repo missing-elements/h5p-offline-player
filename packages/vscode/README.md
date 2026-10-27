@@ -3,6 +3,8 @@
 Open a `.h5p` file in VS Code and it plays, in the same player a website runs it with. There is no
 H5P server and no account. It works offline, and the package never leaves your computer.
 
+![quiz.h5p playing in a VS Code editor tab: a Question Set's first question answered and checked, with the Explorer beside it](images/preview.png)
+
 ## What it does
 
 - **Click a `.h5p` and it plays** in an editor tab: quizzes, interactive videos, presentations,
