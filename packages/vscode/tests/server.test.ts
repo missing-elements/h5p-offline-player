@@ -1,10 +1,12 @@
 import { copyFile, mkdtemp, readFile, rm } from 'node:fs/promises'
+import { createServer, type Server } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { languageTag, packageId, startServer } from '../src/server.mjs'
+import { PORTS, languageTag, packageId, startServer } from '../src/server.mjs'
 
 const require = createRequire(import.meta.url)
 const roots = {
@@ -106,6 +108,34 @@ describe('the preview server', () => {
     const index = await fetch(`${server.url}/__pack/index.json`)
     expect([index.status, index.headers.get('content-type')]).toEqual([200, 'application/json'])
     expect((await fetch(`${server.url}/package.json`)).status).toBe(404)
+  })
+
+  it('takes the first free port of its run, and any free one after it', async () => {
+    // A run of ten, so that a second window has an address of its own from one session to the next.
+    expect(PORTS).toEqual([4646, 4647, 4648, 4649, 4650, 4651, 4652, 4653, 4654, 4655])
+    /** A server on a free port, standing in for another window's. */
+    const holder = async () => {
+      const server = createServer()
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+      return { server, port: (server.address() as AddressInfo).port }
+    }
+    const stop = (server: Server) => new Promise((resolve) => server.close(resolve))
+    const held = await holder()
+    const freed = await holder()
+    await stop(freed.server)
+    const next = await startServer({ roots, packDir, port: [held.port, freed.port] })
+    try {
+      expect(next.url).toBe(`http://127.0.0.1:${freed.port}`)
+    } finally {
+      next.close()
+    }
+    const any = await startServer({ roots, packDir, port: [held.port] })
+    try {
+      expect(new URL(any.url).port).not.toBe(String(held.port))
+    } finally {
+      any.close()
+      await stop(held.server)
+    }
   })
 
   it('names a package by its URI, the same in every session', () => {

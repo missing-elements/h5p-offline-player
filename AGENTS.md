@@ -1833,8 +1833,12 @@ code may lead with "H5P" only beside its author, "Acme's H5P interactive Quiz" b
   (Electron 43, Chrome 150) on macOS, 2026-10-26: the frame's worker registers and controls it, the
   demo quiz reaches `ready` in 0.5 s, and the Interactive Video's H.264 clip decodes (`canPlayType`
   says "probably", `readyState` 4).
-- **One server per window, on port 4646 when it is free.** Every preview in the window shares it,
-  so one origin keeps one copy of the player's worker and caches from session to session; the
+- **One server per window, on the first free port from 4646 to 4655.** Every preview in the window
+  shares it. Each port is an origin with the player's worker and caches of its own, so the address
+  has to be the same from session to session: the first window takes 4646, a second the next free
+  port, and only past 4655 does the server take any free one (`serve` takes a list of ports for
+  this). Until 2026-10-27 it was 4646 or any free port, and every start of a second window's
+  server was a new origin, the last one's worker and caches left behind (#84's review). The
   command's 4645 is left to Open in Browser. A package is served under a hash of its URI,
   `/view/<id>` its page and `/__package/<id>/<name>` the archive, the same in every session, and
   stops being served with its last preview. The server stops with the last preview and starts
@@ -1858,28 +1862,49 @@ code may lead with "H5P" only beside its author, "Acme's H5P interactive Quiz" b
 - **Trust follows the workspace.** In Restricted Mode every package plays `untrusted`, the switch
   disabled. A trusted workspace plays as the settings say (`h5pPreview.untrusted`,
   `h5pPreview.newestLibraries`), with a switch for each in every editor. A change of setting, or
-  trust granted, plays the open previews again as the settings now say.
+  trust granted, plays the open previews again as the settings now say. The page sets `untrusted`
+  as an attribute, as it sets the others: its script runs before the module defines
+  `<h5p-player>`, and a property set then stays on the element as its own, in front of the class's
+  accessor. Until 2026-10-27 it set the property. Measured in Chrome, the package still played
+  untrusted, because every read in the element goes through `this.untrusted`, which found the stray
+  property; but the attribute was never there, and an element reading it would have played
+  Restricted Mode's packages trusted while the bar said untrusted. The page's report reads the
+  attribute, so the suite's untrusted tests check what the element plays by.
 - **Messages are taken from one sender each.** The page posts what the element reached to its first
   ancestor origin only (`location.ancestorOrigins[0]`, the webview). The webview takes the frame's
-  messages by its window and the server's origin, and the extension's by its own origin. A
-  package's own code runs in a frame below the page, on the server's origin, so what it posts upward
-  is neither and is dropped: it cannot reload the preview or switch its trust.
-- **A file that is not on this computer is copied first.** `extensionKind` prefers `ui`, so the
+  messages by its window and the server's origin, and relays a state, `ready` and an error and
+  nothing else; reload and the settings it takes from the extension alone, by its own origin. A
+  package's own code runs in a frame below the page, on the server's origin. What it posts itself
+  comes from neither, and played trusted, sharing the page's origin, it can post as the page, so the
+  most it can do is misreport its own state. Until 2026-10-27 the webview relayed whatever the page
+  posted, a `mode` among them, which the extension took for the tab's switches and Open in Browser
+  played by. `tests/html.test.ts` runs both scripts in Node against stand-ins for their elements.
+- **A file that is not on this computer is copied first.** `extensionKind` is `ui` alone, so the
   extension runs beside the webview, which reaches only this computer's loopback; a remote or
   virtual workspace's file is copied to a temporary folder through `workspace.fs`, and copied again
-  when it changes. Not tested.
-- **A file written again plays again**, 500 ms after it last changed. A watcher on the file sends
-  the reload, and the validator, the file's size and time, makes it a new package to the element.
+  when it changes. The suite plays a package from a file system of its own, a scheme over a folder,
+  which takes this path; a real remote, SSH or a container, is not tested. `workspace` was in the
+  list until 2026-10-27. VS Code for the Web with Codespaces then runs the extension on the remote
+  machine, as the desktop does when it is installed only there, and the server listened on that
+  machine's loopback while the webview framed this one's. Having no `browser` entry, the extension
+  is now unavailable in VS Code for the Web, rather than installed and showing nothing.
+- **A file written again plays again**, 500 ms after it last changed. A watcher on the file's folder
+  sends the reload when an event names the file, and the validator, the file's size and time, makes
+  it a new package to the element. The folder is watched and the name compared because a name as
+  the pattern is a glob: until 2026-10-27 it was, and `quiz [v2].h5p` never matched itself, so its
+  previews never played again. The suite's file is named `package [v2] {draft}.h5p` for that.
 
 Tests. `tests/*.test.ts` run in Node with the rest of `pnpm test`: the server against the built
-player, runtime and pack, and the two HTML builders. `tests/vscode/run.mjs` downloads VS Code into
+player, runtime and pack, with its run of ports, and the webview's and the page's scripts run
+against stand-ins. `tests/vscode/run.mjs` downloads VS Code into
 `.vscode-test/` and runs `suite.cjs` in its extension host. The suite opens the demo's packages and
 waits on the extension's `onDidChangeState`, the one thing `activate` exports: the quiz, the
 Interactive Video, a content-only export played from the pack, Reload, untrusted by setting and
-live, and a file written again. CI runs it on Linux under `xvfb-run`, in the `vscode` job, which
+live, a package on a file system of the suite's own, and a file written again under a name with
+brackets and braces. CI runs it on Linux under `xvfb-run`, in the `vscode` job, which
 also uploads the `.vsix`. Started from a terminal inside VS Code, the downloaded editor ran as plain
 Node, because `ELECTRON_RUN_AS_NODE` is inherited; `run.mjs` deletes it. Not covered: Restricted
-Mode (the suite opens a trusted folder), Open in Browser, remote copies, and Windows.
+Mode (the suite opens a trusted folder), Open in Browser, a real remote, and Windows.
 
 ## Types for the plain-JS packages
 

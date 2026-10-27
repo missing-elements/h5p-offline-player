@@ -109,10 +109,14 @@ export class Previews {
     const copy = uri.scheme === 'file' ? null : await localCopy(uri)
     const document = new H5PDocument(uri, copy ? copy.file : uri.fsPath, copy ? copy.folder : null)
     // A package written again — by hand, by a build, by an agent — plays again once it has settled.
-    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(vscode.Uri.joinPath(uri, '..'), document.name))
+    // The folder is watched and the name compared: a name as the pattern is a glob, and brackets or
+    // braces in it, `quiz [v2].h5p`, would match other names and never its own.
+    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(vscode.Uri.joinPath(uri, '..'), '*'))
     /** @type {ReturnType<typeof setTimeout> | undefined} */
     let timer
-    const changed = () => {
+    /** @param {vscode.Uri} changedUri */
+    const changed = (changedUri) => {
+      if (basename(changedUri.path) !== document.name) return
       clearTimeout(timer)
       timer = setTimeout(async () => {
         if (document.folder) await writeFile(document.file, await vscode.workspace.fs.readFile(uri)).catch(() => {})
@@ -148,8 +152,12 @@ export class Previews {
       if (panel.active) this.active = preview
     })
     panel.webview.onDidReceiveMessage((message) => {
-      if (message?.type === 'mode') preview.mode = { untrusted: Boolean(message.untrusted), newest: Boolean(message.newest) }
-      else if (message?.source === 'h5p-preview') this.states.fire({ ...message, uri: document.uri })
+      if (!message || typeof message !== 'object') return
+      // What the page reported, which the webview relays: a state, `ready` or an error. Never a mode,
+      // whatever its type says: a package's own code can post as the page.
+      if (message.source === 'h5p-preview') this.states.fire({ ...message, uri: document.uri })
+      // The webview's own: its switches as they stand.
+      else if (message.type === 'mode') preview.mode = { untrusted: Boolean(message.untrusted), newest: Boolean(message.newest) }
     })
 
     let server

@@ -34,8 +34,7 @@
     "preview"
   ],
   "extensionKind": [
-    "ui",
-    "workspace"
+    "ui"
   ],
   "capabilities": {
     "untrustedWorkspaces": {

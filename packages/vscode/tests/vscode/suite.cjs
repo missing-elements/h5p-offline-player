@@ -1,13 +1,84 @@
 // Runs in the extension host of the VS Code that run.mjs starts: opens the demo's packages in the
 // preview and waits on what each page reports through the extension's `onDidChangeState`.
 const assert = require('node:assert/strict')
-const { copyFileSync, mkdtempSync, rmSync } = require('node:fs')
+const { copyFileSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } = require('node:fs')
 const { tmpdir } = require('node:os')
 const path = require('node:path')
 const vscode = require('vscode')
 
 const VIEW_TYPE = 'missingElements.h5pPreview'
 const WAIT_MS = 60_000
+
+/**
+ * A folder on disk under a scheme of its own, read-only: what a remote or virtual workspace's files
+ * are to the extension, a URI that is not `file:`, read through `workspace.fs`.
+ * @implements {import('vscode').FileSystemProvider}
+ */
+class DiskView {
+  /** @param {string} root */
+  constructor(root) {
+    this.root = root
+    this.onDidChangeFile = new vscode.EventEmitter().event
+  }
+
+  /** @param {import('vscode').Uri} uri */
+  file(uri) {
+    return path.join(this.root, uri.path)
+  }
+
+  watch() {
+    return new vscode.Disposable(() => {})
+  }
+
+  /** @param {import('vscode').Uri} uri */
+  stat(uri) {
+    let found
+    try {
+      found = statSync(this.file(uri))
+    } catch {
+      throw vscode.FileSystemError.FileNotFound(uri)
+    }
+    const type = found.isDirectory() ? vscode.FileType.Directory : vscode.FileType.File
+    return { type, ctime: found.ctimeMs, mtime: found.mtimeMs, size: found.size }
+  }
+
+  /** @param {import('vscode').Uri} uri */
+  readDirectory(uri) {
+    return readdirSync(this.file(uri), { withFileTypes: true }).map((entry) => [
+      entry.name,
+      entry.isDirectory() ? vscode.FileType.Directory : vscode.FileType.File
+    ])
+  }
+
+  /** @param {import('vscode').Uri} uri */
+  readFile(uri) {
+    try {
+      return readFileSync(this.file(uri))
+    } catch {
+      throw vscode.FileSystemError.FileNotFound(uri)
+    }
+  }
+
+  /** @param {import('vscode').Uri} uri */
+  createDirectory(uri) {
+    throw vscode.FileSystemError.NoPermissions(uri)
+  }
+
+  /** @param {import('vscode').Uri} uri */
+  writeFile(uri) {
+    throw vscode.FileSystemError.NoPermissions(uri)
+  }
+
+  /** @param {import('vscode').Uri} uri */
+  delete(uri) {
+    throw vscode.FileSystemError.NoPermissions(uri)
+  }
+
+  /** @param {import('vscode').Uri} uri */
+  rename(uri) {
+    throw vscode.FileSystemError.NoPermissions(uri)
+  }
+}
 
 exports.run = async function run() {
   const content = vscode.workspace.workspaceFolders[0].uri
@@ -105,10 +176,23 @@ exports.run = async function run() {
     }
   })
 
-  await test('a package written again plays again', async () => {
+  await test('a package on another file system is copied to this computer, and plays', async () => {
+    const registration = vscode.workspace.registerFileSystemProvider('h5p-test', new DiskView(content.fsPath), { isReadonly: true })
+    try {
+      const state = await open(vscode.Uri.from({ scheme: 'h5p-test', path: '/quiz.h5p' }))
+      assert.equal(state.type, 'ready', state.message)
+      assert.equal(state.title, 'Do you know what just happened?')
+    } finally {
+      await vscode.commands.executeCommand('workbench.action.closeAllEditors')
+      registration.dispose()
+    }
+  })
+
+  // Brackets and braces are glob syntax, and the file's name is not a pattern.
+  await test('a package written again plays again, whatever its name', async () => {
     const folder = mkdtempSync(path.join(tmpdir(), 'h5p-preview-'))
     try {
-      const file = path.join(folder, 'package.h5p')
+      const file = path.join(folder, 'package [v2] {draft}.h5p')
       copyFileSync(path.join(content.fsPath, 'quiz.h5p'), file)
       const uri = vscode.Uri.file(file)
       assert.equal((await open(uri)).title, 'Do you know what just happened?')

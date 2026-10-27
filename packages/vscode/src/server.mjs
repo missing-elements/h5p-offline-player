@@ -12,11 +12,13 @@ import { viewPage } from './page.mjs'
  */
 
 /**
- * The port the server takes when it is free. One origin in every session, so that VS Code keeps
- * one copy of the player's worker and caches rather than a new one for each port. Not the
+ * The ports the server tries, in order, before any free one. Each is an origin, and VS Code keeps
+ * the player's worker and caches for each origin it has framed, so the address has to be the same
+ * from one session to the next: the first window takes 4646, a second the next free one, and so
+ * on, where any free port would be a new origin each time a window's server starts. Not the
  * command's 4645, which Open in Browser's preview takes.
  */
-export const PORT = 4646
+export const PORTS = Array.from({ length: 10 }, (_, index) => 4646 + index)
 
 /** A package's id on the server, its page `/view/<id>` and its archive `/__package/<id>/<name>`. */
 const ID = /^[0-9a-f]{16}$/
@@ -52,10 +54,11 @@ export function languageTag(value) {
  * @param {object} options
  * @param {{ dist: string, runtime: string }} options.roots the player's files and the runtime's
  * @param {string} options.packDir the library pack's parts, served as the pack
- * @param {number} [options.port]
+ * @param {number | number[]} [options.port] the port, or the ports in order, before any free one;
+ *   0 for any free one at once
  * @returns {Promise<PreviewServer>}
  */
-export async function startServer({ roots, packDir, port = PORT }) {
+export async function startServer({ roots, packDir, port = PORTS }) {
   const sources = librarySources(packDir)
   /** @type {Map<string, { file: string, name: string, previews: number }>} */
   const packages = new Map()

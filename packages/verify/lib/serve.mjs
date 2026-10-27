@@ -117,7 +117,8 @@ export async function playerDist() {
  * @param {{ files: Map<string, string>, packDir: string | null }} sources bundles on disk by route, and a
  *   copy of the pack's `parts/`, served under `PACK_ROUTE`
  * @param {(path: string, request: IncomingMessage, response: ServerResponse) => boolean | Promise<boolean>} own
- * @param {number} [port] the port to take; any free one when it is taken, or with 0
+ * @param {number | number[]} [port] the port to take, or the ports to try in order; any free one when
+ *   they are taken, or with 0
  * @returns {Promise<{ url: string, close: () => void }>}
  */
 export function serve({ dist, runtime }, { files: bundles, packDir }, own, port = 0) {
@@ -146,12 +147,15 @@ export function serve({ dist, runtime }, { files: bundles, packDir }, own, port 
       else response.destroy()
     }
   })
+  // The ports asked for, in order, and then any free one.
+  const ports = [...[port].flat().filter((candidate) => candidate !== 0), 0]
+  let attempt = 0
   return new Promise((resolveServer, rejectServer) => {
     server.on('error', (error) => {
-      // The port asked for is taken, by another preview or another program: any free one will do.
-      if (/** @type {NodeJS.ErrnoException} */ (error).code === 'EADDRINUSE' && port !== 0) {
-        port = 0
-        server.listen(0, '127.0.0.1')
+      // A port asked for is taken, by another preview or another program: the next will do.
+      if (/** @type {NodeJS.ErrnoException} */ (error).code === 'EADDRINUSE' && attempt < ports.length - 1) {
+        attempt += 1
+        server.listen(ports[attempt], '127.0.0.1')
       } else rejectServer(error)
     })
     server.once('listening', () => {
@@ -165,7 +169,7 @@ export function serve({ dist, runtime }, { files: bundles, packDir }, own, port 
         }
       })
     })
-    server.listen(port, '127.0.0.1')
+    server.listen(ports[0], '127.0.0.1')
   })
 }
 

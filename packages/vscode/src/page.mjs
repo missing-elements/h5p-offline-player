@@ -43,7 +43,9 @@ export function viewPage(settings) {
       if (settings.packBase) player.setAttribute('pack-base', settings.packBase)
       if (!settings.newest) player.setAttribute('refresh-libraries', 'off')
       if (settings.lang) player.setAttribute('lang', settings.lang)
-      if (settings.untrusted) player.untrusted = true
+      // An attribute, as the rest: this runs before the module defines the element, and a property
+      // set now would stay on it, in front of the element's own, which reads the attribute.
+      if (settings.untrusted) player.setAttribute('untrusted', '')
 
       player.addEventListener('statechange', (event) => tell({ type: 'state', state: event.detail.state }))
       player.addEventListener('ready', (event) => {
@@ -54,7 +56,8 @@ export function viewPage(settings) {
           mainLibrary: (metadata && metadata.mainLibrary) || null,
           license: metadata && metadata.license ? [metadata.license, metadata.licenseVersion].filter(Boolean).join(' ') : null,
           refreshed: (libraryBundle && libraryBundle.refreshed) || [],
-          untrusted: player.untrusted
+          // The attribute, which is what the element plays by.
+          untrusted: player.hasAttribute('untrusted')
         })
       })
       player.addEventListener('error', (event) => {

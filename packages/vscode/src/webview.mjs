@@ -16,9 +16,11 @@
  * origin alone.
  *
  * Messages are taken from two places only. The frame's, by its window and the server's origin:
- * what the element reached, which goes on to the extension. The extension's, by the webview's
- * own origin: reload, a change of trust or of the settings. A package's own code runs in a frame
- * below the page, on the server's origin, and what it posts to the webview is neither.
+ * what the element reached — a state, `ready`, an error — which goes on to the extension, and
+ * nothing else. The extension's, by the webview's own origin: reload, a change of trust or of the
+ * settings. A package's own code runs in a frame below the page, on the server's origin. What it
+ * posts itself is from neither place; played trusted, though, it shares the page's origin and can
+ * post as the page, so the most it can do is misreport its own state.
  * @param {object} options
  * @param {string} options.nonce
  * @param {WebviewConfig} options.config
@@ -161,7 +163,11 @@ export function webviewHtml({ nonce, config }) {
           if (event.origin !== config.origin || !message || message.source !== 'h5p-preview') return
           if (message.type === 'ready') showReady(message)
           else if (message.type === 'error') showError(message)
-          else if (message.type === 'state' && message.state !== 'ready' && message.state !== 'error' && !ready) say('Opening…')
+          else if (message.type === 'state') {
+            if (message.state !== 'ready' && message.state !== 'error' && !ready) say('Opening…')
+          }
+          // Anything else is not the page's to say: a mode, a reload, the settings.
+          else return
           vscode.postMessage(message)
           return
         }

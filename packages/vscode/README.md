@@ -46,13 +46,13 @@ The switches above each preview override them for that tab.
 
 ## How it works
 
-The editor frames a page from a small server the extension runs on `127.0.0.1`, port 4646 when it
-is free. It serves the package, the player, the H5P runtime and the libraries, and nothing
+The editor frames a page from a small server the extension runs on `127.0.0.1`, on the first free
+port from 4646. It serves the package, the player, the H5P runtime and the libraries, and nothing
 else. The player reads the package where it is: the libraries in a few reads, media in the ranges
 the content asks for. Nothing is unpacked into your folders.
 
-Remote and virtual workspaces work: the file is copied to a temporary folder on this computer
-first.
+In a remote or virtual workspace, the extension runs on this computer and copies the file to a
+temporary folder here before it plays.
 
 ## Requirements
 
