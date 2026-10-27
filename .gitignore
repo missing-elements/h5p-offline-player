@@ -18,6 +18,14 @@ packages/verify/LICENSE
 packages/cmi5/LICENSE
 packages/embed/LICENSE
 
+# The VS Code extension's build: the player, runtime and library pack it carries, the licence and
+# notice written for its .vsix, the .vsix itself, and the VS Code its tests download.
+packages/vscode/assets/
+packages/vscode/LICENSE
+packages/vscode/NOTICE.txt
+*.vsix
+.vscode-test/
+
 # h5p-verify writes its report and screenshot to <package>.verify/ beside the package by default.
 *.verify/
 

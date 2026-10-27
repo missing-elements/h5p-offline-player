@@ -6,7 +6,10 @@ packages:
 # h5p-standalone's `preinstall: npx only-allow yarn` guard from failing the install — we only
 # consume its prebuilt dist/ files — which npm needed `ignore-scripts=true` for, a setting that
 # also silenced our own `prepublishOnly`. esbuild's postinstall only verifies its binary.
+# @vscode/vsce-sign's copies this platform's signing binary out of its optional dependency (and
+# downloads it from npm only when that is missing): `vsce publish` signs the VS Code extension with it.
 onlyBuiltDependencies:
+  - '@vscode/vsce-sign'
   - esbuild
 
 # Named so the install says nothing about it: its only script is the yarn guard above.

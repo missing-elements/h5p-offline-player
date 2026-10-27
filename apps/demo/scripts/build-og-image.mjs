@@ -1,15 +1,16 @@
-import { writeFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { chromium } from 'playwright'
 
 /**
  * Renders the social card, `demo/og-image.png`, 1200 by 630, from a small HTML page in Chromium.
  * Link previews want a raster image and the repository has no image tooling, so the browser the
- * tests already need does the rasterizing. The output is committed; run this when the card's
- * text or the brand colour changes.
+ * tests already need does the rasterizing. The mark beside the name is the site's logo,
+ * `demo/favicon.svg`. The output is committed; run this when the card's text or the logo changes.
  */
 
 const rootDir = resolve(import.meta.dirname, '..')
+const logo = await readFile(resolve(rootDir, 'demo', 'favicon.svg'), 'utf8')
 
 const html = `<!doctype html>
 <html lang="en">
@@ -26,10 +27,7 @@ const html = `<!doctype html>
         background: linear-gradient(135deg, #f6f8fa 0%, #ffffff 55%, #eef3ff 100%);
       }
       .brand { display: flex; align-items: center; gap: 20px; font-size: 34px; font-weight: 700; }
-      .mark {
-        width: 64px; height: 64px; border-radius: 16px; background: #2f6df6; color: #fff;
-        display: grid; place-items: center; font: 700 22px / 1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: -0.02em;
-      }
+      .brand svg { display: block; width: 64px; height: 64px; }
       h1 { margin: 0; font-size: 66px; line-height: 1.08; letter-spacing: -1.5px; max-width: 1000px; }
       p { margin: 26px 0 0; font-size: 30px; line-height: 1.4; color: #5b6370; max-width: 980px; }
       code { font-family: ui-monospace, Menlo, monospace; background: #eef1f5; padding: 2px 12px; border-radius: 8px; color: #15171c; }
@@ -37,7 +35,7 @@ const html = `<!doctype html>
     </style>
   </head>
   <body>
-    <div class="brand"><div class="mark">H5P</div>h5p-offline-player</div>
+    <div class="brand">${logo}h5p-offline-player</div>
     <div>
       <h1>Self-hosted H5P.<br />No H5P server, no unpacking.</h1>
       <p>A web component that reads a <code>.h5p</code> in place and serves it to the H5P runtime with a Service Worker.</p>
