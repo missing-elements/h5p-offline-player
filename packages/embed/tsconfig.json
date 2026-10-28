@@ -13,5 +13,5 @@
     "skipLibCheck": true,
     "checkJs": true
   },
-  "include": ["lib/**/*.mjs", "site/embed.js", "tests/**/*.ts"]
+  "include": ["lib/**/*.mjs", "site/embed.js", "scorm/scorm.js", "tests/**/*.ts"]
 }

@@ -179,7 +179,8 @@ packages/cmi5/            @missing-elements/h5p-cmi5 — cmi5 for the element, p
                             client and a fake element, and requirements.test.ts, which holds every
                             AU requirement in @cmi5/requirements to a test or a stated reason
 
-packages/embed/           @missing-elements/h5p-embed — the embed page as a static site for a player domain
+packages/embed/           @missing-elements/h5p-embed — the embed page as a static site for a player domain,
+                          and one package as a SCORM zip for an LMS (see *The SCORM package*)
   site/                     the page: index.html (its CSP a placeholder the writer fills), main.js,
                             embed.js (startEmbed, also what the demo's /embed runs), embed.css,
                             resizer.js (the page-side half of the resizer protocol, served at the
@@ -187,11 +188,16 @@ packages/embed/           @missing-elements/h5p-embed — the embed page as a st
   lib/build.mjs             buildSite(): copies the page, the player's dist/, the runtime's dist/ as
                             frame-assets/ and the library pack; writes config.js, the policy into the
                             page, the headers for five kinds of host and NOTICE.txt
+  lib/scorm.mjs             buildScorm(), `--scorm`: one .h5p, the player and the runtime as a SCORM 1.2
+                            zip, refused when the package does not carry its libraries
+  scorm/                    the SCORM package's launch page (index.html, its title, language and
+                            build filled in by the writer) and scorm.js, its bridge to the LMS's API
   bin/h5p-embed.mjs         the command
   tests/                    build.test.ts, no browser; site.test.ts, a written site on 127.0.0.1
-                            framed by a page on localhost, as deployed; package-types.ts as for the
-                            normalizer
-  types/                    generated, not in git: the declarations of both entries
+                            framed by a page on localhost, as deployed; scorm.test.ts, the zip in Node
+                            and the launch page under a stand-in for an LMS's player page in
+                            Chromium; package-types.ts as for the normalizer
+  types/                    generated, not in git: the declarations of the three entries
 
 packages/vscode/          h5p-preview, "H5P Preview by Missing Elements" — the VS Code extension, a .vsix
                           for the Visual Studio Marketplace and Open VSX, not on npm (see *The VS Code
@@ -1831,10 +1837,19 @@ for packages it makes; the verifier, which is handed a stranger's, still does no
 `packages/vscode` is **H5P Preview by Missing Elements** (`MissingElements.h5p-preview`): a `.h5p`
 opens in a read-only custom editor that plays it. Built on 2026-10-26 (#83), the first of the
 plugins weighed in the owner's notes: the Marketplace had one H5P extension, for developing content
-types, and nothing that played a package. It is not on npm. The owner publishes the `.vsix` to the
-Visual Studio Marketplace and to Open VSX, for Cursor and VSCodium, under the publisher and namespace
+types, and nothing that played a package. It is not on npm. It is published to the Visual Studio
+Marketplace and to Open VSX, for Cursor and VSCodium, under the publisher and namespace
 `MissingElements`, the ID the owner gave the Marketplace publisher on 2026-10-28 and which
 `package.json`'s `publisher` has to match; it was `missing-elements`, the npm scope's, until then.
+Open VSX matches the case too (eclipse-openvsx/openvsx#2279).
+
+Open VSX takes each version from `.github/workflows/vscode-publish.yml` by trusted publishing,
+since 2026-10-28, when its namespace was granted. Its registration names the repository, that file
+and the `open-vsx` environment, which deploys from `main` alone. The run's GitHub ID token stands in
+for an access token, so none is stored. The owner runs the workflow by hand after a version bump. A
+registration cannot be edited, so renaming the file means registering again. The Marketplace
+upload takes the same run's `.vsix`. vsce 4 can also publish by OIDC (`--oidc`), once a policy on
+the Marketplace names this file.
 The name is the owner's, under H5P Group's trademark policy (h5p.org/trademark, 2.5): open-source
 code may lead with "H5P" only beside its author, "Acme's H5P interactive Quiz" being its example.
 The icon is the project's logo, a play triangle with a hand tapping it, which the owner made on
@@ -1954,6 +1969,87 @@ also uploads the `.vsix`. Started from a terminal inside VS Code, the downloaded
 Node, because `ELECTRON_RUN_AS_NODE` is inherited; `run.mjs` deletes it. Not covered: Restricted
 Mode in a real editor (the suite opens a trusted folder; the server's side of it is a Node test),
 Open in Browser, a real remote, and Windows.
+
+## The SCORM package
+
+`npx @missing-elements/h5p-embed --scorm course.h5p` writes `course.scorm.zip`, SCORM 1.2. It holds
+the package as `package.h5p`, the player's three files, the runtime as `frame-assets/`, `embed.css`
+and the launch page with its bridge, for a package that does not carry its libraries the library
+pack's parts it needs in `libraries/`, and `imsmanifest.xml` lists every file. Built on 2026-10-28
+for teachers who hand students links and want results. A teacher's published notes chose this
+player over Lumi Cloud and Digiquiz for everything but results, which only Lumi Cloud kept, and
+French schools' platform, Éléa, is a Moodle that takes SCORM. The LMS keeps the results; nothing of
+ours runs a server.
+
+- **The worker registers under the package's own path in the LMS.** Moodle serves a package from
+  `pluginfile.php/<context>/mod_scorm/content/<revision>/`, on its own origin, so the element's
+  default `h5p-sw.js` beside it registers with that folder as its scope, which no other page of the
+  LMS is in. Measured in Moodle 4.5.15 in Docker on 2026-10-28: the worker registered, and the
+  package was read in six ranged requests, every one answered 206. Each new revision of the activity
+  is a new scope; the old worker stays registered, which is harmless.
+- **Trusted, and the pack's parts for what the package does not carry.** SCORM content runs on the
+  LMS's origin by design, so the package's own code runs, as any SCORM package's does. An export
+  without its libraries, from h5p.com or h5p.org, gets the parts of the pack it needs, in the zip
+  (the owner's call, the same day: those exports are what many teachers have). The writer runs the
+  player's planner as the launch page has the element run it, filling gaps only: `planParts` is
+  `planPack` with `refresh` off and nothing attached before, and `librariesNamedIn`,
+  `addonPatterns`, `textMatches` and `ownLibraries` are copies of the player's. Keep them in step.
+  It writes those parts into `libraries/`, with an `index.json` that lists only them, and the page
+  names the folder with `libraries="pack"`, `pack-base` and `refresh-libraries="off"`. The element
+  then plans the same parts and finds each in the zip, and plays a package's own libraries as
+  exported. Because the index lists only what the zip carries, a plan that ever came out different
+  could only fall short: a gap the element refuses by name, or an addon left out, never a request
+  for a part the zip lacks. What neither the package nor the pack supplies is refused when the zip
+  is written, by the walk the player makes (`servingFolder` mirrors `reachableFolder`, the walk
+  `missingDependencies`), run over the package without the folders a part replaces and over the
+  parts. The walk starts from the sub-content the parameters name as well, which the player would
+  find missing only when the runtime reached it. So a gap shows up when the teacher writes the zip,
+  not when a learner opens it. Measured: the demo's formulas quiz, a stripped export, took 11 parts,
+  4 MB, 2.8 MB of it MathDisplay; its full exports took none. In Moodle 4.5 the formulas zip
+  reached `ready`, fetched exactly those 11 parts and the index, and typeset its LaTeX.
+- **What the bridge reports.** On a first launch, `LMSInitialize` and `lesson_status`
+  `incomplete`. On each `finished`:
+  - the score out of 100, as `score.raw` with `min` 0 and `max` 100, from `scaled`, else from
+    `raw` over `max`;
+  - `passed` or `failed` by the content's `success`, else `completed`;
+  - the session time, then `LMSCommit`.
+
+  The last `finished` counts, as `setFinished` does on an H5P site. On `pagehide` it sets the
+  session time and `cmi.core.exit` (`suspend` unless finished), then calls `LMSFinish`. Moodle's API
+  sends with `navigator.sendBeacon` while unloading, and the `exit` it stored showed that the call
+  arrived. Content with no result of its own stays `incomplete`. Moodle takes `score.raw` as the
+  grade, against the activity's maximum grade (`grademax` is its `maxgrade` in
+  `scorm_grade_item_update`), so the README says to leave that at 100, Moodle's default.
+- **Resume through `cmi.suspend_data`.** The element plays with `resume="host"`. Every `userdata`
+  event rewrites `{ build, entries }` into `suspend_data` and commits. A launch hands `userData`
+  back before `src` when the stamp matches. The stamp is the first 16 hex digits of the package's
+  SHA-256, or, with parts of the pack, of one over the package's and theirs, written into the page's
+  `<meta name="h5p-package-build">`. So a teacher who replaces the zip with another package does not
+  hand learners state saved against the old one, and a zip written with other parts starts them
+  over, as a refreshed package does in the player (the owner's rule of 2026-10-18). SCORM 1.2 keeps
+  4,096 characters; a larger state is not written, and the last one that fitted stays. Checked in
+  Moodle: a learner left after the first question, the next launch's `entry` was `resume`, and the
+  quiz reopened on the second question.
+- **Outside an LMS** the page finds no API, plays the package and reports nothing.
+
+`tests/scorm.test.ts` checks the zip, the parts it carries and its refusals in Node. In Chromium it
+plays the unpacked zip under a page that holds the API and frames the launch page, as Moodle's
+player does. It covers:
+
+- a passed and a failed result, the end of the session, resume, and refusing state saved by
+  another build;
+- a result with no score, and a state past 4,096 characters, through the element's events
+  dispatched as it dispatches them, since no package here reaches either headless;
+- the formulas export played from the zip's parts: the parts the element fetched are compared
+  with those the writer planned, and the test waits for the LaTeX to be typeset;
+- playing with no LMS.
+
+Not covered:
+
+- any LMS but Moodle 4.5, and SCORM 2004;
+- Firefox and Safari;
+- Moodle with `slasharguments` off, its popup window and its mobile app;
+- untrusted packages, whose every library would then come from the pack.
 
 ## Types for the plain-JS packages
 
@@ -2933,6 +3029,8 @@ deliberate additions to it, not drift:
   headless, for whoever produces packages by machine.
 - A VS Code extension. The design has the player on websites; the extension plays a package in
   the editor, from a server on the author's own computer.
+- A SCORM package. The design emits results and stores none; `h5p-embed --scorm` puts one package
+  in an LMS, which records its score, result, time and the learner's place.
 - The libraries are warmed into the cache before the frame boots on a `Range` host. The design
   reads every entry on demand; on a high-latency host that made the boot a matter of minutes.
 - A library source that cannot be reached falls back to a bundle downloaded whole from the same

@@ -91,8 +91,9 @@ await writeFile(
 
   dist/extension.cjs  the extension, with the preview server of @missing-elements/h5p-verify
                       bundled: MIT.
-  assets/player/      @missing-elements/h5p-offline-player ${versions.player}: MIT. The two workers
-                      also carry zip.js, BSD-3-Clause, its licence in each file's header.
+  assets/player/      @missing-elements/h5p-offline-player ${versions.player}: MIT. The Service
+                      Worker, h5p-sw.js, also carries zip.js, BSD-3-Clause, its licence in its
+                      header.
   assets/runtime/     @missing-elements/h5p-runtime ${versions.runtime}, the H5P core runtime:
                       GPL-3.0-only. Its LICENSE.txt and NOTICE.txt say what it is and where
                       its source is.

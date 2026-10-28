@@ -2,6 +2,8 @@
 
 Writes the H5P embed page as a static site for a player domain of your own. Any site then embeds
 a package with an iframe and one script line. No H5P server, no backend, no third-party service.
+With `--scorm`, it writes one package as a SCORM zip instead, for an LMS to play and grade (see
+[A SCORM package, for an LMS](#a-scorm-package-for-an-lms)).
 
 Needs Node 22 or later. Write `@latest`: without it, npm on an older Node quietly installs the
 last version that supported it, which writes a player from before 1.0.
@@ -35,6 +37,7 @@ a subdomain shares your site's cookies.
 | `--default-libraries <sources>` | The `libraries` value for addresses that name none: `pack` or URLs. Checked against `--packages`. Default: none, so exports without libraries are refused unless the address asks |
 | `--no-libraries` | Leave out the library pack, 13.8 MB in `libraries/`, one archive per library, of which a learner's browser fetches only those a package needs; `libraries=pack` then fetches them from jsDelivr, where allowed |
 | `--force` | Write into a non-empty folder, replacing only this tool's files |
+| `--scorm <package.h5p> [zip]` | Write a SCORM 1.2 package of one `.h5p` instead of the site; see [A SCORM package, for an LMS](#a-scorm-package-for-an-lms) |
 | `-h`, `--help` / `-v`, `--version` | |
 
 Origins are `https://host.example`, comma or space separated, no path or trailing slash;
@@ -122,6 +125,45 @@ Whatever `xapi=` says, the frame also posts to its parent:
 { context: 'h5p-offline-player', action: 'error', code, message }  // code 'refused', 'no-src' or the load's
 ```
 
+## A SCORM package, for an LMS
+
+```bash
+npx @missing-elements/h5p-embed@latest --scorm course.h5p     # writes ./course.scorm.zip
+```
+
+writes one package as a SCORM 1.2 zip: the package, the player and the H5P runtime, and a launch
+page that reports to the LMS. Add it to a course as a SCORM activity, in Moodle or another LMS that
+takes SCORM 1.2, and the LMS records:
+
+- the score out of 100, and `passed` or `failed` when the content says whether it was passed,
+  `completed` when it does not. The content's last result counts, as on an H5P site;
+- the time spent in each session;
+- the learner's place: the content's saved state goes into `cmi.suspend_data`, and the next
+  launch continues from it. SCORM 1.2 keeps 4,096 characters, enough for a quiz; a larger state is
+  not saved.
+
+Moodle records the score as the grade, out of the activity's maximum grade, so leave that at 100,
+its default.
+
+An export from h5p.com or h5p.org, which leaves the libraries out, works as well: the zip carries
+the ones it needs from the library pack, and only those. For a quiz with formulas, that is 11
+libraries, 4 MB, most of it the formula renderer. A package that carries its libraries, as exports
+from Lumi and the H5P plugins of Moodle, WordPress and Drupal do, plays with its own. One that needs
+a library neither it nor the pack has, or a newer version than the pack's, is refused, with what is
+missing named.
+
+The package plays trusted: its own code runs on the LMS's origin, as every SCORM package's does.
+The LMS has to be served over https, since the player needs its Service Worker, and Moodle has to
+serve files by path, which it does by default (`slasharguments`).
+
+Content that reports no result of its own, an Accordion or a Virtual Tour, stays `incomplete`:
+complete such an activity on viewing it instead. Replacing the zip with one written from another
+`.h5p`, or with other libraries from the pack, starts learners over, since their saved state
+belongs to what it was saved in.
+
+Checked in Moodle 4.5: the score reaches the gradebook, and a learner who leaves halfway continues
+there on the next launch. Other LMSs have not been tried yet.
+
 ## As a library
 
 ```js
@@ -138,7 +180,9 @@ export, which `libraries=pack` then plays from) or `packBase` (the folder of a c
 `@missing-elements/h5p-runtime` export, for a bundled element) and `askInOwnFrame` (default
 `true`; `false` plays a package from another origin as it is when a same-origin page frames it).
 `librariesPack`, the URL of a whole `libraries.h5p`, still works, as a bundle that only fills gaps.
-Both entries ship with TypeScript declarations.
+`buildScorm` from `@missing-elements/h5p-embed/scorm` is `--scorm`: it takes `h5p`, `out` and
+`force`, and returns the zip's path, its title, size, the `libraries` it carries from the pack,
+and `build`, the stamp saved state is kept against. Every entry ships with TypeScript declarations.
 
 ```js
 import '@missing-elements/h5p-offline-player'
@@ -154,7 +198,8 @@ startEmbed({ runtime, pack, defaultLibraries: 'pack' })
 
 The site sets no cookies and sends nothing anywhere of its own. Learners' browsers contact your
 player domain, the package hosts and, only for `pack` on a site built with `--no-libraries`,
-`cdn.jsdelivr.net`. What the player stores and
+`cdn.jsdelivr.net`. A SCORM package contacts nothing but the LMS it was uploaded to, which gets the
+score, the result, the time spent and the learner's saved state. What the player stores and
 sends, for a privacy notice or a GDPR review:
 [Privacy and data protection](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/privacy.md).
 
@@ -164,4 +209,6 @@ MIT. The written folder also carries
 [`@missing-elements/h5p-runtime`](https://www.npmjs.com/package/@missing-elements/h5p-runtime)
 under the GPL-3.0, as `frame-assets/` with its `LICENSE.txt` and `NOTICE.txt`, and, unless
 `--no-libraries`, the hub's libraries under their own licences, listed in `libraries.txt`. The
-folder's `NOTICE.txt` says which file is what.
+folder's `NOTICE.txt` says which file is what. A SCORM zip carries the runtime the same way, the
+package under its own licences, and any libraries from the pack as the folder does; its
+`NOTICE.txt` says the same.

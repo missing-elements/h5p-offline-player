@@ -5,10 +5,13 @@
  */
 import { EmbedError, buildSite, type BuiltSite } from '@missing-elements/h5p-embed'
 import { startEmbed } from '@missing-elements/h5p-embed/embed.js'
+import { buildScorm, type BuiltScorm } from '@missing-elements/h5p-embed/scorm'
 import { pack } from '@missing-elements/h5p-libraries'
 import { runtime } from '@missing-elements/h5p-runtime'
 // @ts-expect-error a helper the tests use, not part of the package's API (#60)
 import { parseOrigin } from '@missing-elements/h5p-embed'
+// @ts-expect-error the same for the SCORM writer's
+import { servingFolder } from '@missing-elements/h5p-embed/scorm'
 
 export async function asACallerWould(): Promise<string> {
   const site: BuiltSite = await buildSite({ out: 'public/player', packages: ['https://cdn.example.org'], defaultLibraries: 'pack' })
@@ -20,6 +23,13 @@ export async function asACallerWould(): Promise<string> {
   // @ts-expect-error the folder is named `out`
   await buildSite({ folder: 'public/player' })
 
-  void [hosts, parseOrigin, new EmbedError('refused') instanceof Error]
+  // One package as a SCORM zip, for an LMS.
+  const zip: BuiltScorm = await buildScorm({ h5p: 'course.h5p', out: 'course.scorm.zip', force: true })
+  const build: string = zip.build
+  const fromPack: string[] = zip.libraries
+  // @ts-expect-error the package is named `h5p`
+  await buildScorm({ package: 'course.h5p', out: 'course.scorm.zip' })
+
+  void [hosts, build, fromPack, parseOrigin, servingFolder, new EmbedError('refused') instanceof Error]
   return site.csp
 }

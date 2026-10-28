@@ -20,15 +20,19 @@ const SITE = fileURLToPath(new URL('../site', import.meta.url))
 
 /** The page's own files, copied as they are; `index.html` is written, not copied. */
 const PAGE_FILES = ['embed.js', 'embed.css', 'main.js', 'resizer.js']
-/** The player's files, by the names the element looks for beside itself. */
-const PLAYER_FILES = ['h5p-player.js', 'h5p-sw.js', 'h5p-jobs.js']
+/**
+ * The player's files, by the names the element looks for beside itself.
+ * @internal
+ */
+export const PLAYER_FILES = ['h5p-player.js', 'h5p-sw.js', 'h5p-jobs.js']
 
 /**
  * Where an installed package's file is, or a message that says which one is missing.
+ * @internal
  * @param {string} specifier
  * @param {string} hint
  */
-function installed(specifier, hint) {
+export function installed(specifier, hint) {
   try {
     return require.resolve(specifier)
   } catch {
@@ -304,8 +308,8 @@ function notice({ version, libraries }) {
   Caddyfile, nginx.conf, .htaccess, _headers, vercel.json
                     the same headers for five kinds of host; use the one yours reads
   h5p-player.js, h5p-sw.js, h5p-jobs.js
-                    @missing-elements/h5p-offline-player ${version}: MIT. The two workers also
-                    carry zip.js, BSD-3-Clause, its licence in each file's header.
+                    @missing-elements/h5p-offline-player ${version}: MIT. The Service Worker,
+                    h5p-sw.js, also carries zip.js, BSD-3-Clause, its licence in its header.
   frame-assets/     @missing-elements/h5p-runtime, the H5P core runtime: GPL-3.0-only. Its
                     LICENSE.txt and NOTICE.txt say what it is and where its source is; keep them
                     with it.

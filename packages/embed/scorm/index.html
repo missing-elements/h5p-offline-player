@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="%LANG%">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>%TITLE%</title>
+    <meta name="h5p-package-build" content="%BUILD%" />
+    <link rel="stylesheet" href="./embed.css" />
+    <script type="module" src="./h5p-player.js"></script>
+    <script type="module" src="./scorm.js"></script>
+  </head>
+
+  <body>
+    <div class="loader" id="loader" role="status">
+      <span class="spinner" aria-hidden="true"></span>
+      <span class="loader-text">Loading…</span>
+    </div>
+    <h5p-player%LIBRARIES%></h5p-player>
+    <p class="notice error" id="notice" role="alert" hidden></p>
+  </body>
+</html>

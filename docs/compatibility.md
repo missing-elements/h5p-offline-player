@@ -89,9 +89,15 @@ What is covered of the pack itself: the `pack` export, `parts/` with its `index.
   lists them: what a snippet, or a page that reads `report`, is built on.
 - **`buildSite()`**, the command as a function, and **`startEmbed()`**, the page as one, with
   their options and their types; and `resizer.js`, which speaks H5P's own resizer protocol.
+- **The SCORM package `--scorm` writes**, and **`buildScorm()`**, with its options and types: SCORM
+  1.2, the elements its page sets (`cmi.core.score.raw`, `.min` and `.max`,
+  `cmi.core.lesson_status`, `cmi.core.session_time`, `cmi.core.exit`), and what it keeps in
+  `cmi.suspend_data`, which a zip written by a later version reads back unless the libraries it
+  carries from the pack have changed.
 
 A written site is a folder of copies and changes only when it is written again: upgrading is
-running the new version of the command and deploying the folder.
+running the new version of the command and deploying the folder. A SCORM zip likewise, replaced in
+the LMS.
 
 ### cmi5, `@missing-elements/h5p-cmi5`
 

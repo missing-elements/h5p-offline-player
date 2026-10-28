@@ -1,0 +1,45 @@
+name: Publish the VS Code extension
+
+# Publishes H5P Preview by Missing Elements to Open VSX by trusted publishing. Open VSX trusts this
+# file in this repository, run in the `open-vsx` environment, and takes the ID token GitHub gives
+# the run in place of an access token, so none is stored anywhere. The registration names the file:
+# renamed, it has to be registered again. The .vsix is built from the commit the run starts on, as
+# the `vscode` job in ci.yml builds it, and kept with the run for the Marketplace's upload.
+#
+# Run it by hand, from main, once packages/vscode/package.json carries the new version: Open VSX
+# refuses a version it already has.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  open-vsx:
+    name: Open VSX
+    runs-on: ubuntu-latest
+    # The environment deploys from main alone, and the registration names it, so a run from any
+    # other branch is not trusted.
+    environment: open-vsx
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v6
+      # No cache: a job that publishes installs from the registry against the lockfile's hashes,
+      # not from a store another run wrote.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: pnpm install --frozen-lockfile
+      # The player and the runtime, which the extension carries.
+      - run: pnpm build
+      - run: pnpm --filter h5p-preview package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: h5p-preview-vsix
+          path: packages/vscode/*.vsix
+      - run: pnpm exec ovsx publish *.vsix --trusted-publishing
+        working-directory: packages/vscode

@@ -5,10 +5,11 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 /**
- * Writes `h5p-preview-<version>.vsix` from what `scripts/build.mjs` built: the file the owner
- * publishes to the Visual Studio Marketplace and to Open VSX. vsce takes no node_modules
- * (`--no-dependencies`; everything is in `dist/` and `assets/`), and its README's relative links
- * resolve to this folder of the repository, which its default base, the repository's root, would not.
+ * Writes `h5p-preview-<version>.vsix` from what `scripts/build.mjs` built: the file published to
+ * the Visual Studio Marketplace and to Open VSX (`.github/workflows/vscode-publish.yml`). vsce
+ * takes no node_modules (`--no-dependencies`; everything is in `dist/` and `assets/`), and its
+ * README's relative links resolve to this folder of the repository, which its default base, the
+ * repository's root, would not.
  */
 
 const root = fileURLToPath(new URL('..', import.meta.url))

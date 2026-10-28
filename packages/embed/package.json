@@ -1,7 +1,7 @@
 {
   "name": "@missing-elements/h5p-embed",
   "version": "1.1.1",
-  "description": "Self-hosted H5P embeds: writes the H5P embed page as a static site for a player domain of your own, then any site frames it with an iframe and one script line. No H5P server, no third-party service; optional allowlists for package hosts and embedding sites.",
+  "description": "Self-hosted H5P embeds: writes the H5P embed page as a static site for a player domain of your own, then any site frames it with an iframe and one script line; or wraps one .h5p as a SCORM 1.2 package an LMS plays and grades. No H5P server, no third-party service; optional allowlists for package hosts and embedding sites.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -24,6 +24,10 @@
       "types": "./types/lib/build.d.mts",
       "default": "./lib/build.mjs"
     },
+    "./scorm": {
+      "types": "./types/lib/scorm.d.mts",
+      "default": "./lib/scorm.mjs"
+    },
     "./embed.js": {
       "types": "./types/site/embed.d.ts",
       "default": "./site/embed.js"
@@ -35,6 +39,7 @@
   "files": [
     "bin",
     "lib",
+    "scorm",
     "site",
     "types"
   ],
@@ -47,6 +52,9 @@
     "embed",
     "static-site",
     "elearning",
+    "scorm",
+    "lms",
+    "moodle",
     "cli"
   ],
   "scripts": {
@@ -59,11 +67,11 @@
   "dependencies": {
     "@missing-elements/h5p-libraries": "workspace:^",
     "@missing-elements/h5p-offline-player": "workspace:^",
-    "@missing-elements/h5p-runtime": "workspace:^"
+    "@missing-elements/h5p-runtime": "workspace:^",
+    "@zip.js/zip.js": "^2.24.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
-    "@zip.js/zip.js": "^2.24.0",
     "playwright": "^1.64.1",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"

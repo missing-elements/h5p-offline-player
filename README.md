@@ -36,7 +36,8 @@ without its own code running.
 
 It is a player, not an editor: author in Lumi, on h5p.com or in a site with the H5P plugin, and
 play the export here. It stores no results: the `xapi` and `finished` events go wherever your
-page, an LRS or cmi5 sends them.
+page, an LRS or cmi5 sends them, and a package wrapped as a SCORM zip reports to the LMS it is
+uploaded to.
 [How it compares](https://h5p-offline-player.vercel.app/demo/compare.html) says when to choose
 something else.
 
@@ -54,7 +55,9 @@ something else.
   [Packages you did not make](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/untrusted.md).
 - **Gives results you can audit.** Every xAPI statement names the
   [build it came from](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/revision.md), `finished` is the content's own result,
-  [cmi5](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/cmi5.md) launches it from an LMS, and [resume](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/resume.md) keeps the
+  [cmi5](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/cmi5.md) launches it from an LMS, a
+  [SCORM package](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#a-scorm-package-for-an-lms)
+  puts one in an LMS such as Moodle with its score and the learner's place, and [resume](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/resume.md) keeps the
   learner's place.
 - **Works offline, in the content's language.** The installable app plays with no network, on iOS
   too, and H5P's own buttons match the language the content is written in, any of more than fifty. Results stay on your page

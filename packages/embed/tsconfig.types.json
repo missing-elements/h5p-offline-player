@@ -8,5 +8,5 @@
     "rootDir": ".",
     "outDir": "types"
   },
-  "include": ["lib/build.mjs", "site/embed.js"]
+  "include": ["lib/build.mjs", "lib/scorm.mjs", "site/embed.js"]
 }

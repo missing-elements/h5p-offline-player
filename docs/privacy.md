@@ -68,6 +68,12 @@ The element emits each statement as an `xapi` event and keeps nothing.
   when it fails; neither message carries anything about the learner.
 - With [`@missing-elements/h5p-cmi5`](cmi5.md), statements go to the LMS's LRS, under the launch's
   learner and registration. The launch token stays in memory unless you choose `storage`.
+- In a SCORM package written by
+  [`h5p-embed --scorm`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#a-scorm-package-for-an-lms),
+  no statement leaves the page. The LMS gets, under its own record of the learner, the score out
+  of 100, `passed`, `failed` or `completed`, the time spent, and the content's saved state in
+  `cmi.suspend_data`, which holds the answers given so far. That state is kept in the LMS, not on
+  the device.
 
 ## Answering a data subject request
 
