@@ -1810,7 +1810,10 @@ driver along and the normalizer should not.
   needs no check, but CodeQL flagged the text going in, as `js/xss-through-dom`. A Download link
   beside the name (#81, the owner's request of 2026-10-23, so that whoever reviews a package can
   keep the file they played) takes the same parsed address, and hides once the presence stream
-  fails, since the server it downloads from has gone. H5P's own Reuse button (`frame export
+  fails, since the server it downloads from has gone. The status line then says the preview has
+  ended and keeps saying it: a load still under way when the server goes changes state afterwards,
+  and until 2026-10-28 its "Opening…" or its error wrote over that line, which CI caught on `main`
+  and which failed 1 local run in 12. H5P's own Reuse button (`frame export
   download-url`) was the other way: it changes how the content looks, takes two clicks, and its
   dialog's button is English whatever the content's language.
 

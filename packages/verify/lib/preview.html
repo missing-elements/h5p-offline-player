@@ -36,8 +36,12 @@
       if (settings.packBase) player.setAttribute('pack-base', settings.packBase)
       if (!settings.refreshLibraries) player.setAttribute('refresh-libraries', 'off')
       if (settings.untrusted) player.untrusted = true
+      // Set once its server has gone. A load still under way changes state after that, and its
+      // "Opening…" or the error of a request that failed would write over the page saying so.
+      let ended = false
 
       player.addEventListener('statechange', (event) => {
+        if (ended) return
         const { state } = event.detail
         if (state === 'ready') {
           status.textContent = settings.untrusted
@@ -47,7 +51,7 @@
       })
       player.addEventListener('error', (event) => {
         // An error once the content is up leaves it running; before that, the package did not open.
-        if (player.state !== 'ready') status.textContent = event.detail.message
+        if (!ended && player.state !== 'ready') status.textContent = event.detail.message
       })
       // Only a web address becomes `src`: never a `javascript:` or `data:` URL. The Download link
       // takes the same address, so that whoever reviews the package can keep the file they played.
@@ -69,6 +73,7 @@
       // server has gone the page stops asking, so that it cannot keep a later preview alive.
       const presence = new EventSource('/__preview/events')
       presence.addEventListener('error', () => {
+        ended = true
         presence.close()
         // Its server, which the link downloads from, has gone with it.
         download.hidden = true

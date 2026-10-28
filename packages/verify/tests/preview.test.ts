@@ -153,6 +153,12 @@ describe('h5p-verify --preview', () => {
       expect((await readFile(await download.path())).equals(await readFile(quiz))).toBe(true)
       preview.close()
       await link.waitFor({ state: 'hidden' })
+      // What a load still under way sends once its server has gone: on CI, on 2026-10-28, its next
+      // state left "Opening…" where the page had said the preview ended.
+      await page.locator('h5p-player').evaluate((player) => {
+        player.dispatchEvent(new CustomEvent('statechange', { detail: { state: 'indexing' } }))
+        player.dispatchEvent(new CustomEvent('error', { detail: { message: 'Failed to fetch' } }))
+      })
       expect(await page.locator('#status').textContent()).toContain('The preview has ended.')
     } finally {
       preview.close()
