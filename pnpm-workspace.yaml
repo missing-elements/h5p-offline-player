@@ -15,3 +15,13 @@ onlyBuiltDependencies:
 # Named so the install says nothing about it: its only script is the yarn guard above.
 ignoredBuiltDependencies:
   - h5p-standalone
+
+# @vscode/vsce reaches @azure/msal-node through @azure/identity, whose range, ^6, has no release
+# that fixes GHSA-xcx6-jx8p-x3h5 (high, Dependabot alert #3, opened when the VS Code extension
+# merged): 7.1.0 is the first. So 7 is forced under @azure/identity alone, a major above its range
+# (2026-10-28). vsce loads it for every command; with it `vsce package` writes the same .vsix, and
+# vsce's Microsoft Entra sign-in, the one path that runs MSAL, fails here as it did on 6, with every
+# credential unavailable rather than an error from a changed API. Remove this once @azure/identity
+# takes 7: neither 4.14.0 nor 4.15.0-beta.1 does.
+overrides:
+  '@azure/identity>@azure/msal-node': ^7.1.0
