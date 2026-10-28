@@ -141,6 +141,7 @@ attribute, in the browser's storage on that device (or handed to the host with
 `resume="host"`), never sent. And if they generate or rewrite packages, `npx @missing-elements/h5p-verify@latest
 course.h5p` checks a package plays before it is published.
 
-The element's API and events: https://github.com/missing-elements/h5p-offline-player/blob/main/README.md#api
+The element's API and events: https://github.com/missing-elements/h5p-offline-player/blob/main/docs/api.md
+Each install path in full: https://github.com/missing-elements/h5p-offline-player/blob/main/docs/setup.md
 Every symptom and its fix: https://github.com/missing-elements/h5p-offline-player/blob/main/docs/troubleshooting.md
 Single-worker hosts and upgrades: https://github.com/missing-elements/h5p-offline-player/blob/main/docs/single-worker.md

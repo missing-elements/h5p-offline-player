@@ -109,6 +109,13 @@ describe('buildContentSecurityPolicy', () => {
     expect(csp).toContain("base-uri 'self'")
     expect(csp).toContain("connect-src 'self'")
   })
+
+  it("lets script reach Vimeo's oEmbed record, by path, and nothing else off this origin", () => {
+    // Vimeo's SDK reads it before it can create the player; refused, every Vimeo video showed
+    // H5P.Video's loading error (2026-10-28).
+    const connect = buildContentSecurityPolicy(options).split('; ').find((directive) => directive.startsWith('connect-src '))!
+    expect(connect).toBe("connect-src 'self' vimeo.com/api/oembed.json")
+  })
 })
 
 describe('the policy for an untrusted package', () => {
@@ -129,6 +136,17 @@ describe('the policy for an untrusted package', () => {
     expect(sources).toEqual(expect.arrayContaining(['https://www.youtube.com/iframe_api', 'https://www.youtube.com/s/player/', 'https://player.vimeo.com/api/player.js']))
     for (const host of ['cdn.jsdelivr.net', 'cdnjs.cloudflare.com', 'ajax.googleapis.com', 'www.youtube.com']) {
       expect(sources).not.toContain(host)
+    }
+    // And Vimeo's oEmbed record, which its player reads first, stays reachable untrusted too.
+    expect(buildContentSecurityPolicy({ ...options, untrusted: true })).toMatch(/connect-src 'self' vimeo\.com\/api\/oembed\.json/)
+  })
+
+  it("names the endpoints Timeline reads its web media from, by path, in both policies", () => {
+    // TimelineJS fetches Wikipedia, Vimeo, SoundCloud and Flickr items as JSONP, so a `<script>`
+    // names each endpoint; a whole host would let any file of theirs run (2026-10-28).
+    const jsonp = ['*.wikipedia.org/w/api.php', 'vimeo.com/api/v2/video/', 'soundcloud.com/oembed', 'api.flickr.com/services/rest/']
+    for (const untrusted of [false, true]) {
+      expect(scriptSources(buildContentSecurityPolicy({ ...options, untrusted }))).toEqual(expect.arrayContaining(jsonp))
     }
   })
 

@@ -42,4 +42,4 @@ still not stored. With `resume="host"` and each save sent to a server, `save-int
 spaces the saves as the H5P plugins do; the default is 10 seconds.
 
 The element's full API and events:
-https://github.com/missing-elements/h5p-offline-player/blob/main/README.md#api
+https://github.com/missing-elements/h5p-offline-player/blob/main/docs/api.md

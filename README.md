@@ -44,33 +44,30 @@ something else.
 
 ## What it does
 
-- **Plays the packages people have.** Large ones stream: a video starts before the archive has
-  arrived, and a host without `Range` support still gets an early start. An export without its
-  libraries, as h5p.com and h5p.org make them, plays against a
-  [library pack](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/libraries.md) of every content type the H5P hub serves, downloading
-  only the libraries it needs; an older export plays the pack's newer versions of its own, and its
-  content is upgraded to them first.
+- **Plays the packages people have.** Large ones stream, a video starting before the archive has
+  arrived. An export without its libraries, as h5p.com and h5p.org make them, plays against a
+  [library pack](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/libraries.md)
+  of every content type the H5P hub serves, downloading only the libraries it needs.
 - **Validates what it plays.** With `untrusted`, none of a package's own code runs, and its content
-  is checked field by field against each library's definitions by a port of H5P's own validator.
-  Every package's entry names and libraries are checked before it starts. See
+  is checked field by field against each library's definitions by a port of H5P's own validator:
   [Packages you did not make](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/untrusted.md).
 - **Gives results you can audit.** Every xAPI statement names the
-  [build it came from](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/revision.md), `finished` is the content's own result,
+  [build it came from](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/revision.md),
   [cmi5](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/cmi5.md) launches it from an LMS, a
   [SCORM package](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#a-scorm-package-for-an-lms)
-  puts one in an LMS such as Moodle with its score and the learner's place, and [resume](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/resume.md) keeps the
-  learner's place.
+  puts one in an LMS such as Moodle with its score, and [resume](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/resume.md)
+  keeps the learner's place.
 - **Works offline, in the content's language.** The installable app plays with no network, on iOS
-  too, and H5P's own buttons match the language the content is written in, any of more than fifty. Results stay on your page
-  unless your code sends them; [privacy](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/privacy.md)
-  lists what the player fetches, and what it keeps on the device.
-- **Comes with tools for pipelines.** [`h5p-verify`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/verify.md) plays a package headless
-  and says whether it works, [`h5p-normalize`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/streaming-video.md) rewrites one so its
-  video streams, and [`h5p-embed`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#readme)
+  too, and H5P's own buttons follow the language the content is written in, any of more than fifty.
+  Nothing leaves your page unless your code sends it:
+  [privacy](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/privacy.md).
+- **Comes with tools for pipelines.** [`h5p-verify`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/verify.md)
+  plays a package headless and says whether it works, [`h5p-normalize`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/streaming-video.md)
+  rewrites one so its video streams, and [`h5p-embed`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#readme)
   writes the embed site. The [agent skills](#agent-skills) cover those workflows and quiz authoring.
 - **Is tested where it runs.** CI runs the browser tests in Chromium, Firefox and WebKit on every
-  change, and plays every content type in the library pack, untrusted and trusted, on each change to
-  the player, the runtime or the pack, and every week.
+  change, and plays every content type in the library pack, untrusted and trusted, on each change
+  to the player, the runtime or the pack, and every week.
 
 ## Which setup
 
@@ -84,17 +81,13 @@ An H5P package is JavaScript, and the player runs it on the origin that serves t
 | Cannot host a file (page builder, hosted CMS, LMS page) | **Embed** |
 
 Installed, you get the whole API, and a package played as it is runs as your site. Embedded, a
-package never sees your cookies, storage or page, and you get results as relayed xAPI.
+package never sees your cookies, storage or page, and you get results as relayed xAPI. `untrusted`
+plays a package as data, none of its own code running and its content checked, as an H5P plugin
+checks an author's upload: [Packages you did not make](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/untrusted.md).
 
-`untrusted` plays a package as data. None of its own code runs: its libraries come from the
-library pack, and its content is checked against each library's field definitions before it is
-shown, as the H5P CMS plugins check an author's upload. Installed with `untrusted`, a package is
-as contained as in an H5P plugin on the same site, and Embed adds a separate origin on top. A
-package that needs a newer library than the pack has is refused until the pack catches up.
-[Packages you did not make](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/untrusted.md) has the details.
-
-Both need the page on `https://` or `localhost`, and CORS headers on the package host. `Range`
-support is optional: without it the archive is downloaded once and played from the cache.
+Both need the page on `https://` or `localhost`, and CORS headers on the package host; `Range`
+support is optional. [Setting up the player](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/setup.md)
+has every path below in full: the library pack from your own site, jsDelivr, caching, upgrades.
 
 ### Install with a bundler
 
@@ -112,25 +105,12 @@ document.querySelector('h5p-player').runtime = runtime
 ```
 
 The bundler emits the Service Worker, the runtime and its fonts as assets; nothing to copy. The
-runtime is a separate package because it is GPL-3.0 (see [Licence](#licence)). With a bundler
-that does not emit `new URL(…, import.meta.url)` assets, esbuild among them, serve both packages'
-`dist/` and set `sw` and `assets-base`.
-
-For [`libraries="pack"`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/libraries.md)
-served from your own site rather than jsDelivr, install `@missing-elements/h5p-libraries` too
-and hand over its `pack` export, which the bundler emits as one asset per library:
-
-```js
-import { pack } from '@missing-elements/h5p-libraries'
-
-document.querySelector('h5p-player').pack = pack
-```
+runtime is a separate package because it is GPL-3.0 (see [Licence](#licence)).
 
 ### Install without a build step
 
-Copy the files onto your own site, so that nothing a learner's browser loads comes from anyone
-else's server; npm is only how you get them. `public/` stands for the folder your site is served
-from:
+Copy the files onto your own site; npm is only how you get them. `public/` stands for the folder
+your site is served from:
 
 ```bash
 npm install @missing-elements/h5p-offline-player @missing-elements/h5p-runtime
@@ -144,49 +124,19 @@ cp -r node_modules/@missing-elements/h5p-runtime/dist public/h5p-player/frame-as
 ```
 
 The element finds the Service Worker and the runtime beside its own script, so it needs no other
-attribute, and the worker is always the element's own version. For `libraries="pack"`, copy the
-library pack too, with the list of its libraries' licences, and name its folder with
-`pack-base="/h5p-libraries/"`:
-
-```bash
-npm install @missing-elements/h5p-libraries
-cp -r node_modules/@missing-elements/h5p-libraries/parts public/h5p-libraries
-cp node_modules/@missing-elements/h5p-libraries/libraries.txt public/h5p-libraries/
-```
-
-To upgrade, delete the folders and copy them again. Serve them with `Cache-Control: no-cache`, or
-with no caching header at all: the file names stay the same from one version to the next, so a
-copy a browser kept from before an upgrade would run against the new Service Worker.
-
-Or load the element and the runtime from jsDelivr, and copy only the Service Worker:
-
-```html
-<script type="module"
-  src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@1.1.1/dist/h5p-player.js"></script>
-<h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js"
-            assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-runtime@1.0.0/dist/"></h5p-player>
-```
-
-Copy `dist/h5p-sw.js` of the same version onto your own site: browsers register a Service Worker
-only from the page's origin. Its scope is `/h5p/`, so an existing site worker is left alone. Pin
-the version, and copy the worker again whenever you change it; the element warns when the two
-differ. Every learner's browser then fetches the player from jsDelivr, as it does the pack's
-libraries unless `pack-base` names a copy of your own.
+attribute. Serve the folder with `Cache-Control: no-cache`: the file names stay the same from one
+version to the next.
 
 ### Embed
 
 [`@missing-elements/h5p-embed`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#readme)
-writes the player page as a static site:
+writes the player page as a static site (Node 22 or later):
 
 ```bash
 npx @missing-elements/h5p-embed@latest h5p-player --packages https://host.example
 ```
 
-It needs Node 22 or later. Write `@latest`: without it, npm on an older Node quietly installs the
-last version that supported it, which writes a player from before 1.0.
-
-Deploy it to a separate registrable domain that holds nothing else (a subdomain would receive
-your site's cookies) and frame it:
+Deploy it to a separate registrable domain that holds nothing else and frame it:
 
 ```html
 <iframe src="https://h5p-player.example.net/?src=https://host.example/course.h5p&xapi=https://your-site.example"
@@ -194,63 +144,18 @@ your site's cookies) and frame it:
 <script src="https://h5p-player.example.net/resizer.js"></script>
 ```
 
-`microphone` and `camera` are for the content types that record or film: Audio Recorder, Speak the
-Words and AR Scavenger. A frame from another site gets neither unless the page allows it.
-
 When something goes wrong, see [Troubleshooting](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/troubleshooting.md). A site that
 allows one Service Worker, or must work offline, mounts the player in its own worker:
 [single-worker hosts](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/single-worker.md).
 
 ## API
 
-| Name | Set as | What it does |
-|---|---|---|
-| `src` | attribute, property | The package URL. Setting a new one loads; removing it empties the player. To reload the same URL, remove it and set it again |
-| `file` | property | A `File` from a picker; wins over `src` |
-| `sw` | attribute | The Service Worker's URL, same-origin. Default: `h5p-sw.js` beside the element |
-| `jobs` | attribute | The background worker's URL, for a CSP without `blob:` in `worker-src`. Default: `blob:`, then `h5p-jobs.js` beside the element |
-| `runtime` | property | The `runtime` export of `@missing-elements/h5p-runtime`. Set before `src` |
-| `assets-base` | attribute | Where the runtime's `dist/` is served. Default: `frame-assets/` beside the element |
-| `libraries` | attribute | Sources for a package's libraries, tried in order: `pack`, the library pack, of which only the libraries a package needs are downloaded, and whose newer versions play in place of those a package carries; a `.h5p` URL, which only fills gaps; or both. Default: a package plays as it is, and one without its libraries is refused |
-| `pack-base` | attribute | Where `pack` is: the folder of a copy of `@missing-elements/h5p-libraries`' `parts/` on your site. Default: jsDelivr, at the version this release pins |
-| `pack` | property | The `pack` export of `@missing-elements/h5p-libraries`, as a bundler emits it; wins over `pack-base`. Set before `src` |
-| `refresh-libraries` | attribute | `off` plays the libraries a package carries as exported, and `pack` only fills gaps. Default: the pack's newer versions play |
-| `untrusted` | attribute, property | Plays a package you did not make as data: its own library folders are ignored and the libraries come from `libraries` (default `pack`), `content/` serves only H5P's own file types, and the frame's script policy names exact paths. Its content is checked against each library's `semantics.json`, as the H5P CMS plugins check it. A package that needs its own copy of a library is refused, with `missingLibraries.carried` set |
-| `allow-origins` | attribute | Extra origins for the frame's CSP, space separated |
-| `frame`, `copyright`, `export`, `icon`, `embed` | attribute | Show the H5P action bar and its buttons. `export` needs `download-url` or a package URL, `embed` needs `embed-code` |
-| `fullscreen` | attribute | `off` removes the fullscreen button |
-| `download-url`, `embed-code`, `resize-code` | attribute | What the download and embed buttons offer; `:w` and `:h` in `embed-code` stand for the size |
-| `custom-css`, `custom-js` | attribute | Stylesheets and scripts loaded in the frame after the runtime's own |
-| `reporting` | attribute | Enables the submit button in content types that have one |
-| `activity-id` | attribute | The statements' object id. Default: the package URL |
-| `lang` | attribute | The language of H5P's own buttons and dialogs, such as "Fullscreen" and "Rights of use", for a package that does not name its own. A package that names its language in `h5p.json` (`defaultLanguage`), as H5P's exports do, gets them in that language, so they match the content's own text whatever the page's language. More than fifty languages. Inherited from the page like any element's language, and read at each load. Default: English |
-| `user` | property | `{ name, mail }`, the actor of every statement. Set before `src` |
-| `auto-resize` | attribute | `off` to size the element yourself. Default: follows the content's height |
-| `preload` | attribute, property | `auto` pulls large deflated media before it is asked for. Default: `none` |
-| `resume` | attribute, property | `device` keeps the content's saved state on this device; `host` hands it to the page. Default: `off` |
-| `save-interval` | attribute, property (`saveInterval`) | Seconds between saves while the content runs, with `resume`; also saved after each completion and as the page closes. Default: `10` |
-| `userData` | property | Under `resume="host"`, the state to restore, as `userdata` events carried it. Set before `src`. Not checked against the build: compare the `revision` you stored |
-| `state` | read-only | `idle`, `probing`, `downloading`, `indexing`, `ready` or `error` |
-| `pkgId`, `revision` | read-only | The loaded package's id and build fingerprint |
-| `source` | read-only | `{ type: 'range-http' \| 'chunked' \| 'file', size, … }` |
-| `metadata` | read-only | `h5p.json`'s metadata plus `mainLibrary` |
-| `libraryBundle` | read-only | `{ url, origin, fromCache, refreshed? }` for what supplied libraries: for the pack, `refreshed` lists the libraries the package carries that played at the pack's version, `{ library, from, to }` |
-| `scope` | read-only | The Service Worker scope |
-
-`clearUserData()` forgets the state kept on this device for the current package; remove `src` and set it again to restart the content.
-
-Events are `CustomEvent`s:
-
-| Event | `detail` | When |
-|---|---|---|
-| `ready` | `{ pkgId, source, metadata, revision, libraryBundle }` | The content is visible |
-| `xapi` | `{ statement, verb }` | Any xAPI statement; nothing is stored |
-| `finished` | `{ statement }` | The content reported its result: a `completed` or `answered` statement from the content itself, not from a part inside it. That is H5P's own `setFinished` rule, except that a part created without a parent counts as a part too, which H5P's rule misses for Interactive Book's chapters and Game Map's exercises. It can come more than once, for a question checked again; the last is the result. Content that reports no result of its own never raises it, and Interactive Book reports one only with `reporting` |
-| `userdata` | `{ pkgId, dataType, subContentId, data, revision }` | With `resume`: the content saved its state; `data: null` means delete it |
-| `progress` | `{ phase, fraction, loaded, total, entry? }` | `download`, `libraries`, `warm` or `extract`; `fraction` is 0–1, or `null` while the total is unknown |
-| `resize` | `{ height }` | The content's height changed |
-| `statechange` | `{ state }` | `state` changed |
-| `error` | `{ code, message, missingLibraries? }` | `no-cors`, `no-worker`, `network`, `quota`, `bad-archive` or `runtime`. An error while `state` stays `ready` (a content exception, or one media file that failed to extract) leaves the content running |
+`<h5p-player>` takes the package as `src` or as a `file` from a picker, the library pack as
+`libraries="pack"`, `untrusted`, `resume`, `lang` and H5P's display options by their own names,
+and emits `ready`, `xapi`, `finished`, `userdata`, `progress`, `resize`, `statechange` and `error`.
+[The element's API](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/api.md)
+lists every attribute, property, method and event with its `detail`; it is the contract
+[Compatibility](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/compatibility.md) holds a version to.
 
 ```js
 const player = document.querySelector('h5p-player')
@@ -267,6 +172,8 @@ is an example.
 
 ## Guides
 
+- [Setting up the player](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/setup.md) — each install path in full: the pack from your own site, jsDelivr, caching, upgrades
+- [The element's API](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/api.md) — every attribute, property, method and event
 - [Packages you did not make](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/untrusted.md) — `untrusted` and the content check
 - [Video that cannot stream](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/streaming-video.md) — `preload` and the normalizer
 - [Libraries](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/libraries.md) — the library pack, for packages without their libraries and older than it
@@ -275,6 +182,7 @@ is an example.
 - [Resume](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/resume.md) — saved state on the device or with the host
 - [Privacy and data protection](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/privacy.md) — what is stored and sent, for a privacy notice or a GDPR review
 - [cmi5](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/cmi5.md) — launching from an LMS
+- [A SCORM package](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#a-scorm-package-for-an-lms) — one package in an LMS, with its score and the learner's place
 - [Verifying a package](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/verify.md) — `h5p-verify`
 - [Troubleshooting](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/troubleshooting.md) — symptoms, causes and fixes
 - [Single-worker hosts and upgrades](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/single-worker.md)
@@ -291,18 +199,12 @@ npx skills add missing-elements/h5p-offline-player
 ```
 
 [`h5p-author`](https://github.com/missing-elements/h5p-offline-player/tree/main/skills/h5p-author)
-turns a prompt or lesson into a text-only Multiple Choice or Question Set: a portable helper
-builds the `.h5p` against the installed library pack, and the agent verifies it in the real
-player, reviews the screenshot, and opens the quiz in your browser for you to play before
-handing it over. Works with Claude Code and other agents with filesystem and command access;
-no provider API key or H5P server is needed.
-For example: "Create five practice questions from this lesson for new employees, with
-explanatory feedback. Use h5p-author and verify the result." Needs Node 22 or later.
-
-`h5p-player-setup` puts H5P on a site, `h5p-normalize` fixes packages whose video will not
-stream, and `h5p-verify` checks a generated package plays, then opens it in your browser for you
-to judge the rest. A verifier pass checks startup and rendering, not whether the answers are
-right or the activity is accessible.
+turns a prompt or lesson into a Multiple Choice or Question Set, verifies it in the real player and
+opens it in your browser for you to play before handing it over. `h5p-player-setup` puts H5P on a
+site, `h5p-normalize` fixes packages whose video will not stream, and `h5p-verify` checks that a
+generated package plays. They work with Claude Code and other agents with filesystem and command
+access, with no provider API key or H5P server; a verifier pass checks startup and rendering, not
+whether the answers are right.
 
 ## Development
 
@@ -311,15 +213,13 @@ and [AGENTS.md](https://github.com/missing-elements/h5p-offline-player/blob/main
 
 ## Licence
 
-The player is MIT ([LICENSE](https://github.com/missing-elements/h5p-offline-player/blob/main/LICENSE)).
-Its Service Worker bundles [zip.js](https://github.com/gildas-lormeau/zip.js), BSD-3-Clause
+The player is MIT ([LICENSE](https://github.com/missing-elements/h5p-offline-player/blob/main/LICENSE));
+its Service Worker bundles [zip.js](https://github.com/gildas-lormeau/zip.js), BSD-3-Clause
 ([NOTICE.md](https://github.com/missing-elements/h5p-offline-player/blob/main/packages/player/NOTICE.md)).
-
-The H5P runtime the frame loads is GPL-3.0: the H5P core from
-[h5p-php-library](https://github.com/h5p/h5p-php-library), at a commit its notice names, and the
-script that boots it. It is published separately as
-[`@missing-elements/h5p-runtime`](https://www.npmjs.com/package/@missing-elements/h5p-runtime);
-the player talks to it only over HTTP and `postMessage`. Its
+The H5P runtime the frame loads is GPL-3.0, the H5P core from
+[h5p-php-library](https://github.com/h5p/h5p-php-library) and the script that boots it, published
+separately as [`@missing-elements/h5p-runtime`](https://www.npmjs.com/package/@missing-elements/h5p-runtime);
+the player talks to it only over HTTP and `postMessage`, and its
 [NOTICE.md](https://github.com/missing-elements/h5p-offline-player/blob/main/packages/runtime/NOTICE.md)
 says what serving it entails. Whether the copyleft reaches the page around the player is a legal
 question this README does not answer.

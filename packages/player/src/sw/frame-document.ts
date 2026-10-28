@@ -46,7 +46,19 @@ const RUNTIME_ALLOWLIST = {
     'developers.panopto.com'
   ],
   style: ['fonts.googleapis.com'],
-  font: ['fonts.gstatic.com', 'fonts.googleapis.com']
+  font: ['fonts.gstatic.com', 'fonts.googleapis.com'],
+  // What script fetches, by path, since one endpoint is all it needs. Found on 2026-10-28 by
+  // scanning every script and stylesheet in the pack for the hosts they name, then reading what
+  // each load is; the invariant in AGENTS.md records the scan and what it left out. Vimeo's SDK
+  // reads the video's oEmbed record before it can create the player: given the URL and an
+  // element, as H5P.Video's handler gives it, it has nothing else to build the frame from.
+  // Refused, the handler shows its loading error after eight seconds.
+  connect: ['vimeo.com/api/oembed.json'],
+  // TimelineJS, under H5P.Timeline, fetches a slide's web media as JSONP, a `<script>` naming the
+  // endpoint, so these are script sources, in both policies: Wikipedia in any language, Vimeo's
+  // old API, SoundCloud and Flickr. Its Twitter, Storify, Vine and YouTube-feed endpoints are
+  // gone, and its Google Maps key is from 2013, so none of those are here.
+  jsonp: ['*.wikipedia.org/w/api.php', 'vimeo.com/api/v2/video/', 'soundcloud.com/oembed', 'api.flickr.com/services/rest/']
 } as const
 
 /**
@@ -59,7 +71,8 @@ export const CONTENT_CHECK_HEADER = 'x-h5p-content-check'
 /**
  * What an `untrusted` package's frame may load scripts from beyond its own path and the runtime's
  * files: the video players' APIs H5P.Video loads, each by exact path — YouTube's `iframe_api` then
- * its widget script under `/s/player/`, Vimeo's `player.js`, Panopto's embed API. Whole hosts would
+ * its widget script under `/s/player/`, Vimeo's `player.js`, Panopto's embed API; and, as in the
+ * trusted policy, TimelineJS's JSONP endpoints (`RUNTIME_ALLOWLIST.jsonp`). Whole hosts would
  * let markup a package injects load any script those hosts serve; a CDN such as jsDelivr serves
  * any file on npm and GitHub. MathJax is not here: H5P.MathDisplay carries it in its own folder
  * since 1.0, and an older copy fetching it from a CDN is the package's code, which does not run.
@@ -286,7 +299,7 @@ function untrustedScriptSources(options: FrameDocumentOptions): string[] {
     ...customUrls(options.frameOptions?.customJs),
     ...(options.workerScript ? [options.workerScript] : [])
   ]
-  return [pathSource(`${options.virtualRoot}/`, options.virtualRoot), ...files.map((url) => pathSource(url, options.virtualRoot)), ...UNTRUSTED_SCRIPT_PATHS].filter(
+  return [pathSource(`${options.virtualRoot}/`, options.virtualRoot), ...files.map((url) => pathSource(url, options.virtualRoot)), ...UNTRUSTED_SCRIPT_PATHS, ...RUNTIME_ALLOWLIST.jsonp].filter(
     (source): source is string => source !== null
   )
 }
@@ -320,7 +333,7 @@ export function buildContentSecurityPolicy(options: FrameDocumentOptions): strin
     `default-src 'self'`,
     directive(
       'script-src',
-      ...(options.untrusted ? untrustedScriptSources(options) : ["'self'", ...origins, ...customJs, ...RUNTIME_ALLOWLIST.script]),
+      ...(options.untrusted ? untrustedScriptSources(options) : ["'self'", ...origins, ...customJs, ...RUNTIME_ALLOWLIST.script, ...RUNTIME_ALLOWLIST.jsonp]),
       ...extra,
       `'nonce-${options.nonce}'`,
       // EmbeddedJS compiles its templates with `eval`, and content types built on it — the board
@@ -350,8 +363,9 @@ export function buildContentSecurityPolicy(options: FrameDocumentOptions): strin
     `media-src * data: blob:`,
     `frame-src *`,
     // Deliberately narrow: this blocks the few content types that fetch external data files
-    // (remote subtitles, remote JSON). Accepted for v1.
-    directive('connect-src', "'self'", ...extra),
+    // (remote subtitles, remote JSON). Accepted for v1. Vimeo's oEmbed record is the one
+    // exception, since nothing of Vimeo's plays without it.
+    directive('connect-src', "'self'", ...RUNTIME_ALLOWLIST.connect, ...extra),
     `worker-src 'self' blob:`,
     `object-src 'none'`,
     // `'self'`, not `'none'`: H5P sets a `<base>` to the frame's own URL, and refusing it logs

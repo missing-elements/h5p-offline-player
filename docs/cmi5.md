@@ -3,8 +3,10 @@
 cmi5 is xAPI with a launch contract: the LMS opens content by URL, hands it a one-time token
 and an LRS, and the content sends its statements there. It suits this player: the package stays
 on a static host, the LMS imports only a small course structure, no LRS credentials sit in page
-code, and every statement keeps `context.revision`. An LMS that supports only SCORM needs a
-SCORM wrapper instead, which hosts the player and the package inside the LMS.
+code, and every statement keeps `context.revision`. An LMS that speaks only SCORM takes the
+package [`h5p-embed --scorm`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#a-scorm-package-for-an-lms)
+writes instead, which carries the player and the package into the LMS and reports the score, the
+result and the learner's place to it.
 
 The element does not change for it. The wiring is a package of its own with no dependencies,
 [`@missing-elements/h5p-cmi5`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/cmi5):

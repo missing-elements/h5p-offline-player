@@ -300,7 +300,10 @@ apps/skills/              the skills' test project, a project of the kind a skil
 README.md                 what npm shows; ACCESSIBILITY.md, SECURITY.md, CONTRIBUTING.md, GLOSSARY.md,
                           CODE_OF_CONDUCT.md beside it
 
-docs/                     the README's longer sections, one file each: streaming video, libraries, the
+docs/                     the README's longer sections, one file each: the element's API (api.md, the
+                          tables Compatibility holds a version to, out of the README since 2026-10-28,
+                          when it went from 325 lines to 225), setting up the player (setup.md, each
+                          install path in full, the same day), streaming video, libraries, the
                           frame's CSP, packages you did not make (`untrusted` and the content check), the
                           revision on statements, resume, the verifier, cmi5, development,
                           troubleshooting, single-worker hosts and upgrades, compatibility (what a
@@ -1374,9 +1377,38 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   that one feature often spans three (script, style, font). The list covers what H5P itself
   loads: MathJax, Google's WebFont loader, and the YouTube, Vimeo and Panopto player APIs that
   H5P.Video puts in the document before embedding a player (`frame-src *` covers the embed, not
-  the script that creates it). A host that only some deployments use — a tenant's Panopto server
-  — belongs in the host's `allow-origins` attribute instead, which appends host-sources and drops
-  anything that is not plainly a host, so a value cannot append directives of its own.
+  the script that creates it). Three entries came from the owner's Vimeo report of 2026-10-28
+  and the scan it prompted: every script and stylesheet in the pack and the core read for the
+  hosts they name, each load then traced to what makes it. `connect-src`, by path: Vimeo's
+  `vimeo.com/api/oembed.json`, which its SDK reads before it creates the frame, given a URL and
+  an element as H5P.Video's handler gives it, so under `'self'` alone every Vimeo video ended in
+  the handler's loading error (the verifier reproduced it and still passed the package, with a
+  CSP warning, since the content reached `ready` around the empty player). `script-src`, by
+  path and in both policies (`RUNTIME_ALLOWLIST.jsonp`): the four live endpoints TimelineJS
+  fetches a slide's media from as JSONP, Wikipedia in any language, Vimeo's v2 API, SoundCloud
+  and Flickr, measured refused on a Timeline with a Wikipedia and a SoundCloud item and loading
+  with the entries, the extract drawn and the SoundCloud widget playing. Left out on purpose:
+  TimelineJS's Twitter, Storify, Vine and YouTube-feed endpoints, which are gone, and its Google
+  Maps key of 2013; the WebVR device database A-Frame's polyfill asks for on a phone
+  (`dpdb.webvr.rocks`, dead, and the polyfill falls back); A-Frame's fonts and controller
+  models on `cdn.aframe.io`, which no content type in the pack uses; and MathJax's font CDN,
+  since H5P.MathDisplay points it at its own folder. Everything else the scan found is an IRI,
+  a licence link, a namespace or a share link. **AR Scavenger does not run under this policy at
+  all**, found the same day with a marker given to the sweep's package and a fake camera: its
+  bundle re-injects A-Frame and AR.js as inline scripts (`script.text = H5P.AFrame.toString()`),
+  which the nonce refuses, so it shows its title and no scene, in both policies. Were that
+  solved, AR.js would next fetch its default camera calibration,
+  `ar-js-org.github.io/AR.js/data/data/camera_para.dat`, by XHR, since the content type sets no
+  `cameraParametersUrl` and ships no file: a `connect-src` entry to add then, not before. The
+  one policy shape that admits it is `'strict-dynamic'` beside the nonce, measured in Chrome:
+  scripts a nonced script creates run, inline or external, while parser-inserted ones, a
+  `<script>` in content markup, stay refused; but so would run the inline script jQuery's
+  `.html()` makes of one, which only the content check then keeps out, and host sources stop
+  counting for `script-src`. The owner's decision, not yet taken. The sweep passes AR Scavenger
+  because it reaches `ready` before its scene, with no marker to start one. A host
+  that only some deployments use — a tenant's Panopto server — belongs in the host's
+  `allow-origins` attribute instead, which appends host-sources and drops anything that is not
+  plainly a host, so a value cannot append directives of its own.
 - **Clearing site data demolishes three things at once, all held by handles that still look
   valid.** The IndexedDB connection is force-closed, so `idb.ts` listens for `versionchange` and
   `close`, drops the cached handle, and retries a transaction once on `InvalidStateError` —

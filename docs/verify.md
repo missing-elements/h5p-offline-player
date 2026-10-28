@@ -27,6 +27,11 @@ ends a few seconds after its last tab closes:
 npx @missing-elements/h5p-verify@latest course.h5p --preview
 ```
 
+In VS Code, Cursor or VSCodium, the
+[H5P Preview extension](https://marketplace.visualstudio.com/items?itemName=MissingElements.h5p-preview)
+does the same in an editor tab, and plays the file again whenever it is rewritten; it carries the
+library pack, so an export without its libraries plays offline.
+
 For authoring, the
 [`h5p-author` skill](https://github.com/missing-elements/h5p-offline-player/tree/main/skills/h5p-author)
 adds a prompt-to-quiz workflow and a portable packaging helper for text-only Multiple Choice

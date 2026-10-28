@@ -25,8 +25,8 @@ list a breaking change, or a fix of either kind, first, with what to do about it
 
 ### The player, `@missing-elements/h5p-offline-player`
 
-- **The element.** `<h5p-player>`, and every attribute, property, method and event in the
-  [README's API tables](https://github.com/missing-elements/h5p-offline-player#api), with the
+- **The element.** `<h5p-player>`, and every attribute, property, method and event in
+  [the element's API](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/api.md), with the
   values and `detail` shapes given there. A new error `code` or `progress` phase can come in a
   minor: treat one you do not know as the general case.
 - **The files.** The package's exports — `.`, the element, and `./sw`, `mountH5P` — and the four
@@ -44,7 +44,7 @@ list a breaking change, or a fix of either kind, first, with what to do about it
   object ids are built on it; a package's `pkgId` comes from its URL and the host's validator, or
   from the picked file's name, size and date, and saved state is kept under it. Neither recipe
   changes within a major.
-- **What counts as the result.** The rule behind `finished`, as the README states it, since an
+- **What counts as the result.** The rule behind `finished`, as the API page states it, since an
   LMS records completion by it.
 - **What is kept on the device.** Saved state (`resume="device"`) survives every release, a
   major included, unless the release's notes say otherwise. Cached packages survive minors and
