@@ -94,7 +94,7 @@ class DiskView {
 
 exports.run = async function run() {
   const content = vscode.workspace.workspaceFolders[0].uri
-  const extension = vscode.extensions.getExtension('missing-elements.h5p-preview')
+  const extension = vscode.extensions.getExtension('MissingElements.h5p-preview')
   const api = await extension.activate()
   const failures = []
 

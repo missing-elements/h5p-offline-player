@@ -1825,11 +1825,13 @@ for packages it makes; the verifier, which is handed a stranger's, still does no
 
 ## The VS Code extension
 
-`packages/vscode` is **H5P Preview by Missing Elements** (`missing-elements.h5p-preview`): a `.h5p`
+`packages/vscode` is **H5P Preview by Missing Elements** (`MissingElements.h5p-preview`): a `.h5p`
 opens in a read-only custom editor that plays it. Built on 2026-10-26 (#83), the first of the
 plugins weighed in the owner's notes: the Marketplace had one H5P extension, for developing content
 types, and nothing that played a package. It is not on npm. The owner publishes the `.vsix` to the
-Visual Studio Marketplace (publisher `missing-elements`) and to Open VSX, for Cursor and VSCodium.
+Visual Studio Marketplace and to Open VSX, for Cursor and VSCodium, under the publisher and namespace
+`MissingElements`, the ID the owner gave the Marketplace publisher on 2026-10-28 and which
+`package.json`'s `publisher` has to match; it was `missing-elements`, the npm scope's, until then.
 The name is the owner's, under H5P Group's trademark policy (h5p.org/trademark, 2.5): open-source
 code may lead with "H5P" only beside its author, "Acme's H5P interactive Quiz" being its example.
 The icon is the project's logo, a play triangle with a hand tapping it, which the owner made on
