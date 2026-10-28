@@ -2,7 +2,7 @@
   "name": "h5p-preview",
   "displayName": "H5P Preview by Missing Elements",
   "description": "Open .h5p files in VS Code and play them in the real player: no H5P server, offline, and nothing leaves your computer.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "MissingElements",
   "private": true,
   "license": "MIT",

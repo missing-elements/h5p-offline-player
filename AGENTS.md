@@ -1404,7 +1404,9 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   scripts a nonced script creates run, inline or external, while parser-inserted ones, a
   `<script>` in content markup, stay refused; but so would run the inline script jQuery's
   `.html()` makes of one, which only the content check then keeps out, and host sources stop
-  counting for `script-src`. The owner's decision, not yet taken. The sweep passes AR Scavenger
+  counting for `script-src`. The owner decided against it on 2026-10-28: AR Scavenger is not
+  supported, which `docs/troubleshooting.md` says, rather than `'strict-dynamic'` for every load
+  or for its loads alone, which the worker could tell from the manifest it keeps. The sweep passes AR Scavenger
   because it reaches `ready` before its scene, with no marker to start one. A host
   that only some deployments use — a tenant's Panopto server — belongs in the host's
   `allow-origins` attribute instead, which appends host-sources and drops anything that is not
