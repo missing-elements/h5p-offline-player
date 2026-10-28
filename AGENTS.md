@@ -1847,9 +1847,16 @@ Open VSX takes each version from `.github/workflows/vscode-publish.yml` by trust
 since 2026-10-28, when its namespace was granted. Its registration names the repository, that file
 and the `open-vsx` environment, which deploys from `main` alone. The run's GitHub ID token stands in
 for an access token, so none is stored. The owner runs the workflow by hand after a version bump. A
-registration cannot be edited, so renaming the file means registering again. The Marketplace
-upload takes the same run's `.vsix`. vsce 4 can also publish by OIDC (`--oidc`), once a policy on
-the Marketplace names this file.
+run on a version Open VSX already has publishes nothing and is the check that the trust holds: the
+first, that day, on 0.1.0, had its token issued and the version refused as a duplicate. It also
+installed from a cache, which the job is written not to: setup-node v5 restores the pnpm store
+`ci.yml` saves on `main` whenever `package.json` names a package manager, so the job turns
+`package-manager-cache` off. A registration cannot be edited, so renaming the file means
+registering again. The Marketplace upload takes the same run's `.vsix`, by hand. vsce 4 has
+`--oidc` for the Marketplace, which did not take it yet in October 2026: its token exchange
+answered `TrustedPublishingNotSupportedException`, and it had no page to name a workflow on
+(microsoft/vscode-vsce#1275).
+
 The name is the owner's, under H5P Group's trademark policy (h5p.org/trademark, 2.5): open-source
 code may lead with "H5P" only beside its author, "Acme's H5P interactive Quiz" being its example.
 The icon is the project's logo, a play triangle with a hand tapping it, which the owner made on

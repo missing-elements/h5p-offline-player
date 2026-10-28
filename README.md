@@ -16,6 +16,7 @@ week. The player is MIT; the H5P runtime it loads is GPL-3.0 and published separ
 
 - [Player](https://h5p-offline-player.vercel.app/) — paste a URL or pick a file
 - [Offline app (PWA)](https://h5p-offline-player.vercel.app/app/) — install it and play `.h5p` files with no network
+- [VS Code extension](https://marketplace.visualstudio.com/items?itemName=MissingElements.h5p-preview) — click a `.h5p` and it plays in an editor tab, offline; on [Open VSX](https://open-vsx.org/extension/MissingElements/h5p-preview) for Cursor and VSCodium
 - [How it compares](https://h5p-offline-player.vercel.app/demo/compare.html) with h5p.com, the CMS plugins, Lumi and h5p-standalone
 
 Once the player's files are on your site, as [Which setup](#which-setup) describes, a package is

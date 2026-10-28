@@ -132,6 +132,9 @@ them to run instead.
 - Deliver the `.h5p`, source JSON, the verification report and screenshot, the
   **full `revision` from the report**, and the preview command, with any remaining
   warnings and limits.
+- For a user who works in VS Code, Cursor or VSCodium, mention the H5P Preview
+  extension (`MissingElements.h5p-preview`): the quiz plays in an editor tab, and
+  plays again each time it is rebuilt from the source.
 - To put the quiz on a website, use `h5p-player-setup`. Prefer `untrusted` with a
   host-chosen pack on sites with accounts or packages from other authors. No player
   page, deployment, results collection, or AI calls are added by this helper.

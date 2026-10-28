@@ -109,4 +109,9 @@ Download button beside the file's name saves a copy of the package.
 - The address is `127.0.0.1` on the machine that runs the command. If that is not the user's
   computer, as in a cloud sandbox, they cannot reach it: hand over the file and the command for
   them to run.
+- A user who works in VS Code, Cursor or VSCodium can also keep the package open in the H5P
+  Preview extension (`MissingElements.h5p-preview`, on the Visual Studio Marketplace and Open
+  VSX): it plays a `.h5p` in an editor tab, and plays it again each time the file is rewritten,
+  which suits a package you are still changing. It plays by its own settings, not the check's
+  options.
 - Exit 2: the preview could not start, and the message says why.

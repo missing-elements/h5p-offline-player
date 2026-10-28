@@ -29,10 +29,12 @@ jobs:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v6
       # No cache: a job that publishes installs from the registry against the lockfile's hashes,
-      # not from a store another run wrote.
+      # not from a store another run wrote. setup-node v5 restores the pnpm store ci.yml saves
+      # whenever package.json names a package manager, unless told not to: the first run did.
       - uses: actions/setup-node@v5
         with:
           node-version: 22
+          package-manager-cache: false
       - run: pnpm install --frozen-lockfile
       # The player and the runtime, which the extension carries.
       - run: pnpm build
