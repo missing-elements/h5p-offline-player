@@ -119,7 +119,8 @@ npx @missing-elements/h5p-verify@latest course.h5p --preview
 
 Start it in the background; it ends about ten seconds after its tab closes. Ask the
 user to answer every question, a wrong answer included, and to check the feedback,
-navigation, score, retry, and the result. With browser tools of your own, add
+navigation, score, retry, and the result. Tell them that the Download button beside
+the file's name saves a copy of the quiz. With browser tools of your own, add
 `--no-open`, play the printed address yourself, and record what you saw. The
 preview is served from the machine that runs the command: if that is not the
 user's computer, as in a cloud sandbox, hand over the file and the command for

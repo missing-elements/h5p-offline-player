@@ -101,7 +101,8 @@ Pass the same `--untrusted` and `--libraries` as the check, so that they play wh
 checks nothing and works for every content type; a large video starts at once. Start it in the
 background: it serves the package from this machine and ends about ten seconds after its last tab
 closes. Then tell the user what to try, such as a wrong answer and a right one for each question,
-every branch of a scenario, or the interactions at a video's timestamps.
+every branch of a scenario, or the interactions at a video's timestamps. Tell them too that the
+Download button beside the file's name saves a copy of the package.
 
 - `--no-open` prints the address instead of opening their default browser, for when you drive a
   browser yourself or none opens.
