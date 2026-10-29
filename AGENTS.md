@@ -1965,7 +1965,22 @@ and committed, as are the app's install screenshots (`pnpm demo:screenshots`), w
   script URLs only; a page it frames from a local server can. Measured in VS Code 1.143.1
   (Electron 43, Chrome 150) on macOS, 2026-10-26: the frame's worker registers and controls it, the
   demo quiz reaches `ready` in 0.5 s, and the Interactive Video's H.264 clip decodes (`canPlayType`
-  says "probably", `readyState` 4).
+  says "probably", `readyState` 4). Its picture, that is: the sound was not checked then.
+- **VS Code does not play every format a browser does, and says it does.** Measured on 2026-10-29
+  in the same VS Code (#90), the bytes handed to a media element from a blob so that the network
+  played no part: MP3 plays with its sound; an MP4's H.264 picture plays and its AAC sound does not,
+  no audio bytes decoded; M4A audio does not play (`DEMUXER_ERROR_NO_SUPPORTED_STREAMS`), nor does
+  WebM (`DEMUXER_ERROR_COULD_NOT_OPEN`: its ffmpeg has no Matroska demuxer); and YouTube's player
+  fetches its stream, drops it and fetches it again, buffering for ever. Chrome played every one.
+  `canPlayType` and `MediaSource.isTypeSupported` answer yes to all of them, so H5P.Video takes a
+  WebM listed first over the MP4 beside it — h5p.org's Interactive Video example does that — and
+  shows "Video format not supported." The extension cannot change VS Code's codecs, so it says what
+  will not play: the page reads the content's parameters from the element's frame on `ready`
+  (`H5PIntegration.contents`, as the verifier does), so a video on a slide or tab not yet shown
+  counts, and names the kinds in the `ready` it tells (`media`: `mp4`, `webm`, `aac`, `youtube`);
+  the webview shows them under the bar with an Open in Browser button, which the extension takes
+  from the webview alone. Not measured: Windows and Linux, where the H.264 picture may not decode
+  either, and Vimeo and the other hosted players.
 - **One server per window, on the first free port from 4646 to 4655.** Every preview in the window
   shares it. Each port is an origin with the player's worker and caches of its own, so the address
   has to be the same from session to session: the first window takes 4646, a second the next free

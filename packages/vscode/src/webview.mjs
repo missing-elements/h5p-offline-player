@@ -18,9 +18,11 @@
  * Messages are taken from two places only. The frame's, by its window and the server's origin:
  * what the element reached — a state, `ready`, an error — which goes on to the extension, and
  * nothing else. The extension's, by the webview's own origin: reload, a change of trust or of the
- * settings. A package's own code runs in a frame below the page, on the server's origin. What it
- * posts itself is from neither place; played trusted, though, it shares the page's origin and can
- * post as the page, so the most it can do is misreport its own state.
+ * settings. The webview posts its own two: the mode its switches are in, and Open in Browser from
+ * the note on media VS Code does not play. A package's own code runs in a frame below the page, on
+ * the server's origin. What it posts itself is from neither place; played trusted, though, it
+ * shares the page's origin and can post as the page, so the most it can do is misreport its own
+ * state, and its media with it: a note, whose button opens the same package in the browser.
  * @param {object} options
  * @param {string} options.nonce
  * @param {WebviewConfig} options.config
@@ -61,6 +63,10 @@ export function webviewHtml({ nonce, config }) {
       label { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; cursor: pointer; }
       label:has(input:disabled) { cursor: default; opacity: 0.7; }
       input:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
+      #media { margin: 0; padding: 4px 12px; color: var(--vscode-editorWarning-foreground); border-bottom: 1px solid var(--vscode-panel-border, transparent); }
+      #media[hidden] { display: none; }
+      #media button { padding: 0; border: 0; background: none; font: inherit; color: var(--vscode-textLink-foreground); text-decoration: underline; cursor: pointer; }
+      #media button:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
       iframe { flex: 1; width: 100%; border: 0; background: #fff; }
     </style>
   </head>
@@ -72,6 +78,7 @@ export function webviewHtml({ nonce, config }) {
         <label title="Play the library pack's newer version of a library the package carries, as a site with the pack does."><input type="checkbox" id="newest" /> Newest libraries</label>
       </span>
     </header>
+    <p id="media" hidden><span id="media-text"></span> <button type="button" id="open-in-browser">Open in Browser</button></p>
     <iframe id="frame" title="H5P content" allow="fullscreen; autoplay; microphone; camera"></iframe>
     <script type="application/json" id="config">${json}</script>
     <script nonce="${nonce}">
@@ -82,6 +89,8 @@ export function webviewHtml({ nonce, config }) {
       const untrustedBox = document.getElementById('untrusted')
       const untrustedLabel = document.getElementById('untrusted-label')
       const newestBox = document.getElementById('newest')
+      const media = document.getElementById('media')
+      const mediaText = document.getElementById('media-text')
       // A switch set in this preview outlives VS Code hiding and showing it again.
       const mode = Object.assign({ untrusted: config.untrusted, newest: config.newest }, vscode.getState())
       let ready = null
@@ -101,6 +110,7 @@ export function webviewHtml({ nonce, config }) {
         if (!mode.newest) url.searchParams.set('newest', '0')
         if (config.lang) url.searchParams.set('lang', config.lang)
         ready = null
+        media.hidden = true
         say('Opening…')
         frame.src = url.href
       }
@@ -129,6 +139,19 @@ export function webviewHtml({ nonce, config }) {
           ...message.refreshed.map((library) => library.library + ' ' + library.from + ' → ' + library.to),
           ...downgraded.map((library) => library.library + ' made for ' + library.from + ', played at ' + library.to)
         ].join('\\n')
+        showMedia(message.media || [])
+      }
+
+      // What the content has that VS Code's own media stack does not play in full; a browser does.
+      function showMedia(kinds) {
+        const list = (items) => (items.length > 1 ? items.slice(0, -1).join(', ') + ' or ' + items.at(-1) : items[0])
+        const names = { webm: 'WebM video', aac: 'M4A audio', youtube: 'YouTube video' }
+        const unplayable = kinds.filter((kind) => kind in names).map((kind) => names[kind])
+        const parts = []
+        if (kinds.includes('mp4')) parts.push('plays its MP4 video without sound')
+        if (unplayable.length > 0) parts.push('cannot play its ' + list(unplayable))
+        media.hidden = parts.length === 0
+        mediaText.textContent = parts.length > 0 ? 'VS Code ' + parts.join(' and ') + '.' : ''
       }
 
       function showError(message) {
@@ -160,6 +183,7 @@ export function webviewHtml({ nonce, config }) {
         mode.newest = newestBox.checked
         play()
       })
+      document.getElementById('open-in-browser').addEventListener('click', () => vscode.postMessage({ type: 'open-in-browser' }))
 
       window.addEventListener('message', (event) => {
         if (event.source === frame.contentWindow) {

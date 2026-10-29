@@ -17,6 +17,18 @@ H5P server and no account. It works offline, and the package never leaves your c
 - **Open in Browser** plays it in your default browser, served from this computer until you close
   the tab.
 
+## Video and audio VS Code does not play
+
+VS Code plays media with a smaller set of codecs than a browser has. In VS Code 1.143 on macOS:
+
+- **MP4 video** plays its picture without sound.
+- **WebM video, M4A audio and YouTube** do not play at all.
+- **MP3 audio** plays with its sound.
+
+When a package has MP4, WebM, M4A or YouTube media, on any slide or tab, a line under the bar says
+what VS Code will not play, with an **Open in Browser** button that plays the package in your
+browser, sound included.
+
 ## Packages you did not make
 
 A package carries JavaScript. By default the preview runs it, as it plays your own work.

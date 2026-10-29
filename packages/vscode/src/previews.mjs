@@ -166,8 +166,9 @@ export class Previews {
       // What the page reported, which the webview relays: a state, `ready` or an error. Never a mode,
       // whatever its type says: a package's own code can post as the page.
       if (message.source === 'h5p-preview') this.states.fire({ ...message, uri: document.uri })
-      // The webview's own: its switches as they stand.
+      // The webview's own: its switches as they stand, and Open in Browser from its note on media.
       else if (message.type === 'mode') preview.mode = { untrusted: Boolean(message.untrusted), newest: Boolean(message.newest) }
+      else if (message.type === 'open-in-browser') this.openInBrowser(document.uri)
     })
 
     let server
