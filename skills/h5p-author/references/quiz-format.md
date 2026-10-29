@@ -12,7 +12,18 @@ All authored text is plain text. `<script>` and other markup display as text.
 | `license` | yes | H5P code: `U`, `CC BY`, `CC BY-SA`, `CC BY-ND`, `CC BY-NC`, `CC BY-NC-SA`, `CC BY-NC-ND`, `CC0 1.0`, `PD`, or `C` |
 | `authors` | yes | Non-empty list of `{ "name": "...", "role": "Author" }` |
 | `passPercentage` | no | Integer 0-100; defaults to the library's value (100 for Multiple Choice, 50 for Question Set in the current pack) |
+| `passedFeedback` | no | Plain text for a learner who reached `passPercentage`. Set it with `failedFeedback` and an explicit `passPercentage` |
+| `failedFeedback` | no | Plain text for a learner below `passPercentage`; say what to do next |
 | `questions` | yes | Non-empty list of questions |
+
+`passedFeedback` and `failedFeedback` become the activity's overall feedback: two
+score ranges split at the pass mark, which the library matches exactly as it decides
+the `success` an LMS records. A standalone Multiple Choice shows the message under
+the answers after Check. A Question Set in the current pack (1.21) does not draw it
+on its result page yet, an H5P bug ([h5p/h5p-question-set#183](https://github.com/h5p/h5p-question-set/issues/183)):
+screen readers announce it, and it appears once H5P's fix reaches the pack. Until
+then a learner sees the score and not the pass mark, so they need to learn the pass
+mark another way.
 
 Each question:
 

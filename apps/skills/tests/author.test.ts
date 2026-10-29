@@ -43,6 +43,8 @@ describe('quiz authoring', () => {
   it('accepts both kinds, multiple correct answers, and a zero pass threshold', () => {
     expect(() => validateQuiz(example)).not.toThrow()
     expect(() => validateQuiz({ ...example, kind: 'multiple-choice', passPercentage: 0, questions: [example.questions[0]] })).not.toThrow()
+    // A quiz without a pass mark, and so without its messages, as before they existed.
+    expect(() => validateQuiz({ ...example, passPercentage: undefined, passedFeedback: undefined, failedFeedback: undefined })).not.toThrow()
   })
 
   it.each([
@@ -56,6 +58,10 @@ describe('quiz authoring', () => {
     [{ ...example, authors: [{ name: 'A', role: 'Editor' }] }, 'quiz.authors[0].role'],
     [{ ...example, passPercentage: 101 }, 'quiz.passPercentage'],
     [{ ...example, passPercentage: '50' }, 'quiz.passPercentage'],
+    [{ ...example, failedFeedback: undefined }, 'quiz.failedFeedback: set passedFeedback and failedFeedback together'],
+    [{ ...example, passedFeedback: undefined }, 'quiz.passedFeedback: set passedFeedback and failedFeedback together'],
+    [{ ...example, passedFeedback: ' ' }, 'quiz.passedFeedback: expected non-empty text'],
+    [{ ...example, passPercentage: undefined }, 'quiz.passPercentage: set it with passedFeedback and failedFeedback'],
     [{ ...example, questions: [] }, 'quiz.questions'],
     [{ ...example, kind: 'multiple-choice' }, 'exactly one question'],
     [{ ...example, customJs: 'evil.js' }, 'quiz.customJs: unsupported field'],
@@ -85,6 +91,14 @@ describe('quiz authoring', () => {
     expect(content.passPercentage).toBe(100)
     expect(content.texts.finishButton).toBeTruthy()
     expect(content.endGame.showResultPage).toBe(true)
+    // The pass mark as the set's own score ranges, escaped as H5P stores a text field; the rest
+    // of the result page keeps its defaults, and no question inside gets the quiz's message.
+    expect(content.endGame.overallFeedback).toEqual([
+      { from: 0, to: 99, feedback: 'Not passed yet. Read each answer&#39;s feedback, then select Retry.' },
+      { from: 100, to: 100, feedback: 'Passed. You chose the safe response every time.' }
+    ])
+    expect(content.endGame.retryButtonText).toBe('Retry')
+    for (const question of content.questions) expect(question.params.overallFeedback).toBeUndefined()
     expect(content.questions).toHaveLength(2)
     expect(content.questions[0].params.question).toContain(example.questions[0].prompt)
     expect(content.questions[0].params.UI.checkAnswerButton).toBe('Check')
@@ -113,13 +127,15 @@ describe('quiz authoring', () => {
   it('builds standalone Multiple Choice, escapes markup, and preserves false and zero values', async () => {
     const path = join(dir, 'single.h5p')
     const source = {
-      ...example, kind: 'multiple-choice', passPercentage: 0,
+      ...example, kind: 'multiple-choice', passPercentage: 0, passedFeedback: 'Done <b>& dusted</b>',
       questions: [{ ...example.questions[0], prompt: '<script>run()</script> & "quoted"\nNext line' }]
     }
     const { manifest, content, libraries } = await buildQuiz(source, path, project)
     expect(manifest.mainLibrary).toBe('H5P.MultiChoice')
     expect(content.question).toBe('<p>&lt;script&gt;run()&lt;/script&gt; &amp; &quot;quoted&quot;<br>Next line</p>')
     expect(content.behaviour).toMatchObject({ type: 'single', passPercentage: 0 })
+    // With nothing to fail, one range: every score passes.
+    expect(content.overallFeedback).toEqual([{ from: 0, to: 100, feedback: 'Done &lt;b&gt;&amp; dusted&lt;/b&gt;' }])
     expect(content.answers).toEqual(expect.arrayContaining([expect.objectContaining({ correct: false })]))
     expect(libraries.some(name => name.startsWith('H5P.QuestionSet-'))).toBe(false)
     await archive(path)
@@ -131,6 +147,7 @@ describe('quiz authoring', () => {
     const files = await archive(path)
     const content = JSON.parse(files.get('content/content.json')!)
     expect(content.passPercentage).toBe(80)
+    expect(content.endGame.overallFeedback.map(({ from, to }: { from: number, to: number }) => [from, to])).toEqual([[0, 79], [80, 100]])
     expect(content.questions).toHaveLength(8)
     expect(content.questions.filter((question: { params: { behaviour: { type: string } } }) => question.params.behaviour.type === 'multi')).toHaveLength(4)
     expect(content.questions[0].params.question).toContain('&quot;Benefits &amp; Payroll:')

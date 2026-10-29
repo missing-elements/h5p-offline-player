@@ -5,6 +5,8 @@
   "license": "CC0 1.0",
   "authors": [{ "name": "Example author", "role": "Author" }],
   "passPercentage": 100,
+  "passedFeedback": "Passed. You chose the safe response every time.",
+  "failedFeedback": "Not passed yet. Read each answer's feedback, then select Retry.",
   "questions": [
     {
       "title": "An unexpected sign-in link",

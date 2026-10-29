@@ -22,9 +22,10 @@ content license is declared separately in its source JSON.
 
 Use what the user already supplied. Clarify missing essentials: source material,
 audience, learning objective, question count, single- or multiple-answer questions,
-language, authorship/license, and destination. Do not invent factual source material,
-claim expert review, or assign a license the user has not authorized. Use `U`
-(undisclosed) when the license is unknown, and ask for the author's name.
+pass mark, language, authorship/license, and destination. Do not invent factual
+source material, claim expert review, or assign a license the user has not
+authorized. Use `U` (undisclosed) when the license is unknown, and ask for the
+author's name.
 
 Read [the input format](./references/quiz-format.md) and
 [the worked quiz](./assets/quiz.json). Write a source JSON file in the user's
@@ -40,6 +41,13 @@ For each question:
 - Mark exactly one correct answer unless `multipleAnswers` is true.
 - For multiple answers, say "Select all that apply" and mark at least one correct.
 - Keep the source JSON as the editable deliverable; do not edit generated archives.
+
+When the quiz has a pass mark, set `passPercentage` and write `passedFeedback` and
+`failedFeedback` in the content's language. They are the learner's only word on
+whether they passed; the failed one should say what to do next. A Question Set does
+not draw them on its result page until H5P fixes its bug, and only screen readers
+announce them meanwhile (see the input format). For a Question Set, tell the user
+so, since learners then need to learn the pass mark another way.
 
 The library defaults, including their Check/Retry/result labels, are English.
 `language` records the content language; it does not translate those defaults.

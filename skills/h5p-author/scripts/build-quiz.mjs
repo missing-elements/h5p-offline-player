@@ -11,7 +11,8 @@ import { createHash, randomUUID } from 'node:crypto'
  * @typedef {{ title?: string, prompt: string, multipleAnswers?: boolean, answers: Answer[] }} Question
  * @typedef {{
  *   kind: 'multiple-choice' | 'question-set', title: string, language: string, license: string,
- *   authors: { name: string, role: 'Author' }[], passPercentage?: number, questions: Question[]
+ *   authors: { name: string, role: 'Author' }[], passPercentage?: number,
+ *   passedFeedback?: string, failedFeedback?: string, questions: Question[]
  * }} Quiz
  * @typedef {{
  *   name: string, type: string, optional?: boolean, default?: unknown,
@@ -32,7 +33,7 @@ function text(value, path) {
 
 /** @param {unknown} source @returns {asserts source is Quiz} */
 export function validateQuiz(source) {
-  record(source, 'quiz', ['kind', 'title', 'language', 'license', 'authors', 'passPercentage', 'questions'])
+  record(source, 'quiz', ['kind', 'title', 'language', 'license', 'authors', 'passPercentage', 'passedFeedback', 'failedFeedback', 'questions'])
   const quiz = /** @type {Quiz} */ (source)
   if (!['multiple-choice', 'question-set'].includes(quiz.kind)) throw new Error('quiz.kind: use "multiple-choice" or "question-set"')
   for (const key of ['title', 'language', 'license']) text(quiz[key], `quiz.${key}`)
@@ -53,6 +54,14 @@ export function validateQuiz(source) {
   })
   if (quiz.passPercentage !== undefined && (!Number.isInteger(quiz.passPercentage) || quiz.passPercentage < 0 || quiz.passPercentage > 100)) {
     throw new Error('quiz.passPercentage: expected an integer from 0 to 100')
+  }
+  if (quiz.passedFeedback !== undefined || quiz.failedFeedback !== undefined) {
+    // One without the other leaves some learners with no word on the result.
+    for (const key of ['passedFeedback', 'failedFeedback']) {
+      if (quiz[key] === undefined) throw new Error(`quiz.${key}: set passedFeedback and failedFeedback together`)
+      text(quiz[key], `quiz.${key}`)
+    }
+    if (quiz.passPercentage === undefined) throw new Error('quiz.passPercentage: set it with passedFeedback and failedFeedback; the library defaults differ by kind')
   }
   if (!Array.isArray(quiz.questions) || !quiz.questions.length) throw new Error('quiz.questions: at least one question is required')
   if (quiz.kind === 'multiple-choice' && quiz.questions.length !== 1) throw new Error('quiz.questions: multiple-choice requires exactly one question')
@@ -114,8 +123,28 @@ function valueFor(field, written) {
   throw new Error(`No authoring value or default for required field: ${field.name} (${field.type})`)
 }
 
+/** Plain text as H5P stores a text field: escaped, since the libraries insert it as HTML. */
+function escape(value) {
+  return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;')
+}
+
 function html(value) {
-  return `<p>${value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;').replaceAll('\n', '<br>')}</p>`
+  return `<p>${escape(value).replaceAll('\n', '<br>')}</p>`
+}
+
+/**
+ * The pass mark as two score ranges for the content's overall feedback. The libraries pick a
+ * range by the floored percentage and judge `success` by the exact one, which agree for a whole
+ * number, so the message a learner gets matches the result an LMS records.
+ * @param {Quiz} quiz
+ */
+function passFeedback(quiz) {
+  if (quiz.passedFeedback === undefined || quiz.failedFeedback === undefined || quiz.passPercentage === undefined) return undefined
+  const pass = quiz.passPercentage
+  return [
+    ...(pass > 0 ? [{ from: 0, to: pass - 1, feedback: escape(quiz.failedFeedback) }] : []),
+    { from: pass, to: 100, feedback: escape(quiz.passedFeedback) }
+  ]
 }
 
 /** The versions the helper is tested with; a missing or older install is refused with this command. */
@@ -209,6 +238,8 @@ export async function buildQuiz(source, output, project = process.cwd()) {
     const choice = await use('H5P.MultiChoice', 1)
     const set = source.kind === 'question-set' ? await use('H5P.QuestionSet', 1) : null
     if (!choice.semantics || (set && !set.semantics)) throw new Error('The installed quiz libraries must carry semantics.json')
+    // The whole quiz's result, never a question's inside a set, which shows its own after Check.
+    const overallFeedback = passFeedback(source)
     const questions = source.questions.map((question, i) => {
       const written = {
         question: html(question.prompt),
@@ -219,7 +250,8 @@ export async function buildQuiz(source, output, project = process.cwd()) {
         behaviour: {
           type: question.multipleAnswers ? 'multi' : 'single',
           ...(!set && source.passPercentage !== undefined ? { passPercentage: source.passPercentage } : {})
-        }
+        },
+        ...(!set && overallFeedback ? { overallFeedback } : {})
       }
       return {
         library: `${choice.machineName} ${choice.majorVersion}.${choice.minorVersion}`,
@@ -229,7 +261,11 @@ export async function buildQuiz(source, output, project = process.cwd()) {
       }
     })
     const content = set
-      ? parameters(set.semantics, { questions, ...(source.passPercentage === undefined ? {} : { passPercentage: source.passPercentage }) })
+      ? parameters(set.semantics, {
+          questions,
+          ...(source.passPercentage === undefined ? {} : { passPercentage: source.passPercentage }),
+          ...(overallFeedback ? { endGame: { overallFeedback } } : {})
+        })
       : questions[0].params
     const root = set ?? choice
     const manifest = {
