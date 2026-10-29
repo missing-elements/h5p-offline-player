@@ -379,6 +379,8 @@
   .app .topbar :is(a, button) { -webkit-app-region: no-drag; app-region: no-drag; }
   .app .topbar .icon-button { width: 1.9rem; height: 1.9rem; }
   .app .brand-mark { width: 1.35rem; height: 1.35rem; }
+  /* One line here: the title bar has the height for one, and width to spare. */
+  .app .brand-name { flex-direction: row; align-items: baseline; gap: 0.35em; }
   /* The bar is out of the flow now; the page starts below it. */
   .app { padding-top: env(titlebar-area-height, 2.5rem); }
 }

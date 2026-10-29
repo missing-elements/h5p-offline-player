@@ -178,7 +178,7 @@ const parts = await splitPack(pack, join(outDir, 'parts'))
 await writePackModule(parts, outDir)
 
 const lines = [
-  'H5P Offline Player library pack: the H5P hub runtime libraries the installable app carries,',
+  'Library pack of H5P Offline Player by Missing Elements: the H5P hub runtime libraries the installable app carries,',
   'so that a package exported without its own libraries plays offline. Each library is used here',
   'under the licence below; its source is the library folder itself, as shipped by the hub',
   `(${HUB}<content type>), or for an addon as H5P Group publishes it (${ADDONS.join(', ')}).`,

@@ -3039,6 +3039,36 @@ checks their content as the CMS plugins do. The letters are gone from the user d
 which say "formerly Setup A/B/C" under each heading; this file still says Setup A (bundler),
 B (no build step) and C (Embed).
 
+## Names and the H5P trademark
+
+H5P is H5P Group's trademark. Its policy (h5p.org/trademark, published 2018-05-24) lets
+open-source software lead its name with "H5P" only when the name says who made it, rule 5 of its
+automatic approval: "Acmes H5P interactive Quiz" is approved, "H5P interactive Quiz" is not ("No
+author, suggests endorsement"). Read against this repository on 2026-10-29 at the owner's
+request, which changed:
+
+- the installable app, "H5P Offline Player" until then, the same shape as the refused example:
+  "H5P Offline Player by Missing Elements" in its manifest, page, About dialog and window title,
+  and "Offline Player" as its short name, which has no room for an author;
+- the site's name: "by Missing Elements" beside `h5p-offline-player` in the bar, under it there
+  (`.brand-by`, so the bar is no wider; one line in an installed window's title bar), in every
+  page's `og:site_name`, in the front page's `WebSite` name and on the social card;
+- the header of the pack's `libraries.txt`, which the pages link, in step with its generator so
+  that the weekly refresh sees no change.
+
+Left as they are: the npm names, whose scope names the author, and which the policy treats as
+names in code; descriptive uses ("Self-hosted H5P …"), which it allows as a "secondary
+identifier"; the `— h5p-offline-player` at the end of the page titles; and the title inside the
+pack's archives, "H5P Offline Player library pack", which nobody sees. Changing that one changes
+every part's bytes, so every package's `libraries` revision, and every learner's saved state
+starts over once; it goes with the next pack release that rewrites every part anyway. The VS Code
+extension was named to the rule from the start. Not decided: the site's address,
+`h5p-offline-player.vercel.app`, which names no owner (the policy approves "h5p.terrisblog.com"
+and refuses "h5pbootcamp.com"), and the tab title "H5P player" of `/embed` and the embed
+package's page, a generic use. Two limits outweigh any name: the automatic licence covers free,
+non-commercial use only, so anything paid under an H5P name needs a licence from H5P Group; and
+the name may not be used to compete with the H5P Hub or H5P.com.
+
 ## Where this differs from the original design
 
 The architecture document, removed on 2026-10-10 and in git history, predates the code. These are

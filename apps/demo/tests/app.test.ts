@@ -212,7 +212,7 @@ it('opens a file from the keyboard, shows it under its own title, and closes it 
 
   state = await seen(page)
   expect(state).toMatchObject({ screen: 'player', bar: 'Do you know what just happened?', startOver: true, back: true })
-  expect(await page.title()).toMatch(/^Do you know what just happened\? — H5P Offline Player$/)
+  expect(await page.title()).toMatch(/^Do you know what just happened\? — H5P Offline Player by Missing Elements$/)
   // One step in the window's history, and the keyboard is not left on the hidden home screen.
   expect(await page.evaluate(() => history.length)).toBe(steps + 1)
   expect(await page.evaluate(() => document.activeElement?.id)).toBe('back')
