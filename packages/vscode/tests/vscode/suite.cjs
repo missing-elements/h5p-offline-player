@@ -141,12 +141,14 @@ exports.run = async function run() {
     assert.equal(state.title, 'Do you know what just happened?')
     assert.equal(state.mainLibrary, 'H5P.QuestionSet')
     assert.equal(state.untrusted, false)
+    assert.deepEqual(state.media, [])
   })
 
-  await test('an Interactive Video plays', async () => {
+  await test('an Interactive Video plays, and the bar says VS Code plays its MP4 without sound', async () => {
     const state = await open(vscode.Uri.joinPath(content, 'video.h5p'))
     assert.equal(state.type, 'ready', state.message)
     assert.equal(state.mainLibrary, 'H5P.InteractiveVideo')
+    assert.deepEqual(state.media, ['mp4'])
   })
 
   await test('an export without its libraries plays from the pack the extension carries', async () => {

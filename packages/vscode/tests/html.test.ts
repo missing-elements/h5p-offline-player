@@ -39,6 +39,7 @@ class StandIn {
   textContent = ''
   checked = false
   disabled = false
+  hidden = false
   src = ''
   contentWindow = {}
   setAttribute(name: string, value: string) {
@@ -85,6 +86,9 @@ function runWebview(state?: object) {
     frame,
     status: element('status'),
     untrustedBox: element('untrusted'),
+    media: element('media'),
+    mediaText: element('media-text'),
+    openInBrowser: element('open-in-browser'),
     receive,
     /** The page in the frame: its window, the server's origin. */
     fromPage: { source: frame.contentWindow, origin: config.origin },
@@ -176,6 +180,33 @@ describe('the webview', () => {
     expect(status.title).toBe('H5P.Question 1.5.9 → 1.5.12\nH5P.MultiChoice made for 1.17, played at 1.16.27')
   })
 
+  it('names the media VS Code does not play under the bar, and opens the package in the browser from there', () => {
+    const { posted, receive, fromPage, fromExtension, media, mediaText, openInBrowser } = runWebview()
+    const ready = (kinds: string[]) => ({ source: 'h5p-preview', type: 'ready', title: 'Video', mainLibrary: 'H5P.InteractiveVideo', license: null, refreshed: [], media: kinds, untrusted: false })
+    expect(media.hidden).toBe(true)
+
+    receive(ready(['mp4', 'webm', 'youtube']), fromPage)
+    expect(media.hidden).toBe(false)
+    expect(mediaText.textContent).toBe('VS Code plays its MP4 video without sound and cannot play its WebM video or YouTube video.')
+    posted.length = 0
+    ;(openInBrowser.listeners.get('click') as Listener)({})
+    expect(posted).toEqual([{ type: 'open-in-browser' }])
+
+    receive(ready(['mp4']), fromPage)
+    expect(mediaText.textContent).toBe('VS Code plays its MP4 video without sound.')
+    receive(ready(['webm', 'aac', 'youtube']), fromPage)
+    expect(mediaText.textContent).toBe('VS Code cannot play its WebM video, M4A audio or YouTube video.')
+    // A page from before the note says nothing about media, and there is nothing to say.
+    receive(ready([]), fromPage)
+    expect(media.hidden).toBe(true)
+
+    receive(ready(['aac']), fromPage)
+    expect(media.hidden).toBe(false)
+    // Playing again starts without it, until the content is up and says.
+    receive({ type: 'reload' }, fromExtension)
+    expect(media.hidden).toBe(true)
+  })
+
   it('takes the page’s messages from the server’s origin only', () => {
     const { posted, receive, frame } = runWebview()
     posted.length = 0
@@ -228,7 +259,7 @@ describe('the page a preview frames', () => {
     ready({ detail: { metadata: { title: 'Quiz', mainLibrary: 'H5P.QuestionSet', license: 'CC BY', licenseVersion: '4.0' }, libraryBundle: { refreshed: [] }, downgradedLibraries } })
     expect(told).toEqual([
       [
-        { source: 'h5p-preview', type: 'ready', title: 'Quiz', mainLibrary: 'H5P.QuestionSet', license: 'CC BY 4.0', refreshed: [], downgraded: downgradedLibraries, untrusted: true },
+        { source: 'h5p-preview', type: 'ready', title: 'Quiz', mainLibrary: 'H5P.QuestionSet', license: 'CC BY 4.0', refreshed: [], downgraded: downgradedLibraries, media: [], untrusted: true },
         WEBVIEW_ORIGIN
       ]
     ])
@@ -236,6 +267,37 @@ describe('the page a preview frames', () => {
     const alone = runPage({}, [])
     ;(alone.player.listeners.get('ready') as Listener)({ detail: { metadata: null, libraryBundle: null } })
     expect(alone.told).toEqual([])
+  })
+
+  it('leaves out a licence H5P calls undisclosed', () => {
+    const { player, told } = runPage()
+    ;(player.listeners.get('ready') as Listener)({ detail: { metadata: { title: 'Tabs', mainLibrary: 'H5P.Tabs', license: 'U' }, libraryBundle: null } })
+    expect(told[0][0].license).toBe(null)
+  })
+
+  it('names the media in the content that VS Code does not play in full, wherever it is in the parameters', () => {
+    const { player, told } = runPage()
+    const params = {
+      interactiveVideo: { video: { files: [{ path: 'videos/clip.mp4', mime: 'video/mp4' }] } },
+      // MP3 plays, with sound; an image is not media.
+      audio: { files: [{ path: 'audios/voice.mp3', mime: 'audio/mpeg' }] },
+      tabs: [
+        { content: { params: { sources: [{ path: 'https://youtu.be/j4-yBgTVk3A', mime: 'video/YouTube' }] } } },
+        { content: { params: { files: [{ path: 'audios/reading.m4a', mime: 'audio/mp4' }], image: { path: 'images/cover.jpg', mime: 'image/jpeg' } } } },
+        { content: { params: { files: [{ path: 'https://example.org/clip.webm?t=1' }] } } }
+      ]
+    }
+    const contents = { 'cid-quiz': { jsonContent: JSON.stringify(params) } }
+    Object.assign(player, { shadowRoot: { querySelector: () => ({ contentWindow: { H5PIntegration: { contents } } }) } })
+    ;(player.listeners.get('ready') as Listener)({ detail: { metadata: null, libraryBundle: null } })
+    expect(told[0][0].media).toEqual(['mp4', 'webm', 'aac', 'youtube'])
+
+    // A frame it cannot read says nothing.
+    const closed = runPage()
+    const frame = Object.defineProperty({}, 'contentWindow', { get: () => { throw new Error('SecurityError') } })
+    Object.assign(closed.player, { shadowRoot: { querySelector: () => frame } })
+    ;(closed.player.listeners.get('ready') as Listener)({ detail: { metadata: null, libraryBundle: null } })
+    expect(closed.told[0][0].media).toEqual([])
   })
 
   it('takes a web address as the package, and nothing else', () => {
