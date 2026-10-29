@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0
+
+Content made for a newer version of a library than the package and the library pack carry, such
+as an h5p.com export ahead of the H5P hub, plays on the newest older minor of the same major
+instead of being refused. The bar says so, "one library older than the content", and its tooltip
+names each one: "H5P.MultiChoice made for 1.17, played at 1.16.27". Player 1.2.0 inside.
+
 ## 0.1.1
 
 Vimeo videos play. The frame's policy now admits the oEmbed record Vimeo's player reads before
