@@ -35,6 +35,8 @@
       if (settings.libraries) player.setAttribute('libraries', settings.libraries)
       if (settings.packBase) player.setAttribute('pack-base', settings.packBase)
       if (!settings.refreshLibraries) player.setAttribute('refresh-libraries', 'off')
+      // `false` only: a preview page from before the option said nothing, and the element's default is on.
+      if (settings.downgradeLibraries === false) player.setAttribute('downgrade-libraries', 'off')
       if (settings.untrusted) player.untrusted = true
       // Set once its server has gone. A load still under way changes state after that, and its
       // "Opening…" or the error of a request that failed would write over the page saying so.

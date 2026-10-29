@@ -18,8 +18,8 @@ type Marked = Window & {
   H5P: { instances: { params: Record<string, unknown> }[] }
 }
 
-const playUntrusted = async (src: string) => {
-  const player = createPlayer({ untrusted: '', libraries: FIXTURES.libraries })
+const playUntrusted = async (src: string, extra: Record<string, string> = {}) => {
+  const player = createPlayer({ untrusted: '', libraries: FIXTURES.libraries, ...extra })
   const settled = waitForSettled(player)
   player.setAttribute('src', src)
   return { player, result: await settled }
@@ -145,8 +145,15 @@ describe('an untrusted package', () => {
     expect(scripts.some((source) => source.includes('jsdelivr') || source.includes('googleapis'))).toBe(false)
   })
 
-  it('refuses a package that needs a library only it carries, and says its own copy would play it', async () => {
-    const { result } = await playUntrusted(FIXTURES.untrustedNewer)
+  it("plays a package that carries a newer minor than the bundle's on the bundle's, none of its own code running (#85)", async () => {
+    const { player, result } = await playUntrusted(FIXTURES.untrustedNewer)
+    if (!result.ok) expect.fail(`${result.detail.code} — ${result.detail.message}`)
+    expect(message(player)).toBe('Served from the archive, never extracted to disk.')
+    expect(player.downgradedLibraries).toEqual([{ library: 'H5P.OfflineTest', from: '1.3', to: '1.0.0' }])
+  })
+
+  it('refuses it with downgrade-libraries="off", and says its own copy would play it', async () => {
+    const { result } = await playUntrusted(FIXTURES.untrustedNewer, { 'downgrade-libraries': 'off' })
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.detail.code).toBe('bad-archive')

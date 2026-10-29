@@ -804,7 +804,9 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   Embed adds a separate origin on top.
   `tests/browser/untrusted.test.ts` plays `untrusted.h5p`, whose own copy of the fixture content
   type marks the frame, against the bundle and then trusted, checks each content type and the
-  header, injects scripts, reads the policy, and refuses `untrusted-newer.h5p` with `carried`. It
+  header, injects scripts, reads the policy, plays `untrusted-newer.h5p` on the bundle's older
+  minor (see *Content written for a newer minor than any source has*) and, with
+  `downgrade-libraries="off"`, refuses it with `carried`. It
   plays `untrusted-markup.h5p`, a form, a script, a handler, a `javascript:` link and a field the
   semantics do not name, at the top and in sub-content, through the fixture content type's
   `.html()`, untrusted and trusted, and refuses it against `libraries-without-semantics.h5p`; the
@@ -1206,6 +1208,59 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   the demo's bundled page), or the element's `pack` on a site built with `--no-libraries` where
   jsDelivr is allowed. A source that fails outright is passed over while another remains; only
   the last one's failure is the load's.
+- **Content written for a newer minor than any source has plays at the newest older one**
+  (2026-10-29, #85). H5P Group's October release put library minors on h5p.com weeks before the
+  hub served them, and the pack follows the hub, so content made there can name a version nothing
+  here has. Measured that day with the demo's quiz relabelled: a content-only export was refused
+  naming its main library; one whose sub-content was newer booted and died with "Cannot read
+  properties of undefined (reading 'on')", nothing drawn and no library named, since nothing checks
+  sub-content before the boot; an untrusted export carrying its own newer copy was refused with
+  `carried`. The owner's rule: what can play, plays. So `resolveLibraryFolder` takes `downgrade`,
+  and with it a dependency nothing satisfies is served from the newest older minor of the same
+  major, never across a major. Four choices in it. **Strict first**: `index()` in the element tries
+  every source for the version named, as before, and only when the last leaves something missing
+  does it switch the load, with an `attach-libraries` carrying `downgrade: true`, and index again,
+  offering the pack with `downgrade` so that `planPack` supplies its older part (unless the package
+  carries, or a source provides, one at least as new). So a later source with the version named
+  wins over an earlier one with an older version, which `pack.test.ts` holds with a bundle at 1.0
+  before the pack at 1.2. **Kept with the load**: the switch is `LoadSettings.downgrade`, so a
+  worker started again serves the folders the frame booted with; the next load starts strict.
+  **Never while arriving**: a partial reader ignores it (`downgrades`), since a package on a host
+  without `Range` may still be bringing its own copy, and a frame booted early on the older one
+  would keep it. **From the parameters too**: the deep index's walk (`checkDependencies`) starts
+  from the sub-content `content.json` names as well as from the manifest, wherever a source has
+  that library's major: an attached archive, or the pack on offer. A stripped export's `h5p.json`
+  names its main library alone and the merged manifest drops what nothing answers for, so the
+  first cut, which walked the manifest only, never saw a question newer than the pack. It played
+  the main library and left the question's library unloaded: the demo's formulas quiz with
+  MultiChoice 1.17 still died as above, which the player page's check by hand found. Missing there
+  now, it goes to the next source and then to the older minor; `newer-child.h5p` in
+  `pack.test.ts` is that shape. A library no source has at its major still plays as before,
+  dropped from the manifest, its sub-content removed by the content check when untrusted, so an
+  old export's retired question type is not refused for it. The walk names each dependency
+  served from a versioned folder below the minor asked. The element keeps them as the load's
+  `downgradedLibraries`, in the `ready` detail too, and warns in the console; the verifier makes
+  each a warning and `report.downgraded` (`--no-downgrade-libraries` refuses instead), the
+  player page and the VS Code extension's bar show them, the player page with an Older if needed
+  switch, and the embed page passes `&downgrade-libraries=off` through and posts the list in its
+  report. The list is the load's because the older copy may be the package's own, with no bundle
+  attached: an export whose `h5p.json` names a newer minor than its folder, or h5p.org's
+  Impressive Presentation, whose libraries ask for Font Awesome 4.5 beside the 4.3 it carries.
+  The first cut put it on `libraryBundle`, which is `null` there, so only the console said so,
+  and the verifier passed such a package without a warning where it had failed before; the
+  branch's own review found it. One thing follows for the
+  pages that ask before a package's own code runs: untrusted, a package carrying a newer minor than
+  the pack's now plays on the pack's, so they ask only for a library no source has at its major, or
+  with the switch off. The embed's `site.test.ts` plays its Question Set 1.99 package both ways.
+  The runtime needed nothing: the content upgrade runs steps only upward (`isUpgrade`), so the
+  parameters play as written, the main library is named at the version served, and a
+  sub-content's string keeps the version it names, which the worker answers from the older folder.
+  What it costs, counted over the pack the same day: 119 of the 469 minor bumps in its libraries'
+  history came with an upgrade step, a change of shape the older code does not read; the others
+  only add. Not done: the SCORM writer stays strict, refusing such a package when the zip is
+  written; and a sub-content library no source has at any minor of its major still fails at
+  runtime, unnamed, when played trusted. `downgrade-libraries="off"` refuses as before, and now
+  names a newer question's library too, where it booted without it.
 - **The element says what it is playing: `source`, `metadata`, `libraryBundle`.** Added on
   2026-10-09 for the package check an embedding site shows under its preview: the probe's classification and
   size (`currentSource`, exposed as a copy), the manifest's metadata plus `mainLibrary` (new on
@@ -2043,8 +2098,9 @@ ours runs a server.
   for a part the zip lacks. What neither the package nor the pack supplies is refused when the zip
   is written, by the walk the player makes (`servingFolder` mirrors `reachableFolder`, the walk
   `missingDependencies`), run over the package without the folders a part replaces and over the
-  parts. The walk starts from the sub-content the parameters name as well, which the player would
-  find missing only when the runtime reached it. So a gap shows up when the teacher writes the zip,
+  parts. The walk starts from the sub-content the parameters name as well, which the player found
+  missing only when the runtime reached it until #85, and since then finds at index only where a
+  source has the library's major. So a gap shows up when the teacher writes the zip,
   not when a learner opens it. Measured: the demo's formulas quiz, a stripped export, took 11 parts,
   4 MB, 2.8 MB of it MathDisplay; its full exports took none. In Moodle 4.5 the formulas zip
   reached `ready`, fetched exactly those 11 parts and the index, and typeset its LaTeX.
@@ -3094,6 +3150,8 @@ deliberate additions to it, not drift:
   at all (`hub` meant the pack until it went before 1.0). Since 0.10 the pack is split, a package downloads only
   the parts it needs, and the pack's newer versions play in place of the older ones a package
   carries: the design plays what a package carries.
+- Content written for a newer minor than any source has plays at the newest older one, once every
+  source has been tried. The design refuses what is not reachable.
 - Content written for an older minor than the one served is upgraded in the frame with the
   libraries' own steps. The design serves what a package carries; a bundle that serves newer
   minors needs the step the platforms take when they install one.

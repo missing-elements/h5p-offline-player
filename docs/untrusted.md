@@ -19,7 +19,7 @@ WordPress and Drupal treat an author's upload:
 | The content's fields | As written | Checked against each library's `semantics.json` | Checked the same way, on upload |
 | Scripts the frame allows | Your origin, and the hosts the runtime needs | Exact paths only | Whatever the site's own policy allows |
 | Media the content names by URL | Loads from that host | Loads from that host | Loads from that host |
-| A package carrying a newer library than the site has | Plays with its own copy | Refused, with `missingLibraries.carried` set, so you can offer to play it as it is | Refused, unless the uploader may update libraries |
+| A package carrying a newer library than the site has | Plays with its own copy | A newer minor plays at the site's older one. A newer major, or a newer minor with `downgrade-libraries="off"`, is refused with `missingLibraries.carried` set, so you can offer to play it as it is | Refused, unless the uploader may update libraries |
 
 Played as it is suits packages your own team made. `untrusted` is for everything else: uploads,
 links from users, a marketplace, exports from another site.
@@ -72,8 +72,9 @@ that runs the check, 0.2 or later. An older runtime plays nothing.
 ## When a package is refused
 
 A package that needs a library your sources do not have is refused with `bad-archive`, naming the
-missing libraries. Usually it is a library newer than the pack, which a later pack release will
-carry.
+missing libraries: a content type the pack does not serve, a newer major version than the pack's,
+or, with `downgrade-libraries="off"`, a newer minor. Without that attribute a newer minor plays at
+the pack's older one; see [Content newer than the pack](libraries.md#content-newer-than-the-pack).
 
 If the package carries that library itself, `missingLibraries.carried` is `true`. Playing it
 without `untrusted` would run the package's own copy. That is a decision for your site, so ask
@@ -98,7 +99,8 @@ With or without `untrusted`:
 - **Entry names.** An entry whose name is not a plain relative path, such as `../index.html`, is
   rejected, and the rest of the package still plays.
 - **Libraries.** A package must carry, or get from `libraries`, every library it declares and every
-  library those depend on. Otherwise it is refused with the missing ones named, before the
+  library those depend on, at the minor version named or, unless `downgrade-libraries="off"`, an
+  older one of the same major. Otherwise it is refused with the missing ones named, before the
   content starts.
 
 ## What it does not cover

@@ -160,6 +160,43 @@ describe('supplying what a package lacks', () => {
   })
 })
 
+describe('content made for a newer minor than the pack has (#85)', () => {
+  // A content-only export from h5p.com after a minor bump the pack has not caught up with.
+  const newer = dependencies([['H5P.QuestionSet', 1, 22], ['H5P.MultiChoice', 1, 17]])
+
+  it('supplies nothing for it until the load asks for the downgrade', () => {
+    expect(plan({ roots: newer })).toBeNull()
+  })
+
+  it("then supplies the pack's newest older minor, with what each part needs", () => {
+    const result = plan({ roots: newer, downgrade: true })
+    expect(folders(result)).toEqual(['H5P.JoubelUI-1.3', 'H5P.MultiChoice-1.16', 'H5P.Question-1.5', 'H5P.QuestionSet-1.21'])
+    expect(result?.refreshed).toEqual([])
+  })
+
+  it('keeps an older version the package carries when it is at least as new as the pack\'s', () => {
+    const own = [carried('H5P.MultiChoice', 1, 16, 30, [['H5P.Question', 1, 5]]), carried('H5P.Question', 1, 5, 9)]
+    expect(plan({ own, roots: dependencies([['H5P.MultiChoice', 1, 17]]), downgrade: true, refresh: false })).toBeNull()
+  })
+
+  it("gives one older than the pack's way to the pack's, as a refresh of what the package carries", () => {
+    const own = [carried('H5P.MultiChoice', 1, 14, 2, [])]
+    const result = plan({ own, roots: dependencies([['H5P.MultiChoice', 1, 17]]), downgrade: true, refresh: false })
+    expect(folders(result)).toEqual(['H5P.JoubelUI-1.3', 'H5P.MultiChoice-1.16', 'H5P.Question-1.5'])
+    expect(result?.superseded).toEqual(['H5P.MultiChoice-1.14'])
+    expect(result?.refreshed).toEqual([{ library: 'H5P.MultiChoice', from: '1.14.2', to: '1.16.9' }])
+  })
+
+  it('asks nothing of the pack where an attached archive is as new already', () => {
+    const provided = [{ folder: 'H5P.MultiChoice-1.16', machineName: 'H5P.MultiChoice', major: 1, minor: 16 }]
+    expect(plan({ roots: dependencies([['H5P.MultiChoice', 1, 17]]), provided, downgrade: true })).toBeNull()
+  })
+
+  it('never crosses a major, and leaves a library the pack has not got for the error', () => {
+    expect(plan({ roots: dependencies([['H5P.QuestionSet', 2, 0], ['H5P.Unknown', 1, 3]]), downgrade: true })).toBeNull()
+  })
+})
+
 describe('addons', () => {
   const params = { text: 'The area is \\(\\pi r^2\\).' }
 

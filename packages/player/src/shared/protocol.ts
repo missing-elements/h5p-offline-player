@@ -81,6 +81,11 @@ export type PackOffer = {
   refresh: boolean
   /** Supply from the pack what the package does not carry. Off while an earlier source is still to be tried. */
   fill: boolean
+  /**
+   * Supply the newest older minor the pack has of a library the content names at a newer one than
+   * any source has. Sent only once every source has been tried for the version named.
+   */
+  downgrade?: boolean
 } & ({ pinned: true } | { libraries: Array<PackLibrary & { url: string }> })
 
 /** A part to download and attach. */
@@ -98,6 +103,19 @@ export interface RefreshedLibrary {
   /** The version the package carries, `1.20.3`. */
   from: string
   /** The pack's, `1.21.2`. */
+  to: string
+}
+
+/**
+ * A library the content names at a newer minor than any library source has, played at the newest
+ * older minor of the same major instead (`downgrade-libraries`, #85).
+ */
+export interface DowngradedLibrary {
+  /** The machine name, `H5P.MultiChoice`. */
+  library: string
+  /** The version the content names, `1.17`: a major and a minor, as content names a library. */
+  from: string
+  /** The version that played, `1.16.27`. */
   to: string
 }
 
@@ -178,6 +196,8 @@ export interface PackageRecord {
   parts?: string[]
   /** The package's own library folders a part replaces; see `LoadSettings.superseded`. */
   superseded?: string[]
+  /** An older minor answers for a newer one; see `LoadSettings.downgrade`. */
+  downgrade?: boolean
   /**
    * `libraries` marks an archive registered only to supply library folders to another package.
    * It is never played, so it is not held to carrying everything its own `h5p.json` declares.
@@ -234,6 +254,13 @@ export interface LoadSettings {
    * library: requests for them resolve to the part's folder, by the rule `get()` serves with.
    */
   superseded?: string[]
+  /**
+   * A library named at a newer minor than any source has is served from the newest older minor of
+   * the same major. Set by the load with an `attach-libraries`, once every library source has been
+   * tried for the version named, and kept here so that a worker started again serves the same
+   * folders the frame was booted with.
+   */
+  downgrade?: boolean
   /** When a load last registered these, for keeping the newest few. */
   registered: number
 }
@@ -350,9 +377,10 @@ export type ToWorkerMessage =
   /**
    * Points a package at other ones, already registered and indexed, for its libraries: a bundle,
    * which replaces the one before, or parts of the pack, which are added, with the package's own
-   * folders they replace.
+   * folders they replace. `downgrade`: from now on an older minor answers for a newer one nothing
+   * provides (`LoadSettings.downgrade`).
    */
-  | { type: 'attach-libraries'; pkgId: string; libraryPkgId?: string; parts?: string[]; superseded?: string[]; view?: string }
+  | { type: 'attach-libraries'; pkgId: string; libraryPkgId?: string; parts?: string[]; superseded?: string[]; downgrade?: true; view?: string }
   /**
    * Asks for a library bundle already downloaded whole from `url`, for when `url` cannot be
    * reached now. Answered `downloaded-libraries`, with `null` when there is none.
@@ -443,6 +471,11 @@ export type WorkerReply =
        * offered the pack. The reply carries nothing else then: index again once they are attached.
        */
       plan?: PackPlan
+      /**
+       * For a `deep` index: the libraries served at an older minor than the content or a library
+       * asks for, which only a load that asked for the downgrade gets. Absent when none was.
+       */
+      downgraded?: DowngradedLibrary[]
     }
   /** `views`: the register named a load key and the worker kept the settings under it. */
   | { ok: true; type: 'ack'; views?: true }

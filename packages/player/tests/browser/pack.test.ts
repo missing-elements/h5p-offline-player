@@ -94,6 +94,54 @@ describe('the library pack, split into parts', () => {
     expect((await loadOf(player)).parts).toEqual([])
   })
 
+  it('plays content written for a newer minor than the pack has on its newest older one, and says so (#85)', async () => {
+    const player = await play(fresh(FIXTURES.writtenFor13, 'downgrade'), withPack())
+
+    // No step runs downward: the parameters play as written, on the older code.
+    expect(messageOf(player)).toBe('Written for 1.3')
+    expect(frameWindow(player).document.querySelector('.h5p-offline-child-text')?.textContent).toBe('Child written for 1.2')
+    expect((await loadOf(player)).parts).toEqual(['H5P.OfflineChild-1.1.h5p', 'H5P.OfflineTest-1.2.h5p'])
+    expect(player.downgradedLibraries).toEqual([
+      { library: 'H5P.OfflineChild', from: '1.2', to: '1.1.0' },
+      { library: 'H5P.OfflineTest', from: '1.3', to: '1.2.0' }
+    ])
+    expect(player.libraryBundle?.refreshed).toEqual([])
+  })
+
+  it('refuses it with downgrade-libraries="off", naming the version it needs', async () => {
+    const { result } = await settle(fresh(FIXTURES.writtenFor13, 'no-downgrade'), withPack({ 'downgrade-libraries': 'off' }))
+    if (result.ok) expect.fail('expected the package to be refused')
+    expect(result.detail).toMatchObject({ code: 'bad-archive', missingLibraries: { folders: ['H5P.OfflineTest-1.3'] } })
+  })
+
+  it('plays sub-content made for a newer minor than the pack has, named only in the parameters, on its older one', async () => {
+    // The content type is the pack's own version, so nothing `h5p.json` names is missing. Until the
+    // walk started from the parameters, the child's library was left out of what the frame loads,
+    // and the content died creating it.
+    const player = await play(fresh(FIXTURES.newerChild, 'child'), withPack())
+
+    expect(messageOf(player)).toBe('Written for 1.2')
+    expect(frameWindow(player).document.querySelector('.h5p-offline-child-text')?.textContent).toBe('Child written for 1.2')
+    expect((await loadOf(player)).parts).toEqual(['H5P.OfflineChild-1.1.h5p', 'H5P.OfflineTest-1.2.h5p'])
+    expect(player.downgradedLibraries).toEqual([{ library: 'H5P.OfflineChild', from: '1.2', to: '1.1.0' }])
+  })
+
+  it('refuses that sub-content by name with downgrade-libraries="off", rather than booting without its library', async () => {
+    const { result } = await settle(fresh(FIXTURES.newerChild, 'child-off'), withPack({ 'downgrade-libraries': 'off' }))
+    if (result.ok) expect.fail('expected the package to be refused')
+    expect(result.detail).toMatchObject({ code: 'bad-archive', missingLibraries: { folders: ['H5P.OfflineChild-1.2'] } })
+  })
+
+  it('takes the version named from a later source before an older one from an earlier source', async () => {
+    // The bundle, first, has the content type at 1.0; the pack, after it, at the 1.2 the content
+    // names. Every source is tried for the version named before any older one is played.
+    const player = await play(fresh(FIXTURES.writtenFor12, 'order'), { libraries: `${FIXTURES.libraries} pack`, 'pack-base': PACK })
+
+    expect(messageOf(player)).toBe('Written for 1.2')
+    expect(player.downgradedLibraries).toEqual([])
+    expect((await loadOf(player)).parts).toEqual(['H5P.OfflineChild-1.1.h5p', 'H5P.OfflineTest-1.2.h5p'])
+  })
+
   it('refreshes nothing without libraries="pack", whatever else names the pack', async () => {
     const player = await play(fresh(FIXTURES.basic, 'no-pack'), { 'pack-base': PACK })
     expect(messageOf(player)).toBe(BASIC_MESSAGE)

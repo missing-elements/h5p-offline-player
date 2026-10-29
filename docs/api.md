@@ -18,6 +18,7 @@ meaning, and a new error `code` or `progress` phase can only be added.
 | `pack-base` | attribute | Where `pack` is: the folder of a copy of `@missing-elements/h5p-libraries`' `parts/` on your site. Default: jsDelivr, at the version this release pins |
 | `pack` | property | The `pack` export of `@missing-elements/h5p-libraries`, as a bundler emits it; wins over `pack-base`. Set before `src` |
 | `refresh-libraries` | attribute | `off` plays the libraries a package carries as exported, and `pack` only fills gaps. Default: the pack's newer versions play |
+| `downgrade-libraries` | attribute | `off` refuses content made for a newer minor version of a library than any source has. Default: once every source has been tried for that version, the newest older minor of the same major plays it, reported in `downgradedLibraries` and the console |
 | `untrusted` | attribute, property | Plays a package you did not make as data: its own library folders are ignored and the libraries come from `libraries` (default `pack`), `content/` serves only H5P's own file types, and the frame's script policy names exact paths. Its content is checked against each library's `semantics.json`, as the H5P CMS plugins check it. A package that needs its own copy of a library is refused, with `missingLibraries.carried` set |
 | `allow-origins` | attribute | Extra origins for the frame's CSP, space separated |
 | `frame`, `copyright`, `export`, `icon`, `embed` | attribute | Show the H5P action bar and its buttons. `export` needs `download-url` or a package URL, `embed` needs `embed-code` |
@@ -38,6 +39,7 @@ meaning, and a new error `code` or `progress` phase can only be added.
 | `source` | read-only | `{ type: 'range-http' \| 'chunked' \| 'file', size, … }` |
 | `metadata` | read-only | `h5p.json`'s metadata plus `mainLibrary` |
 | `libraryBundle` | read-only | `{ url, origin, fromCache, refreshed? }` for what supplied libraries: for the pack, `refreshed` lists the libraries the package carries that played at the pack's version, `{ library, from, to }` |
+| `downgradedLibraries` | read-only | The libraries the content names at a newer minor than any source has, which played at the newest older one (`downgrade-libraries`): `{ library, from, to }`, with `from` the version named, such as `1.17`, and `to` the one played, such as `1.16.27`. Empty when none did. The older version may be the package's own, with no `libraryBundle` |
 | `scope` | read-only | The Service Worker scope |
 
 ## Methods
@@ -51,7 +53,7 @@ Events are `CustomEvent`s:
 
 | Event | `detail` | When |
 |---|---|---|
-| `ready` | `{ pkgId, source, metadata, revision, libraryBundle }` | The content is visible |
+| `ready` | `{ pkgId, source, metadata, revision, libraryBundle, downgradedLibraries }` | The content is visible |
 | `xapi` | `{ statement, verb }` | Any xAPI statement; nothing is stored |
 | `finished` | `{ statement }` | The content reported its result: a `completed` or `answered` statement from the content itself, not from a part inside it. That is H5P's own `setFinished` rule, except that a part created without a parent counts as a part too, which H5P's rule misses for Interactive Book's chapters and Game Map's exercises. It can come more than once, for a question checked again; the last is the result. Content that reports no result of its own never raises it, and Interactive Book reports one only with `reporting` |
 | `userdata` | `{ pkgId, dataType, subContentId, data, revision }` | With `resume`: the content saved its state; `data: null` means delete it |

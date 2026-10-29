@@ -75,8 +75,10 @@ always plays a package against the same libraries. The pin moves in a minor rele
 patch: with `pack`, a library a package carries plays at the pack's newer version, so a new pack
 changes what packages that carry their libraries play, and their `revision`, and a learner's state
 saved against the build before starts over. Libraries move to newer minors, and content written
-for an older minor is brought up by the libraries' own upgrade steps. A pack that drops a content
-type or a library major the one before carried comes only with a player major.
+for an older minor is brought up by the libraries' own upgrade steps. Content written for a newer
+minor than any source has plays at the newest older one unless `downgrade-libraries="off"`, and
+plays at the newer one once a pack has it. A pack that drops a content type or a library major the
+one before carried comes only with a player major.
 
 What is covered of the pack itself: the `pack` export, `parts/` with its `index.json` and one
 `<folder>.h5p` per library, and `libraries.h5p`, the whole pack as one file.

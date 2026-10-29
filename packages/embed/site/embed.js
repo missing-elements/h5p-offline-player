@@ -5,7 +5,7 @@
  * `h5p-embed` was told when it wrote the site, and the demo's `/embed` with the demo's copy of the
  * library pack.
  *
- *   ?src=<package url>[&libraries=pack|<url> …|none][&refresh-libraries=off][&preload=auto]
+ *   ?src=<package url>[&libraries=pack|<url> …|none][&refresh-libraries=off][&downgrade-libraries=off][&preload=auto]
  *    [&xapi=<parent origin>][&frame][&copyright][&export][&icon][&reporting][&fullscreen=off]
  *    [&activity-id=<IRI>][&custom-css=<stylesheet url>][&lang=<language tag>]
  *
@@ -141,20 +141,23 @@ export function startEmbed({ packBase = null, pack = null, librariesPack = null,
    * What the player learnt about the package, for the embedding page to show: whether the host
    * streamed it or made the browser download it whole (`source.type`), how big it is, what it
    * says it is (`metadata`), where libraries it did not carry came from (`libraryBundle`, `null`
-   * when it carried its own), and how long it took here. Posted once, when the content is up:
+   * when it carried its own), which played at an older version than the content names
+   * (`downgradedLibraries`, empty when none did), and how long it took here. Posted once, when the
+   * content is up:
    *
-   *   { context: 'h5p-offline-player', action: 'report', source, metadata, libraryBundle, elapsedMs }
+   *   { context: 'h5p-offline-player', action: 'report', source, metadata, libraryBundle,
+   *     downgradedLibraries, elapsedMs }
    *
    * and to any parent, like the heights: the parent named the package, and the manifest's strings
    * are the package's own to tell. A parent treats them as text. A load that fails before the
    * content is up posts `{ context: 'h5p-offline-player', action: 'error', code, message }`
    * instead, a refusal by this page included (`code: 'refused'`). The shapes are an interface:
-   * a site that checks packages builds its preview from them, so they do not change.
+   * a site that checks packages builds its preview from them, so a field is only ever added.
    */
   let startedAt = 0
 
   player.addEventListener('ready', (event) => {
-    const { source, metadata, libraryBundle } = /** @type {CustomEvent<ReadyDetail>} */ (event).detail
+    const { source, metadata, libraryBundle, downgradedLibraries } = /** @type {CustomEvent<ReadyDetail>} */ (event).detail
     post({
       context: 'h5p-offline-player',
       action: 'report',
@@ -167,6 +170,8 @@ export function startEmbed({ packBase = null, pack = null, librariesPack = null,
         mainLibrary: metadata.mainLibrary
       },
       libraryBundle,
+      // Absent from an element older than the page's own; this page and the element ship together.
+      downgradedLibraries: downgradedLibraries ?? [],
       elapsedMs: Math.round(performance.now() - startedAt)
     })
   })
@@ -311,12 +316,13 @@ export function startEmbed({ packBase = null, pack = null, librariesPack = null,
    * The element's display options, by their attribute names, for the embedding page to ask for:
    * `&frame&copyright&export` shows H5P's action bar with those buttons, `&fullscreen=off` takes
    * that one away, `&refresh-libraries=off` plays a package's own libraries even where the pack
-   * has newer ones, `&activity-id=` names the statements' object and `&custom-css=` restyles the
-   * content to the embedding site's taste. `&lang=` is the embedding page's language, which this
-   * page cannot read across origins: H5P's own buttons and dialogs follow it for a package that
-   * does not name its own language, and follow the content's where it does. Not `custom-js`,
-   * `embed-code` or `user`: a script is a capability on this origin that a link should not hand
-   * out, the embed is the embed, and a learner's name has no place in a URL.
+   * has newer ones, `&downgrade-libraries=off` refuses content made for a newer version of a
+   * library than any source has, `&activity-id=` names the statements' object and `&custom-css=`
+   * restyles the content to the embedding site's taste. `&lang=` is the embedding page's
+   * language, which this page cannot read across origins: H5P's own buttons and dialogs follow it
+   * for a package that does not name its own language, and follow the content's where it does.
+   * Not `custom-js`, `embed-code` or `user`: a script is a capability on this origin that a link
+   * should not hand out, the embed is the embed, and a learner's name has no place in a URL.
    */
   const applyOptions = () => {
     for (const name of ['frame', 'copyright', 'export', 'icon', 'reporting']) {
@@ -326,6 +332,9 @@ export function startEmbed({ packBase = null, pack = null, librariesPack = null,
     // The pack's newer versions of the libraries a package carries, unless the embedding page
     // needs the package exactly as exported.
     if (params.get('refresh-libraries') === 'off') player.setAttribute('refresh-libraries', 'off')
+    // Content made for a newer version than any source has plays at the older one, unless the
+    // embedding page would rather have it refused.
+    if (params.get('downgrade-libraries') === 'off') player.setAttribute('downgrade-libraries', 'off')
     for (const name of ['activity-id', 'custom-css']) {
       const value = params.get(name)?.trim()
       if (value) player.setAttribute(name, value)

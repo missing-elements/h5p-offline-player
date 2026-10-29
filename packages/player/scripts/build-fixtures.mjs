@@ -395,6 +395,19 @@ built.push([
   })
 ])
 
+// 6a'''. One whose `h5p.json` names a newer minor of the content type than the folder it carries,
+//        as an export whose manifest and folders disagree: nothing has 1.1, so its own 1.0 plays
+//        it, with no library bundle attached, or it is refused with `downgrade-libraries="off"`.
+built.push([
+  'older-own.h5p',
+  await writeArchive('older-own.h5p', async (writer) => {
+    const manifest = JSON.parse(await readFile(resolve(sourceDir, 'h5p.json'), 'utf8'))
+    manifest.preloadedDependencies = [{ machineName: 'H5P.OfflineTest', majorVersion: 1, minorVersion: 1 }]
+    await writer.add('h5p.json', new TextReader(JSON.stringify(manifest)))
+    await addBaseFiles(writer, { skip: ['h5p.json'] })
+  })
+])
+
 // 6a''. Content to check against the content type's semantics, played with the bundle: markup a
 //       field does not allow — a script, a handler, a form asking for a password — a scheme off
 //       the list, a field the semantics do not name, and the same in sub-content. Played trusted,
@@ -481,7 +494,13 @@ for (const [name, minor, content] of [
   // The versions the bundle serves: nothing to run.
   ['upgrade-1.2.h5p', '2', { message: 'Written for 1.2', child: offlineChild('1.1', 'Child written for 1.1') }],
   // The first step throws: played as written.
-  ['upgrade-fails.h5p', '0', { message: 'Written for 1.0', failUpgrade: true, child: offlineChild('1.0', 'Child written for 1.0') }]
+  ['upgrade-fails.h5p', '0', { message: 'Written for 1.0', failUpgrade: true, child: offlineChild('1.0', 'Child written for 1.0') }],
+  // A minor ahead of everything the bundle and the pack serve, the sub-content too: played at their
+  // newest older minor, with no step run, or refused with `downgrade-libraries="off"` (#85).
+  ['upgrade-1.3.h5p', '3', { message: 'Written for 1.3', child: offlineChild('1.2', 'Child written for 1.2') }],
+  // The content type at the version served, its sub-content a minor ahead: named only in the
+  // parameters, as a stripped export from h5p.com names a question type newer than the pack's.
+  ['newer-child.h5p', '2', { message: 'Written for 1.2', child: offlineChild('1.2', 'Child written for 1.2') }]
 ]) {
   built.push([
     name,
