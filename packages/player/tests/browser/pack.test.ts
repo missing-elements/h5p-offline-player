@@ -101,7 +101,7 @@ describe('the library pack, split into parts', () => {
     expect(messageOf(player)).toBe('Written for 1.3')
     expect(frameWindow(player).document.querySelector('.h5p-offline-child-text')?.textContent).toBe('Child written for 1.2')
     expect((await loadOf(player)).parts).toEqual(['H5P.OfflineChild-1.1.h5p', 'H5P.OfflineTest-1.2.h5p'])
-    expect(player.libraryBundle?.downgraded).toEqual([
+    expect(player.downgradedLibraries).toEqual([
       { library: 'H5P.OfflineChild', from: '1.2', to: '1.1.0' },
       { library: 'H5P.OfflineTest', from: '1.3', to: '1.2.0' }
     ])
@@ -123,7 +123,7 @@ describe('the library pack, split into parts', () => {
     expect(messageOf(player)).toBe('Written for 1.2')
     expect(frameWindow(player).document.querySelector('.h5p-offline-child-text')?.textContent).toBe('Child written for 1.2')
     expect((await loadOf(player)).parts).toEqual(['H5P.OfflineChild-1.1.h5p', 'H5P.OfflineTest-1.2.h5p'])
-    expect(player.libraryBundle?.downgraded).toEqual([{ library: 'H5P.OfflineChild', from: '1.2', to: '1.1.0' }])
+    expect(player.downgradedLibraries).toEqual([{ library: 'H5P.OfflineChild', from: '1.2', to: '1.1.0' }])
   })
 
   it('refuses that sub-content by name with downgrade-libraries="off", rather than booting without its library', async () => {
@@ -138,7 +138,7 @@ describe('the library pack, split into parts', () => {
     const player = await play(fresh(FIXTURES.writtenFor12, 'order'), { libraries: `${FIXTURES.libraries} pack`, 'pack-base': PACK })
 
     expect(messageOf(player)).toBe('Written for 1.2')
-    expect(player.libraryBundle?.downgraded).toBeUndefined()
+    expect(player.downgradedLibraries).toEqual([])
     expect((await loadOf(player)).parts).toEqual(['H5P.OfflineChild-1.1.h5p', 'H5P.OfflineTest-1.2.h5p'])
   })
 

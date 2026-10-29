@@ -389,7 +389,7 @@ describe('a written site, framed from another site', () => {
     expect(await untrusted(page)).toBe(true)
     expect(await page.evaluate(() => document.querySelector('#notice button'))).toBeNull()
     const downgraded = await page.evaluate(
-      () => (document.querySelector('h5p-player') as unknown as { libraryBundle: { downgraded?: { library: string; from: string; to: string }[] } }).libraryBundle.downgraded
+      () => (document.querySelector('h5p-player') as unknown as { downgradedLibraries: { library: string; from: string; to: string }[] }).downgradedLibraries
     )
     expect(downgraded).toEqual([{ library: 'H5P.QuestionSet', from: '1.99', to: expect.stringMatching(/^1\.21\./) }])
     await page.close()

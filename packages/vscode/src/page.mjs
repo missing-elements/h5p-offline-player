@@ -49,13 +49,15 @@ export function viewPage(settings) {
 
       player.addEventListener('statechange', (event) => tell({ type: 'state', state: event.detail.state }))
       player.addEventListener('ready', (event) => {
-        const { metadata, libraryBundle } = event.detail
+        const { metadata, libraryBundle, downgradedLibraries } = event.detail
         tell({
           type: 'ready',
           title: (metadata && metadata.title) || null,
           mainLibrary: (metadata && metadata.mainLibrary) || null,
           license: metadata && metadata.license ? [metadata.license, metadata.licenseVersion].filter(Boolean).join(' ') : null,
           refreshed: (libraryBundle && libraryBundle.refreshed) || [],
+          // Made for a newer version than the pack the extension carries, and played at an older one.
+          downgraded: downgradedLibraries || [],
           // The attribute, which is what the element plays by.
           untrusted: player.hasAttribute('untrusted')
         })

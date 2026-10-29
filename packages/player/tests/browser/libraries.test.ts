@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import '../../src/h5p-offline-player'
+import type { ReadyDetail } from '../../src/h5p-offline-player'
 import { FIXTURES, clearPackageCaches, createPlayer, frameFetch, frameWindow, messageOf, play, settle, virtualUrl, waitForSettled } from './utils'
 
 /**
@@ -106,6 +107,31 @@ describe('supplying missing libraries', () => {
       expect(result.detail, src).toMatchObject({ code: 'bad-archive', missingLibraries: { folders: ['H5P.OfflineExtra-1.0'], all: false } })
       expect(result.detail.message, src).toContain('H5P.OfflineExtra-1.0')
     }
+  })
+
+  it("plays a package at its own older minor where nothing has the one it names, and says so with no bundle attached (#85)", async () => {
+    // Its h5p.json names the content type at 1.1 and its folder is 1.0, as an export whose manifest
+    // and folders disagree. Nothing supplied anything, so `libraryBundle` stays null: the list is
+    // the load's. It once rode on the bundle, and such a package played with only the console
+    // saying so, and passed the verifier without a warning where it had failed before. On a host
+    // without Range the frame waits for the whole download, since a partial index never downgrades.
+    for (const src of [`${FIXTURES.olderOwn}?case=own`, `/no-range/older-own.h5p?case=own-${Date.now()}`]) {
+      let detail: ReadyDetail | undefined
+      const { player, result } = await settle(src, {}, (element) =>
+        element.addEventListener('ready', (event) => (detail = (event as CustomEvent<ReadyDetail>).detail))
+      )
+      if (!result.ok) expect.fail(`${src}: ${result.detail.code} — ${result.detail.message}`)
+      expect(messageOf(player), src).toBe('Served from the archive, never extracted to disk.')
+      expect(player.libraryBundle, src).toBeNull()
+      expect(player.downgradedLibraries, src).toEqual([{ library: 'H5P.OfflineTest', from: '1.1', to: '1.0.0' }])
+      expect(detail?.downgradedLibraries, src).toEqual(player.downgradedLibraries)
+    }
+  })
+
+  it('refuses that package with downgrade-libraries="off", naming the version it names', async () => {
+    const { result } = await settle(`${FIXTURES.olderOwn}?case=own-off`, { 'downgrade-libraries': 'off' })
+    if (result.ok) expect.fail('expected the package to be refused')
+    expect(result.detail).toMatchObject({ code: 'bad-archive', missingLibraries: { folders: ['H5P.OfflineTest-1.1'] } })
   })
 
   it("supplies a library's own dependency from the bundle, on a host with Range and on one without", async () => {

@@ -62,10 +62,10 @@ the pack's libraries, 119 came with an upgrade step, which is how H5P marks such
 the older code does not find what moved, and a part can be missing or drawn wrong. Played
 `untrusted`, the content is still checked against the older version's fields.
 
-`libraryBundle.downgraded` and the `ready` event's detail list each library played older,
-`{ library, from, to }`, and the console says so. `downgrade-libraries="off"` refuses such a
-package instead, naming the version it needs. A package that carries the newer version itself
-plays it, trusted, and needs none of this.
+`downgradedLibraries`, on the element and in the `ready` event's detail, lists each library
+played older, `{ library, from, to }`, and the console says so. `downgrade-libraries="off"`
+refuses such a package instead, naming the version it needs. A package that carries the newer
+version itself plays it, trusted, and needs none of this.
 
 ## On your own hosting
 

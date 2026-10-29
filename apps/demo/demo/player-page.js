@@ -120,7 +120,7 @@ player.addEventListener('progress', (event) => {
 player.addEventListener('ready', () => {
   bar.hidden = true
   const refreshed = player.libraryBundle?.refreshed ?? []
-  const downgraded = player.libraryBundle?.downgraded ?? []
+  const downgraded = player.downgradedLibraries
   const libraries = (count) => (count === 1 ? 'one library' : `${count} libraries`)
   modeTag.textContent =
     (player.untrusted

@@ -58,6 +58,8 @@ export const FIXTURES = {
   librariesWithoutSemantics: '/fixtures/libraries-without-semantics.h5p',
   /** Needs the content type at 1.3, which only it carries. */
   untrustedNewer: '/fixtures/untrusted-newer.h5p',
+  /** Names the content type at 1.1 and carries it at 1.0, which nothing else has newer. */
+  olderOwn: '/fixtures/older-own.h5p',
   /** The fixture content type at 1.2 and a sub-content type at 1.1, each with an `upgrades.js`. */
   upgradeLibraries: '/fixtures/upgrade-libraries.h5p',
   /** Stripped exports written for 1.0 (with sub-content at 1.0), 1.1 and 1.2, and one whose first step throws. */

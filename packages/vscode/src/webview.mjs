@@ -116,15 +116,19 @@ export function webviewHtml({ nonce, config }) {
         const name = document.createElement('strong')
         name.textContent = message.title || config.name
         const parts = [message.mainLibrary, message.license, message.untrusted ? 'untrusted' : null]
-        if (message.refreshed.length > 0) {
-          parts.push((message.refreshed.length === 1 ? 'one library' : message.refreshed.length + ' libraries') + " at the pack's newer version")
-        }
+        const libraries = (count) => (count === 1 ? 'one library' : count + ' libraries')
+        const downgraded = message.downgraded || []
+        if (message.refreshed.length > 0) parts.push(libraries(message.refreshed.length) + " at the pack's newer version")
+        if (downgraded.length > 0) parts.push(libraries(downgraded.length) + ' older than the content')
         const detail = document.createElement('span')
         detail.className = 'detail'
         detail.textContent = parts.filter(Boolean).map((part) => ' · ' + part).join('')
         status.className = ''
         status.replaceChildren(name, detail)
-        status.title = message.refreshed.map((library) => library.library + ' ' + library.from + ' → ' + library.to).join('\\n')
+        status.title = [
+          ...message.refreshed.map((library) => library.library + ' ' + library.from + ' → ' + library.to),
+          ...downgraded.map((library) => library.library + ' made for ' + library.from + ', played at ' + library.to)
+        ].join('\\n')
       }
 
       function showError(message) {

@@ -167,6 +167,15 @@ describe('the webview', () => {
     expect((status.children[0] as StandIn).textContent).toBe('Quiz')
   })
 
+  it('says in the bar how many libraries played older than the content, and which in its tooltip', () => {
+    const { receive, fromPage, status } = runWebview()
+    const refreshed = [{ library: 'H5P.Question', from: '1.5.9', to: '1.5.12' }]
+    const downgraded = [{ library: 'H5P.MultiChoice', from: '1.17', to: '1.16.27' }]
+    receive({ source: 'h5p-preview', type: 'ready', title: 'Quiz', mainLibrary: 'H5P.QuestionSet', license: null, refreshed, downgraded, untrusted: false }, fromPage)
+    expect((status.children[1] as StandIn).textContent).toBe(" · H5P.QuestionSet · one library at the pack's newer version · one library older than the content")
+    expect(status.title).toBe('H5P.Question 1.5.9 → 1.5.12\nH5P.MultiChoice made for 1.17, played at 1.16.27')
+  })
+
   it('takes the page’s messages from the server’s origin only', () => {
     const { posted, receive, frame } = runWebview()
     posted.length = 0
@@ -215,9 +224,13 @@ describe('the page a preview frames', () => {
   it('tells what the element reached to the webview around it, and to no other window', () => {
     const { player, told } = runPage({ untrusted: true })
     const ready = player.listeners.get('ready') as Listener
-    ready({ detail: { metadata: { title: 'Quiz', mainLibrary: 'H5P.QuestionSet', license: 'CC BY', licenseVersion: '4.0' }, libraryBundle: { refreshed: [] } } })
+    const downgradedLibraries = [{ library: 'H5P.MultiChoice', from: '1.17', to: '1.16.27' }]
+    ready({ detail: { metadata: { title: 'Quiz', mainLibrary: 'H5P.QuestionSet', license: 'CC BY', licenseVersion: '4.0' }, libraryBundle: { refreshed: [] }, downgradedLibraries } })
     expect(told).toEqual([
-      [{ source: 'h5p-preview', type: 'ready', title: 'Quiz', mainLibrary: 'H5P.QuestionSet', license: 'CC BY 4.0', refreshed: [], untrusted: true }, WEBVIEW_ORIGIN]
+      [
+        { source: 'h5p-preview', type: 'ready', title: 'Quiz', mainLibrary: 'H5P.QuestionSet', license: 'CC BY 4.0', refreshed: [], downgraded: downgradedLibraries, untrusted: true },
+        WEBVIEW_ORIGIN
+      ]
     ])
 
     const alone = runPage({}, [])

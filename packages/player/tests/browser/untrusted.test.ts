@@ -149,7 +149,7 @@ describe('an untrusted package', () => {
     const { player, result } = await playUntrusted(FIXTURES.untrustedNewer)
     if (!result.ok) expect.fail(`${result.detail.code} — ${result.detail.message}`)
     expect(message(player)).toBe('Served from the archive, never extracted to disk.')
-    expect(player.libraryBundle?.downgraded).toEqual([{ library: 'H5P.OfflineTest', from: '1.3', to: '1.0.0' }])
+    expect(player.downgradedLibraries).toEqual([{ library: 'H5P.OfflineTest', from: '1.3', to: '1.0.0' }])
   })
 
   it('refuses it with downgrade-libraries="off", and says its own copy would play it', async () => {

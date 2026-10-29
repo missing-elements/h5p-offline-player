@@ -189,16 +189,13 @@ export type PackageSource = SourceDescriptor
  * copy downloaded earlier rather than fetched now. `fromCache` is what a page needs for "nothing
  * left this origin": a bundle on the page's own origin, or one served from cache, meant no
  * request to a third party. `refreshed`, for the pack: the libraries the package carries that
- * played at the pack's newer version. `downgraded`: the libraries the content names at a newer
- * minor than any source has, which played at the newest older one (`downgrade-libraries`); absent
- * when none did.
+ * played at the pack's newer version.
  */
 export interface LibraryBundle {
   url: string
   origin: string
   fromCache: boolean
   refreshed?: RefreshedLibrary[]
-  downgraded?: DowngradedLibrary[]
 }
 
 export type { DowngradedLibrary, RefreshedLibrary } from './shared/protocol.js'
@@ -228,6 +225,7 @@ export interface ReadyDetail {
   metadata: PackageMetadata | null
   revision: string | null
   libraryBundle: LibraryBundle | null
+  downgradedLibraries: DowngradedLibrary[]
 }
 
 export interface PlayerErrorDetail {
@@ -333,6 +331,8 @@ export class H5PPlayerElement extends HTMLElement {
   private internalMetadata: PackageMetadata | null = null
   /** The bundle that supplied the libraries, once one has. See `libraryBundle`. */
   private internalLibraryBundle: LibraryBundle | null = null
+  /** What played at an older minor than the content names, once the index has said. See `downgradedLibraries`. */
+  private internalDowngraded: DowngradedLibrary[] = []
   private heldStatements: HeldStatement[] = []
   /**
    * The package this element played before the current load, and its revision. Emptying the
@@ -541,6 +541,16 @@ export class H5PPlayerElement extends HTMLElement {
     return this.internalLibraryBundle ? { ...this.internalLibraryBundle } : null
   }
 
+  /**
+   * The libraries the content names at a newer minor than any source has, which played at the
+   * newest older one of the same major (`downgrade-libraries`): `{ library, from, to }`, empty when
+   * none did. The load's, not the bundle's: the older version may be the package's own, with no
+   * bundle attached at all.
+   */
+  get downgradedLibraries(): DowngradedLibrary[] {
+    return this.internalDowngraded.map((library) => ({ ...library }))
+  }
+
   /** The resolved Service Worker scope the routes live under. Read-only, `null` until registered. */
   get scope(): string | null {
     return this.routes?.base ?? null
@@ -680,6 +690,7 @@ export class H5PPlayerElement extends HTMLElement {
     this.internalRevision = null
     this.internalMetadata = null
     this.internalLibraryBundle = null
+    this.internalDowngraded = []
     this.currentSource = null
   }
 
@@ -889,6 +900,8 @@ export class H5PPlayerElement extends HTMLElement {
     let next = fill ? 1 : 0
     let packFailure: unknown = null
     let rounds = 0
+    // Read once, as `refresh` is: the attribute takes effect on the next load, not halfway through.
+    const mayDowngrade = this.downgradesLibraries
     let downgrade = false
 
     for (;;) {
@@ -930,7 +943,7 @@ export class H5PPlayerElement extends HTMLElement {
           continue
         }
         if (!source) {
-          if (!downgrade && this.downgradesLibraries) {
+          if (!downgrade && mayDowngrade) {
             downgrade = true
             // Kept with the load's settings, so a worker started again serves the same folders.
             await this.send({ type: 'attach-libraries', ...load, downgrade: true })
@@ -969,12 +982,13 @@ export class H5PPlayerElement extends HTMLElement {
   }
 
   /**
-   * What played at an older minor than the content names, onto `libraryBundle` and the console:
-   * the content was made for a version no source has, and what that version added is left out.
+   * What played at an older minor than the content names, onto `downgradedLibraries` and the
+   * console: the content was made for a version no source has, and what that version added is
+   * left out.
    */
   private reportDowngrades(downgraded: DowngradedLibrary[] | undefined): void {
     if (!downgraded?.length) return
-    if (this.internalLibraryBundle) this.internalLibraryBundle = { ...this.internalLibraryBundle, downgraded }
+    this.internalDowngraded = downgraded
     console.warn(
       `[h5p-player] played at an older version than the content names, since no library source has it: ` +
         `${downgraded.map(({ library, from, to }) => `${library} ${from} → ${to}`).join(', ')}. ` +
@@ -1718,7 +1732,8 @@ export class H5PPlayerElement extends HTMLElement {
               source: this.source,
               metadata: this.metadata,
               revision: this.internalRevision,
-              libraryBundle: this.libraryBundle
+              libraryBundle: this.libraryBundle,
+              downgradedLibraries: this.downgradedLibraries
             }
           })
         )

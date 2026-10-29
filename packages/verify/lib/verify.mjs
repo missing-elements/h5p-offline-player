@@ -216,7 +216,8 @@ export async function verifyPackage(options) {
         state: player.state,
         revision: player.revision,
         untrusted: player.untrusted === true,
-        libraryBundle: player.libraryBundle
+        libraryBundle: player.libraryBundle,
+        downgradedLibraries: player.downgradedLibraries
       }
     })
     const frame = page.frames().find((candidate) => candidate.url().includes('/h5p/frame/'))
@@ -276,7 +277,8 @@ export async function verifyPackage(options) {
       refreshed: collected.libraryBundle?.refreshed ?? [],
       // Made for a newer minor than any source has, and played at an older one: what the newer
       // version added is left out, which only a person playing it can judge.
-      downgraded: collected.libraryBundle?.downgraded ?? [],
+      // The load's, not the bundle's: a package that carries an older minor itself has no bundle.
+      downgraded: collected.downgradedLibraries ?? [],
       verdict: 'pass',
       reasons: [],
       warnings: [],

@@ -1238,11 +1238,17 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   `pack.test.ts` is that shape. A library no source has at its major still plays as before,
   dropped from the manifest, its sub-content removed by the content check when untrusted, so an
   old export's retired question type is not refused for it. The walk names each dependency
-  served from a versioned folder below the minor asked; the element puts them on
-  `libraryBundle.downgraded` and
-  warns in the console, the verifier makes each a warning and `report.downgraded`
-  (`--no-downgrade-libraries` refuses instead), the player page shows it with an Older if needed
-  switch, and the embed page passes `&downgrade-libraries=off` through. One thing follows for the
+  served from a versioned folder below the minor asked. The element keeps them as the load's
+  `downgradedLibraries`, in the `ready` detail too, and warns in the console; the verifier makes
+  each a warning and `report.downgraded` (`--no-downgrade-libraries` refuses instead), the
+  player page and the VS Code extension's bar show them, the player page with an Older if needed
+  switch, and the embed page passes `&downgrade-libraries=off` through and posts the list in its
+  report. The list is the load's because the older copy may be the package's own, with no bundle
+  attached: an export whose `h5p.json` names a newer minor than its folder, or h5p.org's
+  Impressive Presentation, whose libraries ask for Font Awesome 4.5 beside the 4.3 it carries.
+  The first cut put it on `libraryBundle`, which is `null` there, so only the console said so,
+  and the verifier passed such a package without a warning where it had failed before; the
+  branch's own review found it. One thing follows for the
   pages that ask before a package's own code runs: untrusted, a package carrying a newer minor than
   the pack's now plays on the pack's, so they ask only for a library no source has at its major, or
   with the switch off. The embed's `site.test.ts` plays its Question Set 1.99 package both ways.

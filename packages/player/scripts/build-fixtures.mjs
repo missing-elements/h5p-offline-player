@@ -395,6 +395,19 @@ built.push([
   })
 ])
 
+// 6a'''. One whose `h5p.json` names a newer minor of the content type than the folder it carries,
+//        as an export whose manifest and folders disagree: nothing has 1.1, so its own 1.0 plays
+//        it, with no library bundle attached, or it is refused with `downgrade-libraries="off"`.
+built.push([
+  'older-own.h5p',
+  await writeArchive('older-own.h5p', async (writer) => {
+    const manifest = JSON.parse(await readFile(resolve(sourceDir, 'h5p.json'), 'utf8'))
+    manifest.preloadedDependencies = [{ machineName: 'H5P.OfflineTest', majorVersion: 1, minorVersion: 1 }]
+    await writer.add('h5p.json', new TextReader(JSON.stringify(manifest)))
+    await addBaseFiles(writer, { skip: ['h5p.json'] })
+  })
+])
+
 // 6a''. Content to check against the content type's semantics, played with the bundle: markup a
 //       field does not allow — a script, a handler, a form asking for a password — a scheme off
 //       the list, a field the semantics do not name, and the same in sub-content. Played trusted,

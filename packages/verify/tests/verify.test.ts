@@ -99,6 +99,21 @@ const quizNeedingNewerLibrary = () =>
     await writer.add(folder ? entry.filename.replace(folder[0], 'H5P.QuestionSet-1.99/') : entry.filename, new Uint8ArrayReader(bytes))
   })
 
+/**
+ * The quiz whose `h5p.json` names Question Set 1.99 while its folder stays at the version it was
+ * built with, as an export whose manifest and folders disagree: nothing has 1.99, and its own
+ * older copy plays it, with no library source attached.
+ */
+const quizNamingNewerThanItCarries = () =>
+  rewrittenQuiz('names-newer.h5p', async (entry, bytes, writer) => {
+    if (entry.filename === 'h5p.json') {
+      const json = JSON.parse(new TextDecoder().decode(bytes))
+      for (const dependency of json.preloadedDependencies) if (dependency.machineName === 'H5P.QuestionSet') dependency.minorVersion = 99
+      bytes = new TextEncoder().encode(JSON.stringify(json))
+    }
+    await writer.add(entry.filename, new Uint8ArrayReader(bytes))
+  })
+
 /** The quiz built against an older patch of Question Set than the pack has: its own `library.json` says patch 0. */
 const quizWithOlderPatch = () =>
   rewrittenQuiz('older-patch.h5p', async (entry, bytes, writer) => {
@@ -237,6 +252,16 @@ describe('h5p-verify', () => {
     expect(report.downgraded).toEqual([{ library: 'H5P.QuestionSet', from: '1.99', to: expect.stringMatching(/^1\.21\.\d+$/) }])
     expect(report.warnings.some((warning) => warning.startsWith('H5P.QuestionSet played at 1.21.') && warning.includes('1.99'))).toBe(true)
     expect(summarize(report)).toContain('warning: H5P.QuestionSet played at 1.21.')
+  }, 120_000)
+
+  it('played trusted with no library source, warns of a library played at the older minor the package carries (#85)', async () => {
+    // Nothing supplied anything, so there is no library bundle. The report took the list from it
+    // once, and this passed with no warning, where before the fallback it failed naming 1.99.
+    const report = await verifyPackage({ file: await quizNamingNewerThanItCarries() })
+
+    expect(report.verdict).toBe('pass')
+    expect(report.downgraded).toEqual([{ library: 'H5P.QuestionSet', from: '1.99', to: expect.stringMatching(/^1\.\d+\.\d+$/) }])
+    expect(report.warnings.some((warning) => warning.startsWith('H5P.QuestionSet played at 1.') && warning.includes('1.99'))).toBe(true)
   }, 120_000)
 
   it('played untrusted with --no-downgrade-libraries, refuses a package that needs its own copy of a library, and says what to do', async () => {
