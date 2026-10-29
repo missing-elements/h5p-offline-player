@@ -29,6 +29,10 @@ supported it.
   says `refreshed from the pack: <library> <from> → <to>`; `--no-refresh-libraries` plays the
   package's own as exported. `--libraries <url>` for another bundle, `--libraries <path>` for one
   on disk or for a copy of the pack's `parts/` folder.
+- `--no-downgrade-libraries` — fail a package whose content names a newer minor version of a
+  library than any source has, instead of passing it played at the newest older one with a
+  warning. Use it when the destination refuses such packages, as `h5p-embed --scorm` does when it
+  writes the zip, or a site that sets `downgrade-libraries="off"`.
 - `--out <dir>` — where `report.json` and `screenshot.png` go; default `<package>.verify/`.
 - `--json` — the report as JSON instead of the summary.
 - `--browser <path>` — a Chromium executable, for CI or a sandbox where none is found.
@@ -57,7 +61,8 @@ Exit 2: the check could not run (no browser, no such file).
 | warning: `blocked by the frame's CSP` | content loading from an outside origin | put the asset in the package |
 | warning: `content check: <field>: markup removed: …` (with `--untrusted`) | the field holds tags, attributes or styles its library does not allow; the site will strip them | write the field in what `semantics.json` allows for it (its `tags` and `font`), or accept the loss if the text still reads right |
 | warning: `content check: <field>: removed`, `… became …` | a field the semantics do not name, or a value outside its options or range; or the libraries' upgrade moved it, when the pack is newer than what the content was written for | match the field to `semantics.json`, or build against the pack's versions |
-| `bad-archive` with `fix: the package carries … itself, but played untrusted …` | built against a library newer than the pack | build against the pack's versions, or the site must play it trusted |
+| `bad-archive` with `fix: the package carries … itself, but played untrusted …` | built against a library the pack lacks or has only at an older major, or at a newer minor with `--no-downgrade-libraries` | build against the pack's versions, or the site must play it trusted |
+| warning: `<library> played at <to>, older than the <from> the content was made for, …` | the content names a newer minor version of a library than any source has, as an h5p.com export can for a few weeks before the hub serves it; a site with the same sources plays it at the older version too, as the check did, and `report.downgraded` lists it | check the screenshot and the preview: what the newer version added is left out, and where it moved fields a part can be missing or drawn wrong. For a package you build, build against the pack's versions; `--no-downgrade-libraries` fails it instead |
 | `refreshed from the pack: <library> <from> → <to>` (with `--libraries pack` or a copy of it) | the package carries an older version of these libraries than the pack; a site with the pack plays the pack's, and so did the check | nothing to fix: the content was checked as that site will play it. Export against the current versions to ship them, or rerun with `--no-refresh-libraries` to see the package as exported |
 
 ## Look at the screenshot
@@ -78,9 +83,10 @@ Say what was checked: the package starts and renders in the H5P runtime. Do not 
 The tool does not check that the answers are right, the level fits, the text is any good, the
 media are licensed, or the content is accessible; those are the user's to review. Played as it is,
 it does not check library versions: a package built against newer library versions than the H5P
-hub carries (h5p-cli builds from GitHub `master`) plays here and is refused by h5p.com and by the
-offline app's library pack; if the destination is one of those, build against the hub's versions,
-and `--untrusted` checks against the pack's. A pass is not a trust decision either: played as it
+hub carries (h5p-cli builds from GitHub `master`) plays here and is refused by h5p.com, and a site
+that plays it untrusted plays the pack's older versions instead; if the destination is one of
+those, build against the hub's versions. `--untrusted` plays it as such a site does and warns for
+each library played older. A pass is not a trust decision either: played as it
 is, the package's scripts ran in a headless browser on this machine, with its network, and a
 package that behaves at start-up can still read and send what other packages saved on a site that
 plays it. Run the tool only on packages you would open yourself, or with `--untrusted`, which runs

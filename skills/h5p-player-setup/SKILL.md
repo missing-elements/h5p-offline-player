@@ -42,8 +42,10 @@ every package is their own team's.
 `untrusted` (`<h5p-player untrusted src="…">`) plays a package as data: none of its own code runs,
 its libraries come from the library pack, and its content is checked against each library's field
 definitions before it is shown, as the H5P CMS plugins check an author's upload — as contained as
-in an H5P plugin on the same site. It refuses a package that needs a newer library than the
-pack has. Embed adds a separate origin on top.
+in an H5P plugin on the same site. Content made for a newer minor version of a library than the
+pack has plays at the pack's older one (`downgrade-libraries="off"` refuses it instead); a package
+that needs a library the pack lacks, or a newer major, is refused. Embed adds a separate origin on
+top.
 
 ## 2. Do it
 
