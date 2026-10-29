@@ -295,7 +295,10 @@ apps/skills/              the skills' test project, a project of the kind a skil
   tests/author-playback.test.ts  the eight-scenario example in the verifier's preview, the review the
                             skill hands a person, trusted and untrusted: every question's feedback,
                             75% failing and 83.3% passing an 80% threshold, retry to 100%, and only
-                            the parent Question Set finishing; Chromium only
+                            the parent Question Set finishing; the fail and pass messages in the
+                            result's screen-reader announcement, since Question Set 1.21 draws
+                            neither on its result page (h5p/h5p-question-set#183), and drawn
+                            after Check on a question on its own; Chromium only
 
 README.md                 what npm shows; ACCESSIBILITY.md, SECURITY.md, CONTRIBUTING.md, GLOSSARY.md,
                           CODE_OF_CONDUCT.md beside it

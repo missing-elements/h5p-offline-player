@@ -3,8 +3,9 @@
 [The source JSON](../assets/phishing-scenarios.json) is a more complete example than
 the two-question starter. It builds eight text-only questions: four single-answer
 and four multiple-answer, each with four options and explanatory feedback.
-The pass threshold is 80%. It exercises multiline prompts, quotes, ampersands,
-answer shuffling, question navigation, the result page, and retry.
+The pass threshold is 80%, with a message for each outcome. It exercises multiline
+prompts, quotes, ampersands, answer shuffling, question navigation, the result page,
+and retry.
 
 ## Authoring brief
 
@@ -81,6 +82,11 @@ Test two complete attempts:
   navigation, and retry, and confirm that `finished` is the Question Set's result,
   not an individual question's.
 
+The result page shows the score, not the pass or fail message: the current Question
+Set does not draw it yet (see [the input format](./quiz-format.md)), and a screen
+reader announces it.
+
 The repository's app playback tests perform these attempts in both trusted and
-untrusted mode. The regular verifier still checks startup only; the interaction
-test is separate evidence, not a new verifier capability.
+untrusted mode, and check that each message is announced. The regular verifier still
+checks startup only; the interaction test is separate evidence, not a new verifier
+capability.

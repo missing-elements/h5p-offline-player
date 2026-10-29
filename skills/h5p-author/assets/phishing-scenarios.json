@@ -5,6 +5,8 @@
   "license": "CC0 1.0",
   "authors": [{ "name": "missing-elements", "role": "Author" }],
   "passPercentage": 80,
+  "passedFeedback": "Passed: you reached the 80% this simulation asks for. Review any scenario you missed before you finish.",
+  "failedFeedback": "Not passed: this simulation asks for 80%. Read the feedback on the scenarios you missed, then select Retry.",
   "questions": [
     {
       "title": "An urgent benefits deadline",
