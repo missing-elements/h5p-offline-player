@@ -177,6 +177,12 @@ p code, li code, .lede code { padding: 0.1em 0.35em; border-radius: 4px; backgro
   height: 1.7rem;
 }
 
+/* The name with its author on a line under it, so the bar is no wider for it. H5P Group's
+   trademark policy lets a name lead with "H5P" only beside who made it (h5p.org/trademark; see
+   AGENTS.md). The space before the byline keeps the link's name "… by Missing Elements". */
+.brand-name { display: flex; flex-direction: column; line-height: 1.15; }
+.brand-by { color: var(--muted); font-size: 0.72rem; font-weight: 500; letter-spacing: 0; }
+
 /* Wraps rather than overflows: a wider system font or a larger text setting on a narrow phone
    pushed the fourth link past the edge, and the whole page scrolled sideways. */
 .topbar nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem; min-width: 0; }

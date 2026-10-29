@@ -57,7 +57,7 @@ const trust = trustPrompt(confirmBox, $('#confirm-open'))
 /** The installed app's own window: standalone, or on the desktop with its bar in the title bar. */
 const installed = matchMedia('(display-mode: standalone), (display-mode: window-controls-overlay)')
 
-const APP_NAME = 'H5P Offline Player'
+const APP_NAME = 'H5P Offline Player by Missing Elements'
 /** The page's title in a tab, which search engines show too; an installed window's says the app's name. */
 const PAGE_TITLE = document.title
 const homeTitle = () => (installed.matches ? APP_NAME : PAGE_TITLE)

@@ -1,7 +1,7 @@
 {
   "id": "/app/",
-  "name": "H5P Offline Player",
-  "short_name": "H5P Player",
+  "name": "H5P Offline Player by Missing Elements",
+  "short_name": "Offline Player",
   "description": "Open .h5p files and play them with no server and, once installed, no network.",
   "start_url": "/app/",
   "scope": "/app/",

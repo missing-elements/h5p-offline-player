@@ -8,7 +8,7 @@
     <link rel="canonical" href="%SITE_URL%/" />
     <meta name="theme-color" content="#2f6df6" />
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="h5p-offline-player" />
+    <meta property="og:site_name" content="h5p-offline-player by Missing Elements" />
     <meta property="og:locale" content="en_US" />
     <meta property="og:title" content="Self-hosted H5P player: standalone, headless, offline — h5p-offline-player" />
     <meta property="og:description" content="A standalone H5P player in one web component: plays .h5p files on your own site with no H5P server, headless in any front end, and offline as an app." />
@@ -30,7 +30,7 @@
         "@graph": [
           {
             "@type": "WebSite",
-            "name": "h5p-offline-player",
+            "name": "h5p-offline-player by Missing Elements",
             "url": "%SITE_URL%/"
           },
           {
@@ -187,7 +187,11 @@
         files: in a CMS, in object storage, in your repository. One element plays it in any front
         end, from plain HTML to React or Vue, and the results reach your own code as xAPI events.
         <a href="/demo/setup.html">Setting it up</a> covers bundlers, frameworks and pages with no
-        build step. In CI,
+        build step. In VS Code,
+        <a href="https://marketplace.visualstudio.com/items?itemName=MissingElements.h5p-preview" rel="noopener">H5P Preview by Missing Elements</a>
+        opens a <code>.h5p</code> in an editor tab and plays it, offline; Cursor and VSCodium
+        install it from <a href="https://open-vsx.org/extension/MissingElements/h5p-preview" rel="noopener">Open VSX</a>.
+        In CI,
         <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/docs/verify.md" rel="noopener">h5p-verify</a>
         plays a package in a headless browser and says whether it works.
       </p>
