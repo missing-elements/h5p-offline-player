@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0
+
+VS Code plays video and audio with fewer codecs than a browser: an MP4's sound, M4A audio, WebM
+and YouTube do not play in its editor. A line under the bar now says which of these a package has,
+"VS Code plays its MP4 video without sound and cannot play its WebM video", with an Open in Browser
+button that plays it in full. The bar no longer shows a bare "U" for a package whose licence is
+undisclosed. Player 1.2.0 inside, as in 0.2.0.
+
 ## 0.2.0
 
 Content made for a newer version of a library than the package and the library pack carry, such
