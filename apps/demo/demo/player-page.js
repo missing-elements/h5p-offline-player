@@ -18,6 +18,7 @@ const bar = document.querySelector('#progress')
 const message = document.querySelector('#message')
 const log = document.querySelector('#log')
 const refreshToggle = document.querySelector('#refresh')
+const downgradeToggle = document.querySelector('#downgrade')
 const confirmBox = document.querySelector('#confirm-src')
 const modeNote = document.querySelector('#mode-note')
 const modeTag = document.querySelector('#mode-tag')
@@ -119,15 +120,29 @@ player.addEventListener('progress', (event) => {
 player.addEventListener('ready', () => {
   bar.hidden = true
   const refreshed = player.libraryBundle?.refreshed ?? []
-  modeTag.textContent = player.untrusted
-    ? "Untrusted · libraries from this site's pack · content checked"
-    : refreshed.length > 0
-      ? `Trusted · ${refreshed.length === 1 ? 'one library' : `${refreshed.length} libraries`} at the pack's newer version`
-      : player.libraryBundle
-        ? "Trusted · its own libraries, the rest from this site's pack"
-        : 'Trusted · its own libraries'
+  const downgraded = player.libraryBundle?.downgraded ?? []
+  const libraries = (count) => (count === 1 ? 'one library' : `${count} libraries`)
+  modeTag.textContent =
+    (player.untrusted
+      ? "Untrusted · libraries from this site's pack · content checked"
+      : refreshed.length > 0
+        ? `Trusted · ${libraries(refreshed.length)} at the pack's newer version`
+        : player.libraryBundle
+          ? "Trusted · its own libraries, the rest from this site's pack"
+          : 'Trusted · its own libraries') + (downgraded.length > 0 ? ` · ${libraries(downgraded.length)} older than the content` : '')
   write(`mode  ${modeTag.textContent}`)
   for (const { library, from, to } of refreshed) write(`refreshed  ${library} ${from} → ${to}`)
+  for (const { library, from, to } of downgraded) write(`older  ${library} ${to}, made for ${from}`)
+  // Made for a version this site's pack has not got yet, and played at its older one: most of the
+  // time all of it works, but what the newer version added is not there, so the visitor is told.
+  if (downgraded.length > 0) {
+    show(
+      "Made for newer library versions than this site's pack has, so it plays at older ones: " +
+        `${downgraded.map(({ library, from, to }) => `${library} ${from} at ${to}`).join(', ')}. ` +
+        'What the newer versions added is left out. Turn off Older if needed to refuse such packages instead.',
+      'warning'
+    )
+  }
   // The build every statement will name in `context.revision`. On a host without Range the frame
   // can boot before the index that yields it, and the statements wait for it instead.
   if (player.revision) write(`revision  ${player.revision}`)
@@ -241,10 +256,15 @@ const REFRESH_NOTES = {
   on: ' Where the pack has a newer version of a library the package carries, that version plays.',
   off: ' The libraries the package carries play as exported.'
 }
+const DOWNGRADE_NOTES = {
+  on: ' Content made for a newer version than anything here has plays at the newest older one, without what the newer version added.',
+  off: ' Content made for a newer version than anything here has is refused.'
+}
 const playsUntrusted = () => form.elements.mode.value === 'untrusted'
 const describeMode = () => {
   const mode = form.elements.mode.value
-  modeNote.textContent = NOTES[mode] + (mode === 'trusted' ? REFRESH_NOTES[refreshToggle.checked ? 'on' : 'off'] : '')
+  modeNote.textContent =
+    NOTES[mode] + (mode === 'trusted' ? REFRESH_NOTES[refreshToggle.checked ? 'on' : 'off'] : '') + DOWNGRADE_NOTES[downgradeToggle.checked ? 'on' : 'off']
   // Untrusted, none of the package's own libraries play, so there is nothing to refresh.
   refreshToggle.disabled = mode === 'untrusted'
 }
@@ -259,7 +279,12 @@ const applyMode = () => {
   player.untrusted = untrusted
   if (refreshToggle.checked) player.removeAttribute('refresh-libraries')
   else player.setAttribute('refresh-libraries', 'off')
-  return untrusted ? '  (untrusted: none of its own code runs)' : refreshToggle.checked ? '' : '  (libraries as exported)'
+  if (downgradeToggle.checked) player.removeAttribute('downgrade-libraries')
+  else player.setAttribute('downgrade-libraries', 'off')
+  return (
+    (untrusted ? '  (untrusted: none of its own code runs)' : refreshToggle.checked ? '' : '  (libraries as exported)') +
+    (downgradeToggle.checked ? '' : '  (no older versions)')
+  )
 }
 
 /** Plays a package at a URL, in the switch's mode. */
@@ -318,6 +343,12 @@ for (const input of form.elements.mode) {
 // And with its libraries as exported, or at the pack's newer versions: an older export's look
 // against the current one.
 refreshToggle.addEventListener('change', () => {
+  describeMode()
+  reload?.()
+})
+
+// And content made for a newer version than the pack has: played at its older one, or refused.
+downgradeToggle.addEventListener('change', () => {
   describeMode()
   reload?.()
 })

@@ -21,6 +21,10 @@ import { addonPatterns, textMatches } from './package-reader.js'
  *   matches a string in the parameters, H5P.MathDisplay for LaTeX. Added when the pack refreshes
  *   or fills anything, the pack standing in for the platform's installed libraries; a package
  *   played as exported, with nothing from the pack, gets none, as on a site without the addon.
+ * - **Downgrade**, once the load asks for it: what the content names at a newer minor than the
+ *   pack has comes from the pack's older one, unless the package carries, or a source already
+ *   provides, a version at least as new as the pack's (#85). The reader then serves the newest of
+ *   them for the version named.
  *
  * Taking the newest version of each library satisfies every dependency on both sides, since each
  * side's requests are already met by its own versions: the pack's index is complete in itself.
@@ -60,6 +64,8 @@ export interface PlanInput {
   pack: ReadonlyArray<PackLibrary & { url: string }>
   refresh: boolean
   fill: boolean
+  /** Supply the pack's older minor of what nothing has at the minor named. */
+  downgrade?: boolean
 }
 
 interface Request {
@@ -130,8 +136,25 @@ export function planPack(input: PlanInput): PackPlan | null {
 
       if (fromContent && !input.fill) continue
       const candidate = byLibrary.get(libraryKey(dependency.machineName, dependency.majorVersion))
-      if (!candidate || candidate.minorVersion < dependency.minorVersion) continue
-      // An older minor the package carries gives way to the version that satisfies both.
+      if (!candidate) continue
+      if (candidate.minorVersion < dependency.minorVersion) {
+        if (!input.downgrade) continue
+        // Nothing has the minor named: the newest older one plays it. What the package carries or
+        // a source provides may already be as new as the pack's, and is then the one served.
+        const here = [
+          ...own.flatMap((library) => (library.major === null || library.minor === null ? [] : [{ ...library, major: library.major, minor: library.minor }])),
+          ...[...planned.values()].map((library) => ({ machineName: library.machineName, major: library.majorVersion, minor: library.minorVersion })),
+          ...input.provided
+        ].filter((library) => library.machineName === dependency.machineName && library.major === dependency.majorVersion)
+        const newest = here.reduce<(typeof here)[number] | undefined>((best, library) => (!best || library.minor > best.minor ? library : best), undefined)
+        if (newest && newest.minor >= candidate.minorVersion) {
+          const carriedOlder = own.find((library) => library.machineName === newest.machineName && library.major === newest.major && library.minor === newest.minor)
+          for (const each of carriedOlder?.dependencies ?? []) queue.push({ dependency: each, fromContent: true })
+          continue
+        }
+      }
+      // An older minor the package carries gives way to the version that satisfies both, or that
+      // comes closest to what the content names.
       const older = own.find((library) => library.machineName === dependency.machineName && library.major === dependency.majorVersion)
       if (older) supersede(older, candidate)
       queue.push(...plan(candidate))

@@ -15,7 +15,8 @@ it could not start.
 
 Options:
   --preview              open the package in your browser instead of checking it; it takes
-                         --untrusted, --libraries and --no-refresh-libraries
+                         --untrusted, --libraries, --no-refresh-libraries and
+                         --no-downgrade-libraries
   --no-open              with --preview, print the address instead of opening a browser
   --untrusted            play it as a site plays a package it did not make: none of its own
                          code runs, its libraries come only from --libraries (pack by
@@ -27,6 +28,10 @@ Options:
                          pack, a library the package carries plays at the pack's newer
                          version, as on a site with the pack
   --no-refresh-libraries play the libraries the package carries even where the pack has newer
+  --no-downgrade-libraries
+                         refuse content made for a newer minor version of a library than any
+                         source has, instead of playing it at the newest older one with a
+                         warning
   --out <dir>            where report.json and screenshot.png go
                          (default: <package>.verify/ beside the package)
   --browser <path>       a Chromium-based browser; Chrome, Edge or Playwright's found otherwise
@@ -47,6 +52,7 @@ try {
       libraries: { type: 'string' },
       untrusted: { type: 'boolean' },
       'no-refresh-libraries': { type: 'boolean' },
+      'no-downgrade-libraries': { type: 'boolean' },
       out: { type: 'string' },
       browser: { type: 'string' },
       ready: { type: 'string' },
@@ -86,7 +92,8 @@ if (args.values.preview) {
       file,
       libraries: args.values.libraries,
       untrusted: args.values.untrusted,
-      refreshLibraries: !args.values['no-refresh-libraries']
+      refreshLibraries: !args.values['no-refresh-libraries'],
+      downgradeLibraries: !args.values['no-downgrade-libraries']
     })
   } catch (error) {
     console.error(error instanceof VerifyError ? error.message : error)
@@ -125,6 +132,7 @@ try {
     libraries: args.values.libraries,
     untrusted: args.values.untrusted,
     refreshLibraries: !args.values['no-refresh-libraries'],
+    downgradeLibraries: !args.values['no-downgrade-libraries'],
     out,
     browser: args.values.browser,
     readyTimeout: seconds(args.values.ready, 60_000),

@@ -13,7 +13,9 @@ the content drew something. With `--untrusted` it plays the package as a site th
 it will, [untrusted](untrusted.md), against the library pack, and lists as warnings what the
 content check removes from each field: markup, attributes and styles by name, fields, values.
 With `--libraries pack`, or a copy of the pack's `parts/`, it plays a library the package carries
-at the pack's newer version, as a site with the pack will, and says which. It is meant as the last step of a pipeline that generates or
+at the pack's newer version, as a site with the pack will, and says which. Content made for a
+newer minor version than any source has plays at the newest older one, as the player does by
+default, with a warning for each library; `--no-downgrade-libraries` fails it instead. It is meant as the last step of a pipeline that generates or
 rewrites packages; the skill in `skills/h5p-verify/` tells an agent when to run it and how to
 read the result.
 

@@ -65,6 +65,10 @@ export const FIXTURES = {
   writtenFor11: '/fixtures/upgrade-1.1.h5p',
   writtenFor12: '/fixtures/upgrade-1.2.h5p',
   upgradeFails: '/fixtures/upgrade-fails.h5p',
+  /** Written for 1.3 with sub-content at 1.2: a minor ahead of every source here (#85). */
+  writtenFor13: '/fixtures/upgrade-1.3.h5p',
+  /** Written for 1.2, the version served, with sub-content at 1.2, a minor ahead of every source here. */
+  newerChild: '/fixtures/newer-child.h5p',
   /** Library folders with no version suffix, the shape older packages use. */
   unversioned: '/fixtures/unversioned.h5p',
   unversionedPack: '/fixtures/unversioned-pack.h5p'

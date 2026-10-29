@@ -174,6 +174,43 @@ describe('missingDependencies', () => {
     const reader = await withPack(inconsistent, bundle)
     expect(await reader.missingDependencies(await reader.mergedManifest(), read)).toBeNull()
   })
+
+  /** A stripped export whose question was made for a newer minor than any source has (#85). */
+  const newerQuestion = {
+    'h5p.json': JSON.stringify({ mainLibrary: 'H5P.Main', preloadedDependencies: [{ machineName: 'H5P.Main', majorVersion: 1, minorVersion: 0 }] }),
+    'content/content.json': JSON.stringify({ questions: [{ library: 'H5P.Sub 1.3', params: {} }, { library: 'H5P.Retired 1.0', params: {} }] })
+  }
+  const older = { 'h5p.json': '{}', 'H5P.Main-1.0/library.json': library('H5P.Main', 1, 0), 'H5P.Sub-1.2/library.json': library('H5P.Sub', 1, 2) }
+
+  it('starts from the sub-content the parameters name, where a source has its major', async () => {
+    // The merged manifest drops what nothing answers for, so the walk from it alone passed this.
+    const attached = await withPack(newerQuestion, older)
+    const merged = await attached.mergedManifest()
+    expect(merged.preloadedDependencies?.map(({ machineName }) => machineName)).toEqual(['H5P.Main'])
+    expect(await attached.missingDependencies(merged, read)).toEqual({ mainLibrary: 'H5P.Main', folders: ['H5P.Sub-1.3'], all: false })
+
+    // The pack on offer counts as a source before any part of it is attached.
+    const bare = { 'h5p.json': '{}', 'H5P.Main-1.0/library.json': library('H5P.Main', 1, 0) }
+    const offered = await withPack(newerQuestion, bare)
+    expect(await offered.missingDependencies(await offered.mergedManifest(), read)).toBeNull()
+    expect(await offered.missingDependencies(await offered.mergedManifest(), read, [{ machineName: 'H5P.Sub', majorVersion: 1 }])).toEqual({
+      mainLibrary: 'H5P.Main',
+      folders: ['H5P.Sub-1.3'],
+      all: false
+    })
+  })
+
+  it('with downgrade, serves it from the older minor and reports it; one no source has at its major plays as before', async () => {
+    const reader = await PackageReader.open('c', handleOf(await zipOf(newerQuestion)), { requireLibraries: false, downgrade: true })
+    reader.use(await PackageReader.open('p', handleOf(await zipOf(older)), { requireLibraries: false }))
+    const merged = await reader.mergedManifest()
+    expect(merged.preloadedDependencies?.map(({ machineName }) => machineName)).toEqual(['H5P.Main', 'H5P.Sub'])
+    // H5P.Retired is in no source at any minor: left out of the manifest and not missing, as before.
+    expect(await reader.checkDependencies(merged, read)).toEqual({
+      missing: null,
+      downgraded: [{ library: 'H5P.Sub', from: '1.3', to: '1.2.0' }]
+    })
+  })
 })
 
 describe('addonPatterns and textMatches', () => {

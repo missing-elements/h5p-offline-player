@@ -20,6 +20,7 @@ import {
 } from './shared/constants.js'
 import {
   PlayerError,
+  type DowngradedLibrary,
   type ErrorCode,
   type LibrarySource,
   type MissingLibraries,
@@ -188,16 +189,19 @@ export type PackageSource = SourceDescriptor
  * copy downloaded earlier rather than fetched now. `fromCache` is what a page needs for "nothing
  * left this origin": a bundle on the page's own origin, or one served from cache, meant no
  * request to a third party. `refreshed`, for the pack: the libraries the package carries that
- * played at the pack's newer version.
+ * played at the pack's newer version. `downgraded`: the libraries the content names at a newer
+ * minor than any source has, which played at the newest older one (`downgrade-libraries`); absent
+ * when none did.
  */
 export interface LibraryBundle {
   url: string
   origin: string
   fromCache: boolean
   refreshed?: RefreshedLibrary[]
+  downgraded?: DowngradedLibrary[]
 }
 
-export type { RefreshedLibrary } from './shared/protocol.js'
+export type { DowngradedLibrary, RefreshedLibrary } from './shared/protocol.js'
 
 /** Each library of a pack, with where its part is: the `pack` export of `@missing-elements/h5p-libraries`. */
 export interface LibraryPack {
@@ -296,9 +300,9 @@ function adoptShadowStyles(root: ShadowRoot): void {
 export class H5PPlayerElement extends HTMLElement {
   /**
    * The two attributes a change of which does something at once. Every other one — `sw`,
-   * `assets-base`, `jobs`, `libraries`, `pack-base`, `refresh-libraries`, `preload`, `resume`, the
-   * frame options — is read when a load starts or when the package is registered, so a change
-   * takes effect on the next load and needs no callback.
+   * `assets-base`, `jobs`, `libraries`, `pack-base`, `refresh-libraries`, `downgrade-libraries`,
+   * `preload`, `resume`, the frame options — is read when a load starts or when the package is
+   * registered, so a change takes effect on the next load and needs no callback.
    */
   static get observedAttributes(): string[] {
     return ['src', 'auto-resize']
@@ -750,6 +754,7 @@ export class H5PPlayerElement extends HTMLElement {
       if (signal.aborted) return
 
       this.iframe.title = frameTitle(indexed.title)
+      this.reportDowngrades(indexed.downgraded)
       this.internalRevision = indexed.revision ?? null
       this.internalMetadata =
         indexed.metadata || indexed.mainLibrary
@@ -870,6 +875,11 @@ export class H5PPlayerElement extends HTMLElement {
    *
    * With `deep`, the worker also follows each library's own dependencies, as the runtime will,
    * and what none of the package's folders provides is fetched the same way.
+   *
+   * What every source leaves missing gets one more round, unless `downgrade-libraries="off"`: the
+   * load asks the worker to serve the newest older minor of the same major for a library named at
+   * a newer one, and the pack to supply it (#85). Only then, so that a later source with the
+   * version named wins over an earlier one with an older version.
    */
   private async index(load: LoadRef, signal: AbortSignal, deep = false, refresh = this.refreshesLibraries): Promise<IndexResult> {
     const sources = this.librarySources()
@@ -879,13 +889,14 @@ export class H5PPlayerElement extends HTMLElement {
     let next = fill ? 1 : 0
     let packFailure: unknown = null
     let rounds = 0
+    let downgrade = false
 
     for (;;) {
       try {
         let offer: PackOffer | undefined
         if (pack) {
           try {
-            offer = await this.packOffer(pack, { refresh, fill })
+            offer = await this.packOffer(pack, { refresh, fill, downgrade })
           } catch (error) {
             // The index of the host's copy cannot be read, and none was read before: on without
             // the pack, which a package that carries its libraries does not need.
@@ -919,6 +930,13 @@ export class H5PPlayerElement extends HTMLElement {
           continue
         }
         if (!source) {
+          if (!downgrade && this.downgradesLibraries) {
+            downgrade = true
+            // Kept with the load's settings, so a worker started again serves the same folders.
+            await this.send({ type: 'attach-libraries', ...load, downgrade: true })
+            if (signal.aborted) return nothingIndexed()
+            continue
+          }
           if (!packFailure) throw error
           const reason = packFailure instanceof Error ? packFailure.message : String(packFailure)
           throw new PlayerError(
@@ -945,6 +963,25 @@ export class H5PPlayerElement extends HTMLElement {
     return this.getAttribute('refresh-libraries')?.trim() !== 'off'
   }
 
+  /** `downgrade-libraries`: on unless `off`. Read by the load. */
+  private get downgradesLibraries(): boolean {
+    return this.getAttribute('downgrade-libraries')?.trim() !== 'off'
+  }
+
+  /**
+   * What played at an older minor than the content names, onto `libraryBundle` and the console:
+   * the content was made for a version no source has, and what that version added is left out.
+   */
+  private reportDowngrades(downgraded: DowngradedLibrary[] | undefined): void {
+    if (!downgraded?.length) return
+    if (this.internalLibraryBundle) this.internalLibraryBundle = { ...this.internalLibraryBundle, downgraded }
+    console.warn(
+      `[h5p-player] played at an older version than the content names, since no library source has it: ` +
+        `${downgraded.map(({ library, from, to }) => `${library} ${from} → ${to}`).join(', ')}. ` +
+        'What the newer version added is left out; downgrade-libraries="off" refuses such a package instead.'
+    )
+  }
+
   /** Where `libraries="pack"` is: the `pack` property, else a `pack-base`, else the pinned pack on jsDelivr. */
   private packLocation(): PackLocation {
     if (this.packValue?.length) {
@@ -956,9 +993,13 @@ export class H5PPlayerElement extends HTMLElement {
   }
 
   /** The pack as an `index` offers it: the worker's own index for the pinned one, else the copy's. */
-  private async packOffer(pack: PackLocation, { refresh, fill }: { refresh: boolean; fill: boolean }): Promise<PackOffer> {
-    if (pack.kind === 'pinned') return { pinned: true, refresh, fill }
-    return { libraries: pack.kind === 'given' ? pack.libraries : await packIndexAt(pack.url), refresh, fill }
+  private async packOffer(
+    pack: PackLocation,
+    { refresh, fill, downgrade = false }: { refresh: boolean; fill: boolean; downgrade?: boolean }
+  ): Promise<PackOffer> {
+    const asked = { refresh, fill, ...(downgrade ? { downgrade } : {}) }
+    if (pack.kind === 'pinned') return { pinned: true, ...asked }
+    return { libraries: pack.kind === 'given' ? pack.libraries : await packIndexAt(pack.url), ...asked }
   }
 
   /**
@@ -1958,6 +1999,8 @@ interface IndexResult {
   /** `h5p.json`'s metadata and content type; absent from a worker older than the element. */
   metadata?: ContentMetadata
   mainLibrary?: string
+  /** For a deep index: the libraries served at an older minor than asked for. */
+  downgraded?: DowngradedLibrary[]
 }
 
 /**
@@ -1984,7 +2027,8 @@ function indexResultOf(reply: WorkerReply): IndexResult {
     title: reply.title,
     revision: reply.revision,
     metadata: reply.metadata,
-    mainLibrary: reply.mainLibrary
+    mainLibrary: reply.mainLibrary,
+    downgraded: reply.downgraded
   }
 }
 

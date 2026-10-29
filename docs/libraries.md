@@ -47,6 +47,26 @@ with ([Which build a learner completed](revision.md)), and a learner's state sav
 build before starts over, once, with H5P's own "content has changed" dialog. A pack release that
 changes none of a package's libraries changes nothing for it.
 
+## Content newer than the pack
+
+h5p.com gets a library's new minor version before the H5P hub serves it, and the pack follows the
+hub, so for a few weeks content made on h5p.com can name a version no source has. The player
+then plays it at the newest older minor of the same major that a source has: Question Set 1.21
+for content made with 1.22, Multiple Choice 1.16 for a question in it made with 1.17. It does so
+only after every source in `libraries` has been tried for the version named, so a later source
+that has it wins over an earlier one with an older version, and never across a major.
+
+Most minor versions only add fields, which the older code ignores, so the content plays without
+what the newer version added. Some move or rename fields: of the 469 minor bumps in the history of
+the pack's libraries, 119 came with an upgrade step, which is how H5P marks such a change. There
+the older code does not find what moved, and a part can be missing or drawn wrong. Played
+`untrusted`, the content is still checked against the older version's fields.
+
+`libraryBundle.downgraded` and the `ready` event's detail list each library played older,
+`{ library, from, to }`, and the console says so. `downgrade-libraries="off"` refuses such a
+package instead, naming the version it needs. A package that carries the newer version itself
+plays it, trusted, and needs none of this.
+
 ## On your own hosting
 
 The pack is found in one of three places:

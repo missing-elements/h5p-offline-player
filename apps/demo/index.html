@@ -114,9 +114,10 @@
           Choose file
           <input type="file" id="file" accept=".h5p,application/zip" />
         </label>
-        <!-- The element's two modes, for whatever the visitor plays next, and whether a library the
-             package carries plays at the pack's newer version: changing either plays the current
-             package again. See demo/player-page.js. -->
+        <!-- The element's two modes, for whatever the visitor plays next; whether a library the
+             package carries plays at the pack's newer version; and whether content made for a
+             newer version than the pack has plays at its older one: changing any of them plays
+             the current package again. See demo/player-page.js. -->
         <div class="mode-row">
           <div class="mode" role="radiogroup" aria-label="How to play the package" aria-describedby="mode-note">
             <label><input type="radio" name="mode" value="trusted" checked />Trusted</label>
@@ -124,6 +125,9 @@
           </div>
           <div class="mode">
             <label><input type="checkbox" id="refresh" checked aria-describedby="mode-note" />Newest libraries</label>
+          </div>
+          <div class="mode">
+            <label><input type="checkbox" id="downgrade" checked aria-describedby="mode-note" />Older if needed</label>
           </div>
           <p class="mode-note" id="mode-note">
             The package's own scripts run on this site. What it lacks comes from this site's library pack.

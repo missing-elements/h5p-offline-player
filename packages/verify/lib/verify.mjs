@@ -7,7 +7,7 @@ import { VerifyError, librarySources, packageFile, playerDist, sendFile, serve }
 
 export { VerifyError }
 
-/** @import { H5PPlayerElement, PlayerErrorDetail, PlayerState, RefreshedLibrary } from '@missing-elements/h5p-offline-player' */
+/** @import { DowngradedLibrary, H5PPlayerElement, PlayerErrorDetail, PlayerState, RefreshedLibrary } from '@missing-elements/h5p-offline-player' */
 
 /**
  * Plays a package the way a learner would — the real element, the real Service Worker, a real
@@ -44,6 +44,8 @@ const CONTENT_CHECK_HEADER = 'X-H5P-Content-Check'
  * @property {boolean} [untrusted] play the package `untrusted`, as a site that did not make it plays it
  * @property {boolean} [refreshLibraries] with the pack, play its newer versions of the libraries the
  *   package carries, as the element does unless told otherwise; default true
+ * @property {boolean} [downgradeLibraries] play a library the content names at a newer minor than
+ *   any source has at the newest older one, as the element does unless told otherwise; default true
  * @property {string} [out] where `report.json` and `screenshot.png` go; nothing is written without it
  * @property {string} [browser] a Chromium-based browser executable; found automatically otherwise
  * @property {number} [readyTimeout] ms allowed to reach `ready`; default 60 000
@@ -60,6 +62,8 @@ const CONTENT_CHECK_HEADER = 'X-H5P-Content-Check'
  * @property {string | null} libraries the libraries asked for; `pack` when played untrusted and none were named
  * @property {boolean} untrusted whether the element played it untrusted, read back from it
  * @property {RefreshedLibrary[]} refreshed the libraries the package carries that played at the pack's newer version
+ * @property {DowngradedLibrary[]} downgraded the libraries the content names at a newer minor than any
+ *   source has, which played at the newest older one; each is also a warning
  * @property {'pass' | 'fail'} verdict
  * @property {string[]} reasons why it failed; empty on a pass
  * @property {string[]} warnings what is worth reading either way
@@ -187,6 +191,7 @@ export async function verifyPackage(options) {
     if (sources.attribute) query.set('libraries', sources.attribute)
     if (sources.packBase) query.set('pack-base', sources.packBase)
     if (options.refreshLibraries === false) query.set('refresh-libraries', 'off')
+    if (options.downgradeLibraries === false) query.set('downgrade-libraries', 'off')
     if (untrusted) query.set('untrusted', '')
     await page.goto(`${server.url}/${query.size ? `?${query}` : ''}`)
     await page.setInputFiles('#file', file)
@@ -269,6 +274,9 @@ export async function verifyPackage(options) {
       // The libraries the package carries that played at the pack's newer version: what a site
       // with the pack shows, and a sign the export is older than the pack.
       refreshed: collected.libraryBundle?.refreshed ?? [],
+      // Made for a newer minor than any source has, and played at an older one: what the newer
+      // version added is left out, which only a person playing it can judge.
+      downgraded: collected.libraryBundle?.downgraded ?? [],
       verdict: 'pass',
       reasons: [],
       warnings: [],
@@ -306,6 +314,9 @@ export async function verifyPackage(options) {
     if (report.verdict === 'pass' && booting.length > 0) {
       report.verdict = 'fail'
       report.reasons.push(`${booting.length} uncaught error${booting.length === 1 ? '' : 's'} while booting: ${dedupe(booting.map((e) => e.message)).join('; ')}`)
+    }
+    for (const { library, from, to } of report.downgraded) {
+      report.warnings.push(`${library} played at ${to}, older than the ${from} the content was made for, since no library source has ${from}: what ${from} added is left out`)
     }
     for (const message of dedupe(report.errors.filter((e) => e.afterReady).map((e) => e.message))) report.warnings.push(`runtime error after ready: ${message}`)
     for (const { url, status, error } of failedRequests) report.warnings.push(`request failed: ${url} (${status ?? error})`)

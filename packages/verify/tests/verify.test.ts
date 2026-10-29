@@ -230,8 +230,17 @@ describe('h5p-verify', () => {
     expect(report.warnings).toEqual([])
   }, 120_000)
 
-  it('played untrusted, refuses a package that needs its own copy of a library, and says what to do', async () => {
+  it('played untrusted, plays a package made for a newer minor than the pack has at the pack\'s, with a warning (#85)', async () => {
     const report = await verifyPackage({ file: await quizNeedingNewerLibrary(), untrusted: true, libraries: pack })
+
+    expect(report.verdict).toBe('pass')
+    expect(report.downgraded).toEqual([{ library: 'H5P.QuestionSet', from: '1.99', to: expect.stringMatching(/^1\.21\.\d+$/) }])
+    expect(report.warnings.some((warning) => warning.startsWith('H5P.QuestionSet played at 1.21.') && warning.includes('1.99'))).toBe(true)
+    expect(summarize(report)).toContain('warning: H5P.QuestionSet played at 1.21.')
+  }, 120_000)
+
+  it('played untrusted with --no-downgrade-libraries, refuses a package that needs its own copy of a library, and says what to do', async () => {
+    const report = await verifyPackage({ file: await quizNeedingNewerLibrary(), untrusted: true, libraries: pack, downgradeLibraries: false })
 
     expect(report.verdict).toBe('fail')
     expect(report.errors[0]?.missingLibraries?.carried).toBe(true)

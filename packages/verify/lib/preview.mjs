@@ -39,6 +39,8 @@ const HEARTBEAT_MS = 15_000
  * @property {boolean} [untrusted] play it as a site that did not make it plays it
  * @property {boolean} [refreshLibraries] with the pack, play its newer versions of the libraries the
  *   package carries; default true
+ * @property {boolean} [downgradeLibraries] play a library the content names at a newer minor than any
+ *   source has at the newest older one; default true
  * @property {{ dist: string, runtime: string }} [roots] the player's `dist/` and the runtime's, for a host
  *   that ships them itself, as the VS Code extension does; the installed packages' otherwise
  * @property {number} [port] the port to take; default 4645, and any free one when that is taken
@@ -67,6 +69,7 @@ export async function previewPackage(options) {
     libraries: sources.attribute,
     packBase: sources.packBase,
     refreshLibraries: options.refreshLibraries !== false,
+    downgradeLibraries: options.downgradeLibraries !== false,
     untrusted: options.untrusted === true
   }
   // `<` as an escape, so that no file name can end the script block it is written into.

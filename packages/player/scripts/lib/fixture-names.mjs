@@ -31,6 +31,8 @@ export const GENERATED_FIXTURES = [
   'upgrade-1.1.h5p',
   'upgrade-1.2.h5p',
   'upgrade-fails.h5p',
+  'upgrade-1.3.h5p',
+  'newer-child.h5p',
   'unversioned.h5p',
   'unversioned-pack.h5p',
   'corrupt.h5p',

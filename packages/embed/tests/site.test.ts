@@ -102,7 +102,8 @@ async function strippedQuiz(path: string) {
 
 /**
  * The quiz made against a Question Set newer than the pack's: played untrusted, its own copy is
- * withheld and nothing else supplies it, so it plays only with its own code.
+ * withheld and nothing else supplies that version, so it plays at the pack's older one, or, with
+ * `downgrade-libraries=off`, only with its own code.
  */
 async function ownCodeQuiz(path: string) {
   const reader = new ZipReader(new BlobReader(new Blob([await readFile(quiz)])))
@@ -381,9 +382,23 @@ describe('a written site, framed from another site', () => {
     await page.close()
   })
 
-  it('asks before playing a package from elsewhere that needs its own code, and plays it trusted on the click', async () => {
+  it('plays a package from elsewhere made for a newer minor than the pack has at the older one, with no question', async () => {
     const page = await browser.newPage()
     await page.goto(`${asking.origin}/?src=${embedding.origin}/own-code.h5p`)
+    await page.waitForFunction(() => (document.querySelector('h5p-player') as unknown as { state: string }).state === 'ready', null, { timeout: 60_000 })
+    expect(await untrusted(page)).toBe(true)
+    expect(await page.evaluate(() => document.querySelector('#notice button'))).toBeNull()
+    const downgraded = await page.evaluate(
+      () => (document.querySelector('h5p-player') as unknown as { libraryBundle: { downgraded?: { library: string; from: string; to: string }[] } }).libraryBundle.downgraded
+    )
+    expect(downgraded).toEqual([{ library: 'H5P.QuestionSet', from: '1.99', to: expect.stringMatching(/^1\.21\./) }])
+    await page.close()
+  })
+
+  it('asks before playing a package from elsewhere that needs its own code, and plays it trusted on the click', async () => {
+    const page = await browser.newPage()
+    // `downgrade-libraries=off` passed through: the pack's older Question Set would play it otherwise.
+    await page.goto(`${asking.origin}/?src=${embedding.origin}/own-code.h5p&downgrade-libraries=off`)
     await page.waitForSelector('#notice button', { timeout: 60_000 })
     expect(await page.textContent('#notice')).toContain(`This package from ${new URL(embedding.origin).host} plays only with its own scripts.`)
     await page.click('#notice button')

@@ -23,6 +23,7 @@
       const packBase = query.get('pack-base')
       if (packBase) player.setAttribute('pack-base', packBase)
       if (query.get('refresh-libraries') === 'off') player.setAttribute('refresh-libraries', 'off')
+      if (query.get('downgrade-libraries') === 'off') player.setAttribute('downgrade-libraries', 'off')
       // Played as a site plays a package it did not make: none of its own code, the content checked.
       if (query.has('untrusted')) player.untrusted = true
 

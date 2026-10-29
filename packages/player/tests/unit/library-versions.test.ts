@@ -69,6 +69,16 @@ describe('resolveLibraryFolder', () => {
     ).toBeUndefined()
   })
 
+  it('with downgrade, serves the newest older minor of the same major for one nothing satisfies (#85)', () => {
+    expect(resolveLibraryFolder(available, { machineName: 'H5P.Text', major: 1, minor: 9 }, true)).toBe('H5P.Text-1.4')
+  })
+
+  it('with downgrade, still serves a version that satisfies first, and never crosses a major', () => {
+    expect(resolveLibraryFolder(available, { machineName: 'H5P.Text', major: 1, minor: 2 }, true)).toBe('H5P.Text-1.4')
+    expect(resolveLibraryFolder(available, { machineName: 'H5P.Question', major: 1, minor: 0 }, true)).toBeUndefined()
+    expect(resolveLibraryFolder(available, { machineName: 'H5P.Question', major: 3, minor: 0 }, true)).toBeUndefined()
+  })
+
   it('indexes only folders that actually carry a library.json', () => {
     expect(indexLibraryFolders(['H5P.Text-1.1/text.js']).size).toBe(0)
   })
@@ -95,5 +105,11 @@ describe('findMissingLibraries with compatible versions', () => {
 
   it('still accepts the unversioned folder name', () => {
     expect(findMissingLibraries(new Set(['H5P.InteractiveVideo/library.json']), manifest)).toEqual([])
+  })
+
+  it('reports an older minor as missing, and with downgrade accepts it', () => {
+    const names = new Set(['H5P.InteractiveVideo-1.21/library.json'])
+    expect(findMissingLibraries(names, manifest)).toHaveLength(1)
+    expect(findMissingLibraries(names, manifest, true)).toEqual([])
   })
 })

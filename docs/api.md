@@ -18,6 +18,7 @@ meaning, and a new error `code` or `progress` phase can only be added.
 | `pack-base` | attribute | Where `pack` is: the folder of a copy of `@missing-elements/h5p-libraries`' `parts/` on your site. Default: jsDelivr, at the version this release pins |
 | `pack` | property | The `pack` export of `@missing-elements/h5p-libraries`, as a bundler emits it; wins over `pack-base`. Set before `src` |
 | `refresh-libraries` | attribute | `off` plays the libraries a package carries as exported, and `pack` only fills gaps. Default: the pack's newer versions play |
+| `downgrade-libraries` | attribute | `off` refuses content made for a newer minor version of a library than any source has. Default: once every source has been tried for that version, the newest older minor of the same major plays it, reported in `libraryBundle.downgraded` and the console |
 | `untrusted` | attribute, property | Plays a package you did not make as data: its own library folders are ignored and the libraries come from `libraries` (default `pack`), `content/` serves only H5P's own file types, and the frame's script policy names exact paths. Its content is checked against each library's `semantics.json`, as the H5P CMS plugins check it. A package that needs its own copy of a library is refused, with `missingLibraries.carried` set |
 | `allow-origins` | attribute | Extra origins for the frame's CSP, space separated |
 | `frame`, `copyright`, `export`, `icon`, `embed` | attribute | Show the H5P action bar and its buttons. `export` needs `download-url` or a package URL, `embed` needs `embed-code` |
@@ -37,7 +38,7 @@ meaning, and a new error `code` or `progress` phase can only be added.
 | `pkgId`, `revision` | read-only | The loaded package's id and build fingerprint |
 | `source` | read-only | `{ type: 'range-http' \| 'chunked' \| 'file', size, … }` |
 | `metadata` | read-only | `h5p.json`'s metadata plus `mainLibrary` |
-| `libraryBundle` | read-only | `{ url, origin, fromCache, refreshed? }` for what supplied libraries: for the pack, `refreshed` lists the libraries the package carries that played at the pack's version, `{ library, from, to }` |
+| `libraryBundle` | read-only | `{ url, origin, fromCache, refreshed?, downgraded? }` for what supplied libraries: for the pack, `refreshed` lists the libraries the package carries that played at the pack's version, `{ library, from, to }`; `downgraded` the libraries the content names at a newer minor than any source has, which played at an older one, `{ library, from, to }` with `from` the version named, such as `1.17`, and `to` the one played, such as `1.16.27` |
 | `scope` | read-only | The Service Worker scope |
 
 ## Methods

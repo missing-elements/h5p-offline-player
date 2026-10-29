@@ -69,7 +69,8 @@ The package stays on this computer. The preview ends when its tab is closed, or 
 ```
 
 It plays any content type the player plays, with the same player, runtime and library sources
-as the check, so `--untrusted`, `--libraries` and `--no-refresh-libraries` mean the same.
+as the check, so `--untrusted`, `--libraries`, `--no-refresh-libraries` and
+`--no-downgrade-libraries` mean the same.
 
 The package is served with `Range`, as a static host serves it. The libraries take a few
 requests, and a video is read by the ranges the player asks for, so a large one starts at once
@@ -91,6 +92,7 @@ Exit code 0 when it ends, 2 when it could not start.
 | `--untrusted` | play it as a site plays a package it did not make, and report what the content check removed |
 | `--libraries <sources>` | where libraries come from, tried in order: `pack` (the library pack), a bundle's URL, a bundle on disk, or a copy of the pack's `parts/` folder, which plays as `pack`; the verifier serves what is on disk itself. With the pack, a library the package carries plays at the pack's newer version, as on a site with the pack, and the summary lists each under `refreshed from the pack` |
 | `--no-refresh-libraries` | play the libraries the package carries even where the pack has newer ones |
+| `--no-downgrade-libraries` | fail content made for a newer minor version of a library than any source has. Without it, such content plays at the newest older minor, as on a site with the player's defaults, with a warning for each library and the list in `report.downgraded` |
 | `--out <dir>` | where the report and screenshot go |
 | `--browser <path>` | a Chromium-based browser; otherwise Chrome, then Edge, then Playwright's Chromium |
 | `--ready <s>` | time allowed to reach `ready`, default 60 |
