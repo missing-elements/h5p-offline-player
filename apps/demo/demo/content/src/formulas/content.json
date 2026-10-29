@@ -98,6 +98,12 @@
             "feedback": ""
           }
         ]
+      },
+      "subContentId": "5323f6c3-dd34-4831-8d4d-4efbedae1798",
+      "metadata": {
+        "contentType": "Multiple Choice",
+        "license": "U",
+        "title": "The sum of the first n numbers"
       }
     },
     {
@@ -154,6 +160,12 @@
             "feedback": ""
           }
         ]
+      },
+      "subContentId": "b7174bbc-96a5-4d2c-8881-c05383c73cf8",
+      "metadata": {
+        "contentType": "Multiple Choice",
+        "license": "U",
+        "title": "A quadratic equation"
       }
     }
   ]
