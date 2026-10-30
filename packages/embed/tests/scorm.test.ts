@@ -98,6 +98,29 @@ describe('the package', () => {
     await zip.close()
   })
 
+  it('writes each stored entry with its sizes and CRC in its local header, as Java\'s ZipInputStream needs', async () => {
+    // Java's ZipInputStream, which SCORM Cloud imports with, reads the local headers and refuses
+    // a stored entry whose sizes follow its data in a descriptor (#92).
+    const out = join(dir, 'formulas-headers.zip')
+    await buildScorm({ h5p: formulas, out })
+    const bytes = await readFile(out)
+    const reader = new ZipReader(new BlobReader(new Blob([bytes])))
+    const stored = (await reader.getEntries()).filter((entry) => !entry.directory && entry.compressionMethod === 0)
+    await reader.close()
+    const names = stored.map((entry) => entry.filename)
+    expect(names).toContain('package.h5p')
+    expect(names).toContain('frame-assets/fonts/inter-400.woff2')
+    expect(names.some((name) => name.startsWith('libraries/'))).toBe(true)
+    for (const entry of stored) {
+      const header = bytes.subarray(entry.offset, entry.offset + 30)
+      expect(header.readUInt32LE(0), entry.filename).toBe(0x04034b50)
+      expect(header.readUInt16LE(6) & 0x08, `${entry.filename} has a data descriptor`).toBe(0)
+      expect(header.readUInt32LE(14), entry.filename).toBe(entry.crc32)
+      expect(header.readUInt32LE(18), entry.filename).toBe(entry.compressedSize)
+      expect(header.readUInt32LE(22), entry.filename).toBe(entry.uncompressedSize)
+    }
+  })
+
   it('writes the title as text in the manifest and the page, and the page in the content\'s language', async () => {
     const source = join(dir, 'titled.h5p')
     await changedQuiz(source, (manifest) => {

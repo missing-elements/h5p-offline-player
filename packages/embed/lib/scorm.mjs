@@ -4,6 +4,7 @@ import { readdir, readFile, rename, rm, stat } from 'node:fs/promises'
 import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { Writable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
+import { crc32 } from 'node:zlib'
 import { BlobReader, TextReader, TextWriter, ZipReader, ZipWriter, configure } from '@zip.js/zip.js'
 import { EmbedError, PLAYER_FILES, installed } from './build.mjs'
 
@@ -383,6 +384,16 @@ function sha256(file) {
 }
 
 /**
+ * A file's CRC-32, read as a stream.
+ * @param {string} file
+ */
+async function fileCrc32(file) {
+  let crc = 0
+  for await (const chunk of createReadStream(file)) crc = crc32(chunk, crc)
+  return crc
+}
+
+/**
  * Every file under a folder, as zip paths relative to it, sorted.
  * @param {string} dir
  */
@@ -533,9 +544,20 @@ export async function buildScorm({ h5p, out, force = false }) {
     const zip = new ZipWriter(Writable.toWeb(createWriteStream(partial)))
     await zip.add('imsmanifest.xml', new TextReader(xml))
     for (const [name, content] of files) {
-      // The package, the pack's parts and the fonts are compressed already.
-      const level = name.endsWith('.h5p') || name.endsWith('.woff2') ? 0 : 6
-      await zip.add(name, 'text' in content ? new TextReader(content.text) : new BlobReader(await openAsBlob(content.file)), { level })
+      if ('text' in content) {
+        await zip.add(name, new TextReader(content.text), { level: 6 })
+        continue
+      }
+      const blob = await openAsBlob(content.file)
+      // The package, the pack's parts and the fonts are compressed already, so they are stored.
+      // Written into a stream, an entry gets a data descriptor, and Java's ZipInputStream, which
+      // SCORM Cloud imports with, refuses a stored entry that has one. Passed through with its size
+      // and CRC, it gets a complete local header instead, and is still streamed, not held.
+      if (name.endsWith('.h5p') || name.endsWith('.woff2')) {
+        await zip.add(name, new BlobReader(blob), { passThrough: true, compressionMethod: 0, uncompressedSize: blob.size, crc32: await fileCrc32(content.file) })
+      } else {
+        await zip.add(name, new BlobReader(blob), { level: 6 })
+      }
     }
     await zip.close()
     await rename(partial, target)

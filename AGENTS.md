@@ -2146,10 +2146,42 @@ ours runs a server.
   Moodle: a learner left after the first question, the next launch's `entry` was `resume`, and the
   quiz reopened on the second question.
 - **Outside an LMS** the page finds no API, plays the package and reports nothing.
+- **Frappe LMS plays it too, and records less.** Checked on 2026-10-30 against Frappe LMS's
+  `develop` branch in its own Docker setup, as an enrolled student in Chrome, with the demo's quiz,
+  video and formulas export, each made a SCORM chapter through `upsert_chapter`, the call its
+  chapter form makes. Frappe unpacks the zip under `/scorm/<course>/<chapter>/` on its own origin
+  and frames the launch page without a sandbox, so the worker registered with that folder's `h5p/`
+  as its scope, beside Frappe's own worker at `/assets/lms/frontend/`. Its file server answers a
+  range with the whole file and a `200`, so the element read each package as `chunked`, downloaded
+  whole. Its API keeps less than Moodle's (`SCORMChapter.vue`): the lesson is completed on SCORM
+  1.2's `lesson_status` `passed` alone, so `failed` and `completed` leave it "Partially Complete";
+  the score is never sent, since `saveProgress` carries only completion and `suspend_data`; and
+  `suspend_data` is kept and handed back, so the quiz reopened on the second question. The
+  formulas export played from the zip's parts and typeset its LaTeX. Running it took two changes
+  to Frappe's compose setup: the bench image's MariaDB 11.8 client asks for TLS, which
+  `mariadb:10.8` lacks (`skip-ssl` in `~/.my.cnf`), and `bench serve` binds 127.0.0.1 unless the
+  Procfile says `--host 0.0.0.0`.
+- **A stored entry carries its sizes in its local header** (#92). zip.js writing into a stream puts
+  a data descriptor, general purpose bit 3, on every entry, and Java's `ZipInputStream` refuses a
+  stored entry that has one, since nothing says where its data ends. SCORM Cloud reads uploads with
+  it: every zip from embed 1.2.0 to 1.3.0 failed there with "IO Error processing zip", found on
+  2026-10-30, while Moodle (PHP) and Frappe (Python) read the central directory and never noticed.
+  The package, the fonts and the pack's parts are stored, so each goes in passed through with
+  `compressionMethod: 0`, its size and its CRC (`fileCrc32`, `zlib.crc32` over a stream), which
+  zip.js writes as a complete local header and still streams: writing a 433 MB package peaked at
+  211 MB resident, against 226 MB before. Deflated entries keep their descriptors, which Java
+  reads. Measured the same day in SCORM Cloud (a free account, through its v2 API) with zips the
+  fixed writer wrote: the content opens in SCORM Cloud's pop-up from
+  `cloud.scorm.com/content/courses/<app>/<course>/<version>/`, where the worker registers; the
+  package is read by ranges; resume reopened the quiz on its second question; a pass recorded
+  completed, passed and 66.67, a fail failed and 0; the formulas export played from the zip's
+  parts, typeset, and passed; a result with no `success` recorded completed, its success unknown.
+  The pack, its parts, the demo packages (the normalizer's) and h5p-author's quiz have no stored
+  entry with a descriptor, so nothing else needed the change.
 
-`tests/scorm.test.ts` checks the zip, the parts it carries and its refusals in Node. In Chromium it
-plays the unpacked zip under a page that holds the API and frames the launch page, as Moodle's
-player does. It covers:
+`tests/scorm.test.ts` checks the zip, the parts it carries, its stored entries' local headers and
+its refusals in Node. In Chromium it plays the unpacked zip under a page that holds the API and
+frames the launch page, as Moodle's player does. It covers:
 
 - a passed and a failed result, the end of the session, resume, and refusing state saved by
   another build;
@@ -2161,7 +2193,8 @@ player does. It covers:
 
 Not covered:
 
-- any LMS but Moodle 4.5, and SCORM 2004;
+- any LMS but Moodle 4.5, Frappe LMS and SCORM Cloud, and SCORM 2004;
+- SCORM Cloud's launch in a frame of its player page, where it launched in its pop-up;
 - Firefox and Safari;
 - Moodle with `slasharguments` off, its popup window and its mobile app;
 - untrusted packages, whose every library would then come from the pack.
