@@ -7,6 +7,7 @@ import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join, normalize, resolve } from 'node:path'
 import { promisify } from 'node:util'
+import { crc32 } from 'node:zlib'
 import { BlobReader, BlobWriter, TextWriter, Uint8ArrayReader, Uint8ArrayWriter, ZipReader, ZipWriter } from '@zip.js/zip.js'
 import { chromium, type Browser, type BrowserContext, type Frame, type Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -96,6 +97,34 @@ describe('the package', () => {
     expect(page).toContain('<h5p-player></h5p-player>')
     expect(await zip.text('NOTICE.txt')).toContain('GPL-3.0-only')
     await zip.close()
+  })
+
+  it('writes each stored entry with its sizes and CRC in its local header, as Java\'s ZipInputStream needs', async () => {
+    // A Java ZipInputStream reads the local headers and refuses a stored entry whose sizes follow
+    // its data in a descriptor; SCORM Cloud refused every zip for it (#92).
+    const out = join(dir, 'formulas-headers.zip')
+    await buildScorm({ h5p: formulas, out })
+    const bytes = await readFile(out)
+    const reader = new ZipReader(new BlobReader(new Blob([bytes])))
+    const stored = (await reader.getEntries()).filter((entry) => !entry.directory && entry.compressionMethod === 0)
+    await reader.close()
+    const names = stored.map((entry) => entry.filename)
+    expect(names).toContain('package.h5p')
+    expect(names).toContain('frame-assets/fonts/inter-400.woff2')
+    expect(names.some((name) => name.startsWith('libraries/'))).toBe(true)
+    for (const entry of stored) {
+      const header = bytes.subarray(entry.offset, entry.offset + 30)
+      expect(header.readUInt32LE(0), entry.filename).toBe(0x04034b50)
+      expect(header.readUInt16LE(6) & 0x08, `${entry.filename} has a data descriptor`).toBe(0)
+      const size = header.readUInt32LE(22)
+      expect(size, entry.filename).toBe(entry.uncompressedSize)
+      expect(header.readUInt32LE(18), entry.filename).toBe(size)
+      // The data follows the name and the extra field. Its CRC is computed here and held to the
+      // header's: the central directory's was written from the same number as the header's.
+      const data = bytes.subarray(entry.offset + 30 + header.readUInt16LE(26) + header.readUInt16LE(28)).subarray(0, size)
+      expect(data.length, entry.filename).toBe(size)
+      expect(crc32(data), entry.filename).toBe(header.readUInt32LE(14))
+    }
   })
 
   it('writes the title as text in the manifest and the page, and the page in the content\'s language', async () => {

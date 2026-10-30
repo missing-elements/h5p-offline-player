@@ -163,7 +163,21 @@ complete such an activity on viewing it instead. Replacing the zip with one writ
 belongs to what it was saved in.
 
 Checked in Moodle 4.5: the score reaches the gradebook, and a learner who leaves halfway continues
-there on the next launch. Other LMSs have not been tried yet.
+there on the next launch.
+
+Checked in Frappe LMS too, on its `develop` branch, uploaded as a SCORM chapter. A learner who
+leaves halfway continues there, but Frappe records less than Moodle. It marks the lesson done only
+when the content reports a pass, so a quiz needs a pass mark; a failed attempt, or content that
+reports only `completed`, leaves the lesson open. It keeps no score. Frappe sends a file whole
+rather than in ranges, so the package is downloaded in full when the lesson opens, and a large video
+in it starts once the download has reached it.
+
+Checked in SCORM Cloud too: the score, whether it passed, the time and the learner's place are
+recorded, and an export without its libraries plays from the parts in the zip. A zip written by
+embed 1.3.0 or earlier cannot be imported there ("IO Error processing zip"), nor, likely, into
+other LMSs that read uploads with Java; write it again with a later version.
+
+Other LMSs have not been tried yet.
 
 ## As a library
 
