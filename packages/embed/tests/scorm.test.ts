@@ -276,15 +276,26 @@ const LMS_PAGE = `<!doctype html>
     window.calls.push([name, ...args])
     return answer(...args)
   }
+  // Each commit and the finish, with the event the launch page was dispatching when it called,
+  // which is what ILIAS decides by whether to send with a beacon, and the end it would have sent.
+  window.sent = []
+  const sent = (call) => () => {
+    let during = null
+    try {
+      during = document.getElementById('sco')?.contentWindow?.event?.type ?? null
+    } catch {}
+    window.sent.push({ call, during, exit: window.values['cmi.core.exit'] ?? null, time: window.values['cmi.core.session_time'] ?? null })
+    return 'true'
+  }
   window.API = {
     LMSInitialize: record('LMSInitialize', () => 'true'),
-    LMSFinish: record('LMSFinish', () => 'true'),
+    LMSFinish: record('LMSFinish', sent('LMSFinish')),
     LMSGetValue: record('LMSGetValue', (element) => window.values[element] ?? ''),
     LMSSetValue: record('LMSSetValue', (element, value) => {
       window.values[element] = value
       return 'true'
     }),
-    LMSCommit: record('LMSCommit', () => 'true'),
+    LMSCommit: record('LMSCommit', sent('LMSCommit')),
     LMSGetLastError: () => '0',
     LMSGetErrorString: () => '',
     LMSGetDiagnostic: () => ''
@@ -519,6 +530,38 @@ describe('in an LMS', () => {
     expect(await second.sco.evaluate(() => (document.querySelector('h5p-player') as { userData?: unknown[] }).userData?.length)).toBe(kept.entries.length)
     // The second question, where the first session left it.
     await second.h5p.getByRole('radio', { name: 'True' }).waitFor({ state: 'visible', timeout: 10_000 })
+    await context.close()
+  })
+
+  it('commits the session\'s time and end while the page goes, and finishes the session once it has gone', async () => {
+    type Sent = { call: string; during: string | null; exit: string | null; time: string | null }
+    const sent = (page: Page) => page.evaluate(() => (window as unknown as { sent: Sent[] }).sent)
+    const timespan = expect.stringMatching(/^\d{2,4}:\d{2}:\d{2}\.\d{2}$/)
+    const { context, page } = await lmsPage()
+    const { sco } = await launch(page)
+
+    // A leave the learner thinks better of: the session is committed as suspended, and goes on.
+    let before = (await sent(page)).length
+    await sco.evaluate(() => dispatchEvent(new Event('beforeunload')))
+    expect((await sent(page)).slice(before)).toEqual([{ call: 'LMSCommit', during: 'beforeunload', exit: 'suspend', time: timespan }])
+    expect((await calls(page)).some((call) => call[0] === 'LMSFinish')).toBe(false)
+    await sco.evaluate(() => {
+      const player = document.querySelector('h5p-player') as HTMLElement
+      player.dispatchEvent(new CustomEvent('finished', { detail: { statement: { result: { completion: true } } } }))
+    })
+    expect((await values(page))['cmi.core.lesson_status']).toBe('completed')
+
+    // The leave for good: the end is committed during `beforeunload`, when ILIAS sends it with a
+    // beacon, and the session finished on `pagehide`, last.
+    before = (await sent(page)).length
+    await page.evaluate(() => (window as unknown as { leave: () => void }).leave())
+    await page.waitForFunction(() => (window as unknown as { calls: string[][] }).calls.some((call) => call[0] === 'LMSFinish'))
+    const leaving = (await sent(page)).slice(before)
+    const committed = leaving.findIndex((entry) => entry.during === 'beforeunload')
+    expect(leaving[committed]).toEqual({ call: 'LMSCommit', during: 'beforeunload', exit: '', time: timespan })
+    expect(leaving.at(-1)).toEqual({ call: 'LMSFinish', during: 'pagehide', exit: '', time: timespan })
+    expect(committed).toBeLessThan(leaving.length - 1)
+    expect(leaving.filter((entry) => entry.call === 'LMSFinish')).toHaveLength(1)
     await context.close()
   })
 

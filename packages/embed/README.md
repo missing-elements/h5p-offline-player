@@ -177,6 +177,14 @@ recorded, and an export without its libraries plays from the parts in the zip. A
 embed 1.3.0 or earlier cannot be imported there ("IO Error processing zip"), nor, likely, into
 other LMSs that read uploads with Java; write it again with a later version.
 
+Checked in ILIAS 11 too, uploaded as a SCORM learning module. The score, whether it passed, the
+time and the learner's place are recorded, but only once Learning Progress is on, which a fresh
+ILIAS has off: without it ILIAS's SCORM player keeps the learner's place and drops every score and
+status the content sends. Turn it on in Administration, then in the module's Learning Progress
+settings choose "Collection of SCORM Items" and tick the item. ILIAS sent the larger packages whole
+rather than in ranges, as Frappe does. With a zip written by embed 1.3.0 or earlier, ILIAS records
+no time for a session the learner ends by closing the tab; write it again with a later version.
+
 Other LMSs have not been tried yet.
 
 ## As a library
