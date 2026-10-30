@@ -175,7 +175,7 @@ in it starts once the download has reached it.
 Checked in SCORM Cloud too: the score, whether it passed, the time and the learner's place are
 recorded, and an export without its libraries plays from the parts in the zip. A zip written by
 embed 1.3.0 or earlier cannot be imported there ("IO Error processing zip"), nor, likely, into
-other LMSs that read uploads with Java; write it again with a later version.
+some other LMSs written in Java, though OpenOLAT imports it; write it again with a later version.
 
 Checked in ILIAS 11 too, uploaded as a SCORM learning module. The score, whether it passed, the
 time and the learner's place are recorded, but only once Learning Progress is on, which a fresh
@@ -184,6 +184,19 @@ status the content sends. Turn it on in Administration, then in the module's Lea
 settings choose "Collection of SCORM Items" and tick the item. ILIAS sent the larger packages whole
 rather than in ranges, as Frappe does. With a zip written by embed 1.3.0 or earlier, ILIAS records
 no time for a session the learner ends by closing the tab; write it again with a later version.
+
+Checked in OpenOLAT 21.1 too, as a SCORM course element. The score, whether it passed, the time and
+the learner's place are recorded, also when the learner closes the tab, and OpenOLAT serves the
+package in ranges, as Moodle does. Two of its defaults need changing. Its grading takes the score
+with a pass mark of 0, so every result counts as passed, a failed quiz too: set "Score needed to
+pass" to the quiz's own pass mark, or choose "Transfer passed value", which takes pass or fail from
+the content and no score. And in a learning-path course the element counts as done only once the
+learner confirms it: choose "Passed" as its completion criterion.
+
+Checked in Chamilo 3.0 too, imported as a learning path. The score, whether it passed, the time and
+the learner's place are recorded. Chamilo imports a learning path unpublished, so publish it before
+learners can see it. It sends the file whole rather than in ranges, as Frappe does. Chamilo 1.11
+has not been tried.
 
 Other LMSs have not been tried yet.
 

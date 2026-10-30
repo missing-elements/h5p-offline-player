@@ -2202,6 +2202,55 @@ ours runs a server.
   page's, so a session finished on `beforeunload` would refuse that save in every LMS; and a
   learner asked whether to leave may stay, with the session open. The listener is added only once
   the LMS has accepted the session, so a page played outside an LMS has none.
+- **OpenOLAT plays it too; two of its defaults need changing.** Checked on 2026-10-30 against
+  OpenOLAT 21.1.1, the official WAR on the `tomcat:10.1-jdk17-temurin` image with PostgreSQL 17 in
+  Docker (frentix's own image is 19.1.6, amd64 only and "for testing only"; `db.source=local`
+  needs no JNDI, and Tomcat's connector needs `maxPartCount="-1"` for OpenOLAT's forms), as a
+  student in Chrome. Its REST API imported the 1.3.0 quiz zip, whose stored entries carry data
+  descriptors, as readily as 1.3.1's: OpenOLAT, Java too, unpacked both whole, so not every Java
+  LMS refuses them. REST cannot add a SCORM element, so the
+  course went through the editor, by the `o_sel_` selectors of OpenOLAT's own Selenium test
+  (`AssessmentTest.scormCourseWithAssessment`). In the default display ("Show only module") the
+  element runs in an iframe holding a second OpenOLAT page, which carries the API, scorm-again
+  1.5.x with `asyncCommit` (OpenOLAT's copy raises `CMIString4096` to 1 MB; the bridge still
+  stops at 4,096); the launch page is served from `/m/<mapper>/index.html`, the worker registers
+  under `/m/<mapper>/h5p/`, and the package was read `range-http`. OpenOLAT keeps each SCO's data
+  model as `item.xml`, with a copy per session, under `bcroot/scorm/<user>/<course>-<node>/`.
+  Measured: resume reopened the quiz on its second question, after OpenOLAT's Back link, which
+  blanks the SCO's frame itself and then reads the data model from its API (`o_unloadSCO`); a
+  pass recorded 66.67 and `passed`; a fail 0 and `failed`; a result with no `success`
+  `completed`; the formulas export played from the zip's parts, typeset 13 formulas, and passed
+  at 50; every session's time was kept, and the total was their sum. Closing the tab mid-quiz
+  kept the session's time and `exit` `suspend` with the 1.3.0 zip as with 1.3.1's. Two defaults
+  change what a teacher sees. **Grading** transfers the score with "Score needed to pass" 0, so a
+  failed quiz showed as passed, score 0; with 50 it showed as failed, and a pass as passed;
+  "Transfer passed value" took `failed` as not passed and kept no score. **The learning path**
+  marks an element done on "Confirmation by participant", and a mandatory element in the default
+  sequential order locks the ones after it; with "Passed" as the criterion, a passed element was
+  fully assessed. OpenOLAT's pages logged two errors of their own (`oobreadcrumb` and `resizable`
+  "is not a function").
+- **Chamilo 3.0 plays it too.** Checked on 2026-10-30 against Chamilo 3.0.1, the release zip on
+  `php:8.3-apache` with the extensions its README lists and MariaDB 11.4 in Docker, installed
+  through its web wizard, as a student in Chrome. The Learning paths tool's Import took the 1.3.0
+  and 1.3.1 zips alike (PHP). An imported learning path starts as a draft (`resource_link`
+  visibility 0), which a teacher publishes; Chamilo's own sample paths are published. Students
+  open a path in the new runtime, `/resources/lp/171/<lp>/runtime`, which frames the launch page
+  from `/learning-path/scorm/<course>/<session>/<group>/<lp>/<item>/index.html`, where the worker
+  registers, and saves through `/api/learning_paths/<lp>/runtime/scorm/commit` and `/sync`. The
+  file route answers no `Range`, so the package was read `chunked`; Chamilo keeps a worker of its
+  own at `/`, so the `_ping` probe logs a 404, harmless. Measured in `c_lp_item_view`: resume
+  reopened the quiz on its second question; a pass 66.67 of 100, `passed`; a fail 0, `failed`; a
+  result with no `success` `completed`; the formulas export played from the zip's parts, typeset
+  13 formulas, passed at 50; the time kept per session. Closing the tab mid-quiz kept the time and
+  the place with either version, and `core_exit` `suspend` only with 1.3.1's commit on
+  `beforeunload` (#94): with 1.3.0 the next launch's `entry` was `ab-initio`, yet Chamilo handed
+  back `suspend_data` and the quiz reopened on its second question. The old address,
+  `main/lp/lp_controller.php?action=view`, answers 500 to a student in 3.0.1 and on `master`: it
+  constructs `LpAdvancedAccessHelper` with one argument where the constructor takes two since
+  11a5f73 (2026-06-27, the Vue runtime). The course's list links to the runtime, so no learner
+  reaches it that way;
+  the harness first did, and passing `Container::getSettingsManager()` fixed it locally.
+  Chamilo 1.11, still maintained, is not tested.
 - **A stored entry carries its sizes in its local header** (#92). zip.js writing into a stream puts
   a data descriptor, general purpose bit 3, on every entry, and a Java `ZipInputStream` refuses a
   stored entry that has one, since nothing says where its data ends. Every zip from embed 1.2.0 to
@@ -2243,7 +2292,8 @@ frames the launch page, as Moodle's player does. It covers:
 
 Not covered:
 
-- any LMS but Moodle 4.5, Frappe LMS, SCORM Cloud and ILIAS 11, and SCORM 2004;
+- any LMS but Moodle 4.5, Frappe LMS, SCORM Cloud, ILIAS 11, OpenOLAT 21.1 and Chamilo 3.0, and
+  SCORM 2004;
 - SCORM Cloud's launch in a frame of its player page, where it launched in its pop-up;
 - Firefox and Safari;
 - Moodle with `slasharguments` off, its popup window and its mobile app;
