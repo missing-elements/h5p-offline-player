@@ -2,7 +2,8 @@
 
 Writes the H5P embed page as a static site for a player domain of your own. Any site then embeds
 a package with an iframe and one script line. No H5P server, no backend, no third-party service.
-With `--scorm`, it writes one package as a SCORM zip instead, for an LMS to play and grade (see
+With `--scorm`, it writes one package as a SCORM zip instead, for an LMS such as Moodle, ILIAS,
+OpenOLAT or Chamilo to play and grade (see
 [A SCORM package, for an LMS](#a-scorm-package-for-an-lms)).
 
 Needs Node 22 or later. Write `@latest`: without it, npm on an older Node quietly installs the
@@ -133,8 +134,8 @@ npx @missing-elements/h5p-embed@latest --scorm course.h5p     # writes ./course.
 ```
 
 writes one package as a SCORM 1.2 zip: the package, the player and the H5P runtime, and a launch
-page that reports to the LMS. Add it to a course as a SCORM activity, in Moodle or another LMS that
-takes SCORM 1.2, and the LMS records:
+page that reports to the LMS. Add it to a course as a SCORM activity, in one of the
+[supported LMSs](#supported-lmss) or another that takes SCORM 1.2, and the LMS records:
 
 - the score out of 100, and `passed` or `failed` when the content says whether it was passed,
   `completed` when it does not. The content's last result counts, as on an H5P site;
@@ -142,9 +143,6 @@ takes SCORM 1.2, and the LMS records:
 - the learner's place: the content's saved state goes into `cmi.suspend_data`, and the next
   launch continues from it. SCORM 1.2 keeps 4,096 characters, enough for a quiz; a larger state is
   not saved.
-
-Moodle records the score as the grade, out of the activity's maximum grade, so leave that at 100,
-its default.
 
 An export from h5p.com or h5p.org, which leaves the libraries out, works as well: the zip carries
 the ones it needs from the library pack, and only those. For a quiz with formulas, that is 11
@@ -154,51 +152,58 @@ a library neither it nor the pack has, or a newer version than the pack's, is re
 missing named.
 
 The package plays trusted: its own code runs on the LMS's origin, as every SCORM package's does.
-The LMS has to be served over https, since the player needs its Service Worker, and Moodle has to
-serve files by path, which it does by default (`slasharguments`).
+The LMS has to be served over https, since the player needs its Service Worker.
 
 Content that reports no result of its own, an Accordion or a Virtual Tour, stays `incomplete`:
 complete such an activity on viewing it instead. Replacing the zip with one written from another
 `.h5p`, or with other libraries from the pack, starts learners over, since their saved state
 belongs to what it was saved in.
 
-Checked in Moodle 4.5: the score reaches the gradebook, and a learner who leaves halfway continues
-there on the next launch.
+### Supported LMSs
 
-Checked in Frappe LMS too, on its `develop` branch, uploaded as a SCORM chapter. A learner who
-leaves halfway continues there, but Frappe records less than Moodle. It marks the lesson done only
-when the content reports a pass, so a quiz needs a pass mark; a failed attempt, or content that
-reports only `completed`, leaves the lesson open. It keeps no score. Frappe sends a file whole
-rather than in ranges, so the package is downloaded in full when the lesson opens, and a large video
-in it starts once the download has reached it.
+Checked at these versions, as a learner in Chrome. Other LMSs have not been tried yet.
 
-Checked in SCORM Cloud too: the score, whether it passed, the time and the learner's place are
-recorded, and an export without its libraries plays from the parts in the zip. A zip written by
-embed 1.3.0 or earlier cannot be imported there ("IO Error processing zip"), nor, likely, into
-some other LMSs written in Java, though OpenOLAT imports it; write it again with a later version.
+| LMS | Add the zip as | Change from the defaults | The package is read |
+|---|---|---|---|
+| Moodle 4.5 | a SCORM package activity | nothing; keep the maximum grade at 100 | in ranges |
+| ILIAS 11 | a SCORM learning module | turn Learning Progress on | whole |
+| OpenOLAT 21.1 | a "SCORM 1.2" course element | the pass mark; in a learning path, the completion criterion | in ranges |
+| Chamilo 3.0 | an imported learning path | publish the learning path | whole |
+| SCORM Cloud | a course | nothing | in ranges |
+| Frappe LMS, `develop` | a SCORM chapter | nothing; the content needs a pass mark | whole |
 
-Checked in ILIAS 11 too, uploaded as a SCORM learning module. The score, whether it passed, the
-time and the learner's place are recorded, but only once Learning Progress is on, which a fresh
-ILIAS has off: without it ILIAS's SCORM player keeps the learner's place and drops every score and
-status the content sends. Turn it on in Administration, then in the module's Learning Progress
-settings choose "Collection of SCORM Items" and tick the item. ILIAS sent the larger packages whole
-rather than in ranges, as Frappe does. With a zip written by embed 1.3.0 or earlier, ILIAS records
-no time for a session the learner ends by closing the tab; write it again with a later version.
+All of them record the score, whether it passed, the time and the learner's place, except Frappe
+LMS, which records only a pass and the learner's place. Where the package is read whole, it is
+downloaded in full when it opens, and a large video in it starts once the download has reached it;
+a quiz does not notice.
 
-Checked in OpenOLAT 21.1 too, as a SCORM course element. The score, whether it passed, the time and
-the learner's place are recorded, also when the learner closes the tab, and OpenOLAT serves the
-package in ranges, as Moodle does. Two of its defaults need changing. Its grading takes the score
-with a pass mark of 0, so every result counts as passed, a failed quiz too: set "Score needed to
-pass" to the quiz's own pass mark, or choose "Transfer passed value", which takes pass or fail from
-the content and no score. And in a learning-path course the element counts as done only once the
-learner confirms it: choose "Passed" as its completion criterion.
+**Moodle.** The score goes to the gradebook as the grade, out of the activity's maximum grade, so
+keep that at 100, its default. Moodle has to serve files by path, which it does by default
+(`slasharguments`).
 
-Checked in Chamilo 3.0 too, imported as a learning path. The score, whether it passed, the time and
-the learner's place are recorded. Chamilo imports a learning path unpublished, so publish it before
-learners can see it. It sends the file whole rather than in ranges, as Frappe does. Chamilo 1.11
-has not been tried.
+**ILIAS.** Learning Progress is off in a fresh ILIAS, and without it ILIAS's SCORM player keeps
+the learner's place and drops every score and status the content sends. Turn it on in
+Administration, then in the module's Learning Progress settings choose "Collection of SCORM Items"
+and tick the item. ILIAS sent the larger packages whole; only one of a few kilobytes came in ranges.
 
-Other LMSs have not been tried yet.
+**OpenOLAT.** Its grading takes the score with a pass mark of 0, so every result counts as passed, a
+failed quiz too: set "Score needed to pass" to the quiz's own pass mark, or choose "Transfer passed
+value", which takes pass or fail from the content and no score. In a learning-path course the
+element counts as done only once the learner confirms it: choose "Passed" as its completion
+criterion.
+
+**Chamilo.** Chamilo imports a learning path unpublished, so publish it before learners can see it.
+Chamilo 1.11 has not been tried.
+
+**Frappe LMS.** Frappe marks the lesson done only when the content reports a pass, so a quiz needs a
+pass mark; a failed attempt, or content that reports only `completed`, leaves the lesson open. It
+keeps no score.
+
+A zip written by embed 1.3.0 or earlier is worth writing again with the current version. SCORM
+Cloud cannot import it ("IO Error processing zip"), nor, likely, can some other LMSs written in
+Java, though OpenOLAT can; ILIAS keeps no time for a session played from it that the learner ends
+by closing the tab, and Chamilo does not record that such a session was left unfinished, though it
+resumes it.
 
 ## As a library
 

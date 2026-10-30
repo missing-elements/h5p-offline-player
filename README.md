@@ -55,7 +55,7 @@ something else.
   [build it came from](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/revision.md),
   [cmi5](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/cmi5.md) launches it from an LMS, a
   [SCORM package](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#a-scorm-package-for-an-lms)
-  puts one in an LMS such as Moodle with its score, and [resume](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/resume.md)
+  puts one in Moodle, ILIAS, OpenOLAT, Chamilo or another LMS with its score, and [resume](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/resume.md)
   keeps the learner's place.
 - **Works offline, in the content's language.** The installable app plays with no network, on iOS
   too, and H5P's own buttons follow the language the content is written in, any of more than fifty.
@@ -182,7 +182,7 @@ is an example.
 - [Resume](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/resume.md) — saved state on the device or with the host
 - [Privacy and data protection](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/privacy.md) — what is stored and sent, for a privacy notice or a GDPR review
 - [cmi5](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/cmi5.md) — launching from an LMS
-- [A SCORM package](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#a-scorm-package-for-an-lms) — one package in an LMS, with its score and the learner's place
+- [A SCORM package](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#a-scorm-package-for-an-lms) — one package in an LMS, with its score and the learner's place, and the LMSs it is checked in
 - [Verifying a package](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/verify.md) — `h5p-verify`
 - [Troubleshooting](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/troubleshooting.md) — symptoms, causes and fixes
 - [Single-worker hosts and upgrades](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/single-worker.md)

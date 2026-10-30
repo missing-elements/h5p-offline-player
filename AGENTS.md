@@ -2093,7 +2093,8 @@ pack's parts it needs in `libraries/`, and `imsmanifest.xml` lists every file. B
 for teachers who hand students links and want results. A teacher's published notes chose this
 player over Lumi Cloud and Digiquiz for everything but results, which only Lumi Cloud kept, and
 French schools' platform, Éléa, is a Moodle that takes SCORM. The LMS keeps the results; nothing of
-ours runs a server.
+ours runs a server. The embed README's *Supported LMSs* table sums up the per-LMS bullets below,
+one row each; an LMS added here gets a row there.
 
 - **The worker registers under the package's own path in the LMS.** Moodle serves a package from
   `pluginfile.php/<context>/mod_scorm/content/<revision>/`, on its own origin, so the element's
