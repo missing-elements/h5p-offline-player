@@ -2162,22 +2162,29 @@ ours runs a server.
   `mariadb:10.8` lacks (`skip-ssl` in `~/.my.cnf`), and `bench serve` binds 127.0.0.1 unless the
   Procfile says `--host 0.0.0.0`.
 - **A stored entry carries its sizes in its local header** (#92). zip.js writing into a stream puts
-  a data descriptor, general purpose bit 3, on every entry, and Java's `ZipInputStream` refuses a
-  stored entry that has one, since nothing says where its data ends. SCORM Cloud reads uploads with
-  it: every zip from embed 1.2.0 to 1.3.0 failed there with "IO Error processing zip", found on
-  2026-10-30, while Moodle (PHP) and Frappe (Python) read the central directory and never noticed.
-  The package, the fonts and the pack's parts are stored, so each goes in passed through with
-  `compressionMethod: 0`, its size and its CRC (`fileCrc32`, `zlib.crc32` over a stream), which
-  zip.js writes as a complete local header and still streams: writing a 433 MB package peaked at
-  211 MB resident, against 226 MB before. Deflated entries keep their descriptors, which Java
-  reads. Measured the same day in SCORM Cloud (a free account, through its v2 API) with zips the
-  fixed writer wrote: the content opens in SCORM Cloud's pop-up from
-  `cloud.scorm.com/content/courses/<app>/<course>/<version>/`, where the worker registers; the
-  package is read by ranges; resume reopened the quiz on its second question; a pass recorded
-  completed, passed and 66.67, a fail failed and 0; the formulas export played from the zip's
-  parts, typeset, and passed; a result with no `success` recorded completed, its success unknown.
-  The pack, its parts, the demo packages (the normalizer's) and h5p-author's quiz have no stored
-  entry with a descriptor, so nothing else needed the change.
+  a data descriptor, general purpose bit 3, on every entry, and a Java `ZipInputStream` refuses a
+  stored entry that has one, since nothing says where its data ends. Every zip from embed 1.2.0 to
+  1.3.0 failed in SCORM Cloud with "IO Error processing zip", found on 2026-10-30, and the same
+  files imported once the stored entries alone lost their descriptors — the fingerprint of that
+  reader, on Rustici's Java engine, though its code is not public — while Moodle (PHP) and Frappe
+  (Python) read the central directory and never noticed. The package, the fonts and the pack's
+  parts are stored, so each goes in passed through with `compressionMethod: 0`, its size and its
+  CRC (`fileCrc32`, a second read of the file; `lib/crc32.mjs` is a copy of the normalizer's,
+  native from Node 22.2 and a table before, since the floor is 22 and a named import of a missing
+  builtin export fails the whole module at link time — keep the two in step), which zip.js writes
+  as a complete local header and still streams: writing a 433 MB package peaks between 170 and
+  230 MB resident, run to run, as the writer before did (170 to 193 in two runs), nowhere near the
+  package held whole. zip.js computes nothing for a passed-through entry, so the test holds the
+  header's CRC to one computed over the data. Deflated entries keep
+  their descriptors, which Java reads. Measured the same day in SCORM Cloud (a free account,
+  through its v2 API) with zips the fixed writer wrote: the content opens in SCORM Cloud's pop-up
+  from `cloud.scorm.com/content/courses/<app>/<course>/<version>/`, where the worker registers;
+  the package is read by ranges; resume reopened the quiz on its second question; a pass recorded
+  completed, passed and 66.67; the formulas export played from the zip's parts, typeset, and
+  passed. With zips of the same shape, rewritten by zip.js with `dataDescriptor: false` on the
+  stored entries: a fail recorded failed and 0, and a result with no `success` recorded completed,
+  its success unknown. The pack, its parts, the demo packages (the normalizer's) and h5p-author's
+  quiz have no stored entry with a descriptor, so nothing else needed the change.
 
 `tests/scorm.test.ts` checks the zip, the parts it carries, its stored entries' local headers and
 its refusals in Node. In Chromium it plays the unpacked zip under a page that holds the API and

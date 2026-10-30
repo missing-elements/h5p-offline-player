@@ -175,7 +175,7 @@ in it starts once the download has reached it.
 Checked in SCORM Cloud too: the score, whether it passed, the time and the learner's place are
 recorded, and an export without its libraries plays from the parts in the zip. A zip written by
 embed 1.3.0 or earlier cannot be imported there ("IO Error processing zip"), nor, likely, into
-other LMSs that read uploads with Java; write it again with this version.
+other LMSs that read uploads with Java; write it again with a later version.
 
 Other LMSs have not been tried yet.
 

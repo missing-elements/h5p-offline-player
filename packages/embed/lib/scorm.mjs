@@ -4,9 +4,9 @@ import { readdir, readFile, rename, rm, stat } from 'node:fs/promises'
 import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { Writable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
-import { crc32 } from 'node:zlib'
 import { BlobReader, TextReader, TextWriter, ZipReader, ZipWriter, configure } from '@zip.js/zip.js'
 import { EmbedError, PLAYER_FILES, installed } from './build.mjs'
+import { crc32 } from './crc32.mjs'
 
 /**
  * Writes a SCORM 1.2 package that plays one `.h5p` in an LMS and reports its result there: the
@@ -550,9 +550,9 @@ export async function buildScorm({ h5p, out, force = false }) {
       }
       const blob = await openAsBlob(content.file)
       // The package, the pack's parts and the fonts are compressed already, so they are stored.
-      // Written into a stream, an entry gets a data descriptor, and Java's ZipInputStream, which
-      // SCORM Cloud imports with, refuses a stored entry that has one. Passed through with its size
-      // and CRC, it gets a complete local header instead, and is still streamed, not held.
+      // Written into a stream, an entry gets a data descriptor, and a Java ZipInputStream refuses
+      // a stored entry that has one: SCORM Cloud refused exactly those (#92). Passed through with
+      // its size and CRC, it gets a complete local header instead, and is still streamed, not held.
       if (name.endsWith('.h5p') || name.endsWith('.woff2')) {
         await zip.add(name, new BlobReader(blob), { passThrough: true, compressionMethod: 0, uncompressedSize: blob.size, crc32: await fileCrc32(content.file) })
       } else {
