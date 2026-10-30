@@ -2129,8 +2129,10 @@ ours runs a server.
   - `passed` or `failed` by the content's `success`, else `completed`;
   - the session time, then `LMSCommit`.
 
-  The last `finished` counts, as `setFinished` does on an H5P site. On `pagehide` it sets the
-  session time and `cmi.core.exit` (`suspend` unless finished), then calls `LMSFinish`. Moodle's API
+  The last `finished` counts, as `setFinished` does on an H5P site. On `beforeunload` it sets the
+  session time and `cmi.core.exit` (`suspend` unless finished) and commits; on `pagehide` it sets
+  both again and calls `LMSFinish`. The commit is ILIAS's (#94, under *ILIAS plays it too*), and
+  only a commit: the content's last save comes after it, and the learner may stay. Moodle's API
   sends with `navigator.sendBeacon` while unloading, and the `exit` it stored showed that the call
   arrived. Content with no result of its own stays `incomplete`. Moodle takes `score.raw` as the
   grade, against the activity's maximum grade (`grademax` is its `maxgrade` in
@@ -2161,6 +2163,45 @@ ours runs a server.
   to Frappe's compose setup: the bench image's MariaDB 11.8 client asks for TLS, which
   `mariadb:10.8` lacks (`skip-ssl` in `~/.my.cnf`), and `bench serve` binds 127.0.0.1 unless the
   Procfile says `--host 0.0.0.0`.
+- **ILIAS plays it too, once Learning Progress is on.** Checked on 2026-10-30 against ILIAS 11.5
+  (`srsolutions/ilias:11-php8.4-apache` with MariaDB 10.11 in Docker; the database has to be
+  `utf8`, since `utf8mb4` fails ILIAS's setup with "Row size too large"), as root in Chrome, with
+  the demo's quiz, video and formulas export uploaded as SCORM learning modules and the old
+  writer's quiz zip beside them: both shapes import, ILIAS being PHP. A module opens in a new tab,
+  with the launch page as the `sahs_content` frame of ILIAS's player, served from
+  `/data/default/lm_data/lm_<obj>/`, where the worker registers; ILIAS keeps a worker of its own
+  at `/`, so the element's `_ping` probe logs a 404 there, harmless. The quiz and the video were
+  read whole (`chunked`), the small formulas package by ranges. **Nothing but `suspend_data` is
+  recorded until Learning Progress is on**: a fresh ILIAS has it off (Administration → Learning
+  Progress), and a module's own mode has to be "Collection of SCORM Items" (6) with its SCO
+  selected; otherwise the player runs the SCO in `no-credit` mode and `SCORM1_2standard.js:590`
+  drops every score and status write without a word. With that: resume reopened the quiz on its
+  second question; a pass recorded 66.67 and Learning Progress completed at 100%; a fail 0 and
+  failed; the formulas export played from the zip's parts, typeset, and passed at 50; and a result
+  with no `success` was recorded `completed`, which ILIAS counts as done, where Frappe does not.
+  **A session the learner ends by closing the tab keeps its time only through the commit on
+  `beforeunload`** (#94). ILIAS's API (`basisAPI.js`, `useSendBeacon`) sends with a beacon only in
+  Chrome, by user agent, and only while the content frame's current event is `unload`,
+  `beforeunload` or `click`; on `pagehide` it opens a synchronous request, which Chrome refuses
+  while a page is being dismissed, and since `IliasCommit` empties its queue before sending, what
+  it held is gone. With the bridge that finished on `pagehide` alone (embed up to 1.3.0), two
+  sessions closed mid-quiz left no `session_time`, `total_time` or `exit` in `scorm_tracking`,
+  where the score, the status and `suspend_data`, committed while the content played, were there.
+  With the commit on `beforeunload`, the same two left 8.84 s and 8.14 s, a total of 16.98, `exit`
+  `suspend`, and the second resumed on the quiz's second question; ILIAS logged "use sendBeacon"
+  for it beside its own unload request. ILIAS takes `total_time` as the time at launch plus the
+  latest `session_time` (`c_storeSessionTime` `s`, its default), so a second commit counts nothing
+  twice; nor did Moodle, whose total grew by 8.7 s for an 8-second session with either bridge,
+  nor SCORM Cloud, by 8.65 s. Moodle's `request.js` switches to the beacon on its own page's
+  `beforeunload`, `unload` and `pagehide`, and sends with it again when the synchronous request
+  throws, which is why Moodle kept the time before. Why only a commit, measured the same day in
+  Chromium, Firefox and WebKit with three nested same-origin documents, on a navigation and on a
+  close: `beforeunload` fires top-down, a message the innermost frame posts from its handler
+  reaches its parent before any `pagehide`, and `pagehide` then fires top-down too. The core saves
+  the content's state for the last time on its frame's `beforeunload`, which comes after the launch
+  page's, so a session finished on `beforeunload` would refuse that save in every LMS; and a
+  learner asked whether to leave may stay, with the session open. The listener is added only once
+  the LMS has accepted the session, so a page played outside an LMS has none.
 - **A stored entry carries its sizes in its local header** (#92). zip.js writing into a stream puts
   a data descriptor, general purpose bit 3, on every entry, and a Java `ZipInputStream` refuses a
   stored entry that has one, since nothing says where its data ends. Every zip from embed 1.2.0 to
@@ -2192,6 +2233,8 @@ frames the launch page, as Moodle's player does. It covers:
 
 - a passed and a failed result, the end of the session, resume, and refusing state saved by
   another build;
+- the commit on `beforeunload` and the finish on `pagehide`, by the event the launch page was
+  dispatching when it called, which is what ILIAS goes by, and a leave the learner stays from;
 - a result with no score, and a state past 4,096 characters, through the element's events
   dispatched as it dispatches them, since no package here reaches either headless;
 - the formulas export played from the zip's parts: the parts the element fetched are compared
@@ -2200,7 +2243,7 @@ frames the launch page, as Moodle's player does. It covers:
 
 Not covered:
 
-- any LMS but Moodle 4.5, Frappe LMS and SCORM Cloud, and SCORM 2004;
+- any LMS but Moodle 4.5, Frappe LMS, SCORM Cloud and ILIAS 11, and SCORM 2004;
 - SCORM Cloud's launch in a frame of its player page, where it launched in its pop-up;
 - Firefox and Safari;
 - Moodle with `slasharguments` off, its popup window and its mobile app;

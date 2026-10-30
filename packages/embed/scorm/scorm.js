@@ -151,13 +151,36 @@ player.addEventListener('finished', (event) => {
   commit()
 })
 
-// The session ends with the page. Unfinished, it is suspended, so the next launch resumes it.
+/*
+ * The session ends with the page. Unfinished, it is suspended, so the next launch resumes it.
+ *
+ * Its time and how it ended are committed on `beforeunload` too, while the page is still there,
+ * and the session is finished on `pagehide`, once the page is going for good. ILIAS sends what a
+ * closing page writes with a beacon only during `beforeunload`, `unload` or a click; on `pagehide`
+ * it tries a synchronous request, which Chrome refuses while a page goes, so the finish alone lost
+ * the session's time there (#94). The commit is all `beforeunload` does: the content saves its
+ * state for the last time on its own frame's `beforeunload`, which comes after this page's, and a
+ * learner asked whether to leave may stay.
+ */
 let ended = false
+
+function writeEnd() {
+  set('cmi.core.session_time', timespan(Date.now() - started))
+  set('cmi.core.exit', finished ? '' : 'suspend')
+}
+
+if (initialized) {
+  addEventListener('beforeunload', () => {
+    if (ended) return
+    writeEnd()
+    commit()
+  })
+}
+
 addEventListener('pagehide', () => {
   if (!initialized || ended || !api) return
   ended = true
-  set('cmi.core.session_time', timespan(Date.now() - started))
-  set('cmi.core.exit', finished ? '' : 'suspend')
+  writeEnd()
   api.LMSFinish('')
 })
 
