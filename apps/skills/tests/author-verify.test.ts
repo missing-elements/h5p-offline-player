@@ -29,6 +29,14 @@ beforeAll(async () => {
   const translated = join(dir, 'ukrainian.h5p')
   await buildQuiz({ ...example, language: 'uk' }, translated, project)
   files.set('ukrainian', translated)
+  // Titles and an author's name with quotes and markup, which the content check escapes.
+  const punctuation = join(dir, 'punctuation.h5p')
+  await buildQuiz({
+    ...example,
+    authors: [{ name: "Anne O'Brien <ed>", role: 'Author' }],
+    questions: example.questions.map(question => ({ ...question, title: `${question.title}'s "draft" <b> & co` }))
+  }, punctuation, project)
+  files.set('punctuation', punctuation)
 })
 afterAll(async () => { if (dir) await rm(dir, { recursive: true, force: true }) })
 
@@ -41,7 +49,9 @@ it.each([
   ['scenarios', false],
   ['scenarios', true],
   ['ukrainian', false],
-  ['ukrainian', true]
+  ['ukrainian', true],
+  ['punctuation', false],
+  ['punctuation', true]
 ])('plays authored %s (untrusted: %s) without warnings', async (kind, untrusted) => {
   const report = await verifyPackage({
     file: files.get(kind)!,

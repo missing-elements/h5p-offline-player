@@ -171,6 +171,21 @@ describe('quiz authoring', () => {
     await archive(path)
   })
 
+  it('stores question titles and author names as H5P stores text, and h5p.json as its exports write it', async () => {
+    const source = {
+      ...example,
+      authors: [{ name: "Anne O'Brien <ed>", role: 'Author' }],
+      questions: [{ ...example.questions[0], title: 'Kyivan Rus\' & "Cossacks" <b>' }, { ...example.questions[1], title: undefined }]
+    }
+    const path = join(dir, 'punctuation.h5p')
+    await buildQuiz(source, path, project)
+    const files = await archive(path)
+    const content = JSON.parse(files.get('content/content.json')!)
+    expect(content.questions.map((question: { metadata: { title: string } }) => question.metadata.title)).toEqual(['Kyivan Rus&#39; &amp; &quot;Cossacks&quot; &lt;b&gt;', 'Question 2'])
+    for (const question of content.questions) expect(question.metadata.authors).toEqual([{ name: 'Anne O&#39;Brien &lt;ed&gt;', role: 'Author' }])
+    expect(JSON.parse(files.get('h5p.json')!).authors).toEqual(source.authors)
+  })
+
   it('builds the eight-scenario example without losing questions, feedback, or its pass threshold', async () => {
     const path = join(dir, 'scenarios.h5p')
     await buildQuiz(scenarios, path, project)

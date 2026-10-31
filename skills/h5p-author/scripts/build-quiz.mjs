@@ -347,8 +347,11 @@ export async function buildQuiz(source, output, project = process.cwd()) {
     // The whole quiz's result, never a question's inside a set, which shows its own after Check.
     const overallFeedback = passFeedback(source)
     // An untitled question is named as the set labels it itself, in the quiz's language; its
-    // result screen lists each question by this title.
+    // result screen lists each question by this title. A default is stored as it stands.
     const label = set?.semantics.find(field => field.name === 'texts')?.fields?.find(field => field.name === 'questionLabel')?.default ?? 'Question'
+    // A question's title and authors as H5P stores a text field: the platforms check sub-content
+    // metadata as they check its parameters, and Question Set draws the title as HTML.
+    const authors = source.authors.map(author => ({ ...author, name: escape(author.name) }))
     const questions = source.questions.map((question, i) => {
       const written = {
         question: html(question.prompt),
@@ -366,7 +369,7 @@ export async function buildQuiz(source, output, project = process.cwd()) {
         library: `${choice.machineName} ${choice.majorVersion}.${choice.minorVersion}`,
         params: parameters(choice.semantics, written),
         subContentId: randomUUID(),
-        metadata: { title: question.title ?? `${label} ${i + 1}`, license: source.license, authors: source.authors }
+        metadata: { title: question.title === undefined ? `${label} ${i + 1}` : escape(question.title), license: source.license, authors }
       }
     })
     const content = set
@@ -377,6 +380,7 @@ export async function buildQuiz(source, output, project = process.cwd()) {
         })
       : questions[0].params
     const root = set ?? choice
+    // As H5P's exports write it, unescaped: the platforms check it when they load content.
     const manifest = {
       title: source.title, language: source.language, defaultLanguage: source.language,
       license: source.license, authors: source.authors, mainLibrary: root.machineName, embedTypes: ['div'],
