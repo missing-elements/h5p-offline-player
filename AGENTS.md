@@ -291,9 +291,10 @@ apps/skills/              the skills' test project, a project of the kind a skil
                             published, a zip.js older than 2.24 stopped with the install command,
                             and the skill copied outside the checkout, resolving its dependencies
                             from the calling project
-  tests/author-verify.test.ts  both quiz kinds, the eight-scenario example and a quiz in Ukrainian through
-                            the verifier's published API, trusted and untrusted against the installed
-                            pack: each a pass with no warnings
+  tests/author-verify.test.ts  both quiz kinds, the eight-scenario example, a quiz in Ukrainian and one
+                            whose titles and author carry quotes and markup through the verifier's
+                            published API, trusted and untrusted against the installed pack: each a
+                            pass with no warnings
   tests/author-playback.test.ts  the eight-scenario example in the verifier's preview, the review the
                             skill hands a person, trusted and untrusted: every question's feedback,
                             75% failing and 83.3% passing an 80% threshold, retry to 100%, and only
