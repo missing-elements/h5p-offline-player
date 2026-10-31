@@ -7,7 +7,7 @@ import { promisify } from 'node:util'
 import { BlobReader, TextWriter, ZipReader } from '@zip.js/zip.js'
 import { pack } from '@missing-elements/h5p-libraries'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { buildQuiz, validateQuiz } from '../../../skills/h5p-author/scripts/build-quiz.mjs'
+import { buildQuiz, translateDefaults, translationFiles, validateQuiz } from '../../../skills/h5p-author/scripts/build-quiz.mjs'
 
 const skill = resolve(import.meta.dirname, '../../../skills/h5p-author')
 const project = resolve(import.meta.dirname, '..')
@@ -20,7 +20,7 @@ let dir: string
 beforeAll(async () => { dir = await mkdtemp(join(tmpdir(), 'h5p-author-test-')) })
 afterAll(async () => { await rm(dir, { recursive: true, force: true }) })
 
-async function archive(path: string) {
+async function archive(path: string | URL) {
   const reader = new ZipReader(new BlobReader(new Blob([await readFile(path)])), { checkSignature: true })
   try {
     const entries = (await reader.getEntries()).filter(entry => !entry.directory)
@@ -29,6 +29,34 @@ async function archive(path: string) {
     for (const entry of entries) files.set(entry.filename, await entry.getData(new TextWriter()))
     return files
   } finally { await reader.close() }
+}
+
+type Field = { name: string, type: string, default?: unknown, fields?: Field[] }
+type Translated = { default?: string, fields?: Translated[] }
+
+/** A library's English and translated default for a field, named in its semantics, read from the installed part. */
+async function defaults(machineName: string, code: string, path: string[]) {
+  const library = pack.libraries.find(library => library.machineName === machineName && library.majorVersion === 1)!
+  const files = await archive(new URL(library.url))
+  let fields: Field[] = JSON.parse(files.get(`${library.folder}/semantics.json`)!)
+  let translation: Translated[] = JSON.parse(files.get(`${library.folder}/language/${code}.json`)!).semantics
+  let field: Field | undefined
+  let translated: Translated | undefined
+  for (const name of path) {
+    const i = fields.findIndex(candidate => candidate.name === name)
+    field = fields[i]
+    translated = translation[i]
+    fields = field.fields ?? []
+    translation = translated.fields ?? []
+  }
+  return { english: field!.default, translated: translated!.default }
+}
+
+/** Builds a quiz, and reads its content back from the archive written. */
+async function build(source: unknown, name: string) {
+  const path = join(dir, name)
+  const { translations } = await buildQuiz(source, path, project)
+  return { translations, content: JSON.parse((await archive(path)).get('content/content.json')!) }
 }
 
 async function copyDependencies(projectDir: string) {
@@ -98,6 +126,8 @@ describe('quiz authoring', () => {
       { from: 100, to: 100, feedback: 'Passed. You chose the safe response every time.' }
     ])
     expect(content.endGame.retryButtonText).toBe('Retry')
+    // English is the libraries' own; no file stands in for it.
+    expect(result.translations.map(({ translation }) => translation)).toEqual([null, null])
     for (const question of content.questions) expect(question.params.overallFeedback).toBeUndefined()
     expect(content.questions).toHaveLength(2)
     expect(content.questions[0].params.question).toContain(example.questions[0].prompt)
@@ -165,6 +195,104 @@ describe('quiz authoring', () => {
     }
   })
 
+  // Names as the pack's quiz libraries have them, `sme` and Question Set's Traditional `zh` among them.
+  const files = ['de', 'es', 'es-mx', 'he', 'nb', 'nn', 'pt', 'pt-br', 'sme', 'sr', 'zh', 'zh-cn', 'zh-hans', 'zh-hant', 'zh-tw']
+  it.each([
+    ['de', ['de']],
+    ['de-AT', ['de']],
+    ['es-MX', ['es-mx', 'es']],
+    ['pt-BR', ['pt-br', 'pt']],
+    ['iw', ['he']],
+    ['no', ['nb']],
+    ['se', ['sme']],
+    ['sr-Cyrl-BA', ['sr']],
+    ['sr-Latn', []],
+    ['sh', []],
+    ['zh', ['zh-hans', 'zh-cn']],
+    ['zh-TW', ['zh-hant', 'zh-tw']],
+    ['zh-Hant', ['zh-hant', 'zh-tw']],
+    ['en', []]
+  ])('looks the translation for %s up by H5P\'s file names, never in another script', (tag, names) => {
+    expect(translationFiles(files, tag)).toEqual(names)
+  })
+
+  it('takes a translation\'s text defaults only, and keeps the English where it has none, the same, or loses a placeholder', () => {
+    const fields = [
+      { name: 'check', type: 'text', default: 'Check' },
+      { name: 'mode', type: 'select', default: 'auto' },
+      { name: 'score', type: 'text', default: 'You got :num of :total' },
+      {
+        name: 'texts', type: 'group', fields: [
+          { name: 'question', type: 'text', default: 'Question' },
+          { name: 'next', type: 'text', default: 'Next' },
+          { name: 'progress', type: 'text', default: '@current of @total' },
+          { name: 'results', type: 'text', default: 'Results' }
+        ]
+      },
+      { name: 'items', type: 'list', field: { name: 'item', type: 'text', default: 'Item' } }
+    ]
+    const { strings, translated, english } = translateDefaults(fields, [
+      { default: 'Prüfen' },
+      { default: 'manuell' },
+      { default: 'Du hast :num von :max' },
+      { fields: [{ default: 'Question' }, { default: ' ' }, { default: '@current von @total' }] },
+      { field: { default: 'Eintrag' } }
+    ])
+    expect(strings).toBe(7)
+    expect(translated.map(({ field, text }) => [field.name, text])).toEqual([['check', 'Prüfen'], ['progress', '@current von @total'], ['item', 'Eintrag']])
+    expect(english).toEqual([
+      { field: 'score', text: 'You got :num of :total', dropped: [':total'] },
+      { field: 'texts.question', text: 'Question' },
+      { field: 'texts.next', text: 'Next' },
+      { field: 'texts.results', text: 'Results' }
+    ])
+    expect(translateDefaults(fields, { semantics: [] }).translated).toEqual([])
+  })
+
+  it('takes the interface texts from the libraries\' own translation for the quiz\'s language', async () => {
+    const untitled = { ...example, language: 'de-AT', questions: example.questions.map(({ title: _, ...question }: { title?: string }) => question) }
+    const { content, translations } = await build(untitled, 'german.h5p')
+    expect(translations.map(({ library, translation }) => [library.split(' ')[0], translation])).toEqual([['H5P.QuestionSet', 'de'], ['H5P.MultiChoice', 'de']])
+    const question = content.questions[0].params
+    for (const [machineName, path, value] of [
+      ['H5P.QuestionSet', ['introPage', 'startButtonText'], content.introPage.startButtonText],
+      ['H5P.QuestionSet', ['texts', 'finishButton'], content.texts.finishButton],
+      ['H5P.QuestionSet', ['endGame', 'retryButtonText'], content.endGame.retryButtonText],
+      ['H5P.MultiChoice', ['UI', 'checkAnswerButton'], question.UI.checkAnswerButton]
+    ] as const) {
+      const { english, translated } = await defaults(machineName, 'de', [...path])
+      expect(translated).not.toBe(english)
+      expect(value, path.join('.')).toBe(translated)
+    }
+    // What the report names as English is what the content holds.
+    for (const [report, params] of [[translations[0], content], [translations[1], question]] as const) {
+      for (const { field, text } of report.english) expect(field.split('.').reduce((object, key) => object[key], params), field).toBe(text)
+    }
+    // An untitled question is named as the set labels it, in the result screen's list too.
+    const { translated: label } = await defaults('H5P.QuestionSet', 'de', ['texts', 'questionLabel'])
+    expect(content.questions.map((question: { metadata: { title: string } }) => question.metadata.title)).toEqual([`${label} 1`, `${label} 2`])
+  })
+
+  it('stores a translated text as H5P stores plain text, escaped', async () => {
+    const { content } = await build({ ...example, kind: 'multiple-choice', language: 'uk', questions: [example.questions[0]] }, 'ukrainian.h5p')
+    const { translated } = await defaults('H5P.MultiChoice', 'uk', ['UI', 'feedbackAvailable'])
+    expect(translated).toContain("'")
+    expect(content.UI.feedbackAvailable).toBe(translated!.replaceAll("'", '&#39;'))
+  })
+
+  it('never gives Simplified Chinese a Traditional file, and says when a library has no translation', async () => {
+    const chinese = await build({ ...example, language: 'zh-CN' }, 'chinese.h5p')
+    // Question Set's `zh.json` is Traditional, and it has no Simplified file.
+    expect(chinese.translations.map(({ translation }) => translation)).toEqual([null, 'zh-hans'])
+    expect(chinese.content.texts.finishButton).toBe('Finish')
+    const esperanto = await build({ ...example, language: 'eo' }, 'esperanto.h5p')
+    expect(esperanto.translations).toEqual([
+      expect.objectContaining({ translation: null, strings: esperanto.translations[0].english.length }),
+      expect.objectContaining({ translation: null, strings: esperanto.translations[1].english.length })
+    ])
+    expect(esperanto.content.questions[0].params.UI.checkAnswerButton).toBe('Check')
+  })
+
   it('does not overwrite an output, publish partial failures, or leave staging directories', async () => {
     const path = join(dir, 'existing.h5p')
     await writeFile(path, 'keep me')
@@ -218,6 +346,11 @@ describe('quiz authoring', () => {
     expect(stdout).toContain('Not verified')
     const files = await archive(join(portable, 'portable.h5p'))
     expect(JSON.parse(files.get('h5p.json')!).mainLibrary).toBe('H5P.QuestionSet')
+    // In another language, the command says where the interface texts came from.
+    await writeFile(join(portable, 'german.json'), JSON.stringify({ ...example, language: 'de' }))
+    const german = await exec(process.execPath, [script, 'german.json', 'german.h5p'], { cwd: portable })
+    expect(german.stdout).toMatch(/H5P\.MultiChoice 1\.\d+: interface texts from its translation language\/de\.json\./)
+    expect(german.stdout + german.stderr).toMatch(/H5P\.QuestionSet 1\.\d+: interface texts from its translation language\/de\.json/)
     const failed = exec(process.execPath, [script, join(portable, 'installed-skill/assets/quiz.json'), 'missing.h5p'], {
       cwd: dir, env: { ...process.env, NODE_PATH: '' }
     })

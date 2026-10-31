@@ -16,7 +16,7 @@ import { createHash, randomUUID } from 'node:crypto'
  * }} Quiz
  * @typedef {{
  *   name: string, type: string, optional?: boolean, default?: unknown,
- *   fields?: Field[], field?: Field, min?: number, defaultNum?: number
+ *   fields?: Field[], field?: Field, min?: number, defaultNum?: number, tags?: string[]
  * }} Field
  */
 
@@ -147,6 +147,81 @@ function passFeedback(quiz) {
   ]
 }
 
+/** A tag's canonical form in lower case, as H5P names its files; a name that is no tag as it is. */
+function canonical(tag) {
+  try {
+    return Intl.getCanonicalLocales(tag)[0].toLowerCase()
+  } catch {
+    return tag.toLowerCase()
+  }
+}
+
+/** The script a tag is written in, its own or the likely one: `Cyrl` for `sr`. */
+function scriptOf(tag) {
+  try {
+    return new Intl.Locale(tag).maximize().script
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Which of a library's translation files serve a language tag, best first: RFC 4647 lookup over
+ * the files' names, so `de-AT` takes `de.json` and `pt-BR` `pt-br.json`. A shorter tag written in
+ * another script is passed over: `sr.json` is Cyrillic, so `sr-Latn` takes none. Names are compared
+ * in canonical form, since H5P names Northern Sami `sme`, which is `se` as a tag. Two exceptions
+ * follow H5P's own naming. Norwegian Bokmål is `nb`. Chinese goes by script and never to a bare
+ * `zh.json`, which is Traditional in Question Set 1.21 where the tag means Simplified.
+ * @param {string[]} files the files' names, without `.json`
+ * @param {string} language
+ */
+export function translationFiles(files, language) {
+  const tag = Intl.getCanonicalLocales(language)[0]
+  const { language: base, script } = new Intl.Locale(tag).maximize()
+  let names
+  if (base === 'zh') names = script === 'Hant' ? ['zh-hant', 'zh-tw'] : ['zh-hans', 'zh-cn']
+  else {
+    const subtags = tag.toLowerCase().split('-')
+    names = subtags.map((_, i) => subtags.slice(0, subtags.length - i).join('-')).filter(name => scriptOf(name) === script)
+    if (base === 'no') names.push('nb')
+  }
+  return names.flatMap(name => files.filter(file => canonical(file) === name))
+}
+
+/** What the libraries fill into their own texts: `:num`, `@total`, `%d`. */
+const PLACEHOLDER = /[:@%][A-Za-z]+/g
+
+/**
+ * A translation file's `semantics` laid over a library's, position by position, as an H5P editor
+ * lays it: the text defaults it replaces, and those that stay English. Only a text field's default
+ * is replaced, never a select's value. The English stays where the translation has no text, the
+ * same text, or text without a placeholder the library fills in, which a learner would otherwise
+ * meet as `@finals`.
+ * @param {Field[]} fields @param {unknown} translation
+ */
+export function translateDefaults(fields, translation) {
+  /** @type {{ field: Field, text: string }[]} */
+  const translated = []
+  /** @type {{ field: string, text: string, dropped?: string[] }[]} */
+  const english = []
+  /** @param {Field[]} fields @param {unknown} translation @param {string} path @param {string} [item] */
+  const walk = (fields, translation, path, item) => fields.forEach((field, i) => {
+    const entry = Array.isArray(translation) && translation[i] && typeof translation[i] === 'object' ? translation[i] : undefined
+    const name = item ?? (path ? `${path}.${field.name}` : field.name)
+    if (field.type === 'text' && typeof field.default === 'string') {
+      const text = entry?.default
+      const kept = typeof text === 'string' ? text.match(PLACEHOLDER) ?? [] : []
+      const dropped = typeof text === 'string' ? (field.default.match(PLACEHOLDER) ?? []).filter(placeholder => !kept.includes(placeholder)) : []
+      if (typeof text === 'string' && text.trim() && text !== field.default && !dropped.length) translated.push({ field, text })
+      else english.push({ field: name, text: field.default, ...(dropped.length ? { dropped } : {}) })
+    }
+    if (field.fields) walk(field.fields, entry?.fields, name)
+    if (field.field) walk([field.field], entry ? [entry.field] : undefined, name, `${name}[]`)
+  })
+  walk(fields, translation, '')
+  return { strings: translated.length + english.length, translated, english }
+}
+
 /** The versions the helper is tested with; a missing or older install is refused with this command. */
 const INSTALL = 'npm install --save-dev @missing-elements/h5p-libraries@^1 @zip.js/zip.js@^2.24'
 
@@ -227,10 +302,39 @@ export async function buildQuiz(source, output, project = process.cwd()) {
     }
     const semantics = entries.find(entry => entry.filename === `${library.folder}/semantics.json`)
     if (semantics) library.semantics = JSON.parse(await semantics.getData(new TextWriter()))
+    const languages = `${library.folder}/language/`
+    library.translations = new Map(entries.filter(entry => entry.filename.startsWith(languages) && entry.filename.endsWith('.json'))
+      .map(entry => [entry.filename.slice(languages.length, -'.json'.length), entry]))
     for (const dependency of [...(info.preloadedDependencies ?? []), ...(info.dynamicDependencies ?? [])]) {
       await use(dependency.machineName, Number(dependency.majorVersion), Number(dependency.minorVersion))
     }
     return library
+  }
+
+  /**
+   * The library's interface texts in the quiz's language, from the first of its own translations
+   * that translates any. An H5P editor fills new content's defaults from these files: every field
+   * from the translation for the editor's own language, then the fields a library marks `common`
+   * from the one for the content's. With no editor here, the quiz's language fills all of them.
+   */
+  async function localize(library) {
+    const label = `${library.machineName} ${library.majorVersion}.${library.minorVersion}`
+    for (const name of translationFiles([...library.translations.keys()], source.language)) {
+      const entry = library.translations.get(name)
+      let translation
+      try {
+        translation = JSON.parse(await entry.getData(new TextWriter())).semantics
+      } catch (error) {
+        throw new Error(`Library translation is not JSON: ${entry.filename}`, { cause: error })
+      }
+      const { strings, translated, english } = translateDefaults(library.semantics, translation)
+      if (!translated.length) continue
+      // Plain text as H5P stores it; a field with `tags` holds markup, which the content check filters.
+      for (const { field, text } of translated) field.default = field.tags ? text : escape(text)
+      return { library: label, translation: name, strings, english }
+    }
+    const { strings, english } = translateDefaults(library.semantics, undefined)
+    return { library: label, translation: null, strings, english }
   }
 
   let temporary
@@ -238,8 +342,13 @@ export async function buildQuiz(source, output, project = process.cwd()) {
     const choice = await use('H5P.MultiChoice', 1)
     const set = source.kind === 'question-set' ? await use('H5P.QuestionSet', 1) : null
     if (!choice.semantics || (set && !set.semantics)) throw new Error('The installed quiz libraries must carry semantics.json')
+    const translations = []
+    for (const library of set ? [set, choice] : [choice]) translations.push(await localize(library))
     // The whole quiz's result, never a question's inside a set, which shows its own after Check.
     const overallFeedback = passFeedback(source)
+    // An untitled question is named as the set labels it itself, in the quiz's language; its
+    // result screen lists each question by this title.
+    const label = set?.semantics.find(field => field.name === 'texts')?.fields?.find(field => field.name === 'questionLabel')?.default ?? 'Question'
     const questions = source.questions.map((question, i) => {
       const written = {
         question: html(question.prompt),
@@ -257,7 +366,7 @@ export async function buildQuiz(source, output, project = process.cwd()) {
         library: `${choice.machineName} ${choice.majorVersion}.${choice.minorVersion}`,
         params: parameters(choice.semantics, written),
         subContentId: randomUUID(),
-        metadata: { title: question.title ?? `Question ${i + 1}`, license: source.license, authors: source.authors }
+        metadata: { title: question.title ?? `${label} ${i + 1}`, license: source.license, authors: source.authors }
       }
     })
     const content = set
@@ -295,7 +404,7 @@ export async function buildQuiz(source, output, project = process.cwd()) {
     }
     // Unlike a hard link, an exclusive copy also works on FAT/exFAT destinations.
     await copyFile(staged, output, constants.COPYFILE_EXCL)
-    return { output, manifest, content, libraries: [...selected.keys()] }
+    return { output, manifest, content, libraries: [...selected.keys()], translations }
   } finally {
     for (const { reader, file } of readers.values()) {
       try { await reader.close() } finally { await file.file?.close() }
@@ -314,7 +423,16 @@ if (process.argv[1] && await realpath(process.argv[1]) === fileURLToPath(import.
       const source = JSON.parse(await readFile(resolve(args[0]), 'utf8'))
       const result = await buildQuiz(source, args[1])
       console.log(`Built ${result.output}\n${result.manifest.mainLibrary}; ${result.libraries.length} libraries from the installed pack.\nNot verified: run h5p-verify and inspect its screenshot before handing this package over.`)
-      if (!/^en(?:-|$)/i.test(source.language)) console.warn('Library UI defaults are English; the language tag does not translate the Check, Retry, or result labels.')
+      if (!/^en(?:-|$)/i.test(source.language)) {
+        for (const { library, translation, strings, english } of result.translations) {
+          if (!translation) console.warn(`${library} has no translation for ${source.language}: its ${strings} interface texts are English.`)
+          else if (!english.length) console.log(`${library}: interface texts from its translation language/${translation}.json.`)
+          else {
+            const list = english.map(({ field, text, dropped }) => `  ${field}: ${JSON.stringify(text)}${dropped ? ` (its translation drops ${dropped.join(' and ')})` : ''}`)
+            console.warn(`${library}: interface texts from its translation language/${translation}.json; ${english.length} of ${strings} as in English, untranslated or the same word:\n${list.join('\n')}`)
+          }
+        }
+      }
     } catch (error) {
       console.error(`h5p-author: ${error.message}`)
       if (error.cause) console.error(error.cause.message)

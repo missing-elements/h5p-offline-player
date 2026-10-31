@@ -25,6 +25,10 @@ beforeAll(async () => {
   const file = join(dir, 'scenarios.h5p')
   await buildQuiz(scenarios, file, project)
   files.set('scenarios', file)
+  // Interface texts from the libraries' Ukrainian, one of them with an apostrophe the content check escapes.
+  const translated = join(dir, 'ukrainian.h5p')
+  await buildQuiz({ ...example, language: 'uk' }, translated, project)
+  files.set('ukrainian', translated)
 })
 afterAll(async () => { if (dir) await rm(dir, { recursive: true, force: true }) })
 
@@ -35,7 +39,9 @@ it.each([
   ['question-set', false],
   ['question-set', true],
   ['scenarios', false],
-  ['scenarios', true]
+  ['scenarios', true],
+  ['ukrainian', false],
+  ['ukrainian', true]
 ])('plays authored %s (untrusted: %s) without warnings', async (kind, untrusted) => {
   const report = await verifyPackage({
     file: files.get(kind)!,

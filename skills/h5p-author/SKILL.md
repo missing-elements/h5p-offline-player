@@ -49,10 +49,14 @@ not draw them on its result page until H5P fixes its bug, and only screen reader
 announce them meanwhile (see the input format). For a Question Set, tell the user
 so, since learners then need to learn the pass mark another way.
 
-The library defaults, including their Check/Retry/result labels, are English.
-`language` records the content language; it does not translate those defaults.
-For a localized interface or a feature this helper does not support, explain the
-limit rather than delivering an English interface as a translated activity.
+`language` also sets the interface: the libraries' own texts (Start, Check, Retry,
+Finish, the result screen) come from their translations for it, and the player's own
+strings follow it. Those translations are often incomplete. A Question Set's
+navigation and result screen ("Previous", "Next", "Results", "Score") are English in
+all but one or two of its 48 translations. The helper lists every interface text it
+left in English; tell the user which ones, rather than delivering a mixed interface
+as a translated activity.
+For a feature this helper does not support, explain the limit.
 
 ## 2. Prepare the project
 
@@ -82,10 +86,11 @@ node "<skill>/scripts/build-quiz.mjs" quiz.json course.h5p
 ```
 
 The helper validates the source, reads defaults from the installed libraries'
-`semantics.json`, assigns each sub-question a UUID, and writes a self-contained
-archive with the required runtime dependency closure, not the entire pack. Library
-parts are checked against the pack index's SHA-256 before being copied; a mismatch
-stops the build and names the part. Library folders stay together before `content/`.
+`semantics.json` and their translation for `language`, assigns each sub-question a
+UUID, and writes a self-contained archive with the required runtime dependency
+closure, not the entire pack. Library parts are checked against the pack index's
+SHA-256 before being copied; a mismatch stops the build and names the part. Library
+folders stay together before `content/`.
 Existing output is never overwritten; use a new filename for a revision.
 
 There is no media in this workflow, so no normalization step is needed. If a later
