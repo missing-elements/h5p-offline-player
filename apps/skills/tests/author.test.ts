@@ -7,7 +7,7 @@ import { promisify } from 'node:util'
 import { BlobReader, TextWriter, ZipReader } from '@zip.js/zip.js'
 import { pack } from '@missing-elements/h5p-libraries'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { buildQuiz, translateDefaults, translationNames, validateQuiz } from '../../../skills/h5p-author/scripts/build-quiz.mjs'
+import { buildQuiz, translateDefaults, translationFiles, validateQuiz } from '../../../skills/h5p-author/scripts/build-quiz.mjs'
 
 const skill = resolve(import.meta.dirname, '../../../skills/h5p-author')
 const project = resolve(import.meta.dirname, '..')
@@ -195,17 +195,25 @@ describe('quiz authoring', () => {
     }
   })
 
+  // Names as the pack's quiz libraries have them, `sme` and Question Set's Traditional `zh` among them.
+  const files = ['de', 'es', 'es-mx', 'he', 'nb', 'nn', 'pt', 'pt-br', 'sme', 'sr', 'zh', 'zh-cn', 'zh-hans', 'zh-hant', 'zh-tw']
   it.each([
     ['de', ['de']],
-    ['de-AT', ['de-at', 'de']],
+    ['de-AT', ['de']],
+    ['es-MX', ['es-mx', 'es']],
     ['pt-BR', ['pt-br', 'pt']],
     ['iw', ['he']],
-    ['no', ['no', 'nb']],
+    ['no', ['nb']],
+    ['se', ['sme']],
+    ['sr-Cyrl-BA', ['sr']],
+    ['sr-Latn', []],
+    ['sh', []],
     ['zh', ['zh-hans', 'zh-cn']],
     ['zh-TW', ['zh-hant', 'zh-tw']],
-    ['zh-Hant', ['zh-hant', 'zh-tw']]
-  ])('looks the translation for %s up by H5P\'s file names, Chinese by script', (tag, names) => {
-    expect(translationNames(tag)).toEqual(names)
+    ['zh-Hant', ['zh-hant', 'zh-tw']],
+    ['en', []]
+  ])('looks the translation for %s up by H5P\'s file names, never in another script', (tag, names) => {
+    expect(translationFiles(files, tag)).toEqual(names)
   })
 
   it('takes a translation\'s text defaults only, and keeps the English where it has none, the same, or loses a placeholder', () => {

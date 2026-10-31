@@ -147,20 +147,45 @@ function passFeedback(quiz) {
   ]
 }
 
+/** A tag's canonical form in lower case, as H5P names its files; a name that is no tag as it is. */
+function canonical(tag) {
+  try {
+    return Intl.getCanonicalLocales(tag)[0].toLowerCase()
+  } catch {
+    return tag.toLowerCase()
+  }
+}
+
+/** The script a tag is written in, its own or the likely one: `Cyrl` for `sr`. */
+function scriptOf(tag) {
+  try {
+    return new Intl.Locale(tag).maximize().script
+  } catch {
+    return undefined
+  }
+}
+
 /**
- * The file names a library's translation for a language tag may have, best first: RFC 4647
- * lookup over H5P's lower-case names, so `de-AT` takes `de.json` and `pt-BR` `pt-br.json`. Two
- * exceptions follow H5P's own naming. Norwegian Bokmål is `nb`. Chinese goes by script and never
- * to a bare `zh.json`, which is Traditional in Question Set 1.21 where the tag means Simplified.
+ * Which of a library's translation files serve a language tag, best first: RFC 4647 lookup over
+ * the files' names, so `de-AT` takes `de.json` and `pt-BR` `pt-br.json`. A shorter tag written in
+ * another script is passed over: `sr.json` is Cyrillic, so `sr-Latn` takes none. Names are compared
+ * in canonical form, since H5P names Northern Sami `sme`, which is `se` as a tag. Two exceptions
+ * follow H5P's own naming. Norwegian Bokmål is `nb`. Chinese goes by script and never to a bare
+ * `zh.json`, which is Traditional in Question Set 1.21 where the tag means Simplified.
+ * @param {string[]} files the files' names, without `.json`
  * @param {string} language
  */
-export function translationNames(language) {
+export function translationFiles(files, language) {
   const tag = Intl.getCanonicalLocales(language)[0]
   const { language: base, script } = new Intl.Locale(tag).maximize()
-  if (base === 'zh') return script === 'Hant' ? ['zh-hant', 'zh-tw'] : ['zh-hans', 'zh-cn']
-  const subtags = tag.toLowerCase().split('-')
-  const names = subtags.map((_, i) => subtags.slice(0, subtags.length - i).join('-'))
-  return base === 'no' ? [...names, 'nb'] : names
+  let names
+  if (base === 'zh') names = script === 'Hant' ? ['zh-hant', 'zh-tw'] : ['zh-hans', 'zh-cn']
+  else {
+    const subtags = tag.toLowerCase().split('-')
+    names = subtags.map((_, i) => subtags.slice(0, subtags.length - i).join('-')).filter(name => scriptOf(name) === script)
+    if (base === 'no') names.push('nb')
+  }
+  return names.flatMap(name => files.filter(file => canonical(file) === name))
 }
 
 /** What the libraries fill into their own texts: `:num`, `@total`, `%d`. */
@@ -294,9 +319,8 @@ export async function buildQuiz(source, output, project = process.cwd()) {
    */
   async function localize(library) {
     const label = `${library.machineName} ${library.majorVersion}.${library.minorVersion}`
-    for (const name of translationNames(source.language)) {
+    for (const name of translationFiles([...library.translations.keys()], source.language)) {
       const entry = library.translations.get(name)
-      if (!entry) continue
       let translation
       try {
         translation = JSON.parse(await entry.getData(new TextWriter())).semantics

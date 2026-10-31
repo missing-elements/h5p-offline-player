@@ -29,10 +29,13 @@ mark another way.
 Finish, the result screen, and their screen-reader labels. Each library carries
 translations of them in `language/<code>.json`, and the helper takes the first one
 that matches the tag and translates anything. `de-AT` takes `de`, and `pt-BR` takes
-`pt-br`. Chinese goes by script, and `no` takes `nb`. A text stays English where the
-translation has none, has the English text, or leaves out a placeholder the library
-fills in, such as `@finals`. A library with no translation for the language stays
-English throughout. The helper prints the texts that stay English.
+`pt-br`. A file in another script is passed over: Serbian's `sr.json` is Cyrillic,
+so `sr-Latn` stays English. Chinese goes by script too, and `no` takes `nb`.
+
+A text stays English where the translation has none, has the English text, or
+leaves out a placeholder the library fills in, such as `@finals`. A library with no
+translation for the language stays English throughout. The helper prints the texts
+that stay English.
 
 In the current pack, Multiple Choice is fully translated into many languages,
 German and Spanish among them. Question Set's navigation and result screen
