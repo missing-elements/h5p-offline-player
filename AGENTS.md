@@ -285,13 +285,15 @@ apps/skills/              the skills' test project, a project of the kind a skil
                           zip.js, which the script resolves from it, and the verifier the skill runs
                           with npx; nothing in it ships. Out of the demo since 2026-10-23, by the
                           owner's choice
-  tests/author.test.ts      h5p-author's helper in Node: its quiz validation, its archives, a damaged
-                            library part refused by its SHA-256 before anything is published, a zip.js
-                            older than 2.24 stopped with the install command, and the skill copied
-                            outside the checkout, resolving its dependencies from the calling project
-  tests/author-verify.test.ts  both quiz kinds and the eight-scenario example through the verifier's
-                            published API, trusted and untrusted against the installed pack: each a
-                            pass with no warnings
+  tests/author.test.ts      h5p-author's helper in Node: its quiz validation, its archives, the
+                            interface texts from the libraries' translations for the quiz's language,
+                            a damaged library part refused by its SHA-256 before anything is
+                            published, a zip.js older than 2.24 stopped with the install command,
+                            and the skill copied outside the checkout, resolving its dependencies
+                            from the calling project
+  tests/author-verify.test.ts  both quiz kinds, the eight-scenario example and a quiz in Ukrainian through
+                            the verifier's published API, trusted and untrusted against the installed
+                            pack: each a pass with no warnings
   tests/author-playback.test.ts  the eight-scenario example in the verifier's preview, the review the
                             skill hands a person, trusted and untrusted: every question's feedback,
                             75% failing and 83.3% passing an 80% threshold, retry to 100%, and only
@@ -323,10 +325,11 @@ skills/                   agent skills, one directory per skill, at the root bec
                           to read its report), h5p-player-setup (putting the player on a site), h5p-normalize (when
                           a package needs rewriting to stream, and how to read the dry run)
                           and h5p-author (text-only Multiple Choice and Question Set from a prompt:
-                          a quiz JSON source, the installed pack's semantics and runtime dependency
-                          closure, then the verifier's check, its screenshot and its preview for
-                          the user; its bundled scripts/build-quiz.mjs resolves dependencies from
-                          the caller's project, and is tested from apps/skills)
+                          a quiz JSON source, the installed pack's semantics, its translations for
+                          the quiz's language (2026-10-31, #96) and runtime dependency closure,
+                          then the verifier's check, its screenshot and its preview for the user;
+                          its bundled scripts/build-quiz.mjs resolves dependencies from the
+                          caller's project, and is tested from apps/skills)
 
 api/no-range.js           the Vercel function that stands in for a host without Range on the demo
 vercel.json               the deployment: build command, the /no-range rewrite, caching and security headers

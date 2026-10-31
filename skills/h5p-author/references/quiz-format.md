@@ -8,7 +8,7 @@ All authored text is plain text. `<script>` and other markup display as text.
 |---|---|---|
 | `kind` | yes | `multiple-choice` (exactly one question) or `question-set` |
 | `title` | yes | Non-empty activity title, at most 255 characters |
-| `language` | yes | BCP 47 tag, e.g. `en`; library UI defaults remain English |
+| `language` | yes | BCP 47 tag, e.g. `en` or `de-AT`; also picks the libraries' translation of their interface texts (see below) |
 | `license` | yes | H5P code: `U`, `CC BY`, `CC BY-SA`, `CC BY-ND`, `CC BY-NC`, `CC BY-NC-SA`, `CC BY-NC-ND`, `CC0 1.0`, `PD`, or `C` |
 | `authors` | yes | Non-empty list of `{ "name": "...", "role": "Author" }` |
 | `passPercentage` | no | Integer 0-100; defaults to the library's value (100 for Multiple Choice, 50 for Question Set in the current pack) |
@@ -25,11 +25,26 @@ screen readers announce it, and it appears once H5P's fix reaches the pack. Unti
 then a learner sees the score and not the pass mark, so they need to learn the pass
 mark another way.
 
+`language` also picks the content types' interface texts: Start, Check, Retry,
+Finish, the result screen, and their screen-reader labels. Each library carries
+translations of them in `language/<code>.json`, and the helper takes the first one
+that matches the tag and translates anything. `de-AT` takes `de`, and `pt-BR` takes
+`pt-br`. Chinese goes by script, and `no` takes `nb`. A text stays English where the
+translation has none, has the English text, or leaves out a placeholder the library
+fills in, such as `@finals`. A library with no translation for the language stays
+English throughout. The helper prints the texts that stay English.
+
+In the current pack, Multiple Choice is fully translated into many languages,
+German and Spanish among them. Question Set's navigation and result screen
+("Previous", "Next", "Results", "@finals of @totals correct", "Score") are English
+in all but one or two of its 48 translations. The player's own strings, such as
+Fullscreen, follow `language` as well.
+
 Each question:
 
 | Field | Required | Meaning |
 |---|---|---|
-| `title` | no | Short title for sub-content metadata; defaults to `Question N` |
+| `title` | no | Short title for the question, which a Question Set's result screen lists it by; defaults to the set's own label and number, `Question N` in English |
 | `prompt` | yes | Non-empty question text |
 | `multipleAnswers` | no | Boolean, default false; true means at least one correct answer, otherwise exactly one |
 | `answers` | yes | At least two `{ "text": "...", "correct": true/false, "feedback": "..." }` objects |
