@@ -9,13 +9,14 @@ import { buildPackage } from '@missing-elements/h5p-author'
 const project = resolve(import.meta.dirname, '..')
 // The pack this project installed, named to the preview as `--libraries` names a copy of its parts.
 const parts = resolve(project, 'node_modules/@missing-elements/h5p-libraries/parts')
-/** The skill's quiz format, as the scenario example writes it. */
+/** The quiz format the skill first wrote, as the scenario example writes it. */
 type Quiz = {
   kind: string, passPercentage?: number, passedFeedback?: string, failedFeedback?: string,
   questions: { title?: string, prompt: string, multipleAnswers?: boolean, answers: { text: string, correct: boolean, feedback?: string }[] }[]
 }
-const source: Quiz = JSON.parse(await readFile(resolve(project, '../../skills/h5p-author/assets/phishing-scenarios.json'), 'utf8'))
-const example: Quiz = JSON.parse(await readFile(resolve(project, '../../skills/h5p-author/assets/quiz.json'), 'utf8'))
+const fixtures = resolve(project, '../../packages/author/tests/fixtures')
+const source: Quiz = JSON.parse(await readFile(join(fixtures, 'phishing-scenarios.json'), 'utf8'))
+const example: Quiz = JSON.parse(await readFile(join(fixtures, 'quiz.json'), 'utf8'))
 const single: Quiz = { ...example, kind: 'multiple-choice', questions: [example.questions[0]] }
 let dir: string
 let file: string

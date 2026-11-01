@@ -10,10 +10,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 const project = resolve(import.meta.dirname, '..')
 // The pack this project installed, named to the check as `--libraries` names a copy of its parts.
 const parts = resolve(project, 'node_modules/@missing-elements/h5p-libraries/parts')
-const skill = resolve(project, '../../skills/h5p-author')
-const types = join(skill, 'references/types')
-const example = JSON.parse(await readFile(join(skill, 'assets/quiz.json'), 'utf8'))
-const scenarios = JSON.parse(await readFile(join(skill, 'assets/phishing-scenarios.json'), 'utf8'))
+const types = resolve(project, '../../skills/h5p-author/references/types')
+// The quiz format's two examples, which the author package's tests keep.
+const fixtures = resolve(project, '../../packages/author/tests/fixtures')
+const example = JSON.parse(await readFile(join(fixtures, 'quiz.json'), 'utf8'))
+const scenarios = JSON.parse(await readFile(join(fixtures, 'phishing-scenarios.json'), 'utf8'))
 const META = { title: 'Example', language: 'en', license: 'CC BY', authors: [{ name: 'Ann Author', role: 'Author' }] }
 const files = (await readdir(types)).filter((name) => name.endsWith('.md')).sort()
 let dir: string
@@ -88,7 +89,10 @@ beforeAll(async () => {
 })
 afterAll(async () => { if (dir) await rm(dir, { recursive: true, force: true }) })
 
-/** Step 4 of the skill: the check, through the verifier's published API, trusted and untrusted. */
+/**
+ * Step 4 of the skill, the check, through the verifier's published API: trusted, as the skill
+ * runs it, and untrusted, which holds the build to the content check's rules.
+ */
 async function playsBothWays(file: string) {
   for (const untrusted of [false, true]) {
     const report = await verifyPackage({ file, untrusted, libraries: untrusted ? parts : undefined, settle: 500 })

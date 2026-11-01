@@ -31,9 +31,6 @@ Use what the user already gave. Ask for what is missing and matters:
 - A pass mark with its messages: the failed one says what to do next.
 - Alternative text for every picture that carries meaning: what it shows, for a learner who
   cannot see it.
-- For a quiz with a pass mark and mixed answer modes, [the eight-scenario brief](./scenario-quiz.md)
-  and [its source](../assets/phishing-scenarios.json) show the whole of it: answer key,
-  explanatory feedback, an 80% threshold, and the fail, retry and pass checks.
 
 ## Media
 
