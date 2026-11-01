@@ -1,8 +1,10 @@
-# Quiz source format
+# The quiz format
 
-The helper accepts this small authoring format, not raw H5P `content.json`.
-Unknown fields and wrong types fail with a path; nothing is silently dropped.
-All authored text is plain text. `<script>` and other markup display as text.
+A shorter source for a Multiple Choice question, or a Question Set of them alone, which the
+build takes in place of `{ "type", "params" }`: it was the skill's only format until 2026-11, and
+stays. For any other question in a set, write the set's `params` from
+[its type file](./types/H5P.QuestionSet.md). Unknown fields and wrong types fail with a path;
+nothing is silently dropped. All text is plain text: `<script>` and other markup display as text.
 
 | Field | Required | Meaning |
 |---|---|---|
@@ -27,14 +29,14 @@ mark another way.
 
 `language` also picks the content types' interface texts: Start, Check, Retry,
 Finish, the result screen, and their screen-reader labels. Each library carries
-translations of them in `language/<code>.json`, and the helper takes the first one
+translations of them in `language/<code>.json`, and the build takes the first one
 that matches the tag and translates anything. `de-AT` takes `de`, and `pt-BR` takes
 `pt-br`. A file in another script is passed over: Serbian's `sr.json` is Cyrillic,
 so `sr-Latn` stays English. Chinese goes by script too, and `no` takes `nb`.
 
 A text stays English where the translation has none, has the English text, or
 leaves out a placeholder the library fills in, such as `@finals`. A library with no
-translation for the language stays English throughout. The helper prints the texts
+translation for the language stays English throughout. The build prints the texts
 that stay English.
 
 In the current pack, Multiple Choice is fully translated into many languages,
@@ -53,17 +55,11 @@ Each question:
 | `answers` | yes | At least two `{ "text": "...", "correct": true/false, "feedback": "..." }` objects |
 
 `text` and the boolean `correct` are required on every answer. `feedback` is
-optional for the helper, but the authoring workflow should supply it for every
+optional for the build, but the authoring workflow should supply it for every
 answer. It is shown when that answer is chosen. These questions use the library's
 normal retry, solution, and answer-shuffling defaults.
 
 For a standalone question, copy the first question from the
 [worked example](../assets/quiz.json), set `kind` to `multiple-choice`, and keep
-exactly one item in `questions`. The helper sets the main library accordingly;
-standalone questions are not wrapped in a Question Set.
-
-The generated package includes only the selected libraries and their runtime
-dependencies from `@missing-elements/h5p-libraries`. No external media, generated
-JavaScript, editor libraries, or custom scripts are accepted by this format.
-Each part's SHA-256 must match the installed pack index; a damaged or modified part
-fails the build rather than being copied unchecked. Reinstall the pack to restore it.
+exactly one item in `questions`. The build sets the main library accordingly;
+standalone questions are not wrapped in a Question Set. This format takes no media.

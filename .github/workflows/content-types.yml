@@ -16,6 +16,8 @@ on:
       - 'apps/demo/sweep/**'
       - 'apps/demo/scripts/sweep-content-types.mjs'
       - 'apps/demo/scripts/lib/sweep-content.mjs'
+      # The generator the sweep runs, the author package's since #100.
+      - 'packages/author/lib/generator.mjs'
       - '.github/workflows/content-types.yml'
   schedule:
     - cron: '0 7 * * 1'

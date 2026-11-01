@@ -36,10 +36,11 @@ library pack, so an export without its libraries plays offline.
 
 For authoring, the
 [`h5p-author` skill](https://github.com/missing-elements/h5p-offline-player/tree/main/skills/h5p-author)
-adds a prompt-to-quiz workflow and a portable packaging helper for text-only Multiple Choice
-and Question Set. It takes a small quiz JSON file, fills the installed libraries' defaults,
-includes their runtime dependencies, then requires this playback check and screenshot review,
-and opens the quiz in the preview for a person to answer every question. The source JSON remains
-editable; the `.h5p` and full revision from the verification report identify what was checked.
-Answer accuracy and a complete question-by-question interaction check remain separate from the
+adds a prompt-to-package workflow for 28 content types, on
+[`@missing-elements/h5p-author`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/author#readme).
+It takes a short JSON source of only what differs from a type's defaults, fills the rest from the
+libraries' semantics and translations, includes their runtime dependencies, then requires this
+playback check and screenshot review, and opens the package in the preview for a person to work
+through. The source JSON remains editable; the `.h5p` and full revision from the verification
+report identify what was checked. Whether the content is right remains separate from the
 verifier's startup verdict.

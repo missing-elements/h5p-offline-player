@@ -4,11 +4,16 @@ import { join, resolve } from 'node:path'
 import { chromium, type Browser, type Page } from 'playwright'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { previewPackage } from '../../../packages/verify/lib/preview.mjs'
-import { buildQuiz, type Quiz } from '../../../skills/h5p-author/scripts/build-quiz.mjs'
+import { buildPackage } from '@missing-elements/h5p-author'
 
 const project = resolve(import.meta.dirname, '..')
 // The pack this project installed, named to the preview as `--libraries` names a copy of its parts.
 const parts = resolve(project, 'node_modules/@missing-elements/h5p-libraries/parts')
+/** The skill's quiz format, as the scenario example writes it. */
+type Quiz = {
+  kind: string, passPercentage?: number, passedFeedback?: string, failedFeedback?: string,
+  questions: { title?: string, prompt: string, multipleAnswers?: boolean, answers: { text: string, correct: boolean, feedback?: string }[] }[]
+}
 const source: Quiz = JSON.parse(await readFile(resolve(project, '../../skills/h5p-author/assets/phishing-scenarios.json'), 'utf8'))
 const example: Quiz = JSON.parse(await readFile(resolve(project, '../../skills/h5p-author/assets/quiz.json'), 'utf8'))
 const single: Quiz = { ...example, kind: 'multiple-choice', questions: [example.questions[0]] }
@@ -20,9 +25,9 @@ let browser: Browser
 beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), 'h5p-author-interaction-'))
   file = join(dir, 'scenarios.h5p')
-  await buildQuiz(source, file, project)
+  await buildPackage(source, file)
   singleFile = join(dir, 'single.h5p')
-  await buildQuiz(single, singleFile, project)
+  await buildPackage(single, singleFile)
   browser = await chromium.launch()
 })
 afterAll(async () => {

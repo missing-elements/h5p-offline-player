@@ -6,18 +6,19 @@ import { extname, join, normalize, resolve } from 'node:path'
 import { crc32, deflateSync } from 'node:zlib'
 import { BlobReader, BlobWriter, TextReader, Uint8ArrayReader, Uint8ArrayWriter, ZipReader, ZipWriter, configure } from '@zip.js/zip.js'
 import { chromium } from 'playwright'
-import { ContentGenerator, MEDIA, libraryString, librariesIn, mediaIn } from './lib/sweep-content.mjs'
+import { ContentGenerator, MEDIA, libraryString, librariesIn, mediaIn, sweepOptions } from './lib/sweep-content.mjs'
 
 /**
  * Plays every content type in the library pack and reports what each one does: whether it boots,
  * played `untrusted` and trusted, and what it sends when worked through. Built on 2026-10-14; the
  * hub serves no example content, so each package is made here.
  *
- * Each content type's content is generated from its own `semantics.json` (`lib/sweep-content.mjs`),
- * and `sweep/<machineName>.json`, where one exists, adds what generation cannot give — a drop
- * zone, words that cross — and the element's attributes for it (`attributes`). The packages are
- * content-only, as h5p.com and h5p.org export, so the pack supplies every library: this is the
- * pack's own test as much as the player's. Run it with the player built (`pnpm build`):
+ * Each content type's content is generated from its own `semantics.json` by the generator of
+ * @missing-elements/h5p-author, run as `lib/sweep-content.mjs` says, and `sweep/<machineName>.json`,
+ * where one exists, adds what generation cannot give — a drop zone, words that cross — and the
+ * element's attributes for it (`attributes`). The packages are content-only, as h5p.com and
+ * h5p.org export, so the pack supplies every library: this is the pack's own test as much as the
+ * player's. Run it with the player built (`pnpm build`):
  *
  *   pnpm sweep                        every content type, both modes
  *   pnpm sweep --only H5P.Blanks      one or more, comma-separated
@@ -52,7 +53,7 @@ const SETTLE = 1_500
 for (const mode of modes) if (mode !== 'untrusted' && mode !== 'trusted') fail(`--modes: unknown mode "${mode}"`)
 
 const pack = await readPack(packPath)
-const generator = new ContentGenerator(pack)
+const generator = new ContentGenerator(pack, sweepOptions)
 if (args.semantics) {
   const entry = generator.find(args.semantics)
   if (!entry) fail(`--semantics: no ${args.semantics} in the pack`)
