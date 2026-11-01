@@ -88,11 +88,20 @@ export class ContentGenerator {
     return field.showWhen.type === 'and' ? results.every(Boolean) : results.some(Boolean)
   }
 
+  /**
+   * A copy of a field with something changed, drawn by a widget if the field is.
+   * @param {any} field
+   * @param {Record<string, unknown>} changes
+   */
+  #copy(field, changes) {
+    const copy = { ...field, ...changes }
+    if (this.drawn.has(field)) this.drawn.add(copy)
+    return copy
+  }
+
   /** A field as optional, for one the editor hides. @param {any} field */
   #optional(field) {
-    const optional = { ...field, optional: true }
-    if (this.drawn.has(field)) this.drawn.add(optional)
-    return optional
+    return this.#copy(field, { optional: true })
   }
 
   /**
@@ -212,7 +221,7 @@ export class ContentGenerator {
         return this.fields(children, written, stack, optional && written === undefined, path)
       }
       case 'list': {
-        const item = { ...field.field, optional: false }
+        const item = this.#copy(field.field, { optional: false })
         if (Array.isArray(written)) {
           if (!this.lenient) {
             if (field.min !== undefined && written.length < field.min) this.report(path, `has ${written.length} item${written.length === 1 ? '' : 's'}; it takes at least ${field.min}`)

@@ -111,5 +111,7 @@ computer, hand over the file and the command.
 
 Deliver the `.h5p`, the source, the report, screenshot and full `revision`, the preview
 command, and any notes. A pass means it starts and draws, not that it is accurate, accessible
-or right for every LMS. The H5P Preview extension (`MissingElements.h5p-preview`) plays it in
+or right for every LMS. The package carries H5P's libraries, each under its own licence, most
+MIT, listed in the pack's [`libraries.txt`](https://github.com/missing-elements/h5p-offline-player/blob/main/packages/libraries/libraries.txt):
+tell the user, so they check those terms before they distribute it. The H5P Preview extension (`MissingElements.h5p-preview`) plays it in
 VS Code, Cursor or VSCodium; `h5p-player-setup` puts it on a website.

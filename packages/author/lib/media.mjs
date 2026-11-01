@@ -8,8 +8,9 @@ import { escapeText } from './text.mjs'
 /**
  * The files content shows: images, video, audio and other files, named in a source by a path
  * beside it or a web address, copied into the package's `content/` folder with what H5P records
- * of each — its type, an image's size, its copyright. A video on YouTube, Vimeo or Panopto stays
- * there and is played from there, as H5P's editor embeds it, at an address H5P.Video plays.
+ * of each — its type, an image's size, its copyright. A video on YouTube, Vimeo, Panopto or
+ * Echo360 stays there and is played from there, as H5P's editor embeds it, at an address
+ * H5P.Video plays.
  */
 
 /** The types H5P accepts for content (`H5PCore::$defaultContentWhitelist`), by what a field takes. */
@@ -30,33 +31,45 @@ const TYPES = {
 /** The folder under `content/` H5P's editor keeps each kind in. */
 const FOLDERS = { image: 'images', video: 'videos', audio: 'audios', file: 'files' }
 
+/** Whether a host name is one of these domains or under one. @param {string} host @param {string[]} domains */
+const under = (host, domains) => domains.some((domain) => host === domain || host.endsWith(`.${domain}`))
+
 /**
  * Video a host plays itself, which H5P.Video embeds by address. H5P.Video chooses the player for
  * an address by its own pattern for each host, and gives one no pattern matches to its HTML5
  * player, which cannot play a page. So `plays` takes only addresses H5P.Video 1.6's pattern for
- * the host takes as well, and any other address on the host (`on`) is refused, naming the form.
+ * the host takes as well, and any other address on the host (`on`, told by its name, with no
+ * pattern to backtrack through its labels) is refused, naming the form.
+ * @type {{ host: string, mime: string, plays: RegExp, on: (url: URL) => boolean, form: string }[]}
  */
 const HOSTED = [
   {
     host: 'Vimeo',
     mime: 'video/Vimeo',
     plays: /^https?:\/\/(?:[\w-]+\.)*vimeo\.com\/(?:channels\/[A-Za-z_]+\/|groups\/[A-Za-z_]+\/videos\/)?\d/,
-    on: /^https?:\/\/(?:[\w-]+\.)*vimeo\.com\//i,
+    on: (url) => under(url.hostname, ['vimeo.com']),
     form: 'https://vimeo.com/ and the video\'s number'
   },
   {
     host: 'YouTube',
     mime: 'video/YouTube',
     plays: /^https?:\/\/(?:[\w-]+\.)*(?:youtube\.com\/(?:watch\?(?:[^#\s]*&)?v=|embed\/|v\/)|youtu\.be\/)[\w-]{11}/i,
-    on: /^https?:\/\/(?:[\w-]+\.)*(?:youtube(?:-nocookie)?\.com|youtu\.be)\//i,
+    on: (url) => under(url.hostname, ['youtube.com', 'youtube-nocookie.com', 'youtu.be']),
     form: 'https://www.youtube.com/watch?v= and the video\'s id'
   },
   {
     host: 'Panopto',
     mime: 'video/Panopto',
     plays: /^https?:\/\/[^/\s]+\/Panopto\/[^?\s]+\?id=\S+$/,
-    on: /^https?:\/\/(?:(?:[\w-]+\.)*panopto\.(?:com|eu)\/|[^/\s]+\/panopto\/)/i,
+    on: (url) => under(url.hostname, ['panopto.com', 'panopto.eu']) || url.pathname.toLowerCase().startsWith('/panopto/'),
     form: 'the viewer\'s, …/Panopto/Pages/Viewer.aspx?id= and the session\'s id'
+  },
+  {
+    host: 'Echo360',
+    mime: 'video/Echo360',
+    plays: /^https?:\/\/echo360[^/\s]+\/media\/[^/\s]+\/h5p(?:[/?#]\S*)?$/i,
+    on: (url) => url.hostname.split('.').some((label) => label.startsWith('echo360')),
+    form: 'its H5P address, https://echo360.org/media/, the media\'s id and /h5p'
   }
 ]
 
@@ -68,6 +81,12 @@ const COPYRIGHT_LICENSES = ['U', 'CC BY', 'CC BY-SA', 'CC BY-ND', 'CC BY-NC', 'C
 
 /** The most a download may bring: a package of this size is already past what a learner waits for. */
 const MAX_DOWNLOAD = 1024 ** 3
+
+/**
+ * How long a download may go without a byte before it is given up. Not a bound on the whole: a
+ * large video over a slow link takes as long as it takes, and only a silent one is dead.
+ */
+const IDLE_MS = 60_000
 
 /**
  * @typedef {{ name: string, from: string }} StagedFile a file to add to the package: its name under `content/`, and where it is on disk
@@ -113,13 +132,15 @@ export async function imageSize(read) {
 
 export class MediaStore {
   /**
-   * @param {{ base: string, temporary: string, fetch?: typeof fetch }} options
-   *   `base`, the folder a source's relative paths are read from; `temporary`, where downloads land
+   * @param {{ base: string, temporary: string, fetch?: typeof fetch, idle?: number }} options
+   *   `base`, the folder a source's relative paths are read from; `temporary`, where downloads land;
+   *   `idle`, the milliseconds a download may go without a byte
    */
-  constructor({ base, temporary, fetch: fetchImpl = globalThis.fetch }) {
+  constructor({ base, temporary, fetch: fetchImpl = globalThis.fetch, idle = IDLE_MS }) {
     this.base = base
     this.temporary = temporary
     this.fetch = fetchImpl
+    this.idle = idle
     /** @type {StagedFile[]} */
     this.files = []
     /** @type {Map<string, { name: string, mime: string, width?: number, height?: number }>} by source, so one file named twice is copied once */
@@ -148,9 +169,10 @@ export class MediaStore {
       const address = short ? `https://www.youtube.com/watch?v=${short[1]}` : source
       const hosted = HOSTED.find(({ plays }) => plays.test(address))
       if (hosted) return { path: address, mime: hosted.mime, copyright }
-      const other = HOSTED.find(({ on }) => on.test(address))
+      const url = URL.canParse(address) ? new URL(address) : null
+      const other = url ? HOSTED.find(({ on }) => on(url)) : undefined
       if (other) {
-        report(`${at}.path`, `${source} is a ${other.host} address H5P.Video cannot play: give ${other.form}`)
+        report(`${at}.path`, `${source} is an address on ${other.host} that H5P.Video cannot play: give ${other.form}`)
         return { path: source, copyright }
       }
     }
@@ -259,42 +281,55 @@ export class MediaStore {
       report(`${at}.path`, `${source} is not a web address`)
       return null
     }
-    let response
+    // Started again by every byte that arrives.
+    const controller = new AbortController()
+    const failed = (/** @type {unknown} */ error) => {
+      const cause = controller.signal.aborted ? controller.signal.reason : error
+      report(`${at}.path`, `${source} could not be downloaded: ${cause instanceof Error ? cause.message : cause}`)
+      return null
+    }
+    const timer = setTimeout(() => controller.abort(new Error(`nothing arrived for ${this.idle / 1000} s`)), this.idle)
     try {
-      response = await this.fetch(url.href, { redirect: 'follow', signal: AbortSignal.timeout(120_000) })
-    } catch (error) {
-      report(`${at}.path`, `${source} could not be downloaded: ${error instanceof Error ? error.message : error}`)
-      return null
-    }
-    if (!response.ok || !response.body) {
-      report(`${at}.path`, `${source} answered ${response.status}${kind === 'video' ? '; for YouTube, Vimeo or Panopto give the video page\'s address' : ''}`)
-      return null
-    }
-    const named = extname(new URL(response.url || url.href).pathname).slice(1).toLowerCase()
-    const served = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
-    const extension = named in types ? named : Object.keys(types).find((each) => types[each] === served)
-    if (!extension) {
-      await response.body.cancel()
-      report(`${at}.path`, `${source} is ${served || 'of an unknown type'}: this field takes ${Object.keys(types).map((each) => `.${each}`).join(', ')}`)
-      return null
-    }
-    this.downloads += 1
-    const from = join(this.temporary, `download-${this.downloads}.${extension}`)
-    let received = 0
-    const limit = new Transform({
-      transform(chunk, _encoding, callback) {
-        received += chunk.length
-        callback(received > MAX_DOWNLOAD ? new Error(`larger than ${MAX_DOWNLOAD / 1024 ** 3} GB`) : null, chunk)
+      let response
+      try {
+        response = await this.fetch(url.href, { redirect: 'follow', signal: controller.signal })
+      } catch (error) {
+        return failed(error)
       }
-    })
-    try {
-      await pipeline(Readable.fromWeb(/** @type {import('node:stream/web').ReadableStream} */ (response.body)), limit, createWriteStream(from))
-    } catch (error) {
-      report(`${at}.path`, `${source} could not be downloaded: ${error instanceof Error ? error.message : error}`)
-      return null
+      timer.refresh()
+      if (!response.ok || !response.body) {
+        await response.body?.cancel()
+        report(`${at}.path`, `${source} answered ${response.status}${kind === 'video' ? '; for a video on YouTube, Vimeo, Panopto or Echo360 give its address there' : ''}`)
+        return null
+      }
+      const named = extname(new URL(response.url || url.href).pathname).slice(1).toLowerCase()
+      const served = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
+      const extension = named in types ? named : Object.keys(types).find((each) => types[each] === served)
+      if (!extension) {
+        await response.body.cancel()
+        report(`${at}.path`, `${source} is ${served || 'of an unknown type'}: this field takes ${Object.keys(types).map((each) => `.${each}`).join(', ')}`)
+        return null
+      }
+      this.downloads += 1
+      const from = join(this.temporary, `download-${this.downloads}.${extension}`)
+      let received = 0
+      const limit = new Transform({
+        transform(chunk, _encoding, callback) {
+          timer.refresh()
+          received += chunk.length
+          callback(received > MAX_DOWNLOAD ? new Error(`larger than ${MAX_DOWNLOAD / 1024 ** 3} GB`) : null, chunk)
+        }
+      })
+      try {
+        await pipeline(Readable.fromWeb(/** @type {import('node:stream/web').ReadableStream} */ (response.body)), limit, createWriteStream(from))
+      } catch (error) {
+        return failed(error)
+      }
+      const stem = basename(decodeURIComponent(new URL(response.url || url.href).pathname), `.${named}`) || kind
+      return { from, extension, stem }
+    } finally {
+      clearTimeout(timer)
     }
-    const stem = basename(decodeURIComponent(new URL(response.url || url.href).pathname), `.${named}`) || kind
-    return { from, extension, stem }
   }
 
   /**

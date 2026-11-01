@@ -16,72 +16,106 @@ import { escapeText } from './text.mjs'
  * }} Quiz
  */
 
-/** @param {unknown} value @param {string} path @param {string[]} keys */
-function record(value, path, keys) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${path}: expected an object`)
-  for (const key of Object.keys(value)) {
-    if (!keys.includes(key)) throw new Error(`${path}.${key}: unsupported field`)
-  }
-}
+/** @param {unknown} value @returns {value is Record<string, any>} */
+const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
 
-/** @param {unknown} value @param {string} path */
-function text(value, path) {
-  if (typeof value !== 'string' || !value.trim()) throw new Error(`${path}: expected non-empty text`)
-}
+/**
+ * What is wrong with a quiz, all of it, each by its path, as a general source's problems are
+ * listed: a fix takes one round.
+ * @param {unknown} source
+ * @returns {{ path: string, message: string }[]}
+ * @internal
+ */
+export function quizProblems(source) {
+  /** @type {{ path: string, message: string }[]} */
+  const problems = []
+  const report = (/** @type {string} */ path, /** @type {string} */ message) => problems.push({ path, message })
+  /** Whether a value is an object; a field it should not have is reported. @param {unknown} value @param {string} path @param {string[]} keys */
+  const record = (value, path, keys) => {
+    if (!isObject(value)) {
+      report(path, 'expected an object')
+      return false
+    }
+    for (const key of Object.keys(value)) if (!keys.includes(key)) report(`${path}.${key}`, 'unsupported field')
+    return true
+  }
+  /** Whether a value is text with something in it. @param {unknown} value @param {string} path */
+  const text = (value, path) => {
+    if (typeof value === 'string' && value.trim()) return true
+    report(path, 'expected non-empty text')
+    return false
+  }
 
-/** @param {unknown} source @returns {asserts source is Quiz} @internal */
-export function validateQuiz(source) {
-  record(source, 'quiz', ['kind', 'title', 'language', 'license', 'authors', 'passPercentage', 'passedFeedback', 'failedFeedback', 'questions'])
-  const quiz = /** @type {Quiz} */ (source)
-  if (!['multiple-choice', 'question-set'].includes(quiz.kind)) throw new Error('quiz.kind: use "multiple-choice" or "question-set"')
-  for (const key of /** @type {const} */ (['title', 'language', 'license'])) text(quiz[key], `quiz.${key}`)
-  if (quiz.title.length > 255) throw new Error('quiz.title: at most 255 characters')
-  try {
-    Intl.getCanonicalLocales(quiz.language)
-  } catch {
-    throw new Error('quiz.language: expected a BCP 47 language tag, such as "en"')
+  if (!record(source, 'quiz', ['kind', 'title', 'language', 'license', 'authors', 'passPercentage', 'passedFeedback', 'failedFeedback', 'questions'])) return problems
+  const quiz = /** @type {Record<string, any>} */ (source)
+  if (!['multiple-choice', 'question-set'].includes(quiz.kind)) report('quiz.kind', 'use "multiple-choice" or "question-set"')
+  if (text(quiz.title, 'quiz.title') && quiz.title.length > 255) report('quiz.title', 'at most 255 characters')
+  if (text(quiz.language, 'quiz.language')) {
+    try {
+      Intl.getCanonicalLocales(quiz.language)
+    } catch {
+      report('quiz.language', 'expected a BCP 47 language tag, such as "en"')
+    }
   }
-  if (!['U', 'CC BY', 'CC BY-SA', 'CC BY-ND', 'CC BY-NC', 'CC BY-NC-SA', 'CC BY-NC-ND', 'CC0 1.0', 'PD', 'C'].includes(quiz.license)) {
-    throw new Error('quiz.license: use an H5P license code (for example "U", "CC BY", or "CC0 1.0")')
+  if (text(quiz.license, 'quiz.license') && !['U', 'CC BY', 'CC BY-SA', 'CC BY-ND', 'CC BY-NC', 'CC BY-NC-SA', 'CC BY-NC-ND', 'CC0 1.0', 'PD', 'C'].includes(quiz.license)) {
+    report('quiz.license', 'use an H5P license code (for example "U", "CC BY", or "CC0 1.0")')
   }
-  if (!Array.isArray(quiz.authors) || !quiz.authors.length) throw new Error('quiz.authors: name at least one author')
-  quiz.authors.forEach((author, i) => {
-    record(author, `quiz.authors[${i}]`, ['name', 'role'])
-    text(author.name, `quiz.authors[${i}].name`)
-    if (author.role !== 'Author') throw new Error(`quiz.authors[${i}].role: use "Author"`)
+  if (!Array.isArray(quiz.authors) || !quiz.authors.length) report('quiz.authors', 'name at least one author')
+  else quiz.authors.forEach((/** @type {unknown} */ author, /** @type {number} */ i) => {
+    if (!record(author, `quiz.authors[${i}]`, ['name', 'role'])) return
+    const { name, role } = /** @type {Record<string, unknown>} */ (author)
+    text(name, `quiz.authors[${i}].name`)
+    if (role !== 'Author') report(`quiz.authors[${i}].role`, 'use "Author"')
   })
   if (quiz.passPercentage !== undefined && (!Number.isInteger(quiz.passPercentage) || quiz.passPercentage < 0 || quiz.passPercentage > 100)) {
-    throw new Error('quiz.passPercentage: expected an integer from 0 to 100')
+    report('quiz.passPercentage', 'expected an integer from 0 to 100')
   }
   if (quiz.passedFeedback !== undefined || quiz.failedFeedback !== undefined) {
     // One without the other leaves some learners with no word on the result.
-    for (const key of /** @type {const} */ (['passedFeedback', 'failedFeedback'])) {
-      if (quiz[key] === undefined) throw new Error(`quiz.${key}: set passedFeedback and failedFeedback together`)
-      text(quiz[key], `quiz.${key}`)
+    for (const key of ['passedFeedback', 'failedFeedback']) {
+      if (quiz[key] === undefined) report(`quiz.${key}`, 'set passedFeedback and failedFeedback together')
+      else text(quiz[key], `quiz.${key}`)
     }
-    if (quiz.passPercentage === undefined) throw new Error('quiz.passPercentage: set it with passedFeedback and failedFeedback; the library defaults differ by kind')
+    if (quiz.passPercentage === undefined) report('quiz.passPercentage', 'set it with passedFeedback and failedFeedback; the library defaults differ by kind')
   }
-  if (!Array.isArray(quiz.questions) || !quiz.questions.length) throw new Error('quiz.questions: at least one question is required')
-  if (quiz.kind === 'multiple-choice' && quiz.questions.length !== 1) throw new Error('quiz.questions: multiple-choice requires exactly one question')
-  quiz.questions.forEach((question, i) => {
+  if (!Array.isArray(quiz.questions) || !quiz.questions.length) {
+    report('quiz.questions', 'at least one question is required')
+    return problems
+  }
+  if (quiz.kind === 'multiple-choice' && quiz.questions.length !== 1) report('quiz.questions', 'multiple-choice requires exactly one question')
+  quiz.questions.forEach((/** @type {unknown} */ written, /** @type {number} */ i) => {
     const path = `quiz.questions[${i}]`
-    record(question, path, ['title', 'prompt', 'multipleAnswers', 'answers'])
+    if (!record(written, path, ['title', 'prompt', 'multipleAnswers', 'answers'])) return
+    const question = /** @type {Record<string, any>} */ (written)
     text(question.prompt, `${path}.prompt`)
     if (question.title !== undefined) text(question.title, `${path}.title`)
-    if (question.multipleAnswers !== undefined && typeof question.multipleAnswers !== 'boolean') throw new Error(`${path}.multipleAnswers: expected a boolean`)
-    if (!Array.isArray(question.answers) || question.answers.length < 2) throw new Error(`${path}.answers: at least two answers are required`)
-    question.answers.forEach((answer, j) => {
-      const answerPath = `${path}.answers[${j}]`
-      record(answer, answerPath, ['text', 'correct', 'feedback'])
-      text(answer.text, `${answerPath}.text`)
-      if (typeof answer.correct !== 'boolean') throw new Error(`${answerPath}.correct: expected a boolean`)
-      if (answer.feedback !== undefined) text(answer.feedback, `${answerPath}.feedback`)
-    })
-    const correct = question.answers.filter((answer) => answer.correct).length
-    if (question.multipleAnswers ? correct === 0 : correct !== 1) {
-      throw new Error(`${path}.answers: ${question.multipleAnswers ? 'at least one' : 'exactly one'} answer must be correct`)
+    const multiple = question.multipleAnswers
+    if (multiple !== undefined && typeof multiple !== 'boolean') report(`${path}.multipleAnswers`, 'expected a boolean')
+    if (!Array.isArray(question.answers) || question.answers.length < 2) {
+      report(`${path}.answers`, 'at least two answers are required')
+      return
     }
+    let marked = true
+    question.answers.forEach((/** @type {unknown} */ answer, /** @type {number} */ j) => {
+      const answerPath = `${path}.answers[${j}]`
+      if (!record(answer, answerPath, ['text', 'correct', 'feedback'])) {
+        marked = false
+        return
+      }
+      const { text: words, correct, feedback } = /** @type {Record<string, unknown>} */ (answer)
+      text(words, `${answerPath}.text`)
+      if (typeof correct !== 'boolean') {
+        report(`${answerPath}.correct`, 'expected a boolean')
+        marked = false
+      }
+      if (feedback !== undefined) text(feedback, `${answerPath}.feedback`)
+    })
+    // Counted once every answer says whether it is correct, and the question how many may be.
+    if (!marked || (multiple !== undefined && typeof multiple !== 'boolean')) return
+    const correct = question.answers.filter((/** @type {{ correct: boolean }} */ answer) => answer.correct).length
+    if (multiple ? correct === 0 : correct !== 1) report(`${path}.answers`, `${multiple ? 'at least one' : 'exactly one'} answer must be correct`)
   })
+  return problems
 }
 
 /** A plain text written as the paragraph the quiz format has always made of it. @param {string} value */

@@ -18,8 +18,8 @@ async function build(type: string, params: unknown, options: Parameters<typeof b
   return result.content as Record<string, any> & { notes?: never }
 }
 
-async function result(type: string, params: unknown) {
-  return buildPackage({ ...META, type, params }, join(dir, `layout-${++count}.h5p`))
+async function result(type: string, params: unknown, options: Parameters<typeof buildPackage>[2] = {}) {
+  return buildPackage({ ...META, type, params }, join(dir, `layout-${++count}.h5p`), options)
 }
 
 async function problems(type: string, params: unknown) {
@@ -71,11 +71,41 @@ describe('Interactive Video', () => {
     })
     const [a, b, c] = content.interactiveVideo.assets.interactions
     expect(a).toMatchObject({ x: 5, y: 5, libraryTitle: 'True/False Question' })
-    expect([b.x, b.y]).not.toEqual([a.x, a.y])
-    expect(b).toMatchObject({ width: 10, height: 10 })
+    // Below the button shown with it.
+    expect(b).toMatchObject({ x: 5, y: 20, width: 17, height: 16 })
     expect(c).toMatchObject({ x: 5, y: 5 })
     // The summary task nobody opened stays as the editor leaves it.
     expect(content.interactiveVideo.summary.task.library).toMatch(/^H5P\.Summary /)
+  })
+
+  it('sizes a poster by what it holds, and puts posters shown together side by side', async () => {
+    await writeFile(join(dir, 'photo.png'), png(1600, 1200))
+    const poster = (from: number, action: unknown, size = {}) => ({ duration: { from, to: from + 4 }, displayType: 'poster', action, ...size })
+    const { content, notes } = await result('H5P.InteractiveVideo', {
+      interactiveVideo: {
+        video: { files: [{ path: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' }] },
+        assets: {
+          interactions: [
+            poster(1, question),
+            poster(2, question),
+            poster(3, question),
+            poster(10, { library: 'H5P.Text', params: { text: 'All of this water ends in the sea.' } }),
+            poster(20, { library: 'H5P.Image', params: { file: { path: 'photo.png' }, alt: 'A river' } }),
+            poster(30, question, { width: 30, height: 20 })
+          ]
+        }
+      }
+    }, { base: dir })
+    const [first, second, third, text, image, written] = (content as Record<string, any>).interactiveVideo.assets.interactions
+    // A question gets room for its answers and buttons; 10 by 10, the editor's start, hid them.
+    expect(first).toMatchObject({ x: 5, y: 5, width: 17, height: 16 })
+    expect(second).toMatchObject({ x: 50, y: 5, width: 17, height: 16 })
+    expect(third).toMatchObject({ x: 5, y: 5 })
+    expect(notes).toEqual([{ path: 'params.interactiveVideo.assets.interactions[2]', message: expect.stringContaining('has no room left for it') }])
+    // A text its lines, a picture its shape, as the editor gives one.
+    expect(text).toMatchObject({ x: 5, y: 5, width: 12, height: 5.6 })
+    expect(image).toMatchObject({ width: 13.33, height: 10 })
+    expect(written).toMatchObject({ width: 30, height: 20 })
   })
 
   it('refuses an interaction that ends before it starts', async () => {

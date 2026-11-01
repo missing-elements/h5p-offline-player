@@ -154,8 +154,10 @@ describe('content authored from semantics', () => {
     const { problems } = generate([
       { name: 'count', type: 'number' },
       { name: 'ratio', type: 'number', decimals: 1 },
-      { name: 'position', type: 'group', widget: 'coordinates', fields: [{ name: 'x', type: 'number' }, { name: 'y', type: 'number' }] }
-    ], { count: 1.5, ratio: 0.25, position: { x: 12.5, y: 40 } }, [], STRICT)
+      { name: 'position', type: 'group', widget: 'coordinates', fields: [{ name: 'x', type: 'number' }, { name: 'y', type: 'number' }] },
+      // A list's item is the widget's too, numbers and lists in it alike.
+      { name: 'path', type: 'group', widget: 'polyline', fields: [{ name: 'points', type: 'list', field: { name: 'point', type: 'number' } }, { name: 'rows', type: 'list', field: { name: 'row', type: 'list', field: { name: 'cell', type: 'number' } } }] }
+    ], { count: 1.5, ratio: 0.25, position: { x: 12.5, y: 40 }, path: { points: [0.5, 1.25] } }, [], STRICT)
     expect(problems.map(({ path }) => path)).toEqual(['params.count', 'params.ratio'])
   })
 

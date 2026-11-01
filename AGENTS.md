@@ -1993,7 +1993,12 @@ not say by itself:
   fields the form hides (`widget: "none"`). `lib/types.mjs` does each one's work on the generated
   content, wherever the type appears: a slide's unplaced elements stacked, text as tall as its lines
   on CP's 16:9 slide at 16 px per 640, pictures shrunk in shape, a question in what is left, with a
-  note when a slide holds too much; interactions placed apart and named by their library; stages
+  note when a slide holds too much; interactions placed apart, clear of what shows at the same
+  time, and named by their library; a poster sized by what it holds, in IV's em (a 16:9 video is
+  40 by 22.5): a picture in its shape, as the editor's own widget does, a text as wide as keeps
+  it short, a question 17 by 16. The editor starts every interaction at 10 by 10 and leaves the
+  rest to the author's mouse, and seen in Chrome, 10 by 10 showed two answers of four and hid the
+  Check button behind a scroll (#100's review); on a phone IV shows posters as buttons. Stages
   given ids and types, neighbours named by label made indices both ways; end screens numbered. It
   checks what those widgets would not let pass: a scenario node with no next, a link to no node, a
   loop no path leaves; a map with no start; a hotspot question with no right area. A hidden field
@@ -2003,14 +2008,16 @@ not say by itself:
   MIME type, an image's size read from its header (PNG, JPEG, GIF, BMP; a JPEG's segments walked to
   its frame header, which a colour profile can put past the first 64 kB, where the first cut
   stopped and refused the picture), and its copyright, on H5P's own list of types (no SVG, no
-  WebP). A YouTube, Vimeo or Panopto address stays, as the editor embeds it, and only one
-  H5P.Video plays: it chooses a player by its own pattern for each host, and an address none
-  matches goes to its HTML5 player, which cannot play a page. So the build takes an address only
-  where that pattern does too, a Short's or a live stream's written as its video's watch address,
-  and refuses another on those hosts, naming the form; `build.test.ts` holds each accepted
-  address to the patterns read from H5P.Video's scripts in the pack. The first cut took
-  `youtube.com/shorts/`, `player.vimeo.com` and any `panopto.com` address, which built and then
-  did not play (found in the PR's own review). A package with media goes through the
+  WebP). A download is given up after a minute with no byte, not after a fixed time: the first cut
+  allowed two minutes in all, which a large video over a slow link outlasts. A YouTube, Vimeo,
+  Panopto or Echo360 address stays, as the editor embeds it, and only one H5P.Video plays: it
+  chooses a player by its own pattern for each host, and an address none matches goes to its
+  HTML5 player, which cannot play a page. So the build takes an address only where that pattern
+  does too, a Short's or a live stream's written as its video's watch address, and refuses
+  another on those hosts, naming the form; `build.test.ts` holds each accepted address to the
+  patterns read from H5P.Video's scripts in the pack. The first cut took `youtube.com/shorts/`,
+  `player.vimeo.com` and any `panopto.com` address, which built and then did not play, and knew
+  no Echo360 (found in the PR's own review). A package with media goes through the
   normalizer's `normalizeArchive`, so it is stored and laid out to stream, an mp4's index first.
   An addon whose pattern the text matches, H5P.MathDisplay for LaTeX, is carried as a site with
   it installed exports it.

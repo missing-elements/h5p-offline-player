@@ -99,6 +99,23 @@ const MARGIN_Y = 5
 const GAP = 2
 
 /**
+ * How many lines markup takes at 16 px in a width, at about 8.5 px a character: a heading's at
+ * its size, and a little between blocks.
+ * @param {string} html
+ * @param {number} pixels
+ */
+function textLines(html, pixels) {
+  let lines = 0
+  const blocks = html.split(/<\/(?:p|div|li|h[1-6]|pre)>|<br\s*\/?>/i).filter((block) => textOf(block))
+  for (const block of blocks.length ? blocks : [html]) {
+    const scale = /<h[1-3]/i.test(block) ? 1.5 : 1
+    const perLine = Math.max(8, Math.floor(pixels / (SLIDE.char * scale)))
+    lines += Math.max(1, Math.ceil(textOf(block).length / perLine)) * scale + 0.4
+  }
+  return lines
+}
+
+/**
  * How much of a slide's height an element wants at a width: text by its lines, an image or a
  * video by its shape, anything interactive whatever is left.
  * @param {any} element
@@ -110,15 +127,7 @@ function wanted(element, width) {
   const params = element?.action?.params ?? {}
   const pixels = (width / 100) * SLIDE.width
   if (library === 'H5P.AdvancedText') {
-    let lines = 0
-    const html = String(params.text ?? '')
-    const blocks = html.split(/<\/(?:p|div|li|h[1-6]|pre)>|<br\s*\/?>/i).filter((block) => textOf(block))
-    for (const block of blocks.length ? blocks : [html]) {
-      const heading = /<h[1-3]/i.test(block)
-      const scale = heading ? 1.5 : 1
-      const perLine = Math.max(8, Math.floor(pixels / (SLIDE.char * scale)))
-      lines += Math.max(1, Math.ceil(textOf(block).length / perLine)) * scale + 0.4
-    }
+    const lines = textLines(String(params.text ?? ''), pixels)
     return { height: Math.min(95, (lines * SLIDE.font * SLIDE.line / SLIDE.height) * 100 + 3), flexible: false, min: 8 }
   }
   if (library === 'H5P.Image') {
@@ -213,6 +222,66 @@ const coursePresentation = {
 
 /* ---------------------------------------------------------------- Interactive Video */
 
+/**
+ * The video Interactive Video draws interactions over, in the units of their fields: `x` and `y`
+ * in percent of the video, `width` and `height` in em, at 16 px to a video 640 px wide, so a
+ * 16:9 video is 40 em wide and 22.5 em tall.
+ */
+const FRAME = { width: 40, height: 22.5 }
+
+/** The room a button takes, in percent of the video, with some around it. */
+const BUTTON = { width: 12, height: 12 }
+
+/**
+ * A poster's size where none is written. H5P's editor starts every interaction at 10 by 10 em
+ * and leaves the rest to the author's mouse, but for a picture, which it gives the picture's own
+ * shape, as is done here. A build has no mouse: a question gets room for its answers and buttons,
+ * where 10 by 10 showed two answers of four and hid the Check button behind a scroll; a text as
+ * much width as keeps it short. A link, a label and a hotspot keep the editor's size.
+ * @param {any} interaction
+ * @returns {{ width: number, height: number }}
+ */
+function posterSize(interaction) {
+  const library = machineName(interaction?.action?.library)
+  const params = interaction?.action?.params ?? {}
+  if (library === 'H5P.Image') {
+    const file = params.file ?? {}
+    if (!(file.width > 0 && file.height > 0)) return { width: 10, height: 10 }
+    // As the editor's setImageSize: no taller than the picture at 16 px an em, nor under one em.
+    const [width, height] = [Math.max(16, file.width), Math.max(16, file.height)]
+    const tall = Math.min(10, height / 16)
+    const wide = Math.min(FRAME.width - 4, tall * (width / height))
+    return { width: round(wide), height: round(wide * (height / width)) }
+  }
+  if (library === 'H5P.Text') {
+    for (const width of [12, 16, 20, 24]) {
+      // Its lines, and an em of padding all round.
+      const height = textLines(String(params.text ?? ''), (width - 2) * SLIDE.font) * SLIDE.line + 2
+      if (height <= 12 || width === 24) return { width, height: round(Math.min(FRAME.height - 2, height)) }
+    }
+  }
+  if (['H5P.Link', 'H5P.Nil', 'H5P.IVHotspot'].includes(library)) return { width: 10, height: 10 }
+  // Two side by side, with a gap, within the margins.
+  return { width: 17, height: 16 }
+}
+
+/**
+ * Where a box nobody placed goes: down the left of the video, then the next column, a gap clear
+ * of every box shown at the same time; `null` when the video has no room left.
+ * @param {{ width: number, height: number }} box in percent of the video
+ * @param {{ from: number, to: number }} time
+ * @param {{ from: number, to: number, x: number, y: number, width: number, height: number }[]} shown
+ */
+function freeSpot(box, time, shown) {
+  const together = shown.filter((other) => !(time.to < other.from || time.from > other.to))
+  const clear = (/** @type {number} */ x, /** @type {number} */ y) => together.every((other) =>
+    x + box.width + GAP <= other.x || other.x + other.width + GAP <= x || y + box.height + GAP <= other.y || other.y + other.height + GAP <= y)
+  for (let x = 5; x === 5 || x + box.width <= 95; x += 5) {
+    for (let y = 5; y === 5 || y + box.height <= 95; y += 5) if (clear(x, y)) return { x, y }
+  }
+  return null
+}
+
 /** @type {Layout} */
 const interactiveVideo = {
   sets: [
@@ -223,34 +292,28 @@ const interactiveVideo = {
   after(params, path, context) {
     const interactions = params?.interactiveVideo?.assets?.interactions
     if (!Array.isArray(interactions)) return
-    /** @type {{ from: number, to: number, x: number, y: number }[]} */
+    /** @type {{ from: number, to: number, x: number, y: number, width: number, height: number }[]} */
     const shown = []
     interactions.forEach((/** @type {any} */ interaction, /** @type {number} */ i) => {
+      if (!isObject(interaction)) return
       const at = `${path}.interactiveVideo.assets.interactions[${i}]`
-      const from = interaction?.duration?.from
-      const to = interaction?.duration?.to
-      if (typeof from === 'number' && typeof to === 'number' && to < from) context.report(`${at}.duration`, `ends at ${to} s, before it starts at ${from} s`)
-      if (interaction?.action?.metadata && interaction.libraryTitle === undefined) interaction.libraryTitle = context.title(interaction.action.library)
-      const poster = interaction?.displayType === 'poster'
-      if (typeof interaction.x !== 'number' || typeof interaction.y !== 'number') {
-        // Placed down the left of the picture, out of the way of anything shown at the same time.
-        let x = 5
-        let y = 5
-        while (shown.some((other) => other.x === x && other.y === y && !(typeof to === 'number' && typeof from === 'number' && (to < other.from || from > other.to)))) {
-          y += poster ? 30 : 12
-          if (y > 75) {
-            y = 5
-            x += poster ? 35 : 12
-          }
-        }
-        interaction.x = x
-        interaction.y = y
-      }
+      const from = typeof interaction.duration?.from === 'number' ? interaction.duration.from : 0
+      const to = typeof interaction.duration?.to === 'number' ? interaction.duration.to : 0
+      if (to < from) context.report(`${at}.duration`, `ends at ${to} s, before it starts at ${from} s`)
+      if (interaction.action?.metadata && interaction.libraryTitle === undefined) interaction.libraryTitle = context.title(interaction.action.library)
+      const poster = interaction.displayType === 'poster'
       if (poster) {
-        if (typeof interaction.width !== 'number') interaction.width = 10
-        if (typeof interaction.height !== 'number') interaction.height = 10
+        const size = posterSize(interaction)
+        if (typeof interaction.width !== 'number') interaction.width = size.width
+        if (typeof interaction.height !== 'number') interaction.height = size.height
       }
-      shown.push({ from: typeof from === 'number' ? from : 0, to: typeof to === 'number' ? to : 0, x: interaction.x, y: interaction.y })
+      const box = poster ? { width: (interaction.width / FRAME.width) * 100, height: (interaction.height / FRAME.height) * 100 } : BUTTON
+      if (typeof interaction.x !== 'number' || typeof interaction.y !== 'number') {
+        const spot = freeSpot(box, { from, to }, shown)
+        if (!spot) context.note(at, 'shows while the video has no room left for it, so it is placed over another: give it x and y, or show it at another time')
+        Object.assign(interaction, spot ?? { x: 5, y: 5 })
+      }
+      shown.push({ from, to, x: interaction.x, y: interaction.y, ...box })
     })
   }
 }

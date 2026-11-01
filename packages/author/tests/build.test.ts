@@ -10,7 +10,8 @@ import { pack } from '@missing-elements/h5p-libraries'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { buildPackage, SourceError } from '../lib/author.mjs'
 import { readSource } from '../lib/build.mjs'
-import { validateQuiz } from '../lib/quiz.mjs'
+import { MediaStore } from '../lib/media.mjs'
+import { quizProblems } from '../lib/quiz.mjs'
 import { jpeg, mp4, png } from './helpers/media'
 
 const skill = resolve(import.meta.dirname, '../../../skills/h5p-author')
@@ -75,10 +76,10 @@ async function defaults(machineName: string, code: string, path: string[]) {
 
 describe('the quiz format', () => {
   it('accepts both kinds, multiple correct answers, and a zero pass threshold', () => {
-    expect(() => validateQuiz(example)).not.toThrow()
-    expect(() => validateQuiz({ ...example, kind: 'multiple-choice', passPercentage: 0, questions: [example.questions[0]] })).not.toThrow()
+    expect(quizProblems(example)).toEqual([])
+    expect(quizProblems({ ...example, kind: 'multiple-choice', passPercentage: 0, questions: [example.questions[0]] })).toEqual([])
     // A quiz without a pass mark, and so without its messages, as before they existed.
-    expect(() => validateQuiz({ ...example, passPercentage: undefined, passedFeedback: undefined, failedFeedback: undefined })).not.toThrow()
+    expect(quizProblems({ ...example, passPercentage: undefined, passedFeedback: undefined, failedFeedback: undefined })).toEqual([])
   })
 
   it.each([
@@ -108,7 +109,18 @@ describe('the quiz format', () => {
     [{ ...example, questions: [{ ...example.questions[0], multipleAnswers: true, answers: [{ text: 'a', correct: false }, { text: 'b', correct: false }] }] }, 'at least one answer'],
     [{ ...example, questions: [{ ...example.questions[0], answers: [{ text: 'a', correct: true, typo: 'lost' }, { text: 'b', correct: false }] }] }, '.typo: unsupported field']
   ])('rejects malformed input with its field path (%#)', (input, message) => {
+    expect(() => readSource(input)).toThrow(SourceError)
     expect(() => readSource(input)).toThrow(message)
+  })
+
+  it('lists every problem a quiz has at once, each by its path', () => {
+    const quiz = { ...example, title: '', license: 'made-up', questions: [{ ...example.questions[0], prompt: '' }, { ...example.questions[1], answers: [{ text: 'a', correct: true }] }] }
+    expect(quizProblems(quiz).map(({ path, message }) => `${path}: ${message}`)).toEqual([
+      'quiz.title: expected non-empty text',
+      'quiz.license: use an H5P license code (for example "U", "CC BY", or "CC0 1.0")',
+      'quiz.questions[0].prompt: expected non-empty text',
+      'quiz.questions[1].answers: at least two answers are required'
+    ])
   })
 
   it('builds a self-contained Question Set using pack versions, semantics defaults, and the full dependency closure', async () => {
@@ -309,12 +321,32 @@ describe('media', () => {
       if (request.url === '/pictures/map.png') response.writeHead(200, { 'content-type': 'image/png' }).end(png(40, 20))
       else if (request.url === '/picture') response.writeHead(200, { 'content-type': 'image/png' }).end(png(10, 30))
       else if (request.url === '/page.html') response.writeHead(200, { 'content-type': 'text/html' }).end('<p>no</p>')
-      else response.writeHead(404).end()
+      else if (request.url === '/trickle.png') {
+        // Slow, and never silent for long: eight pieces, 100 ms apart.
+        const bytes = png(40, 30)
+        const step = Math.ceil(bytes.length / 8)
+        response.writeHead(200, { 'content-type': 'image/png' })
+        let at = 0
+        const timer = setInterval(() => {
+          response.write(bytes.subarray(at, (at += step)))
+          if (at >= bytes.length) {
+            clearInterval(timer)
+            response.end()
+          }
+        }, 100)
+      } else if (request.url === '/stalled.png') {
+        // Its first bytes, then silence.
+        response.writeHead(200, { 'content-type': 'image/png' }).write(png(40, 30).subarray(0, 10))
+        setTimeout(() => response.end(), 5000).unref()
+      } else response.writeHead(404).end()
     })
     await new Promise<void>(done => server.listen(0, '127.0.0.1', done))
     origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   })
-  afterAll(() => { server.close() })
+  afterAll(() => {
+    server.closeAllConnections()
+    server.close()
+  })
 
   it('copies files beside the source and from the web, with their type, size and copyright', async () => {
     await writeFile(join(dir, 'red.png'), png(300, 200))
@@ -382,7 +414,8 @@ describe('media', () => {
           'https://youtu.be/dQw4w9WgXcQ?si=abc',
           'https://youtube.com/shorts/aqz-KE-bpKQ?feature=share',
           'https://vimeo.com/76979871',
-          'https://video.example.edu/Panopto/Pages/Viewer.aspx?id=0b6d3a5e-1f2c-4c3e-9a51-b0d1a2c3d4e5'
+          'https://video.example.edu/Panopto/Pages/Viewer.aspx?id=0b6d3a5e-1f2c-4c3e-9a51-b0d1a2c3d4e5',
+          'https://echo360.org/media/0b6d3a5e-1f2c-4c3e/h5p'
         ].map(video)
       }
     })
@@ -392,23 +425,34 @@ describe('media', () => {
       'video/YouTube https://youtu.be/dQw4w9WgXcQ?si=abc',
       'video/YouTube https://www.youtube.com/watch?v=aqz-KE-bpKQ',
       'video/Vimeo https://vimeo.com/76979871',
-      'video/Panopto https://video.example.edu/Panopto/Pages/Viewer.aspx?id=0b6d3a5e-1f2c-4c3e-9a51-b0d1a2c3d4e5'
+      'video/Panopto https://video.example.edu/Panopto/Pages/Viewer.aspx?id=0b6d3a5e-1f2c-4c3e-9a51-b0d1a2c3d4e5',
+      'video/Echo360 https://echo360.org/media/0b6d3a5e-1f2c-4c3e/h5p'
     ])
     // H5P.Video's own patterns, read from its scripts in the pack: it chooses a player by them.
     const library = pack.libraries.find(library => library.machineName === 'H5P.Video' && library.majorVersion === 1)!
     const { files } = await archive(new URL(library.url))
-    const plays = Object.fromEntries(['YouTube', 'Vimeo', 'Panopto'].map((host) => {
+    const plays = Object.fromEntries(['YouTube', 'Vimeo', 'Panopto', 'Echo360'].map((host) => {
       const [, body, flags] = /url\.match\(\/(.+)\/([a-z]*)\);/.exec(files.get(`${library.folder}/scripts/${host.toLowerCase()}.js`)!)!
       return [`video/${host}`, new RegExp(body, flags)]
     }))
     for (const { mime, path } of sources) expect(plays[mime].test(path), path).toBe(true)
-    const refused = ['https://player.vimeo.com/video/76979871', 'https://www.youtube.com/playlist?list=PL0123456789', 'https://example.panopto.eu/Panopto/Pages/Sessions/List.aspx']
+    const refused = ['https://player.vimeo.com/video/76979871', 'https://www.youtube.com/playlist?list=PL0123456789', 'https://example.panopto.eu/Panopto/Pages/Sessions/List.aspx', 'https://echo360.org/lesson/0b6d3a5e/classroom']
     for (const path of refused) expect(Object.values(plays).some((pattern) => pattern.test(path)), path).toBe(false)
     expect(await problems({ ...META, type: 'H5P.Column', params: { content: refused.map(video) } })).toEqual([
-      'params.content[0].content.params.sources.path: https://player.vimeo.com/video/76979871 is a Vimeo address H5P.Video cannot play: give https://vimeo.com/ and the video\'s number',
-      'params.content[1].content.params.sources.path: https://www.youtube.com/playlist?list=PL0123456789 is a YouTube address H5P.Video cannot play: give https://www.youtube.com/watch?v= and the video\'s id',
-      'params.content[2].content.params.sources.path: https://example.panopto.eu/Panopto/Pages/Sessions/List.aspx is a Panopto address H5P.Video cannot play: give the viewer\'s, …/Panopto/Pages/Viewer.aspx?id= and the session\'s id'
+      'params.content[0].content.params.sources.path: https://player.vimeo.com/video/76979871 is an address on Vimeo that H5P.Video cannot play: give https://vimeo.com/ and the video\'s number',
+      'params.content[1].content.params.sources.path: https://www.youtube.com/playlist?list=PL0123456789 is an address on YouTube that H5P.Video cannot play: give https://www.youtube.com/watch?v= and the video\'s id',
+      'params.content[2].content.params.sources.path: https://example.panopto.eu/Panopto/Pages/Sessions/List.aspx is an address on Panopto that H5P.Video cannot play: give the viewer\'s, …/Panopto/Pages/Viewer.aspx?id= and the session\'s id',
+      'params.content[3].content.params.sources.path: https://echo360.org/lesson/0b6d3a5e/classroom is an address on Echo360 that H5P.Video cannot play: give its H5P address, https://echo360.org/media/, the media\'s id and /h5p'
     ])
+  })
+
+  it('gives a download up once nothing has arrived for a while, however long a slow one takes', async () => {
+    const reported: string[] = []
+    const report = (path: string, message: string) => reported.push(`${path}: ${message}`)
+    const store = new MediaStore({ base: dir, temporary: dir, idle: 300 })
+    expect(await store.resolve({ type: 'image' }, { path: `${origin}/trickle.png` }, 'params.slow', report)).toMatchObject({ path: 'images/trickle.png', width: 40, height: 30 })
+    expect(await store.resolve({ type: 'image' }, { path: `${origin}/stalled.png` }, 'params.silent', report)).toEqual({ path: `${origin}/stalled.png`, copyright: { license: 'U' } })
+    expect(reported).toEqual([`params.silent.path: ${origin}/stalled.png could not be downloaded: nothing arrived for 0.3 s`])
   })
 
   it('names a file that is missing, of a type the field does not take, or not downloadable', async () => {

@@ -7,7 +7,7 @@ import { normalizeArchive } from '@missing-elements/h5p-normalize'
 import { ContentGenerator, librariesIn, libraryString } from './generator.mjs'
 import { MediaStore } from './media.mjs'
 import { openPack } from './pack.mjs'
-import { quizSource, validateQuiz } from './quiz.mjs'
+import { quizProblems, quizSource } from './quiz.mjs'
 import { escapeText } from './text.mjs'
 import { localize, translationFiles } from './translate.mjs'
 import { LAYOUTS, patchSemantics, placesOf } from './types.mjs'
@@ -62,8 +62,9 @@ const isObject = (value) => value !== null && typeof value === 'object' && !Arra
  */
 export function readSource(input) {
   if (isObject(input) && 'kind' in input) {
-    validateQuiz(input)
-    return /** @type {Source} */ (quizSource(input))
+    const problems = quizProblems(input)
+    if (problems.length) throw new SourceError(problems)
+    return /** @type {Source} */ (quizSource(/** @type {import('./quiz.mjs').Quiz} */ (input)))
   }
   /** @type {Problem[]} */
   const problems = []
