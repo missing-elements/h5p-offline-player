@@ -2,7 +2,7 @@
 
 A video with questions, text and links appearing over it at set times, a bookmark menu, and a summary task at the end.
 
-- `interactiveVideo.video.files` is the video: a file beside the source (`.mp4` or `.webm`), a web address of one, or a YouTube, Vimeo or Panopto page, which plays from there.
+- `interactiveVideo.video.files` is the video: a file beside the source (`.mp4` or `.webm`), a web address of one, or the address of a video on YouTube, Vimeo or Panopto, which plays from there.
 - Each item of `interactiveVideo.assets.interactions` shows its `action` (sub-content) from `duration.from` to `duration.to`, in seconds. `pause: true` stops the video for it; `displayType` `"button"` shows an icon to open it, `"poster"` shows it open over the video. The build places each interaction; give `x` and `y` (percent of the picture) to place one yourself.
 - Bookmarks: `interactiveVideo.assets.bookmarks`, `[{ "time": 30, "label": "…" }]`.
 - The summary task at the end is H5P.Summary at `interactiveVideo.summary.task`, shown at `interactiveVideo.summary.displayAt` seconds before the end; leave it out and there is none.

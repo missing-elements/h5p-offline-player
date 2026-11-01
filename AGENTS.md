@@ -2000,11 +2000,20 @@ not say by itself:
   nothing set is reported. Lists such a widget draws start empty.
 - **Media are copied and described.** A file is `{ path }`, beside the source or an `http(s)`
   address, downloaded at build time; it lands under `content/images|videos|audios|files/` with its
-  MIME type, an image's size read from its header (PNG, JPEG, GIF, BMP), and its copyright, on
-  H5P's own list of types (no SVG, no WebP). A YouTube, Vimeo or Panopto address stays, as the
-  editor embeds it. A package with media goes through the normalizer's `normalizeArchive`, so it is
-  stored and laid out to stream, an mp4's index first. An addon whose pattern the text matches,
-  H5P.MathDisplay for LaTeX, is carried as a site with it installed exports it.
+  MIME type, an image's size read from its header (PNG, JPEG, GIF, BMP; a JPEG's segments walked to
+  its frame header, which a colour profile can put past the first 64 kB, where the first cut
+  stopped and refused the picture), and its copyright, on H5P's own list of types (no SVG, no
+  WebP). A YouTube, Vimeo or Panopto address stays, as the editor embeds it, and only one
+  H5P.Video plays: it chooses a player by its own pattern for each host, and an address none
+  matches goes to its HTML5 player, which cannot play a page. So the build takes an address only
+  where that pattern does too, a Short's or a live stream's written as its video's watch address,
+  and refuses another on those hosts, naming the form; `build.test.ts` holds each accepted
+  address to the patterns read from H5P.Video's scripts in the pack. The first cut took
+  `youtube.com/shorts/`, `player.vimeo.com` and any `panopto.com` address, which built and then
+  did not play (found in the PR's own review). A package with media goes through the
+  normalizer's `normalizeArchive`, so it is stored and laid out to stream, an mp4's index first.
+  An addon whose pattern the text matches, H5P.MathDisplay for LaTeX, is carried as a site with
+  it installed exports it.
 - **The pack is pinned.** The dependency is `workspace:*`, published as the exact version
   packages/libraries has, so a release builds with the libraries it was tested with and one command
   needs no project set up; `--libraries` names another `parts/` folder. Each part is checked

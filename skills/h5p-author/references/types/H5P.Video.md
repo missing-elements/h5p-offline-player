@@ -2,7 +2,7 @@
 
 A video player, a part other content holds: in a page, a book, a slide or a scenario. Not a content type on its own; Interactive Video is the one with questions over a video.
 
-- `sources` is the video: a file beside the source (`.mp4`, `.webm`), a web address of one, or a YouTube, Vimeo or Panopto page, which plays from there and shares the viewing with that site.
+- `sources` is the video: a file beside the source (`.mp4`, `.webm`), a web address of one, or the address of a video on YouTube, Vimeo or Panopto, which plays from there and shares the viewing with that site.
 - Captions: `a11y`, `[{ "label": "English", "kind": "captions", "srcLang": "en", "track": { "path": "captions.vtt" } }]`.
 
 ## Example

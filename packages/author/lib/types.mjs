@@ -51,8 +51,8 @@ function fieldAt(semantics, names) {
   for (const name of names) {
     field = fields.find((each) => each.name === name)
     if (!field) return null
-    fields = field.type === 'list' ? [field.field] : field.fields ?? []
     if (field.type === 'list') fields = field.field?.type === 'group' ? field.field.fields ?? [] : [field.field]
+    else fields = field.fields ?? []
   }
   return field
 }

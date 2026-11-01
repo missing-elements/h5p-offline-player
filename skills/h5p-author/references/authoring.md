@@ -39,7 +39,9 @@ Use what the user already gave. Ask for what is missing and matters:
 
 - Only files the user has or may use; a web address is downloaded into the package at build
   time, so its licence travels with it. A YouTube, Vimeo or Panopto video stays there and
-  plays from there, which tells that site who watches.
+  plays from there, which tells that site who watches. Give the video's own address, the
+  one H5P plays: `youtube.com/watch?v=…` or `youtu.be/…` (a Short's is taken as its
+  video's), `vimeo.com/` and the number, a Panopto viewer's `…/Panopto/Pages/Viewer.aspx?id=…`.
 - Pictures: `.png`, `.jpg`, `.gif`, `.bmp`. Video: `.mp4`, `.webm`. Audio: `.mp3`, `.m4a`,
   `.wav`, `.ogg`. H5P takes no SVG or WebP.
 - Positions on a picture (hotspots, areas, stages) are guesses until seen: look at the picture

@@ -5,13 +5,13 @@ import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
-import { crc32, deflateSync } from 'node:zlib'
 import { BlobReader, TextWriter, Uint8ArrayWriter, ZipReader } from '@zip.js/zip.js'
 import { pack } from '@missing-elements/h5p-libraries'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { buildPackage, SourceError } from '../lib/author.mjs'
 import { readSource } from '../lib/build.mjs'
 import { validateQuiz } from '../lib/quiz.mjs'
+import { jpeg, mp4, png } from './helpers/media'
 
 const skill = resolve(import.meta.dirname, '../../../skills/h5p-author')
 const parts = resolve(import.meta.dirname, '../../libraries/parts')
@@ -71,39 +71,6 @@ async function defaults(machineName: string, code: string, path: string[]) {
     translation = translated.fields ?? []
   }
   return { english: field!.default, translated: translated!.default }
-}
-
-/** A PNG of one colour. */
-function png(width: number, height: number) {
-  const row = Buffer.alloc(1 + width * 3, 0x80)
-  row[0] = 0
-  const chunk = (type: string, data: Buffer) => {
-    const length = Buffer.alloc(4)
-    length.writeUInt32BE(data.length)
-    const crc = Buffer.alloc(4)
-    crc.writeUInt32BE(crc32(Buffer.concat([Buffer.from(type), data])))
-    return Buffer.concat([length, Buffer.from(type), data, crc])
-  }
-  const header = Buffer.alloc(13)
-  header.writeUInt32BE(width, 0)
-  header.writeUInt32BE(height, 4)
-  header[8] = 8
-  header[9] = 2
-  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', header), chunk('IDAT', deflateSync(Buffer.concat(Array.from({ length: height }, () => row)))), chunk('IEND', Buffer.alloc(0))])
-}
-
-/** An mp4 as boxes, its index after its media unless `faststart`. */
-function mp4(faststart: boolean) {
-  const box = (type: string, body: Buffer) => {
-    const head = Buffer.alloc(8)
-    head.writeUInt32BE(8 + body.length)
-    head.write(type, 4)
-    return Buffer.concat([head, body])
-  }
-  const ftyp = box('ftyp', Buffer.from('isom\0\0\0\0isomavc1'))
-  const moov = box('moov', box('mvhd', Buffer.alloc(100)))
-  const mdat = box('mdat', Buffer.alloc(4096, 7))
-  return Buffer.concat(faststart ? [ftyp, moov, mdat] : [ftyp, mdat, moov])
 }
 
 describe('the quiz format', () => {
@@ -351,6 +318,8 @@ describe('media', () => {
 
   it('copies files beside the source and from the web, with their type, size and copyright', async () => {
     await writeFile(join(dir, 'red.png'), png(300, 200))
+    // A colour profile of 100 kB before the frame header, past the first read.
+    await writeFile(join(dir, 'photo.jpg'), jpeg(640, 480, 100_000))
     const { content, entries, media } = await build({
       ...META,
       type: 'H5P.Dialogcards',
@@ -359,7 +328,8 @@ describe('media', () => {
           { text: 'Red', answer: 'Rot', image: { path: 'red.png', copyright: { license: 'CC BY', author: "O'Neil" } }, imageAltText: 'A red square' },
           { text: 'Map', answer: 'Karte', image: { path: `${origin}/pictures/map.png` }, imageAltText: 'A map' },
           { text: 'Tall', answer: 'Hoch', image: { path: `${origin}/picture` }, imageAltText: 'Tall' },
-          { text: 'Again', answer: 'Wieder', image: { path: 'red.png' }, imageAltText: 'The same red square' }
+          { text: 'Again', answer: 'Wieder', image: { path: 'red.png' }, imageAltText: 'The same red square' },
+          { text: 'Photo', answer: 'Foto', image: { path: 'photo.jpg' }, imageAltText: 'A photo' }
         ]
       }
     }, { base: dir })
@@ -367,9 +337,10 @@ describe('media', () => {
       { path: 'images/red.png', mime: 'image/png', width: 300, height: 200, copyright: { license: 'CC BY', author: 'O&#39;Neil' } },
       { path: 'images/map.png', mime: 'image/png', width: 40, height: 20, copyright: { license: 'U' } },
       { path: 'images/picture.png', mime: 'image/png', width: 10, height: 30, copyright: { license: 'U' } },
-      { path: 'images/red.png', mime: 'image/png', width: 300, height: 200, copyright: { license: 'U' } }
+      { path: 'images/red.png', mime: 'image/png', width: 300, height: 200, copyright: { license: 'U' } },
+      { path: 'images/photo.jpg', mime: 'image/jpeg', width: 640, height: 480, copyright: { license: 'U' } }
     ])
-    expect(media).toEqual(['images/red.png', 'images/map.png', 'images/picture.png'])
+    expect(media).toEqual(['images/red.png', 'images/map.png', 'images/picture.png', 'images/photo.jpg'])
     // Media stored, after the content, as the normalizer lays a package out to stream.
     const names = entries.map(entry => entry.filename)
     expect(names.indexOf('content/images/red.png')).toBeGreaterThan(names.indexOf('content/content.json'))
@@ -400,6 +371,46 @@ describe('media', () => {
     expect(entries.length).toBeGreaterThan(3)
   })
 
+  it('takes a hosted video at an address H5P.Video plays, a Short\'s as its video\'s, and refuses another', async () => {
+    const video = (path: string) => ({ content: { library: 'H5P.Video', params: { sources: { path } } } })
+    const { content } = await build({
+      ...META,
+      type: 'H5P.Column',
+      params: {
+        content: [
+          'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s',
+          'https://youtu.be/dQw4w9WgXcQ?si=abc',
+          'https://youtube.com/shorts/aqz-KE-bpKQ?feature=share',
+          'https://vimeo.com/76979871',
+          'https://video.example.edu/Panopto/Pages/Viewer.aspx?id=0b6d3a5e-1f2c-4c3e-9a51-b0d1a2c3d4e5'
+        ].map(video)
+      }
+    })
+    const sources: { path: string, mime: string }[] = content.content.map(({ content }: { content: { params: { sources: unknown[] } } }) => content.params.sources[0])
+    expect(sources.map(({ mime, path }) => `${mime} ${path}`)).toEqual([
+      'video/YouTube https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s',
+      'video/YouTube https://youtu.be/dQw4w9WgXcQ?si=abc',
+      'video/YouTube https://www.youtube.com/watch?v=aqz-KE-bpKQ',
+      'video/Vimeo https://vimeo.com/76979871',
+      'video/Panopto https://video.example.edu/Panopto/Pages/Viewer.aspx?id=0b6d3a5e-1f2c-4c3e-9a51-b0d1a2c3d4e5'
+    ])
+    // H5P.Video's own patterns, read from its scripts in the pack: it chooses a player by them.
+    const library = pack.libraries.find(library => library.machineName === 'H5P.Video' && library.majorVersion === 1)!
+    const { files } = await archive(new URL(library.url))
+    const plays = Object.fromEntries(['YouTube', 'Vimeo', 'Panopto'].map((host) => {
+      const [, body, flags] = /url\.match\(\/(.+)\/([a-z]*)\);/.exec(files.get(`${library.folder}/scripts/${host.toLowerCase()}.js`)!)!
+      return [`video/${host}`, new RegExp(body, flags)]
+    }))
+    for (const { mime, path } of sources) expect(plays[mime].test(path), path).toBe(true)
+    const refused = ['https://player.vimeo.com/video/76979871', 'https://www.youtube.com/playlist?list=PL0123456789', 'https://example.panopto.eu/Panopto/Pages/Sessions/List.aspx']
+    for (const path of refused) expect(Object.values(plays).some((pattern) => pattern.test(path)), path).toBe(false)
+    expect(await problems({ ...META, type: 'H5P.Column', params: { content: refused.map(video) } })).toEqual([
+      'params.content[0].content.params.sources.path: https://player.vimeo.com/video/76979871 is a Vimeo address H5P.Video cannot play: give https://vimeo.com/ and the video\'s number',
+      'params.content[1].content.params.sources.path: https://www.youtube.com/playlist?list=PL0123456789 is a YouTube address H5P.Video cannot play: give https://www.youtube.com/watch?v= and the video\'s id',
+      'params.content[2].content.params.sources.path: https://example.panopto.eu/Panopto/Pages/Sessions/List.aspx is a Panopto address H5P.Video cannot play: give the viewer\'s, …/Panopto/Pages/Viewer.aspx?id= and the session\'s id'
+    ])
+  })
+
   it('names a file that is missing, of a type the field does not take, or not downloadable', async () => {
     await writeFile(join(dir, 'notes.txt'), 'x')
     expect(await problems({
@@ -428,8 +439,12 @@ describe('the build', () => {
   it('does not overwrite an output, publish partial failures, or leave staging directories', async () => {
     const path = join(dir, 'existing.h5p')
     await writeFile(path, 'keep me')
-    await expect(buildPackage(example, path)).rejects.toMatchObject({ code: 'EEXIST' })
+    const refusal = { code: 'EEXIST', message: `${path} exists, and a build never writes over a file: name a new one` }
+    await expect(buildPackage(example, path)).rejects.toMatchObject(refusal)
+    // Before any work: a source with problems is not read.
+    await expect(buildPackage({}, path)).rejects.toMatchObject(refusal)
     expect(await readFile(path, 'utf8')).toBe('keep me')
+    await expect(buildPackage(example, join(dir, 'nowhere', 'quiz.h5p'))).rejects.toThrow(`${join(dir, 'nowhere')} is not a folder to write the package in`)
     expect((await readdir(dir)).filter(name => name.startsWith('.h5p-author-'))).toEqual([])
     await expect(buildPackage({ ...example, questions: [] }, join(dir, 'invalid.h5p'))).rejects.toThrow('quiz.questions')
     expect(await readdir(dir)).not.toContain('invalid.h5p')
@@ -463,7 +478,7 @@ describe('the build', () => {
     expect(german.stdout + german.stderr).toMatch(/H5P\.QuestionSet 1\.\d+: interface texts from its translation language\/de\.json/)
     expect(german.stdout).toContain('Not verified')
     const failed = exec(process.execPath, [bin, 'build', 'german.json', 'german.h5p'], { cwd: project })
-    await expect(failed).rejects.toMatchObject({ code: 1, stderr: expect.stringContaining('EEXIST') })
+    await expect(failed).rejects.toMatchObject({ code: 1, stderr: expect.stringContaining('german.h5p exists, and a build never writes over a file: name a new one') })
     await writeFile(join(project, 'wrong.json'), JSON.stringify({ ...META, type: 'H5P.TrueFalse', params: { correct: 'maybe' } }))
     await expect(exec(process.execPath, [bin, 'build', 'wrong.json', 'wrong.h5p'], { cwd: project })).rejects.toMatchObject({
       code: 1, stderr: expect.stringContaining('params.correct: "maybe" is not an option')

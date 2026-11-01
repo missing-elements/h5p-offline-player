@@ -1,10 +1,11 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { buildPackage, SourceError } from '../lib/author.mjs'
-import { imageSize, isFaststart } from '../lib/media.mjs'
+import { imageSize } from '../lib/media.mjs'
 import { GENERATED_END, GENERATED_START, schemaLines, schemaMarkdown } from '../lib/schema.mjs'
+import { jpeg, png } from './helpers/media'
 
 const META = { title: 'Layout', language: 'en', license: 'U', authors: [{ name: 'Ann Author', role: 'Author' }] }
 let dir: string
@@ -12,8 +13,8 @@ let count = 0
 beforeAll(async () => { dir = await mkdtemp(join(tmpdir(), 'h5p-author-layout-')) })
 afterAll(async () => { await rm(dir, { recursive: true, force: true }) })
 
-async function build(type: string, params: unknown) {
-  const result = await buildPackage({ ...META, type, params }, join(dir, `layout-${++count}.h5p`))
+async function build(type: string, params: unknown, options: Parameters<typeof buildPackage>[2] = {}) {
+  const result = await buildPackage({ ...META, type, params }, join(dir, `layout-${++count}.h5p`), options)
   return result.content as Record<string, any> & { notes?: never }
 }
 
@@ -118,9 +119,10 @@ describe('Branching Scenario', () => {
 
 describe('Game Map', () => {
   it('joins stages named by label both ways, and sets the ids, types and positions the editor keeps', async () => {
+    await writeFile(join(dir, 'map.png'), png(400, 300))
     const content = await build('H5P.GameMap', {
       gamemapSteps: {
-        backgroundImageSettings: { backgroundImage: { path: 'https://example.org/map.png' } },
+        backgroundImageSettings: { backgroundImage: { path: 'map.png' } },
         gamemap: {
           elements: [
             { label: 'Harbour', canBeStartStage: true, telemetry: { x: 20, y: 60 }, neighbors: ['Market'], contentsList: [{ contentType: question }] },
@@ -128,12 +130,7 @@ describe('Game Map', () => {
           ]
         }
       }
-    }).catch((error) => error)
-    // The background is downloaded; without the network it is that problem alone.
-    if (content instanceof SourceError) {
-      expect(content.problems.map(({ path }) => path)).toEqual(['params.gamemapSteps.backgroundImageSettings.backgroundImage.path'])
-      return
-    }
+    }, { base: dir })
     const [harbour, market] = content.gamemapSteps.gamemap.elements
     expect(harbour).toMatchObject({ type: 'stage', neighbors: ['1'], telemetry: { x: '20', y: '60', width: '6', height: '10' } })
     expect(market).toMatchObject({ type: 'stage', neighbors: ['0'] })
@@ -198,30 +195,22 @@ describe('the schema a source is written from', () => {
 })
 
 describe('what a file is', () => {
-  it('reads an image\'s size from its header', () => {
+  /** A file's bytes as the build reads them, from an offset. */
+  const file = (bytes: Uint8Array) => async (offset: number, length: number) => bytes.subarray(offset, offset + length)
+
+  it('reads an image\'s size from its header, a JPEG\'s past any segments before it', async () => {
     const gif = new Uint8Array([71, 73, 70, 56, 57, 97, 3, 0, 5, 0])
     const bmp = new Uint8Array(26)
     bmp.set([66, 77])
     new DataView(bmp.buffer).setInt32(18, 7, true)
     new DataView(bmp.buffer).setInt32(22, -9, true)
-    const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 4, 0, 0, 0xff, 0xc0, 0, 17, 8, 0, 120, 0, 160, 3])
-    expect(imageSize(gif)).toEqual({ width: 3, height: 5 })
-    expect(imageSize(bmp)).toEqual({ width: 7, height: 9 })
-    expect(imageSize(jpeg)).toEqual({ width: 160, height: 120 })
-    expect(imageSize(new Uint8Array([1, 2, 3]))).toBeNull()
-  })
-
-  it('tells an mp4 with its index first from one with it last', async () => {
-    const { writeFile } = await import('node:fs/promises')
-    const box = (type: string, size: number) => {
-      const bytes = Buffer.alloc(size)
-      bytes.writeUInt32BE(size)
-      bytes.write(type, 4)
-      return bytes
-    }
-    await writeFile(join(dir, 'fast.mp4'), Buffer.concat([box('ftyp', 16), box('moov', 32), box('mdat', 64)]))
-    await writeFile(join(dir, 'slow.mp4'), Buffer.concat([box('ftyp', 16), box('mdat', 64), box('moov', 32)]))
-    expect(await isFaststart(join(dir, 'fast.mp4'))).toBe(true)
-    expect(await isFaststart(join(dir, 'slow.mp4'))).toBe(false)
+    expect(await imageSize(file(png(4, 6)))).toEqual({ width: 4, height: 6 })
+    expect(await imageSize(file(gif))).toEqual({ width: 3, height: 5 })
+    expect(await imageSize(file(bmp))).toEqual({ width: 7, height: 9 })
+    expect(await imageSize(file(new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 4, 0, 0, 0xff, 0xc0, 0, 17, 8, 0, 120, 0, 160, 3])))).toEqual({ width: 160, height: 120 })
+    // A colour profile in three segments, 150 kB of them before the frame header.
+    expect(await imageSize(file(jpeg(1600, 1200, 150_000)))).toEqual({ width: 1600, height: 1200 })
+    expect(await imageSize(file(jpeg(1600, 1200).subarray(0, 8)))).toBeNull()
+    expect(await imageSize(file(new Uint8Array([1, 2, 3])))).toBeNull()
   })
 })

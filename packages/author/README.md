@@ -60,7 +60,8 @@ What `params` takes is what H5P's editor would let an author save in the same fo
 - **Files**: `{ "path": "photo.jpg" }`, a file beside the source or an `http(s)` address, with an
   optional `copyright`. Each is copied into the package with its type and, for a picture, its size;
   the package is then laid out to stream, media stored and an mp4's index first. A YouTube, Vimeo
-  or Panopto address stays where it is.
+  or Panopto address stays where it is, if it is one H5P.Video plays: a Short's is taken as its
+  video's, and another address on those sites is refused.
 - **Interface texts** (Check, Retry…): leave them out; they come from the libraries' translations,
   and the command lists what stayed English. A source may still set one by name.
 

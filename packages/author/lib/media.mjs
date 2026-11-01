@@ -9,7 +9,7 @@ import { escapeText } from './text.mjs'
  * The files content shows: images, video, audio and other files, named in a source by a path
  * beside it or a web address, copied into the package's `content/` folder with what H5P records
  * of each — its type, an image's size, its copyright. A video on YouTube, Vimeo or Panopto stays
- * there and is played from there, as H5P's editor embeds it.
+ * there and is played from there, as H5P's editor embeds it, at an address H5P.Video plays.
  */
 
 /** The types H5P accepts for content (`H5PCore::$defaultContentWhitelist`), by what a field takes. */
@@ -30,12 +30,38 @@ const TYPES = {
 /** The folder under `content/` H5P's editor keeps each kind in. */
 const FOLDERS = { image: 'images', video: 'videos', audio: 'audios', file: 'files' }
 
-/** Video a host plays itself, which H5P.Video embeds by address. */
+/**
+ * Video a host plays itself, which H5P.Video embeds by address. H5P.Video chooses the player for
+ * an address by its own pattern for each host, and gives one no pattern matches to its HTML5
+ * player, which cannot play a page. So `plays` takes only addresses H5P.Video 1.6's pattern for
+ * the host takes as well, and any other address on the host (`on`) is refused, naming the form.
+ */
 const HOSTED = [
-  { pattern: /^https?:\/\/(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?|embed\/|shorts\/)|youtu\.be\/)/i, mime: 'video/YouTube' },
-  { pattern: /^https?:\/\/(?:www\.|player\.)?vimeo\.com\//i, mime: 'video/Vimeo' },
-  { pattern: /^https?:\/\/[^/]+\.panopto\.(?:com|eu)\//i, mime: 'video/Panopto' }
+  {
+    host: 'Vimeo',
+    mime: 'video/Vimeo',
+    plays: /^https?:\/\/(?:[\w-]+\.)*vimeo\.com\/(?:channels\/[A-Za-z_]+\/|groups\/[A-Za-z_]+\/videos\/)?\d/,
+    on: /^https?:\/\/(?:[\w-]+\.)*vimeo\.com\//i,
+    form: 'https://vimeo.com/ and the video\'s number'
+  },
+  {
+    host: 'YouTube',
+    mime: 'video/YouTube',
+    plays: /^https?:\/\/(?:[\w-]+\.)*(?:youtube\.com\/(?:watch\?(?:[^#\s]*&)?v=|embed\/|v\/)|youtu\.be\/)[\w-]{11}/i,
+    on: /^https?:\/\/(?:[\w-]+\.)*(?:youtube(?:-nocookie)?\.com|youtu\.be)\//i,
+    form: 'https://www.youtube.com/watch?v= and the video\'s id'
+  },
+  {
+    host: 'Panopto',
+    mime: 'video/Panopto',
+    plays: /^https?:\/\/[^/\s]+\/Panopto\/[^?\s]+\?id=\S+$/,
+    on: /^https?:\/\/(?:(?:[\w-]+\.)*panopto\.(?:com|eu)\/|[^/\s]+\/panopto\/)/i,
+    form: 'the viewer\'s, …/Panopto/Pages/Viewer.aspx?id= and the session\'s id'
+  }
 ]
+
+/** A YouTube Short or live stream, by its video's id, which H5P.Video plays at the watch address. */
+const YOUTUBE_SHORT = /^https?:\/\/(?:[\w-]+\.)*youtube\.com\/(?:shorts|live)\/([\w-]{11})(?![\w-])/i
 
 /** The licences a file's copyright may name, as H5P lists them. */
 const COPYRIGHT_LICENSES = ['U', 'CC BY', 'CC BY-SA', 'CC BY-ND', 'CC BY-NC', 'CC BY-NC-SA', 'CC BY-NC-ND', 'GNU GPL', 'PD', 'C']
@@ -49,66 +75,40 @@ const MAX_DOWNLOAD = 1024 ** 3
  */
 
 /**
- * An image's width and height, read from its header: PNG, JPEG, GIF and BMP.
- * @param {Uint8Array} bytes the first bytes of the file, 64 kB or the whole of a smaller one
- * @returns {{ width: number, height: number } | null}
+ * An image's width and height, read from its header: PNG, JPEG, GIF and BMP. A JPEG's are in its
+ * frame header, which any number of other segments may come before, a colour profile or XMP among
+ * them, so its segments are walked by their lengths, as far into the file as they go.
+ * @param {(offset: number, length: number) => Promise<Uint8Array>} read the file's bytes from an offset, fewer at its end
+ * @returns {Promise<{ width: number, height: number } | null>}
  * @internal
  */
-export function imageSize(bytes) {
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-  const ascii = (/** @type {number} */ offset, /** @type {number} */ length) => String.fromCharCode(...bytes.subarray(offset, offset + length))
-  if (bytes.length >= 24 && ascii(1, 3) === 'PNG' && ascii(12, 4) === 'IHDR') return { width: view.getUint32(16), height: view.getUint32(20) }
-  if (bytes.length >= 10 && (ascii(0, 6) === 'GIF87a' || ascii(0, 6) === 'GIF89a')) return { width: view.getUint16(6, true), height: view.getUint16(8, true) }
-  if (bytes.length >= 26 && ascii(0, 2) === 'BM') return { width: Math.abs(view.getInt32(18, true)), height: Math.abs(view.getInt32(22, true)) }
-  if (bytes.length >= 4 && bytes[0] === 0xff && bytes[1] === 0xd8) {
-    let offset = 2
-    while (offset + 9 < bytes.length) {
-      if (bytes[offset] !== 0xff) return null
-      const marker = bytes[offset + 1]
-      if (marker === 0xff) {
-        offset += 1
-        continue
-      }
-      const length = view.getUint16(offset + 2)
-      // A start-of-frame marker, baseline to lossless, holds the size; DHT, JPG and DAC do not.
-      if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
-        return { width: view.getUint16(offset + 7), height: view.getUint16(offset + 5) }
-      }
-      offset += 2 + length
+export async function imageSize(read) {
+  const head = await read(0, 26)
+  const view = new DataView(head.buffer, head.byteOffset, head.byteLength)
+  const ascii = (/** @type {number} */ offset, /** @type {number} */ length) => String.fromCharCode(...head.subarray(offset, offset + length))
+  if (head.length >= 24 && ascii(1, 3) === 'PNG' && ascii(12, 4) === 'IHDR') return { width: view.getUint32(16), height: view.getUint32(20) }
+  if (head.length >= 10 && (ascii(0, 6) === 'GIF87a' || ascii(0, 6) === 'GIF89a')) return { width: view.getUint16(6, true), height: view.getUint16(8, true) }
+  if (head.length >= 26 && ascii(0, 2) === 'BM') return { width: Math.abs(view.getInt32(18, true)), height: Math.abs(view.getInt32(22, true)) }
+  if (head.length < 4 || head[0] !== 0xff || head[1] !== 0xd8) return null
+  let offset = 2
+  // A bound on the walk, far past the few dozen segments a camera or an editor writes.
+  for (let steps = 0; steps < 10_000; steps++) {
+    const segment = await read(offset, 9)
+    if (segment.length < 4 || segment[0] !== 0xff) return null
+    const marker = segment[1]
+    // Fill before a marker.
+    if (marker === 0xff) {
+      offset += 1
+      continue
     }
+    const header = new DataView(segment.buffer, segment.byteOffset, segment.byteLength)
+    // A start-of-frame marker, baseline to lossless, holds the size; DHT, JPG and DAC do not.
+    if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+      return segment.length < 9 ? null : { width: header.getUint16(7), height: header.getUint16(5) }
+    }
+    offset += 2 + header.getUint16(2)
   }
   return null
-}
-
-/**
- * Whether an mp4 has its index (`moov`) before its media (`mdat`), so it plays before it has all
- * arrived. Read from the top-level boxes; an unreadable file counts as fine, since the normalizer
- * leaves what it cannot read alone.
- * @param {string} file
- * @internal
- */
-export async function isFaststart(file) {
-  const handle = await open(file, 'r')
-  try {
-    const { size } = await handle.stat()
-    let offset = 0
-    const header = new Uint8Array(16)
-    while (offset + 8 <= size) {
-      await handle.read(header, 0, 16, offset)
-      const view = new DataView(header.buffer)
-      let length = view.getUint32(0)
-      const type = String.fromCharCode(...header.subarray(4, 8))
-      if (length === 1) length = Number(view.getBigUint64(8))
-      else if (length === 0) length = size - offset
-      if (type === 'moov') return true
-      if (type === 'mdat') return false
-      if (length < 8) return true
-      offset += length
-    }
-    return true
-  } finally {
-    await handle.close()
-  }
 }
 
 export class MediaStore {
@@ -127,8 +127,6 @@ export class MediaStore {
     /** @type {Set<string>} */
     this.names = new Set()
     this.downloads = 0
-    /** Whether a video has its index at the end, which the build then moves to the front. */
-    this.slowStart = false
   }
 
   /**
@@ -146,8 +144,15 @@ export class MediaStore {
     const copyright = this.copyright(value.copyright, `${at}.copyright`, report)
     const web = /^https?:\/\//i.test(source)
     if (web && kind === 'video') {
-      const hosted = HOSTED.find(({ pattern }) => pattern.test(source))
-      if (hosted) return { path: source, mime: hosted.mime, copyright }
+      const short = YOUTUBE_SHORT.exec(source)
+      const address = short ? `https://www.youtube.com/watch?v=${short[1]}` : source
+      const hosted = HOSTED.find(({ plays }) => plays.test(address))
+      if (hosted) return { path: address, mime: hosted.mime, copyright }
+      const other = HOSTED.find(({ on }) => on.test(address))
+      if (other) {
+        report(`${at}.path`, `${source} is a ${other.host} address H5P.Video cannot play: give ${other.form}`)
+        return { path: source, copyright }
+      }
     }
     if (/^[a-z][a-z0-9+.-]*:/i.test(source) && !web) {
       report(`${at}.path`, 'expected a file beside the source or an http(s) address')
@@ -166,16 +171,17 @@ export class MediaStore {
       if (kind === 'image') {
         const handle = await open(staged.from, 'r')
         try {
-          const head = new Uint8Array(65536)
-          const { bytesRead } = await handle.read(head, 0, head.length, 0)
-          const size = imageSize(head.subarray(0, bytesRead))
+          const size = await imageSize(async (offset, length) => {
+            const bytes = new Uint8Array(length)
+            const { bytesRead } = await handle.read(bytes, 0, length, offset)
+            return bytes.subarray(0, bytesRead)
+          })
           if (!size) report(`${at}.path`, `${source} is not a ${extension.toUpperCase()} image whose size can be read`)
           else Object.assign(described, size)
         } finally {
           await handle.close()
         }
       }
-      if (kind === 'video' && mime === 'video/mp4' && !(await isFaststart(staged.from))) this.slowStart = true
       this.files.push({ name, from: staged.from })
       this.known.set(source, described)
       known = described

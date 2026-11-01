@@ -1,5 +1,5 @@
 import { constants, createReadStream } from 'node:fs'
-import { copyFile, mkdtemp, open, rm } from 'node:fs/promises'
+import { copyFile, lstat, mkdtemp, open, rm, stat } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { Readable, Writable } from 'node:stream'
 import { TextReader, ZipWriter } from '@zip.js/zip.js'
@@ -226,6 +226,15 @@ function strings(value, found = []) {
 }
 
 /**
+ * The refusal of an output that exists, with the file system's code, so a caller tells it from
+ * a source's problems.
+ * @param {string} output
+ */
+function exists(output) {
+  return Object.assign(new Error(`${output} exists, and a build never writes over a file: name a new one`), { code: 'EEXIST' })
+}
+
+/**
  * Builds a package from a source and writes it to `output`, which must not exist yet.
  * @param {unknown} input the source: `{ type, title, language, license, authors, params }`, or a quiz in the published quiz format
  * @param {string} output
@@ -233,9 +242,12 @@ function strings(value, found = []) {
  * @returns {Promise<BuildResult>}
  */
 export async function buildPackage(input, output, options = {}) {
+  output = resolve(output)
+  // Before any work, and again as the package lands, for a file that appears in between.
+  if (await lstat(output).then(() => true, () => false)) throw exists(output)
+  if (!(await stat(dirname(output)).catch(() => null))?.isDirectory()) throw new Error(`${dirname(output)} is not a folder to write the package in`)
   const source = readSource(input)
   const pack = await openPack(options.libraries)
-  output = resolve(output)
   let temporary
   try {
     /** @type {Problem[]} */
@@ -352,7 +364,9 @@ export async function buildPackage(input, output, options = {}) {
       await normalizeArchive({ input: staged, output: final })
     }
     // Unlike a hard link, an exclusive copy also works on FAT/exFAT destinations.
-    await copyFile(final, output, constants.COPYFILE_EXCL)
+    await copyFile(final, output, constants.COPYFILE_EXCL).catch((error) => {
+      throw error?.code === 'EEXIST' ? exists(output) : error
+    })
     return {
       output,
       manifest,
