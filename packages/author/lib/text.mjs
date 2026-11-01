@@ -71,8 +71,12 @@ function stylePatterns(field) {
   return patterns.map((pattern) => new RegExp(pattern, 'i'))
 }
 
-/** A tag, a comment, or a lone `<` or `>`: the pieces the content check reads markup in. */
-const PIECE = /(<(?=[^a-zA-Z!/])|<!--[\s\S]*?-->|<[^>]*(>|$)|>)/g
+/**
+ * A tag, a comment, or a lone `<` or `>`: the pieces the content check reads markup in. A comment
+ * left open runs to the end, as a browser reads it, so its end is looked for once and not again
+ * from every `<!--` after it.
+ */
+const PIECE = /(<(?=[^a-zA-Z!/])|<!--[\s\S]*?(?:-->|$)|<[^>]*(>|$)|>)/g
 const ATTRIBUTE = /([a-zA-Z_:][-a-zA-Z0-9_:.]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g
 const SAFE_URL = /^(?:https?:|mailto:|ftp:|[^:]*$)/i
 
@@ -117,7 +121,7 @@ export function markupText(value, field, report) {
       once('has a comment, which H5P removes: take it out')
       return piece
     }
-    const match = /^<\s*(\/)?\s*([a-zA-Z][a-zA-Z0-9]*)([\s\S]*?)\/?\s*>$/.exec(piece)
+    const match = /^<\s*(?:(\/)\s*)?([a-zA-Z][a-zA-Z0-9]*)((?:[^>a-zA-Z0-9][^>]*)?)>$/.exec(piece)
     if (!match) {
       once(`has "${piece.slice(0, 30)}", which is not a complete tag: write &lt; for a literal <`)
       return piece
@@ -128,7 +132,9 @@ export function markupText(value, field, report) {
       return piece
     }
     if (!match[1]) {
-      for (const [, name, double, single, bare] of match[3].matchAll(ATTRIBUTE)) {
+      // The slash of `<br />` is not part of the last attribute, as the content check reads it.
+      const attributes = match[3].trimEnd().replace(/\/$/, '')
+      for (const [, name, double, single, bare] of attributes.matchAll(ATTRIBUTE)) {
         const attribute = name.toLowerCase()
         const content = double ?? single ?? bare ?? ''
         if (attribute.startsWith('on')) once(`has an event handler, ${attribute}, on <${tag}>, which H5P removes`)

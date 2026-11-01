@@ -173,6 +173,18 @@ describe('content authored from semantics', () => {
     expect(notes).toEqual([{ path: 'params.title', message: expect.stringContaining('shown as written') }])
   })
 
+  it('takes a required field holding only tags as empty, unless one is a picture, and names a pattern by its description\'s text', () => {
+    const { problems } = generate([
+      { name: 'empty', type: 'text', widget: 'html', tags: ['strong'] },
+      { name: 'picture', type: 'text', widget: 'html', tags: ['img'] },
+      { name: 'code', type: 'text', regexp: { pattern: '^[A-Z]{3}$' }, description: 'Three <strong>capital</strong> letters' }
+    ], { empty: '<p><strong> </strong></p>', picture: '<p><img src="https://example.org/a.png"></p>', code: 'abc' }, [], STRICT)
+    expect(problems.map(({ path, message }) => `${path}: ${message}`)).toEqual([
+      'params.empty: is required and is empty',
+      'params.code: "abc" is not in the form this field takes (Three capital letters)'
+    ])
+  })
+
   it('asks for a required list that needs writing, and fills one that only has defaults', () => {
     const { params, problems } = generate([
       { name: 'answers', type: 'list', min: 2, field: { name: 'answer', type: 'group', fields: [{ name: 'text', type: 'text' }, { name: 'correct', type: 'boolean' }] } },

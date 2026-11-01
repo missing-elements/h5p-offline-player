@@ -44,6 +44,22 @@ describe('text as H5P stores it', () => {
     ])
   })
 
+  it('reads a self-closing tag without its slash, and a comment left open to the end, as a browser does', () => {
+    const problems: string[] = []
+    const field = { tags: ['strong'], font: { color: true } }
+    expect(markupText('<span style=color:#ff0000/>a<br />b', field, (message) => problems.push(message))).toBe('<span style=color:#ff0000/>a<br />b')
+    expect(problems).toEqual([])
+    markupText('<p>a</p><!-- b <em>c</em>', field, (message) => problems.push(message))
+    expect(problems).toEqual(['has a comment, which H5P removes: take it out'])
+  })
+
+  it('takes time in proportion to the text, whatever it holds', () => {
+    // The patterns before took three seconds on the first two at 40,000 characters, and four times as long at twice that.
+    const start = performance.now()
+    for (const value of ['<A' + '\t'.repeat(200_000), '<b' + ' '.repeat(200_000), '<!--x>'.repeat(40_000)]) markupText(value, { tags: [] }, () => {})
+    expect(performance.now() - start).toBeLessThan(1000)
+  })
+
   it('notes a tag in a plain field, which a learner sees as written', () => {
     const notes: string[] = []
     expect(plainText('What does <div> do?', (message) => notes.push(message))).toBe('What does &lt;div&gt; do?')

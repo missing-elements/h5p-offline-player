@@ -41,7 +41,7 @@ const machineName = (library) => (typeof library === 'string' ? library.trim().s
 
 /** Text without its tags and entities, for measuring. @param {string} html */
 function textOf(html) {
-  return html.replace(/<[^>]*>/g, ' ').replace(/&[a-zA-Z#0-9]+;/g, '_').replace(/\s+/g, ' ').trim()
+  return html.replace(/<[^<>]*>/g, ' ').replace(/&[a-zA-Z#0-9]+;/g, '_').replace(/\s+/g, ' ').trim()
 }
 
 /** A field's semantics, found by a path of names. @param {any[]} semantics @param {string[]} names */

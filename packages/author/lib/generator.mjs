@@ -459,7 +459,7 @@ export class ContentGenerator {
       }
       if (pattern && !pattern.test(stored)) this.report(path, `"${written.slice(0, 40)}" is not in the form this field takes${field.description ? ` (${stripTags(field.description).slice(0, 120)})` : ''}`)
     }
-    if (!field.optional && stored.replace(/<[^>]*>/g, '').trim() === '' && !/<(img|iframe|video|audio|hr|table)/i.test(stored)) this.report(path, 'is required and is empty')
+    if (!field.optional && stripTags(stored) === '' && !/<(img|iframe|video|audio|hr|table)/i.test(stored)) this.report(path, 'is required and is empty')
     return stored
   }
 
@@ -595,7 +595,7 @@ function names(fields) {
 
 /** @param {string} html */
 function stripTags(html) {
-  return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+  return html.replace(/<[^<>]*>/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 /** @param {any} object @param {string[]} keys */

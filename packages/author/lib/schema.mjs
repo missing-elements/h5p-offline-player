@@ -29,7 +29,7 @@ export function isInterfaceText(field) {
 
 /** @param {string} html */
 function plain(html) {
-  return html.replace(/<\/li>/g, '. ').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&#39;|&#039;/g, "'").replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&').replace(/\s+/g, ' ').replace(/\.\s*\./g, '.').trim()
+  return html.replace(/<\/li>/g, '. ').replace(/<[^<>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&#39;|&#039;/g, "'").replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&').replace(/\s+/g, ' ').replace(/\.\s*\./g, '.').trim()
 }
 
 /** @param {unknown} value */
