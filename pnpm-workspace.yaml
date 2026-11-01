@@ -23,5 +23,11 @@ ignoredBuiltDependencies:
 # vsce's Microsoft Entra sign-in, the one path that runs MSAL, fails here as it did on 6, with every
 # credential unavailable rather than an error from a changed API. Remove this once @azure/identity
 # takes 7: neither 4.14.0 nor 4.15.0-beta.1 does.
+# @vscode/vsce takes minimatch ^10.2.6, and no 10 fixes GHSA-g3hv-75wg-m249 (medium, Dependabot alert
+# #4): 11.0.1 is the first. vsce calls only `minimatch(path, pattern, { dot: true })`, to apply
+# .vscodeignore, which 11 keeps; what 11 removed (makeRe, the AST, debug) it never calls. With 11,
+# `vsce package` writes the same .vsix, every entry's name and CRC alike (2026-11-01). Remove this
+# once vsce takes 11: 4.1.0 does not.
 overrides:
   '@azure/identity>@azure/msal-node': ^7.1.0
+  '@vscode/vsce>minimatch': ^11.0.1
