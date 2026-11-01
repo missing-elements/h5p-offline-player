@@ -28,8 +28,8 @@ The hard constraints that shape every file here:
 
 ## Layout
 
-A pnpm workspace of ten parts: eight packages and two apps, the demo and the skills' test project.
-Seven of the packages are published to npm; the eighth, the VS Code extension, is a `.vsix`. Paths
+A pnpm workspace of eleven parts: nine packages and two apps, the demo and the skills' test project.
+Eight of the packages are published to npm; the ninth, the VS Code extension, is a `.vsix`. Paths
 elsewhere in this file are relative to the part they belong to — `src/…` and `scripts/…` mean the
 player's unless a section says otherwise.
 
@@ -167,6 +167,28 @@ packages/verify/          @missing-elements/h5p-verify — plays a package headl
                             ranges, a browser playing from it, its ending and its command line
   types/                    generated, not in git: the declarations, `VerifyReport` among them
 
+packages/author/          @missing-elements/h5p-author — a playable .h5p of any content type in the pack from a short
+                          source, published as a command (see *The author package*)
+  bin/h5p-author.mjs        the command: `build` and `schema`
+  lib/build.mjs             the source read and checked, the libraries loaded and localized, the
+                            content generated, media copied, layouts run, the archive written
+  lib/generator.mjs         `ContentGenerator`: content from a type's `semantics.json`, authoring
+                            (every written value checked as the editor's form would) or lenient, as
+                            the sweep runs it; moved out of the demo on 2026-11-01 (#100)
+  lib/types.mjs             what the editor's own widgets set and check, per content type: Course
+                            Presentation's layout, Interactive Video's placement, Branching
+                            Scenario's paths, Game Map's stages, Find the Hotspot's areas
+  lib/text.mjs, translate.mjs, media.mjs, pack.mjs, schema.mjs, quiz.mjs   text as H5P stores it; the
+                            libraries' translations; files and web addresses; the pinned pack read
+                            by part; the field list a source is written from; the skill's quiz format
+  scripts/                  sync-skill.mjs writes the skill's type files' generated sections from the
+                            pack (`pnpm --filter @missing-elements/h5p-author sync:skill`);
+                            check-pack-published.mjs, the publish guard for the pinned pack
+  tests/                    node tests: the generator, text and translations, layouts and schema,
+                            builds with media from disk and a local server, the command;
+                            package-types.ts as for the normalizer
+  types/                    generated, not in git: the declarations
+
 packages/cmi5/            @missing-elements/h5p-cmi5 — cmi5 for the element, published as a library
   src/index.ts              startCmi5(player): the launch, the outcome, terminate; its pure parts
                             (allowedStatement, cmi5Score, webAddress) exported for tests
@@ -249,7 +271,7 @@ apps/demo/                the demo app: the dev server for the whole repository,
   tests/app.test.ts         the installable app's screens, history and keyboard, through the dev
                             server; engine.ts and harness.ts its helpers. The demo's other pages
                             have no tests (see *Commands*)
-  tests/sweep-content.test.ts  the sweep's content generator, in Node
+  tests/sweep-content.test.ts  the sweep's fill for h5p-author's generator, in Node
   cmi5-catapult/            docker-compose.yml for ADL's CATAPULT player, MySQL and the SQL LRS;
                             scripts/cmi5-catapult.mjs clones CATAPULT into it (ignored) and proves
                             the cmi5 page against the player
@@ -264,7 +286,8 @@ apps/demo/                the demo app: the dev server for the whole repository,
   scripts/                  build-demo (the site into dist-demo/), build-demo-content, build-og-image,
                             build-app-icons, build-app-screenshots, build-libraries (the pack, into
                             packages/libraries), sweep-content-types (every content type in the pack
-                            played; see *The content-type sweep*), lib/sweep-content.mjs its generator,
+                            played; see *The content-type sweep*), lib/sweep-content.mjs its way of running
+                            h5p-author's generator,
                             lib/code-blocks.mjs the Vite plugin that highlights the pages' code,
                             lib/hub.mjs the hub host, the cache and the download the two hub-reading
                             scripts share, lib/pages.mjs the one list of the site's pages, for the
@@ -281,20 +304,15 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             site root -> dist-demo/
 
 apps/skills/              the skills' test project, a project of the kind a skill's user runs it in:
-                          it installs what h5p-author tells its user to install, the library pack and
-                          zip.js, which the script resolves from it, and the verifier the skill runs
-                          with npx; nothing in it ships. Out of the demo since 2026-10-23, by the
-                          owner's choice
-  tests/author.test.ts      h5p-author's helper in Node: its quiz validation, its archives, the
-                            interface texts from the libraries' translations for the quiz's language,
-                            a damaged library part refused by its SHA-256 before anything is
-                            published, a zip.js older than 2.24 stopped with the install command,
-                            and the skill copied outside the checkout, resolving its dependencies
-                            from the calling project
-  tests/author-verify.test.ts  both quiz kinds, the eight-scenario example, a quiz in Ukrainian and one
-                            whose titles and author carry quotes and markup through the verifier's
-                            published API, trusted and untrusted against the installed pack: each a
-                            pass with no warnings
+                          it installs the commands the skills run with npx, the author package and
+                          the verifier, and the library pack; nothing in it ships. Out of the demo
+                          since 2026-10-23, by the owner's choice
+  tests/author-verify.test.ts  every h5p-author type file's example built, with sample media, and
+                            played trusted and untrusted through the verifier's published API, each
+                            a pass with no warnings; each file's generated section compared with
+                            the pack's, so a pack refresh shows a change; and the quiz format: both
+                            kinds, the eight-scenario example, a quiz in Ukrainian and one whose
+                            titles and author carry quotes and markup
   tests/author-playback.test.ts  the eight-scenario example in the verifier's preview, the review the
                             skill hands a person, trusted and untrusted: every question's feedback,
                             75% failing and 83.3% passing an 80% threshold, retry to 100%, and only
@@ -325,12 +343,12 @@ skills/                   agent skills, one directory per skill, at the root bec
                           `npx skills add <owner/repo>` looks: h5p-verify (when to run the verifier and how
                           to read its report), h5p-player-setup (putting the player on a site), h5p-normalize (when
                           a package needs rewriting to stream, and how to read the dry run)
-                          and h5p-author (text-only Multiple Choice and Question Set from a prompt:
-                          a quiz JSON source, the installed pack's semantics, its translations for
-                          the quiz's language (2026-10-31, #96) and runtime dependency closure,
-                          then the verifier's check, its screenshot and its preview for the user;
-                          its bundled scripts/build-quiz.mjs resolves dependencies from the
-                          caller's project, and is tested from apps/skills)
+                          and h5p-author (any of 28 content types from a prompt, since #100: the
+                          type chosen with the user first, a source of only what differs from the
+                          defaults, written from references/types/<Type>.md — notes, a tested
+                          example and the fields, their section generated from the pack — built
+                          with `npx @missing-elements/h5p-author`, then the verifier's check, its
+                          screenshot and its preview for the user; tested from apps/skills)
 
 api/no-range.js           the Vercel function that stands in for a host without Range on the demo
 vercel.json               the deployment: build command, the /no-range rewrite, caching and security headers
@@ -369,6 +387,8 @@ pnpm typecheck         # every package
 pnpm build             # the player: types, element, both workers; builds the runtime package on the way
 pnpm normalize course.h5p          # rewrite a package so it streams: media stored, mp4 index first
 pnpm verify course.h5p             # play a package in a headless browser and report whether it works
+pnpm author build source.json course.h5p  # a package of any content type in the pack from a short source
+pnpm --filter @missing-elements/h5p-author sync:skill  # the h5p-author skill's type files' fields, from the pack
 pnpm --filter h5p-preview package  # the VS Code extension's .vsix, from the player as pnpm build left it
 pnpm --filter h5p-preview test:vscode  # its suite in a VS Code it downloads; under xvfb-run on Linux
 pnpm --filter h5p-preview screenshot  # its listing's screenshot, images/preview.png, in that VS Code
@@ -438,10 +458,11 @@ cmi5 page also against CATAPULT (`pnpm cmi5:catapult`). Where a page's test was 
 package's behaviour, the test moved into the package: the embed page asking before it plays a
 package that needs its own code, and `resizer.js` answering a frame that loaded before it, are in
 `packages/embed/tests/site.test.ts`; the cmi5 page's were already in `packages/cmi5/tests/`.
-The skills' scripts are source too, tested from `apps/skills`, a project of their own (2026-10-23,
-the owner's choice). h5p-author's tests were first in the demo, which had the pack and zip.js
-installed, and in the verifier's tests, and the playback test played the quiz through the
-installable app. It plays it in the verifier's preview now, the page the skill hands a person to
+The skills are source too, tested from `apps/skills`, a project of their own (2026-10-23, the
+owner's choice): what they tell an agent to write builds and plays. h5p-author's own code is the
+author package's since #100, tested with it. Its tests were first in the demo, which had the pack
+and zip.js installed, and in the verifier's tests, and the playback test played the quiz through
+the installable app. It plays it in the verifier's preview now, the page the skill hands a person to
 review it in, and in Chromium only, where in the demo the `engines` job ran it in Firefox and
 WebKit too; the player's own suite covers the engines.
 
@@ -1928,6 +1949,79 @@ The tests need the player built (`pnpm build`); the package's `test` script does
 The repository's own sweep does click through content and read its statements (next section),
 for packages it makes; the verifier, which is handed a stranger's, still does not.
 
+## The author package
+
+`@missing-elements/h5p-author` builds a playable package of any content type in the pack from a
+source of only what an author would write: `{ type, title, language, license, authors, params }`,
+`params` holding the fields that differ from their defaults. Built on 2026-11-01 for #100, the
+owner's design: the content type chosen with the user first, a file per type in the h5p-author
+skill so no agent works out how a type is built, a short skill, one package for the whole pack. It
+replaced the skill's bundled `scripts/build-quiz.mjs`, which built Multiple Choice and Question Set
+alone, and its quiz format stays a source the build takes (`lib/quiz.mjs` maps it), so nothing
+written in it broke. Measured on a five-question quiz, at four characters a token: `content.json`
+was about 3,470 tokens to write by hand, after reading 3,900 to 9,500 of a type's semantics; the
+source is 1,000 to 1,800 tokens, written from a type file of 200 to 3,000. Six things the code does
+not say by itself:
+
+- **One generator, two ways to run it.** `ContentGenerator` was the sweep's
+  (`apps/demo/scripts/lib/sweep-content.mjs`), and moved here so there is one copy; the sweep runs
+  it `lenient`, keeping what its files write as written and filling every required field from its
+  own samples, and its 55 types came out byte for byte the same after the move. Authoring checks
+  every written value as H5P's editor would let an author save it, and reports every problem with
+  its path, all at once, so a fix is one round: a field the semantics do not name, a select's
+  unknown option, a number out of range or with decimals the editor's number field refuses, a list
+  too short or long, a required field with neither a value nor a default, sub-content of a library
+  the field does not take. What the editor does is the rule, read from h5p-editor-php-library's
+  widgets on 2026-11-01: a new list starts with `defaultNum`, `min` or one item, and a list such an
+  item needs writing in is reported as one missing list; a field its `showWhen` rule hides is not
+  asked for (Multimedia Choice's poster, wanted only for audio); media fields, which the editor
+  never asks for, are required where the semantics say so, and optional where a type plays without
+  them (H5P.Video's poster); a library default nobody opened, Interactive Video's summary task, is
+  left as the editor leaves it, asking nothing.
+- **Text is stored as the platforms store it.** A plain field is escaped as `htmlspecialchars`
+  does, existing entities kept, and a tag in it is noted, since a learner sees it as written. A
+  field with `tags` takes markup with the tags the content check keeps for it (its own, `div`,
+  `span`, `p`, `br`, and what they imply), checked here rather than filtered later: any other tag,
+  an event handler, a style the field does not allow, a script address or a comment is a problem
+  by name. Plain text written into such a field is wrapped as the editor wraps typing: in `<p>`
+  where the field's `enterMode` is `p` or its tags offer headings, `pre`, `p` or `div`, in `<div>`
+  otherwise. Every plain default is escaped too, English or translated, and a `null` default (Course
+  Presentation's colours) is left out, which the content check would otherwise turn into a
+  warning. Every type file's example plays untrusted with no warning, which is the test of this.
+- **Some types need what their editor widget does.** Course Presentation, Interactive Video, Game
+  Map and Branching Scenario are edited on a slide, a video, a map and a tree of their own, which set
+  fields the form hides (`widget: "none"`). `lib/types.mjs` does each one's work on the generated
+  content, wherever the type appears: a slide's unplaced elements stacked, text as tall as its lines
+  on CP's 16:9 slide at 16 px per 640, pictures shrunk in shape, a question in what is left, with a
+  note when a slide holds too much; interactions placed apart and named by their library; stages
+  given ids and types, neighbours named by label made indices both ways; end screens numbered. It
+  checks what those widgets would not let pass: a scenario node with no next, a link to no node, a
+  loop no path leaves; a map with no start; a hotspot question with no right area. A hidden field
+  nothing set is reported. Lists such a widget draws start empty.
+- **Media are copied and described.** A file is `{ path }`, beside the source or an `http(s)`
+  address, downloaded at build time; it lands under `content/images|videos|audios|files/` with its
+  MIME type, an image's size read from its header (PNG, JPEG, GIF, BMP), and its copyright, on
+  H5P's own list of types (no SVG, no WebP). A YouTube, Vimeo or Panopto address stays, as the
+  editor embeds it. A package with media goes through the normalizer's `normalizeArchive`, so it is
+  stored and laid out to stream, an mp4's index first. An addon whose pattern the text matches,
+  H5P.MathDisplay for LaTeX, is carried as a site with it installed exports it.
+- **The pack is pinned.** The dependency is `workspace:*`, published as the exact version
+  packages/libraries has, so a release builds with the libraries it was tested with and one command
+  needs no project set up; `--libraries` names another `parts/` folder. Each part is checked
+  against the index's SHA-256 before it is read. `prepublishOnly` refuses while that version is not
+  on npm with this checkout's index (`scripts/check-pack-published.mjs`), as the player's does.
+- **The skill's type files are partly generated.** `skills/h5p-author/references/types/<Type>.md`
+  holds hand-written notes, an example, and the type's fields between two markers, written by
+  `schemaOf(…, { markdown: true })`: names, kinds, defaults, options, list sizes, a markup field's
+  tags, the sub-content the pack has, the syntax the editor's `important` box explains, `showWhen`
+  conditions; interface texts and the fields a layout sets left out. The weekly pack refresh runs
+  `sync:skill`; `apps/skills`' test fails on a file out of date, and builds and plays every
+  example. 28 content types have files, and the parts other content holds (Text, Image, Video);
+  any other type's fields are one `h5p-author schema` away.
+
+Not built: editing an existing package, layout for Drag and Drop and Crossword, and any judgement
+of whether content is right, which stays the person's, in the verifier's preview.
+
 ## The VS Code extension
 
 `packages/vscode` is **H5P Preview by Missing Elements** (`MissingElements.h5p-preview`): a `.h5p`
@@ -2306,7 +2400,7 @@ Not covered:
 
 ## Types for the plain-JS packages
 
-The normalizer, the verifier and the embed package are JavaScript with JSDoc, and since #60 their
+The normalizer, the verifier, the embed package and the author are JavaScript with JSDoc, and since #60 their
 documented API ships with declarations generated from it: `tsconfig.json` checks `lib/` (and
 `site/embed.js`) with `checkJs`, `tsconfig.types.json` emits the entries' declarations into
 `types/` with `stripInternal`, and each `exports` entry names them under `types`. `pnpm types`
@@ -2349,8 +2443,9 @@ been measured on four content types: the hub serves no example content, and h5p.
 carry licences of their own and old versions, so each package is made here. 110 plays take about
 three minutes locally, five on CI.
 
-- **Content is generated from the content type's own `semantics.json`**
-  (`lib/sweep-content.mjs`), as H5P's editor saves a form: every default, and for a required field
+- **Content is generated from the content type's own `semantics.json`** by the author package's
+  generator, run lenient with the sweep's fill (`lib/sweep-content.mjs`; one copy since #100,
+  checked byte for byte on all 55 types when it moved), as H5P's editor saves a form: every default, and for a required field
   without one the smallest value the content check accepts — a label as text, the first sample a
   pattern accepts, the minimum number, the first option, a list as long as its `min` or
   `defaultNum`, the sample image, video or audio. A group's own default is its whole value; a group

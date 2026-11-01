@@ -1,0 +1,66 @@
+{
+  "name": "@missing-elements/h5p-author",
+  "version": "0.1.0",
+  "description": "Builds a playable .h5p of any content type in the H5P hub's library pack from a short JSON source: only the fields that differ from the defaults, the rest filled from the libraries' own semantics and translations. For AI agents and scripts; no H5P server.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/missing-elements/h5p-offline-player.git",
+    "directory": "packages/author"
+  },
+  "homepage": "https://github.com/missing-elements/h5p-offline-player/tree/main/packages/author#readme",
+  "bugs": {
+    "url": "https://github.com/missing-elements/h5p-offline-player/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "bin": {
+    "h5p-author": "./bin/h5p-author.mjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./types/author.d.mts",
+      "default": "./lib/author.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "types"
+  ],
+  "keywords": [
+    "h5p",
+    "authoring",
+    "generator",
+    "quiz",
+    "elearning",
+    "ai",
+    "cli",
+    "agent-skill"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "typecheck": "pnpm types && tsc -p tsconfig.json",
+    "sync:skill": "node scripts/sync-skill.mjs",
+    "prepack": "node -e \"require('node:fs').copyFileSync('../../LICENSE', 'LICENSE')\" && pnpm types",
+    "prepublishOnly": "node -e \"if (!/^pnpm\\//.test(process.env.npm_config_user_agent || '')) { console.error('Publish with pnpm publish: npm would ship the workspace: dependency ranges as they are, and the package would not install.'); process.exit(1) }\" && node scripts/check-pack-published.mjs && pnpm typecheck && pnpm test",
+    "types": "node -e \"require('node:fs').rmSync('types', { recursive: true, force: true })\" && tsc -p tsconfig.types.json"
+  },
+  "dependencies": {
+    "@missing-elements/h5p-libraries": "workspace:*",
+    "@missing-elements/h5p-normalize": "workspace:^",
+    "@zip.js/zip.js": "^2.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

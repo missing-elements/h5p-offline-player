@@ -1,153 +1,115 @@
 ---
 name: h5p-author
-description: Create an H5P quiz from a prompt, lesson, or supplied source material. Use when asked to generate, author, or build a playable .h5p Multiple Choice question or Question Set with AI. Includes a portable packaging helper, a quiz example, and the authoring-and-verification loop; no H5P server or provider API needed.
+description: Create H5P content from a prompt, a lesson or supplied material, as a playable .h5p - quizzes, fill in the blanks, drag the words, flash cards, presentations, interactive books, branching scenarios, interactive video, image hotspots, memory games and more. Use when asked to generate, author or build H5P content or an .h5p file with AI. The content type is chosen with the user first; a short JSON source holds only what differs from its defaults. No H5P server or provider API needed.
 license: MIT
 ---
 
-# Author and verify an H5P quiz
+# Author H5P content
 
-Turn source material into a playable `.h5p`, not just JSON that looks plausible.
-This first workflow supports **text-only H5P.MultiChoice and H5P.QuestionSet**.
-It does not implement other content types, media, or a general H5P editor. Do not
-quietly substitute a quiz if the user requested another kind of activity.
+You write a short source: the content type and only what its defaults cannot know.
+`@missing-elements/h5p-author` fills in the rest from the libraries, copies them, and checks
+every field. Needs Node 22 and a shell; nothing to install. Keep [LICENSE](./LICENSE) with
+the skill.
 
-Works with Claude Code and other agents that can read skills, write files, and run
-Node commands. Ordinary chat without filesystem and command access cannot run the
-workflow by itself. No AI provider SDK, API key, MCP server, or repository checkout
-is required. Model calls are made by the user's agent, not by the player.
-Keep [LICENSE](./LICENSE) with the installed skill and helper. Each sample's
-content license is declared separately in its source JSON.
+## 1. Choose the content type with the user
 
-## 1. Establish the brief
+Read [the brief](./references/authoring.md) once. If the user named no type, propose one or
+two that fit the material and objective, a sentence each on why, and wait for their choice.
 
-Use what the user already supplied. Clarify missing essentials: source material,
-audience, learning objective, question count, single- or multiple-answer questions,
-pass mark, language, authorship/license, and destination. Do not invent factual
-source material, claim expert review, or assign a license the user has not
-authorized. Use `U` (undisclosed) when the license is unknown, and ask for the
-author's name.
+| Type | Use it for |
+|---|---|
+| H5P.MultiChoice | one question, one or several right answers |
+| H5P.QuestionSet | a quiz: questions in turn, then a score |
+| H5P.TrueFalse | one statement, true or false |
+| H5P.Blanks | typing the missing words of a text |
+| H5P.DragText | dragging words into the gaps of a text |
+| H5P.MarkTheWords | clicking the words of a text that fit a rule |
+| H5P.SingleChoiceSet | quick questions, one right answer each |
+| H5P.Summary | building a summary from true statements |
+| H5P.SortParagraphs | putting paragraphs in order |
+| H5P.Essay | free text, scored by keywords |
+| H5P.Dialogcards | flash cards, not scored |
+| H5P.Accordion | reference text in panels, not scored |
+| H5P.Column | a page of text, media and questions |
+| H5P.Questionnaire | a survey, no right answers |
+| H5P.InteractiveBook | chapters of pages, with a summary |
+| H5P.CoursePresentation | slides with text, pictures and questions |
+| H5P.BranchingScenario | a story whose choices lead to different ends |
+| H5P.Timeline | events along a time line |
+| H5P.InteractiveVideo | questions and text over a video (needs a video) |
+| H5P.ImageHotspots | a picture with spots that open text (a picture) |
+| H5P.ImageHotspotQuestion | clicking the right area of a picture (a picture) |
+| H5P.MultiMediaChoice | a question with pictures as answers (pictures) |
+| H5P.MemoryGame | finding pairs of cards (pictures) |
+| H5P.ImagePair | matching pictures to pictures (pictures) |
+| H5P.ImageSequencing | putting pictures in order (pictures) |
+| H5P.Dictation | hearing sentences and typing them (recordings) |
+| H5P.Audio | an audio player (a recording) |
+| H5P.GameMap | stages on a map, each with exercises (a map) |
 
-Read [the input format](./references/quiz-format.md) and
-[the worked quiz](./assets/quiz.json). Write a source JSON file in the user's
-project. These strings are **plain text**, not HTML. The helper escapes them.
-For a fuller example, read [the eight-scenario brief and answer key](./references/scenario-quiz.md)
-with [its source JSON](./assets/phishing-scenarios.json): mixed answer modes,
-explanatory feedback, an 80% threshold, and complete fail/retry/pass checks.
+Media come from the user; never invent them. For a type not listed, run
+`npx @missing-elements/h5p-author@latest schema <Type>` and say it has no notes here. Never
+read a library's semantics or code yourself.
 
-For each question:
+## 2. Write the source
 
-- Test the stated objective with an answer supported by the supplied material.
-- Write plausible distractors and explanatory feedback for every answer.
-- Mark exactly one correct answer unless `multipleAnswers` is true.
-- For multiple answers, say "Select all that apply" and mark at least one correct.
-- Keep the source JSON as the editable deliverable; do not edit generated archives.
+Read the type's file, `references/types/<Type>.md`: notes, an example, its fields. Parts other
+content holds have files too: H5P.AdvancedText, H5P.Image, H5P.Video, H5P.Text.
 
-When the quiz has a pass mark, set `passPercentage` and write `passedFeedback` and
-`failedFeedback` in the content's language. They are the learner's only word on
-whether they passed; the failed one should say what to do next. A Question Set does
-not draw them on its result page until H5P fixes its bug, and only screen readers
-announce them meanwhile (see the input format). For a Question Set, tell the user
-so, since learners then need to learn the pass mark another way.
-
-`language` also sets the interface: the libraries' own texts (Start, Check, Retry,
-Finish, the result screen) come from their translations for it, and the player's own
-strings follow it. Those translations are often incomplete. A Question Set's
-navigation and result screen ("Previous", "Next", "Results", "Score") are English in
-all but one or two of its 48 translations. The helper lists every interface text it
-left in English; tell the user which ones, rather than delivering a mixed interface
-as a translated activity.
-For a feature this helper does not support, explain the limit.
-
-## 2. Prepare the project
-
-Needs **Node 22 or later**. Run from a writable project directory with a
-`package.json` (create one with the project's package manager if needed):
-
-```bash
-npm install --save-dev @missing-elements/h5p-libraries@^1 @zip.js/zip.js@^2.24
+```json
+{
+  "type": "H5P.Blanks", "title": "Rivers", "language": "en", "license": "CC BY",
+  "authors": [{ "name": "Ann Author", "role": "Author" }],
+  "params": { "questions": ["The *Danube* flows into the Black Sea."] }
+}
 ```
 
-Use the project's existing package manager if different, and keep its lockfile:
-the installed library pack determines the exact library versions in the output.
-If either package is already installed at an older version, the helper stops and
-prints this command.
-The pack contains third-party libraries under their own licenses; preserve their
-files/notices and review those terms before distribution.
-
-Resolve `<skill>` below to **this installed skill's directory**, not a path in the
-player's repository. Quote paths that contain spaces. Dependencies are resolved
-from the project's current working directory, so a globally installed skill works
-too. The helper reads the installed pack locally; no hub or CDN is contacted.
+- `params` holds only fields that differ from their defaults. Never interface texts (Check,
+  Retry…): they come from the libraries' translations for `language`.
+- Text is plain, or markup with only the tags a field marked `html` lists.
+- A file is `{ "path": "photo.jpg" }`, beside the source or a web address, with `copyright`
+  when known.
+- Sub-content is `{ "library": "H5P.MultiChoice", "params": { … }, "metadata": { "title": "…" } }`.
+- A quiz of Multiple Choice questions alone is shorter in [the quiz format](./references/quiz-format.md),
+  which the build also takes.
 
 ## 3. Build
 
 ```bash
-node "<skill>/scripts/build-quiz.mjs" quiz.json course.h5p
+npx @missing-elements/h5p-author@latest build source.json course.h5p
 ```
 
-The helper validates the source, reads defaults from the installed libraries'
-`semantics.json` and their translation for `language`, assigns each sub-question a
-UUID, and writes a self-contained archive with the required runtime dependency
-closure, not the entire pack. Library parts are checked against the pack index's
-SHA-256 before being copied; a mismatch stops the build and names the part. Library
-folders stay together before `content/`.
-Existing output is never overwritten; use a new filename for a revision.
+It writes nothing until the whole source is right, listing every problem by its path, and
+never overwrites a file. Fix and build to a new name. Pass its notes on to the user: texts
+left in English, a slide that holds too much.
 
-There is no media in this workflow, so no normalization step is needed. If a later
-workflow adds media, use `h5p-normalize` and verify the final rewritten file.
-
-## 4. Verify the actual output
+## 4. Verify
 
 ```bash
 npx @missing-elements/h5p-verify@latest course.h5p
-```
-
-Needs Chrome/Edge or Playwright Chromium (`npx playwright install chromium`).
-Keep `@latest`: an older Node can otherwise select an old verifier silently.
-For a destination that plays uploads untrusted against its pack, also run:
-
-```bash
 npx @missing-elements/h5p-verify@latest course.h5p --untrusted --libraries pack
 ```
 
-Use `--libraries /path/to/parts` to check offline against a specific local pack.
-Read `report.json` and open `screenshot.png` in the reported output folder. An exit
-code of zero is not enough: read warnings and check the picture. The screenshot
-shows startup, not every question or the final result; the preview in step 5 does.
-
-If `h5p-verify` is installed as a skill, follow its detailed troubleshooting loop.
-Fix the source or helper, rebuild to a new output path, and verify again. Never
-make verification pass by removing a question, changing the learning objective,
-or hiding an error. If a browser cannot run, report the package as **unverified**.
+The second plays it as a site that takes uploads untrusted. Read `report.json` and look at
+`screenshot.png`: layout mistakes raise no error. Follow the `h5p-verify` skill's loop if it is
+installed. Fix the source, never by removing what fails. Without a browser, say the package is
+**unverified**.
 
 ## 5. Review and hand over
 
-Check the answer key and feedback against the source, not the verifier's verdict.
-Then open the quiz for the user to play in the real player, in their own browser,
-adding `--untrusted --libraries pack` if the check used them:
+Check answers and feedback against the material. Then let the user play it in their browser,
+adding the check's `--untrusted --libraries pack` if used:
 
 ```bash
 npx @missing-elements/h5p-verify@latest course.h5p --preview
 ```
 
-Start it in the background; it ends about ten seconds after its tab closes. Ask the
-user to answer every question, a wrong answer included, and to check the feedback,
-navigation, score, retry, and the result. Tell them that the Download button beside
-the file's name saves a copy of the quiz. With browser tools of your own, add
-`--no-open`, play the printed address yourself, and record what you saw. The
-preview is served from the machine that runs the command: if that is not the
-user's computer, as in a cloud sandbox, hand over the file and the command for
-them to run instead.
+Run it in the background; it ends once its tab has closed. Ask the user to work through all of
+it, wrong answers included; its Download button saves a copy. With browser tools of your own,
+add `--no-open` and play the address yourself. Where the command does not run on the user's
+computer, hand over the file and the command.
 
-- A verifier pass means startup/rendering only. Do not claim pedagogical accuracy,
-  accessibility conformance, full interaction testing, or compatibility with every
-  LMS. The pack's versions may be newer than those installed in the destination.
-- Deliver the `.h5p`, source JSON, the verification report and screenshot, the
-  **full `revision` from the report**, and the preview command, with any remaining
-  warnings and limits.
-- For a user who works in VS Code, Cursor or VSCodium, mention the H5P Preview
-  extension (`MissingElements.h5p-preview`): the quiz plays in an editor tab, and
-  plays again each time it is rebuilt from the source.
-- To put the quiz on a website, use `h5p-player-setup`. Prefer `untrusted` with a
-  host-chosen pack on sites with accounts or packages from other authors. No player
-  page, deployment, results collection, or AI calls are added by this helper.
+Deliver the `.h5p`, the source, the report, screenshot and full `revision`, the preview
+command, and any notes. A pass means it starts and draws, not that it is accurate, accessible
+or right for every LMS. The H5P Preview extension (`MissingElements.h5p-preview`) plays it in
+VS Code, Cursor or VSCodium; `h5p-player-setup` puts it on a website.

@@ -63,8 +63,10 @@ something else.
   [privacy](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/privacy.md).
 - **Comes with tools for pipelines.** [`h5p-verify`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/verify.md)
   plays a package headless and says whether it works, [`h5p-normalize`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/streaming-video.md)
-  rewrites one so its video streams, and [`h5p-embed`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#readme)
-  writes the embed site. The [agent skills](#agent-skills) cover those workflows and quiz authoring.
+  rewrites one so its video streams, [`h5p-embed`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#readme)
+  writes the embed site, and [`h5p-author`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/author#readme)
+  builds a package of any content type from a short JSON source. The [agent skills](#agent-skills)
+  cover those workflows and authoring.
 - **Is tested where it runs.** CI runs the browser tests in Chromium, Firefox and WebKit on every
   change, and plays every content type in the library pack, untrusted and trusted, on each change
   to the player, the runtime or the pack, and every week.
@@ -199,8 +201,10 @@ npx skills add missing-elements/h5p-offline-player
 ```
 
 [`h5p-author`](https://github.com/missing-elements/h5p-offline-player/tree/main/skills/h5p-author)
-turns a prompt or lesson into a Multiple Choice or Question Set, verifies it in the real player and
-opens it in your browser for you to play before handing it over. `h5p-player-setup` puts H5P on a
+turns a prompt or lesson into H5P content of any of 28 types, chosen with you first: quizzes, fill
+in the blanks, flash cards, presentations, interactive books, branching scenarios, interactive video
+and more. It verifies the package in the real player and opens it in your browser for you to play
+before handing it over. `h5p-player-setup` puts H5P on a
 site, `h5p-normalize` fixes packages whose video will not stream, and `h5p-verify` checks that a
 generated package plays. They work with Claude Code and other agents with filesystem and command
 access, with no provider API key or H5P server; a verifier pass checks startup and rendering, not

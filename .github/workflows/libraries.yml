@@ -62,6 +62,8 @@ jobs:
           # The player's libraries="pack" pins this version and carries its parts' index: stamp
           # both in the same change.
           pnpm --filter @missing-elements/h5p-offline-player sync:assets
+          # The h5p-author skill's type files list each content type's fields from the pack.
+          pnpm --filter @missing-elements/h5p-author sync:skill
 
           # Every content type played against the new pack, for the review: CI does not start on
           # a pull request a workflow opened, so the result goes into its description.
@@ -76,7 +78,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git switch -C "$branch"
-          git add packages/libraries packages/player/src/shared/constants.ts packages/player/src/shared/pack-index.ts
+          git add packages/libraries packages/player/src/shared/constants.ts packages/player/src/shared/pack-index.ts skills/h5p-author/references/types
           git commit -m "chore(libraries): refresh from the H5P hub, $version"
           git push --force origin "$branch"
 
