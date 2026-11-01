@@ -180,13 +180,15 @@ packages/author/          @missing-elements/h5p-author — a playable .h5p of an
                             Scenario's paths, Game Map's stages, Find the Hotspot's areas
   lib/text.mjs, translate.mjs, media.mjs, pack.mjs, schema.mjs, quiz.mjs   text as H5P stores it; the
                             libraries' translations; files and web addresses; the pinned pack read
-                            by part; the field list a source is written from; the skill's quiz format
+                            by part; the field list a source is written from; the first skill's
+                            quiz format, still built
   scripts/                  sync-skill.mjs writes the skill's type files' generated sections from the
                             pack (`pnpm --filter @missing-elements/h5p-author sync:skill`);
                             check-pack-published.mjs, the publish guard for the pinned pack
   tests/                    node tests: the generator, text and translations, layouts and schema,
-                            builds with media from disk and a local server, the command;
-                            package-types.ts as for the normalizer
+                            builds with media from disk and a local server, the command, the quiz
+                            format; fixtures/ the quiz format's two examples, which apps/skills
+                            plays too; package-types.ts as for the normalizer
   types/                    generated, not in git: the declarations
 
 packages/cmi5/            @missing-elements/h5p-cmi5 — cmi5 for the element, published as a library
@@ -310,9 +312,10 @@ apps/skills/              the skills' test project, a project of the kind a skil
   tests/author-verify.test.ts  every h5p-author type file's example built, with sample media, and
                             played trusted and untrusted through the verifier's published API, each
                             a pass with no warnings; each file's generated section compared with
-                            the pack's, so a pack refresh shows a change; and the quiz format: both
-                            kinds, the eight-scenario example, a quiz in Ukrainian and one whose
-                            titles and author carry quotes and markup
+                            the pack's, so a pack refresh shows a change; and the quiz format, from
+                            the author package's fixtures: both kinds, the eight-scenario example,
+                            a quiz in Ukrainian and one whose titles and author carry quotes and
+                            markup
   tests/author-playback.test.ts  the eight-scenario example in the verifier's preview, the review the
                             skill hands a person, trusted and untrusted: every question's feedback,
                             75% failing and 83.3% passing an 80% threshold, retry to 100%, and only
@@ -1958,10 +1961,15 @@ owner's design: the content type chosen with the user first, a file per type in 
 skill so no agent works out how a type is built, a short skill, one package for the whole pack. It
 replaced the skill's bundled `scripts/build-quiz.mjs`, which built Multiple Choice and Question Set
 alone, and its quiz format stays a source the build takes (`lib/quiz.mjs` maps it), so nothing
-written in it broke. Measured on a five-question quiz, at four characters a token: `content.json`
-was about 3,470 tokens to write by hand, after reading 3,900 to 9,500 of a type's semantics; the
-source is 1,000 to 1,800 tokens, written from a type file of 200 to 3,000. Seven things the code
-does not say by itself:
+written in it broke. The skill stopped describing it on 2026-11-01 (#102), when an agent given a
+quiz was found reading both it and the two type files: every type is written from its type file,
+a quiz from H5P.QuestionSet's and H5P.MultiChoice's, and the format's two examples are the tests'
+fixtures. The skill runs the verifier once, trusted (the owner's call, the same day): the build
+already holds text to the content check's rules, from the pack an untrusted check plays, and
+`apps/skills` plays every example untrusted too. Measured on a five-question quiz, at four
+characters a token: `content.json` was about 3,470 tokens to write by hand, after reading 3,900 to
+9,500 of a type's semantics; the source is 1,000 to 1,800 tokens, written from a type file of 200
+to 3,000. Seven things the code does not say by itself:
 
 - **One generator, two ways to run it.** `ContentGenerator` was the sweep's
   (`apps/demo/scripts/lib/sweep-content.mjs`), and moved here so there is one copy; the sweep runs

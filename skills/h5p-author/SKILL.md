@@ -70,8 +70,6 @@ content holds have files too: H5P.AdvancedText, H5P.Image, H5P.Video, H5P.Text.
 - A file is `{ "path": "photo.jpg" }`, beside the source or a web address, with `copyright`
   when known.
 - Sub-content is `{ "library": "H5P.MultiChoice", "params": { … }, "metadata": { "title": "…" } }`.
-- A quiz of Multiple Choice questions alone is shorter in [the quiz format](./references/quiz-format.md),
-  which the build also takes.
 
 ## 3. Build
 

@@ -14,11 +14,12 @@ import { MediaStore } from '../lib/media.mjs'
 import { quizProblems } from '../lib/quiz.mjs'
 import { jpeg, mp4, png } from './helpers/media'
 
-const skill = resolve(import.meta.dirname, '../../../skills/h5p-author')
+// The quiz format's two examples, from the skill that first wrote it.
+const fixtures = resolve(import.meta.dirname, 'fixtures')
 const parts = resolve(import.meta.dirname, '../../libraries/parts')
 const bin = resolve(import.meta.dirname, '../bin/h5p-author.mjs')
-const example = JSON.parse(await readFile(join(skill, 'assets/quiz.json'), 'utf8'))
-const scenarios = JSON.parse(await readFile(join(skill, 'assets/phishing-scenarios.json'), 'utf8'))
+const example = JSON.parse(await readFile(join(fixtures, 'quiz.json'), 'utf8'))
+const scenarios = JSON.parse(await readFile(join(fixtures, 'phishing-scenarios.json'), 'utf8'))
 const exec = promisify(execFile)
 const META = { title: 'Rivers', language: 'en', license: 'CC BY', authors: [{ name: 'Ann Author', role: 'Author' }] }
 let dir: string
