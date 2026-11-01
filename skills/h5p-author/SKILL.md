@@ -87,18 +87,15 @@ left in English, a slide that holds too much.
 
 ```bash
 npx @missing-elements/h5p-verify@latest course.h5p
-npx @missing-elements/h5p-verify@latest course.h5p --untrusted --libraries pack
 ```
 
-The second plays it as a site that takes uploads untrusted. Read `report.json` and look at
-`screenshot.png`: layout mistakes raise no error. Follow the `h5p-verify` skill's loop if it is
-installed. Fix the source, never by removing what fails. Without a browser, say the package is
-**unverified**.
+Read `report.json` and look at `screenshot.png`: layout mistakes raise no error. Follow the
+`h5p-verify` skill's loop if it is installed. Fix the source, never by removing what fails.
+Without a browser, say the package is **unverified**.
 
 ## 5. Review and hand over
 
-Check answers and feedback against the material. Then let the user play it in their browser,
-adding the check's `--untrusted --libraries pack` if used:
+Check answers and feedback against the material. Then let the user play it in their browser:
 
 ```bash
 npx @missing-elements/h5p-verify@latest course.h5p --preview
