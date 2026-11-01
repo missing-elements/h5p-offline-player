@@ -1,7 +1,9 @@
 node_modules
 dist
 dist-demo
+# The plain-JS packages' generated declarations; the h5p-author skill's content-type files are not.
 types
+!skills/h5p-author/references/types/
 .vercel
 
 # Generated: the player's `sync:assets` vendors the h5p-standalone runtime into
@@ -12,9 +14,10 @@ public
 # Copied from the repository root by the player's `prepack`, so npm finds them in the package.
 packages/player/README.md
 packages/player/LICENSE
-# The same for the normalizer, the verifier, the cmi5 wiring and the embed site writer, whose `prepack` copies the LICENSE.
+# The same for the normalizer, the verifier, the author, the cmi5 wiring and the embed site writer, whose `prepack` copies the LICENSE.
 packages/normalize/LICENSE
 packages/verify/LICENSE
+packages/author/LICENSE
 packages/cmi5/LICENSE
 packages/embed/LICENSE
 

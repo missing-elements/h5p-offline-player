@@ -1,8 +1,8 @@
 name: Library pack
 
 # Rebuilds packages/libraries from the H5P hub every week and opens a pull request when a library
-# changed. The pack is built deterministically, in any time zone, so an unchanged hub leaves the
-# tree clean.
+# changed, saying whether every content type and h5p-author's examples play against it. The pack is
+# built deterministically, in any time zone, so an unchanged hub leaves the tree clean.
 
 on:
   schedule:
@@ -62,6 +62,8 @@ jobs:
           # The player's libraries="pack" pins this version and carries its parts' index: stamp
           # both in the same change.
           pnpm --filter @missing-elements/h5p-offline-player sync:assets
+          # The h5p-author skill's type files list each content type's fields from the pack.
+          pnpm --filter @missing-elements/h5p-author sync:skill
 
           # Every content type played against the new pack, for the review: CI does not start on
           # a pull request a workflow opened, so the result goes into its description.
@@ -73,10 +75,26 @@ jobs:
           fi
           report=$(cat "$RUNNER_TEMP/sweep/report.md" 2>/dev/null || tail -n 30 "$RUNNER_TEMP/sweep.log")
 
+          # h5p-author against the new pack, for the same reason: its own tests, then every type
+          # file's example built and played, untrusted and trusted (apps/skills), which is where a
+          # library's renamed, new or hidden field shows. The playback test drives Playwright's
+          # Chromium.
+          pnpm --filter @missing-elements/h5p-offline-player exec playwright install chromium > /dev/null
+          author_ok=true
+          NO_COLOR=1 pnpm --filter @missing-elements/h5p-author test > "$RUNNER_TEMP/author.log" 2>&1 || author_ok=false
+          NO_COLOR=1 pnpm --filter @missing-elements/h5p-skills test >> "$RUNNER_TEMP/author.log" 2>&1 || author_ok=false
+          if $author_ok; then
+            author="h5p-author builds and plays every type file's example against the new pack, untrusted and trusted, and its own tests pass."
+            author_details=""
+          else
+            author="**h5p-author fails against the new pack**: fix the type file, its example or \`packages/author/lib/types.mjs\` on this branch. The tests' output is below."
+            author_details=$(printf '%s\n' "<details><summary>h5p-author's tests</summary>" "" '```' "$(tail -n 120 "$RUNNER_TEMP/author.log" | sed -e 's/\x1b\[[0-9;]*m//g')" '```' "" "</details>")
+          fi
+
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git switch -C "$branch"
-          git add packages/libraries packages/player/src/shared/constants.ts packages/player/src/shared/pack-index.ts
+          git add packages/libraries packages/player/src/shared/constants.ts packages/player/src/shared/pack-index.ts skills/h5p-author/references/types
           git commit -m "chore(libraries): refresh from the H5P hub, $version"
           git push --force origin "$branch"
 
@@ -96,11 +114,15 @@ jobs:
             "" \
             "$sweep" \
             "" \
+            "$author" \
+            "" \
             "<details><summary>The sweep's report</summary>" \
             "" \
             "$report" \
             "" \
-            "</details>")
+            "</details>" \
+            "" \
+            "$author_details")
 
           if gh pr view "$branch" --json state --jq .state 2>/dev/null | grep -q OPEN; then
             gh pr edit "$branch" --title "Library pack $version" --body "$body"

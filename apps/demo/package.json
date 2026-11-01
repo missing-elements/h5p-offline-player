@@ -23,6 +23,7 @@
     "@vercel/analytics": "^2.0.1"
   },
   "devDependencies": {
+    "@missing-elements/h5p-author": "workspace:*",
     "@missing-elements/h5p-libraries": "workspace:*",
     "@missing-elements/h5p-normalize": "workspace:*",
     "@types/node": "^26.6.5",

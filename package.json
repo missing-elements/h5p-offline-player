@@ -15,6 +15,7 @@
     "typecheck": "pnpm -r typecheck",
     "normalize": "node packages/normalize/bin/h5p-normalize.mjs",
     "verify": "node packages/verify/bin/h5p-verify.mjs",
+    "author": "node packages/author/bin/h5p-author.mjs",
     "demo:content": "pnpm --filter @missing-elements/h5p-demo demo:content",
     "demo:og": "pnpm --filter @missing-elements/h5p-demo demo:og",
     "demo:icons": "pnpm --filter @missing-elements/h5p-demo demo:icons",

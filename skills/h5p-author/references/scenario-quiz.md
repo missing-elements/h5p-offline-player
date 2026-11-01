@@ -37,17 +37,14 @@ organization-specific review is implied.
 
 ## Build and verify
 
-From a project with the skill's authoring dependencies installed:
-
 ```bash
-node "<skill>/scripts/build-quiz.mjs" "<skill>/assets/phishing-scenarios.json" phishing-scenarios.h5p
+npx @missing-elements/h5p-author@latest build "<skill>/assets/phishing-scenarios.json" phishing-scenarios.h5p
 npx @missing-elements/h5p-verify@latest phishing-scenarios.h5p
-npx @missing-elements/h5p-verify@latest phishing-scenarios.h5p --untrusted --libraries /path/to/parts
+npx @missing-elements/h5p-verify@latest phishing-scenarios.h5p --untrusted --libraries pack
 ```
 
-Use Node 22 or later. `<skill>` is the installed `h5p-author` directory;
-`/path/to/parts` is the local library pack's `parts/` directory. The second
-verification checks the destination's untrusted mode against that exact pack.
+Use Node 22 or later. `<skill>` is the installed `h5p-author` directory. The second
+verification checks the destination's untrusted mode against the library pack.
 Inspect the reports and screenshots. Existing output is not replaced: use a new
 filename when rebuilding.
 
