@@ -148,7 +148,7 @@ describe('Branching Scenario', () => {
 })
 
 describe('Game Map', () => {
-  it('joins stages named by label both ways, and sets the ids, types and positions the editor keeps', async () => {
+  it('joins stages named by label both ways, and sets their ids, types and positions', async () => {
     await writeFile(join(dir, 'map.png'), png(400, 300))
     const content = await build('H5P.GameMap', {
       gamemapSteps: {

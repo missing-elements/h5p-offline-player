@@ -15,6 +15,18 @@ import { markupText, plainText } from './text.mjs'
  * `lenient`, taking what is written as it is and filling a required field from `fill`, so that
  * every content type in the pack plays (apps/demo/scripts/sweep-content-types.mjs).
  *
+ * The editor is h5p-editor-php-library's form at commit 3bec2594356cf1be4e6401f7e7e557650720aa9b
+ * (2026-10-08), and H5PEditor.ShowWhen 1.0.9 at 93678737300e084cb9390a691d3e1ad4e793fbaa for
+ * `showWhen`. Each rule taken from them names the script it follows, here and in text.mjs,
+ * translate.mjs, schema.mjs and media.mjs; AGENTS.md says how to move them to a newer editor. Where
+ * this departs from that editor:
+ *
+ * - An optional list nobody wrote stays empty. The editor starts every new list with `defaultNum`,
+ *   `min` or one item, optional or not, for an author to fill or remove.
+ * - A `showWhen` rule on a field that is not a select, a library or a boolean is compared as text,
+ *   where ShowWhen leaves the rule out; the pack has none. A value a source writes for a field
+ *   that `nullWhenHidden` hides is kept, where the editor clears it.
+ *
  * Pure but for the ids: the pack is handed in as a map of folders, each with its `library.json`
  * and `semantics.json`. Media are not read here: a written file is checked for its shape and
  * collected in `media`, for the caller to copy and describe.
@@ -55,13 +67,16 @@ export class ContentGenerator {
     this.drawn = new WeakSet()
     /** @type {{ field: any, path: string }[]} hidden fields left for a content type's layout to set */
     this.unset = []
-    /** @type {{ fields: any[], given: Record<string, any> }[]} the groups being filled, innermost last, for `showWhen` */
+    /** @type {{ fields: any[], given: Record<string, any> }[]} the levels a `showWhen` path climbs, innermost last */
     this.scopes = []
   }
 
   /**
-   * Whether the editor shows a field, by its `showWhen` rules: one of them holds, on the value
-   * written for the field they name, or its default. A field the editor hides is not asked for.
+   * Whether the editor shows a field, by its `showWhen` rules as H5PEditor.ShowWhen reads them:
+   * one of them holds, or every one where the rules say `and`, on the value written for the field
+   * a rule names, or its default. Each `../` in that name climbs a level, as h5peditor.js's
+   * `findField` climbs from a widget to its parent (see `#level`). A field the editor hides is not
+   * asked for.
    * @param {any} field
    */
   #visible(field) {
@@ -102,6 +117,31 @@ export class ContentGenerator {
   /** A field as optional, for one the editor hides. @param {any} field */
   #optional(field) {
     return this.#copy(field, { optional: true })
+  }
+
+  /** A field as it is filled here: optional where the editor hides it. @param {any} field */
+  #shown(field) {
+    return this.lenient || this.#visible(field) ? field : this.#optional(field)
+  }
+
+  /**
+   * What a callback generates a level down, for `showWhen`: the fields a rule can name there, and
+   * what was written for them. The editor makes a level of every widget that holds others: the
+   * form, each group, a group of one field among them, each list and each sub-content. A list's
+   * level names no field, so a rule in a list's item reaches what holds the list with `../../`.
+   * @template T
+   * @param {any[]} fields
+   * @param {Record<string, unknown>} given
+   * @param {() => T} generate
+   * @returns {T}
+   */
+  #level(fields, given, generate) {
+    this.scopes.push({ fields, given })
+    try {
+      return generate()
+    } finally {
+      this.scopes.pop()
+    }
   }
 
   /**
@@ -165,15 +205,12 @@ export class ContentGenerator {
       return out
     }
     const given = isObject(written) ? written : {}
-    this.scopes.push({ fields, given })
-    try {
+    this.#level(fields, given, () => {
       for (const field of fields) {
-        const value = this.field(this.lenient || this.#visible(field) ? field : this.#optional(field), given[field.name], stack, lenient, `${path}.${field.name}`)
+        const value = this.field(this.#shown(field), given[field.name], stack, lenient, `${path}.${field.name}`)
         if (value !== undefined) out[field.name] = value
       }
-    } finally {
-      this.scopes.pop()
-    }
+    })
     for (const [key, value] of Object.entries(given)) {
       if (key in out || fields.some((field) => field.name === key)) continue
       // Lenient, what the semantics do not name is kept as written: the content check removes
@@ -202,11 +239,16 @@ export class ContentGenerator {
     switch (field.type) {
       case 'group': {
         const children = field.fields ?? []
-        // A group of one field is saved as that field's value, as the editor and the content
-        // check have it, unless the group is sub-content.
+        // A group of one field is saved as that field's value, as the editor (h5peditor-group.js)
+        // and the content check have it, unless the group is sub-content. It is still a level for
+        // `showWhen`, the parent of its one field.
         const flattened = children.length === 1 && !field.isSubContent
         if (written === undefined && field.default !== undefined) return structuredClone(field.default)
-        if (flattened) return this.field(children[0], written, stack, optional && written === undefined, path)
+        if (flattened) {
+          const [only] = children
+          return this.#level(children, written === undefined ? {} : { [only.name]: written }, () =>
+            this.field(this.#shown(only), written, stack, optional && written === undefined, path))
+        }
         if (written !== undefined && !isObject(written)) {
           if (this.lenient) return written
           this.report(path, `expected an object with the fields ${names(children)}`)
@@ -216,8 +258,9 @@ export class ContentGenerator {
         // a slide — takes numbers as that widget sets them, decimals included, and starts its
         // lists empty.
         if (field.widget && field.widget !== 'showWhen' && field.widget !== 'none') this.#draw(children)
-        // Saved even when optional and untouched, as the editor saves every group in its form:
-        // content types read into one without looking (Personality Quiz's `image.file`).
+        // Saved even when optional and untouched, as the editor saves every group in its form
+        // (h5peditor-group.js): content types read into one without looking (Personality Quiz's
+        // `image.file`).
         return this.fields(children, written, stack, optional && written === undefined, path)
       }
       case 'list': {
@@ -227,7 +270,7 @@ export class ContentGenerator {
             if (field.min !== undefined && written.length < field.min) this.report(path, `has ${written.length} item${written.length === 1 ? '' : 's'}; it takes at least ${field.min}`)
             if (field.max !== undefined && written.length > field.max) this.report(path, `has ${written.length} items; it takes at most ${field.max}`)
           }
-          return written.map((each, index) => this.field(item, each, stack, false, `${path}[${index}]`)).filter((each) => each !== undefined)
+          return this.#level([], {}, () => written.map((each, index) => this.field(item, each, stack, false, `${path}[${index}]`)).filter((each) => each !== undefined))
         }
         if (written !== undefined && !this.lenient) {
           this.report(path, 'expected a list')
@@ -237,9 +280,9 @@ export class ContentGenerator {
           ? optional ? 0 : field.min ?? 0
           : Math.min(Math.max(optional ? 0 : (field.min ?? 0), field.defaultNum ?? (optional ? 0 : 1)), field.max ?? Infinity)
         if (!this.lenient && count > 0) {
-          // A required list nobody wrote is what the editor offers a new author: as many items as
-          // it asks for, each with its defaults. Where an item needs something only an author can
-          // give, the list itself is what is missing.
+          // A required list nobody wrote is what the editor offers a new author
+          // (h5peditor-list.js): as many items as it asks for, each with its defaults. Where an
+          // item needs something only an author can give, the list itself is what is missing.
           const before = this.problems.length
           const items = this.#items(item, count, stack, lenient, path)
           if (this.problems.length > before) {
@@ -258,9 +301,10 @@ export class ContentGenerator {
           this.report(path, `expected sub-content, { "library": "${optionNames(field)[0] ?? 'H5P.…'}", "params": { … } }`)
           return undefined
         }
-        // A default names the content the editor starts with: Interactive Video's summary task.
-        // Left as the editor leaves it for an author who never opens it: what it would ask for
-        // is not asked here either, and stays unwritten.
+        // A default names the content the editor starts with (h5peditor.js puts it in the
+        // parameters, h5peditor-library.js loads it): Interactive Video's summary task. Left as the
+        // editor leaves it for an author who never opens it: what it would ask for is not asked
+        // here either, and stays unwritten.
         if (written === undefined && isObject(field.default) && typeof field.default.library === 'string') {
           if (this.lenient) return this.writtenLibrary(field.default, stack, path, null)
           return this.#quietly(() => this.writtenLibrary(structuredClone(field.default), stack, path, null))
@@ -279,7 +323,7 @@ export class ContentGenerator {
         return optional ? undefined : this.missing(field, stack, path)
       case 'boolean':
         if (written !== undefined && !this.lenient && typeof written !== 'boolean') this.report(path, 'expected true or false')
-        // The editor's checkbox saves false when nobody ticked it.
+        // The editor's checkbox saves false when nobody ticked it (h5peditor-boolean.js).
         return written ?? field.default ?? false
       case 'select':
         if (written !== undefined) return this.lenient ? written : this.select(field, written, path)
@@ -324,6 +368,7 @@ export class ContentGenerator {
   }
 
   /**
+   * A new list's items, each with its defaults, a level below the list's.
    * @param {any} item
    * @param {number} count
    * @param {string[]} stack
@@ -331,12 +376,14 @@ export class ContentGenerator {
    * @param {string} path
    */
   #items(item, count, stack, lenient, path) {
-    const items = []
-    for (let index = 0; index < count; index++) {
-      const value = this.field(item, undefined, stack, lenient, `${path}[${index}]`)
-      if (value !== undefined) items.push(value)
-    }
-    return items
+    return this.#level([], {}, () => {
+      const items = []
+      for (let index = 0; index < count; index++) {
+        const value = this.field(item, undefined, stack, lenient, `${path}[${index}]`)
+        if (value !== undefined) items.push(value)
+      }
+      return items
+    })
   }
 
   /**
@@ -473,6 +520,9 @@ export class ContentGenerator {
   }
 
   /**
+   * A number as h5peditor-number.js checks it: within its range; with at most `decimals`
+   * decimals, or none where the field has no `decimals` and no widget of its own draws it; and a
+   * multiple of `step`, counted from 0 as its `value % step` counts.
    * @param {any} field
    * @param {unknown} written
    * @param {string} path
@@ -488,7 +538,7 @@ export class ContentGenerator {
       const factor = 10 ** Number(field.decimals)
       if (Math.round(written * factor) / factor !== written) this.report(path, `takes ${field.decimals ? `at most ${field.decimals} decimals` : 'a whole number'}`)
     } else if (!field.widget && !this.drawn.has(field) && !Number.isInteger(written)) this.report(path, 'takes a whole number')
-    if (field.step !== undefined && Number(field.step) > 0 && (written - Number(field.min ?? 0)) % Number(field.step) !== 0) this.report(path, `takes steps of ${field.step}`)
+    if (field.step !== undefined && Number(field.step) > 0 && written % Number(field.step) !== 0) this.report(path, `takes steps of ${field.step}`)
     return written
   }
 

@@ -9,8 +9,8 @@ import { escapeText } from './text.mjs'
  * The files content shows: images, video, audio and other files, named in a source by a path
  * beside it or a web address, copied into the package's `content/` folder with what H5P records
  * of each — its type, an image's size, its copyright. A video on YouTube, Vimeo, Panopto or
- * Echo360 stays there and is played from there, as H5P's editor embeds it, at an address
- * H5P.Video plays.
+ * Echo360 stays there and is played from there, as H5P's editor embeds it (h5peditor-av.js, its
+ * `providers`), at an address H5P.Video plays.
  */
 
 /** The types H5P accepts for content (`H5PCore::$defaultContentWhitelist`), by what a field takes. */
@@ -28,7 +28,7 @@ const TYPES = {
   }
 }
 
-/** The folder under `content/` H5P's editor keeps each kind in. */
+/** The folder under `content/` H5P's editor keeps each kind in (h5peditor-file.class.php). */
 const FOLDERS = { image: 'images', video: 'videos', audio: 'audios', file: 'files' }
 
 /** Whether a host name is one of these domains or under one. @param {string} host @param {string[]} domains */

@@ -1960,8 +1960,8 @@ replaced the skill's bundled `scripts/build-quiz.mjs`, which built Multiple Choi
 alone, and its quiz format stays a source the build takes (`lib/quiz.mjs` maps it), so nothing
 written in it broke. Measured on a five-question quiz, at four characters a token: `content.json`
 was about 3,470 tokens to write by hand, after reading 3,900 to 9,500 of a type's semantics; the
-source is 1,000 to 1,800 tokens, written from a type file of 200 to 3,000. Six things the code does
-not say by itself:
+source is 1,000 to 1,800 tokens, written from a type file of 200 to 3,000. Seven things the code
+does not say by itself:
 
 - **One generator, two ways to run it.** `ContentGenerator` was the sweep's
   (`apps/demo/scripts/lib/sweep-content.mjs`), and moved here so there is one copy; the sweep runs
@@ -1972,9 +1972,11 @@ not say by itself:
   unknown option, a number out of range or with decimals the editor's number field refuses, a list
   too short or long, a required field with neither a value nor a default, sub-content of a library
   the field does not take. What the editor does is the rule, read from h5p-editor-php-library's
-  widgets on 2026-11-01: a new list starts with `defaultNum`, `min` or one item, and a list such an
-  item needs writing in is reported as one missing list; a field its `showWhen` rule hides is not
-  asked for (Multimedia Choice's poster, wanted only for audio); media fields, which the editor
+  widgets at a pinned commit (*The editor is pinned* below): a new list starts with `defaultNum`,
+  `min` or one item, and a list such an item needs writing in is reported as one missing list; a
+  field its `showWhen` rule hides is not asked for (Multimedia Choice's poster, wanted only for
+  audio), the rule's `../` climbing a level for each group and each list, as the editor's
+  `findField` climbs from widget to parent; media fields, which the editor
   never asks for, are required where the semantics say so, and optional where a type plays without
   them (H5P.Video's poster); a library default nobody opened, Interactive Video's summary task, is
   left as the editor leaves it, asking nothing.
@@ -2034,6 +2036,30 @@ not say by itself:
   `sync:skill`; `apps/skills`' test fails on a file out of date, and builds and plays every
   example. 28 content types have files, and the parts other content holds (Text, Image, Video);
   any other type's fields are one `h5p-author schema` away.
+- **The editor is pinned, and not watched** (2026-11-01, the owner's choice, as for the content
+  check). Nothing the editor does decides whether a package plays: the libraries and the platforms'
+  validator do, both pinned here too. A change in the editor makes a build differ from what the
+  editor now saves, in the rule that changed, and no more. A change in a library can matter, and
+  reaches the author with the weekly pack refresh, which since #100's review runs the author's
+  tests and `apps/skills`' against the new pack and says in its pull request whether every
+  example still builds and plays: a renamed field, a new required one or a new hidden one fails
+  there by name. The rules were read from h5p-editor-php-library at 3bec259 (2026-10-08), whose
+  `master` had not moved since, and H5PEditor.ShowWhen 1.0.9; the layouts' from the editors the
+  pack's content types name in `editorDependencies`, each at the newest release of the minor named,
+  which GitHub's default branch is not always: H5PEditor.InteractiveVideo 1.26.3,
+  H5PEditor.BranchingScenario 1.5.13 (its `main` is 1.6) and H5PEditor.GameMap 1.2.5 (1.5).
+  `generator.mjs` and `types.mjs` name the commits and where they depart from the editor, and each
+  rule the script it follows. To move to a newer editor by hand: diff those scripts between the
+  pinned commit and `master`, or between the pinned release and the one a refreshed pack names;
+  port what changed; move the commits named in the two files; and run the author's tests and
+  `apps/skills`'. Pinning found three things the first cut had wrong: a number's steps were
+  counted from `min`, where the editor's `value % step` counts from 0; a `showWhen` path skipped
+  the level the editor gives a list and a group of one field, which only Advent Calendar's door
+  cover reached (`../../modeDoorImage`, from a list's item, optional either way; the pack's other
+  98 rules resolve alike); and two comments said the editor sets what it does not, a Branching
+  Question's own `nextContentId`, which it deletes, and a Game Map stage's `type`, which it keeps
+  out of the content. Both fields are still written, being hidden and required, and the runtime
+  ignores the first and works the second out again.
 
 Not built: editing an existing package, layout for Drag and Drop and Crossword, and any judgement
 of whether content is right, which stays the person's, in the verifier's preview.

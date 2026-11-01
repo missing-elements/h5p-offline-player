@@ -15,6 +15,14 @@ import { randomUUID } from 'node:crypto'
  *
  * Paths in `sets` and `optional` are dotted, `[]` for a list's item, relative to the type's own
  * parameters.
+ *
+ * The widgets followed are the newest release of the minor each content type in the pack names in
+ * its `editorDependencies`: H5PEditor.InteractiveVideo 1.26.3 (h5p/h5p-editor-interactive-video at
+ * 205abc173eece12046c4dedbe883ea5835e49151), H5PEditor.BranchingScenario 1.5.13
+ * (h5p/h5p-editor-branching-scenario at 8fcd92d0a5a5f6b855d9d03ce4d19ab31baa4b99) and
+ * H5PEditor.GameMap 1.2.5 (otacke/h5p-editor-game-map at a1ad6b04abb00ef0c1fda5bd446e4f95b8434873).
+ * Course Presentation's and Find the Hotspot's layouts are this package's own and take nothing
+ * from their editors. AGENTS.md says how to move them to a newer editor.
  */
 
 /**
@@ -248,6 +256,7 @@ function posterSize(interaction) {
     const file = params.file ?? {}
     if (!(file.width > 0 && file.height > 0)) return { width: 10, height: 10 }
     // As the editor's setImageSize: no taller than the picture at 16 px an em, nor under one em.
+    // And, which it does not check, no wider than the video less 2 em each side.
     const [width, height] = [Math.max(16, file.width), Math.max(16, file.height)]
     const tall = Math.min(10, height / 16)
     const wide = Math.min(FRAME.width - 4, tall * (width / height))
@@ -325,6 +334,11 @@ const interactiveVideo = {
  * `content`, a Branching Question to one per alternative, and a negative id ends the scenario
  * there, on the end screen with that `contentId`. Every node has to be reachable from the first,
  * and every path has to reach an end, or a learner is stuck.
+ *
+ * Where this departs from the editor: it gives a node with no next -1, an end, where here a source
+ * has to say, a link left out being likelier a slip than an ending; and it makes one end screen,
+ * -1, where the ones a source writes after it are numbered -2, -3… here, which the runtime finds by
+ * `contentId` as it finds the first.
  * @type {Layout}
  */
 const branchingScenario = {
@@ -343,7 +357,8 @@ const branchingScenario = {
     const next = content.map((/** @type {any} */ node, /** @type {number} */ i) => {
       const nodeAt = `${at}.content[${i}]`
       if (machineName(node?.type?.library) === 'H5P.BranchingQuestion') {
-        // A question goes where its alternatives say; the node's own next is the editor's -1.
+        // A question goes where its alternatives say. Its own next, which the editor deletes from a
+        // question, is -1 here: the field is hidden and required, and would be reported unset.
         if (node.nextContentId === undefined) node.nextContentId = -1
         const alternatives = node?.type?.params?.branchingQuestion?.alternatives ?? []
         return alternatives.map((/** @type {any} */ alternative, /** @type {number} */ j) => check(alternative?.nextContentId, `${nodeAt}.type.params.branchingQuestion.alternatives[${j}].nextContentId`))
@@ -396,9 +411,12 @@ const branchingScenario = {
 /* ---------------------------------------------------------------- Game Map */
 
 /**
- * Stages on a map: each placed by `telemetry`, in percent of the map, and joined to its
- * `neighbors`, which a source names by label or index and the map stores as indices, both ways.
- * The ids and types the editor's map widget keeps are set here.
+ * Stages on a map: each placed by `telemetry`, in percent of the map and kept as text, and joined
+ * to its `neighbors`, which a source names by label or index and the map stores as indices, both
+ * ways, as the editor's map widget keeps them. Each gets the id that widget gives it, a UUID, and a
+ * `type`, `stage` or `special-stage`, which the widget keeps on its own element rather than in the
+ * content and the runtime works out from `specialStageType` again: the field is hidden and
+ * required, and would be reported unset.
  * @type {Layout}
  */
 const gameMap = {

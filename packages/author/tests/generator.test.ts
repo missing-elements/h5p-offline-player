@@ -161,6 +161,12 @@ describe('content authored from semantics', () => {
     expect(problems.map(({ path }) => path)).toEqual(['params.count', 'params.ratio'])
   })
 
+  it('counts a number\'s steps from 0, as the editor\'s check does', () => {
+    const semantics = [{ name: 'size', type: 'number', min: 1, step: 2 }]
+    expect(generate(semantics, { size: 4 }, [], STRICT).problems).toEqual([])
+    expect(generate(semantics, { size: 3 }, [], STRICT).problems).toEqual([{ path: 'params.size', message: 'takes steps of 2' }])
+  })
+
   it('stores plain text escaped and markup as the editor writes it, and refuses a tag the field does not take', () => {
     const { params, problems, notes } = generate([
       { name: 'title', type: 'text' },
@@ -212,6 +218,21 @@ describe('content authored from semantics', () => {
     ]
     expect(generate(semantics, {}, [], STRICT).problems.map(({ path }) => path)).toEqual(['params.icon'])
     expect(generate(semantics, { kind: 'image' }, [], STRICT).problems.map(({ path }) => path)).toEqual(['params.picture'])
+  })
+
+  it('climbs a showWhen path as the editor does, a list and a group of one field each a level', () => {
+    // Advent Calendar's shape: a door's cover shows when the calendar's mode, outside the list,
+    // is manual.
+    const semantics = [
+      { name: 'mode', type: 'select', default: 'automatic', options: [{ value: 'automatic' }, { value: 'manual' }] },
+      { name: 'doors', type: 'list', field: { name: 'door', type: 'group', fields: [
+        { name: 'label', type: 'text', default: 'Door' },
+        { name: 'cover', type: 'image', showWhen: { rules: [{ field: '../../mode', equals: 'manual' }] } }
+      ] } },
+      { name: 'wrapped', type: 'group', fields: [{ name: 'picture', type: 'image', showWhen: { rules: [{ field: '../mode', equals: 'manual' }] } }] }
+    ]
+    expect(generate(semantics, { doors: [{}] }, [], STRICT).problems).toEqual([])
+    expect(generate(semantics, { mode: 'manual', doors: [{}] }, [], STRICT).problems.map(({ path }) => path)).toEqual(['params.doors[0].cover', 'params.wrapped'])
   })
 
   it('takes sub-content by machine name, only of a library the field takes, and its title alone as metadata', () => {

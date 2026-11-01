@@ -47,10 +47,10 @@ const PLACEHOLDER = /[:@%][A-Za-z]+/g
 
 /**
  * A translation file's `semantics` laid over a library's, position by position, as an H5P editor
- * lays it: the text defaults it replaces, and those that stay English. Only a text field's default
- * is replaced, never a select's value. The English stays where the translation has no text, the
- * same text, or text without a placeholder the library fills in, which a learner would otherwise
- * meet as `@finals`.
+ * lays it (h5peditor.js, `loadLibrary`): the text defaults it replaces, and those that stay
+ * English. Only a text field's default is replaced, never a select's value. The English stays
+ * where the translation has no text, the same text, or text without a placeholder the library
+ * fills in, which a learner would otherwise meet as `@finals`.
  * @param {any[]} fields
  * @param {unknown} translation
  * @internal
@@ -98,9 +98,10 @@ function escapeDefaults(fields) {
 
 /**
  * A library's semantics with its interface texts in a language, from the first of its own
- * translations that translates any. An H5P editor fills new content's defaults from these files:
- * every field from the translation for the editor's own language, then the fields a library marks
- * `common` from the one for the content's. With no editor here, the content's language fills all.
+ * translations that translates any. An H5P editor fills new content's defaults from these files
+ * (h5peditor.js, `loadLibrary` and `updateCommonFieldsDefault`): every field from the translation
+ * for the editor's own language, then the fields a library marks `common` from the one for the
+ * content's. With no editor here, the content's language fills all.
  * @param {any[]} semantics the library's, left as it is
  * @param {{ name: string, read: () => Promise<unknown> }[]} files its translations that serve the language, best first
  * @param {string} label the library as `H5P.Blanks 1.14`, for the report

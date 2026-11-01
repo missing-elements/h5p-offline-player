@@ -151,7 +151,8 @@ function lines(field, indent, path, counts, options, drawn = false) {
   const description = options.descriptions !== false && ['text', 'list', 'library', 'number', 'select'].includes(shown.type) ? plain(own || itemDescription) : ''
   const about = [label, description && description !== label ? description : ''].filter(Boolean).join(': ')
   const out = [`${indent}- \`${field.name}\` ${head}${about ? ` — ${about.length > 200 ? `${about.slice(0, 197)}…` : about}` : ''}`]
-  // What the editor shows in its "important" box: the syntax a field's text is written in.
+  // What the editor shows in its "important" box (h5peditor.js, `createImportantDescription`): the
+  // syntax a field's text is written in.
   const important = shown.important ?? (item && item.type !== 'group' ? item.important : null)
   if (options.descriptions !== false && important?.description) {
     const example = important.example ? ` Example: ${plain(String(important.example))}` : ''

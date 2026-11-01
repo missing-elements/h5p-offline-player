@@ -36,8 +36,9 @@ export function allowedTags(field) {
 }
 
 /**
- * The block a line of text becomes in a markup field, as H5P's editor writes it: `<p>` where the
- * field asks for paragraphs or offers headings, `<div>` otherwise.
+ * The block a line of text becomes in a markup field, as H5P's editor writes it
+ * (h5peditor-html.js): `<p>` where the field asks for paragraphs or offers headings, `pre`, `p` or
+ * `div`, `<div>` otherwise.
  * @param {any} field
  */
 export function blockTag(field) {
