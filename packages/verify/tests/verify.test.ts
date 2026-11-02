@@ -1,7 +1,9 @@
+import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { promisify } from 'node:util'
 import { BlobReader, BlobWriter, type Entry, TextReader, Uint8ArrayReader, Uint8ArrayWriter, ZipReader, ZipWriter } from '@zip.js/zip.js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { contentChanges, summarize, verifyPackage } from '../lib/verify.mjs'
@@ -11,6 +13,7 @@ import { contentChanges, summarize, verifyPackage } from '../lib/verify.mjs'
  * content. Each case launches a browser, so the timeouts are generous.
  */
 
+const bin = resolve(import.meta.dirname, '../bin/h5p-verify.mjs')
 const content = resolve(import.meta.dirname, '../../../apps/demo/demo/content')
 const quiz = join(content, 'quiz.h5p')
 /** The workspace's library pack, served by the verifier itself, so the untrusted cases need no network. */
@@ -234,6 +237,18 @@ describe('h5p-verify', () => {
       ])
     )
     expect(report.warnings).toContain('content check: questions[0].params.question: markup removed: <form>, <input>')
+  }, 120_000)
+
+  it('prints a report larger than a pipe holds whole to a program that reads it through one (#117)', async () => {
+    // Each field the semantics do not name is removed and reported: a report of tens of kilobytes.
+    const file = await quizWithContent('many-changes.h5p', (params) => {
+      for (let index = 0; index < 300; index++) params[`unknownField${index}`] = 'a value no library reads'
+    })
+    const out = join(dir, 'many-changes')
+    const { stdout } = await promisify(execFile)(process.execPath, [bin, file, '--untrusted', '--libraries', pack, '--json', '--out', out], { maxBuffer: 1 << 26 })
+
+    expect(Buffer.byteLength(stdout)).toBeGreaterThan(16 * 1024)
+    expect(JSON.parse(stdout)).toEqual(JSON.parse(await readFile(join(out, 'report.json'), 'utf8')))
   }, 120_000)
 
   it('played untrusted, passes the quiz unchanged', async () => {
