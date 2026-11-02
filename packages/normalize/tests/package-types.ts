@@ -6,6 +6,8 @@
 import { archiveFingerprint, formatBytes, normalizeArchive, type EntryResult, type Report } from '@missing-elements/h5p-normalize'
 // @ts-expect-error a helper the tests use, not part of the package's API (#60)
 import { orderEntries } from '@missing-elements/h5p-normalize'
+// For the packages of this repository that write zips, h5p-author's page build among them.
+import { crc32 } from '@missing-elements/h5p-normalize/crc32'
 
 export async function asACallerWould(): Promise<string> {
   const seen: EntryResult[] = []
@@ -17,6 +19,10 @@ export async function asACallerWould(): Promise<string> {
   // @ts-expect-error the source is named `input`
   await normalizeArchive({ file: 'in.h5p' })
 
-  void [moved, saved, orderEntries]
+  const checked: number = crc32(new Uint8Array(4), crc32(new Uint8Array(4)))
+  // @ts-expect-error bytes, not text
+  crc32('h5p.json')
+
+  void [moved, saved, orderEntries, checked]
   return `${report.revision} ${revision}`
 }

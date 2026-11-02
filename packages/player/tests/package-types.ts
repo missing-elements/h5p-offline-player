@@ -8,7 +8,7 @@
  */
 import { H5PPlayerElement, type PackageMetadata, type PlayerErrorDetail, type ReadyDetail } from '@missing-elements/h5p-offline-player'
 import { mountH5P } from '@missing-elements/h5p-offline-player/sw'
-import { librariesNamedIn, ownLibraries, planPack, reachableFolder, walkDependencies, type PackPlan } from '@missing-elements/h5p-offline-player/plan'
+import { librariesNamedIn, ownLibraries, packLibrariesIn, planPack, reachableFolder, walkDependencies, type PackPlan } from '@missing-elements/h5p-offline-player/plan'
 
 export function asACallerWould(worker: ServiceWorkerGlobalScope): string[] {
   const player: H5PPlayerElement | null = document.querySelector('h5p-player')
@@ -24,6 +24,8 @@ export function asACallerWould(worker: ServiceWorkerGlobalScope): string[] {
   const folder: string | undefined = reachableFolder(roots[0], names, new Map())
   const walked: Promise<{ missing: { machineName: string }[] }> = walkDependencies(roots, (dependency) => reachableFolder(dependency, names, new Map()), async (located: string) => ({ located }))
   const own: Promise<{ folder: string; major: number | null }[]> = ownLibraries(['H5P.Blanks-1.14'])
+  // A pack's index read from the network, held to its shape, as h5p-author's page build reads one.
+  const index: { folder: string; url: string; sha256: string }[] = packLibrariesIn(JSON.parse('[]'))
 
   // @ts-expect-error not an error code
   const code: PlayerErrorDetail['code'] = 'offline'
@@ -34,6 +36,6 @@ export function asACallerWould(worker: ServiceWorkerGlobalScope): string[] {
   // @ts-expect-error the title is a string
   const title: PackageMetadata['title'] = 1
 
-  void [player, code, folders, source, title, plan, parts, folder, walked, own]
+  void [player, code, folders, source, title, plan, parts, folder, walked, own, index]
   return player?.libraryBundle?.refreshed?.map(({ library, to }) => `${library} ${to}`) ?? []
 }

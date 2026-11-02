@@ -5,35 +5,20 @@
  * package pins, checked against its index. A tool beside the build takes the libraries as the build
  * loads them (`openPack`, `loadLibraries`, and `packageLibraries` for a package's own), its rules
  * for text (`markupText`, `plainText`, `allowedTags`), and the check it runs last on what it writes,
- * for saved content (`checkContent`).
+ * for saved content (`checkContent`). This is the entry for Node: `./core` is what of it needs no
+ * Node, and `./browser` builds in a page.
  */
 
-import { openPack } from './pack.mjs'
+import { openPack } from './node.mjs'
 import { schemaLines, schemaMarkdown } from './schema.mjs'
 import { LAYOUTS } from './types.mjs'
 
-export { buildPackage, SourceError } from './build.mjs'
-export { checkContent } from './check.mjs'
-export { ContentGenerator, librariesIn, libraryString } from './generator.mjs'
-export { loadLibraries, packageLibraries } from './libraries.mjs'
-export { openPack } from './pack.mjs'
-export { GENERATED_END, GENERATED_START } from './schema.mjs'
-export { allowedTags, markupText, plainText } from './text.mjs'
+export * from './core.mjs'
+export { buildPackage, openPack } from './node.mjs'
 
 /**
- * @typedef {import('./build.mjs').Source} Source
- * @typedef {import('./build.mjs').BuildResult} BuildResult
- * @typedef {import('./build.mjs').BuildOptions} BuildOptions
- * @typedef {import('./check.mjs').CheckedContent} CheckedContent
- * @typedef {import('./generator.mjs').GeneratorOptions} GeneratorOptions
- * @typedef {import('./generator.mjs').PackEntry} PackEntry
- * @typedef {import('./libraries.mjs').LibraryRecord} LibraryRecord
- * @typedef {import('./libraries.mjs').LibrarySource} LibrarySource
- * @typedef {import('./libraries.mjs').LoadedLibraries} LoadedLibraries
- * @typedef {import('./libraries.mjs').PackageFiles} PackageFiles
- * @typedef {import('./translate.mjs').TranslationReport} TranslationReport
- * @typedef {import('./pack.mjs').IndexEntry} IndexEntry
- * @typedef {import('./pack.mjs').PartLibrary} PartLibrary
+ * @typedef {import('./node.mjs').BuildResult} BuildResult
+ * @typedef {import('./node.mjs').BuildOptions} BuildOptions
  */
 
 /**

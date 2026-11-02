@@ -24,6 +24,14 @@
       "types": "./types/author.d.mts",
       "default": "./lib/author.mjs"
     },
+    "./core": {
+      "types": "./types/core.d.mts",
+      "default": "./lib/core.mjs"
+    },
+    "./browser": {
+      "types": "./types/browser.d.mts",
+      "default": "./lib/browser.mjs"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -42,8 +50,8 @@
     "agent-skill"
   ],
   "scripts": {
-    "test": "pnpm --filter @missing-elements/h5p-offline-player build:plan && vitest run",
-    "test:unit": "pnpm --filter @missing-elements/h5p-offline-player build:plan && vitest run",
+    "test": "pnpm --filter @missing-elements/h5p-offline-player build && vitest run",
+    "test:unit": "pnpm --filter @missing-elements/h5p-offline-player build:plan && vitest run --project node",
     "typecheck": "pnpm types && tsc -p tsconfig.json",
     "sync:skill": "node scripts/sync-skill.mjs",
     "prepack": "node -e \"require('node:fs').copyFileSync('../../LICENSE', 'LICENSE')\" && pnpm types",
@@ -57,7 +65,11 @@
     "@zip.js/zip.js": "^2.24.0"
   },
   "devDependencies": {
+    "@missing-elements/h5p-verify": "workspace:*",
     "@types/node": "^26.6.5",
+    "@vitest/browser": "^5.0.5",
+    "@vitest/browser-playwright": "^5.0.5",
+    "playwright": "^1.64.1",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"
   },

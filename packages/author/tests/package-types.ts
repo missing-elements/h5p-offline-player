@@ -6,6 +6,10 @@ import {
 } from '@missing-elements/h5p-author'
 // @ts-expect-error The source reader is internal: a helper the tests import from its module.
 import { readSource } from '@missing-elements/h5p-author'
+import { buildPackage as buildInPage, openPack as openInPage, type BuildResult as PageBuildResult } from '@missing-elements/h5p-author/browser'
+import { checkContent as checkBeside, ContentGenerator as Generator, loadLibraries as loadBeside, type IndexEntry } from '@missing-elements/h5p-author/core'
+// @ts-expect-error The core builds nothing: a build is Node's or a page's.
+import { buildPackage as noBuild } from '@missing-elements/h5p-author/core'
 
 const source: Source = { type: 'H5P.TrueFalse', title: 'T', language: 'en', license: 'U', authors: [{ name: 'A', role: 'Author' }], params: {} }
 export async function check(): Promise<[BuildResult, string, string]> {
@@ -59,5 +63,22 @@ export async function edit(names: string[], read: (name: string) => Promise<stri
     return checked
   } finally {
     await pack.close()
+  }
+}
+
+/** A page's build: the pack a bundler emitted, a picture the person chose, the package back as a Blob. */
+export async function inAPage(pack: { libraries: IndexEntry[] }, picture: File): Promise<Blob> {
+  const libraries = await openInPage(pack)
+  try {
+    const built: PageBuildResult = await buildInPage(source, { libraries, files: { 'volga.png': picture } })
+    // @ts-expect-error A page's build writes no file: it takes no output path.
+    await buildInPage(source, 'out.h5p')
+    // The core takes the page's pack as it takes Node's: a tool beside the page's build checks what it changes.
+    const content = { type: 'H5P.Blanks 1.14', language: 'en', params: built.content }
+    const checked = checkBeside(await loadBeside(libraries, content), content)
+    void [checked.problems, new Generator(new Map()), noBuild, built.notes.map(({ path }) => path)]
+    return built.blob
+  } finally {
+    await libraries.close()
   }
 }

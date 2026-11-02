@@ -8,5 +8,5 @@
     "rootDir": "lib",
     "outDir": "types"
   },
-  "include": ["lib/author.mjs"]
+  "include": ["lib/author.mjs", "lib/core.mjs", "lib/browser.mjs"]
 }

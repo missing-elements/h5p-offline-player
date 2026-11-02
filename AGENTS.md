@@ -39,9 +39,9 @@ packages/player/          @missing-elements/h5p-offline-player — the published
     h5p-offline-player.ts   the <h5p-player> custom element — the only public entry point
     plan.ts                 `./plan` -> dist/h5p-plan.js: the player's library rules (`planPack`, `ownLibraries`,
                             `librariesNamedIn`, `addonPatterns`, `textMatches`, `dependenciesIn`, `reachableFolder`,
-                            `walkDependencies` and the folder helpers) for the packages that write what it plays,
-                            h5p-author and embed; not covered by docs/compatibility.md, so they pin the player
-                            exactly (#106, #109)
+                            `walkDependencies` and the folder helpers, `packLibrariesIn`) for the packages that
+                            write what it plays, h5p-author and embed; not covered by docs/compatibility.md, so
+                            they pin the player exactly (#106, #109, #108)
     jobs-worker-handle.ts   starts the Jobs worker from the first script the page's CSP allows, holding jobs until it runs
     user-data-store.ts      the learner's saved state for `resume`, in a database of the page's own
     shadow.css              the element's own box, imported `?inline` so Vite minifies it into the bundle
@@ -161,7 +161,10 @@ packages/libraries/       @missing-elements/h5p-libraries — the hub's runtime 
 packages/normalize/       @missing-elements/h5p-normalize — the package rewriter, published as a command
   bin/h5p-normalize.mjs     the command
   lib/                      normalize.mjs (the policy), mp4-faststart.mjs (the remux), zip-writer.mjs,
-                            crc32.mjs, format.mjs, fingerprint.mjs (the player's `indexFingerprint` for Node)
+                            crc32.mjs, format.mjs, fingerprint.mjs (the player's `indexFingerprint` for Node);
+                            crc32-table.mjs, the CRC-32 with no Node import, which `./crc32` gives anything
+                            but Node, crc32.mjs zlib's to Node (#108): embed's SCORM writer and h5p-author's
+                            page build write their stored entries with it
   tests/                    node tests; tests/helpers/mp4.ts builds structurally honest mp4s;
                             package-types.ts the package by its name as a TypeScript caller sees it
   types/                    generated, not in git: the declarations, from the JSDoc (`pnpm types`;
@@ -183,9 +186,16 @@ packages/verify/          @missing-elements/h5p-verify — plays a package headl
 packages/author/          @missing-elements/h5p-author — a playable .h5p of any content type in the pack from a short
                           source, published as a command (see *The author package*)
   bin/h5p-author.mjs        the command: `build` and `schema`
-  lib/build.mjs             the source read and checked, the libraries loaded, the content generated,
-                            media copied, the content checked as saved, the parts planned with the
-                            player's `planPack`, the archive written
+  lib/author.mjs, core.mjs, browser.mjs   the three entries: `.`, Node's, the core and Node's build;
+                            `./core`, what needs neither Node nor a page; `./browser`, the core and a
+                            page's build (#108)
+  lib/build.mjs             what both builds do: the source read and checked, the libraries loaded,
+                            the content generated, media resolved, the content checked as saved, the
+                            parts planned with the player's `planPack`, the archive's manifest,
+                            libraries and content written into a zip.js writer
+  lib/node.mjs              what only Node does, and the one module that imports `node:`: the pack read
+                            from disk, a source's files beside it, downloads in a temporary folder,
+                            the package written to a path and normalized (#108)
   lib/check.mjs             `checkContent`: content in the form H5P saves it checked, the layouts' `after`
                             run, for a tool that edits a saved package and for the build, which runs it
                             last on what it writes (#107); no Node import of its own
@@ -201,18 +211,23 @@ packages/author/          @missing-elements/h5p-author — a playable .h5p of an
                             Presentation's layout, Interactive Video's placement, Branching
                             Scenario's paths, Game Map's stages, Find the Hotspot's areas
   lib/text.mjs, translate.mjs, media.mjs, metadata.mjs, pack.mjs, schema.mjs, quiz.mjs   text as H5P
-                            stores it; the libraries' translations; files and web addresses; the
-                            licences and roles H5P's metadata takes; the pinned pack read by part;
-                            the field list a source is written from; the first skill's quiz format,
-                            still built
+                            stores it; the libraries' translations; files and web addresses, reached
+                            through the environment's `MediaAccess`; the licences and roles H5P's
+                            metadata takes; the pack read by part, each read whole and checked by
+                            `crypto.subtle`; the field list a source is written from; the first
+                            skill's quiz format, still built
   scripts/                  sync-skill.mjs writes the skill's type files' generated sections from the
                             pack (`pnpm --filter @missing-elements/h5p-author sync:skill`);
-                            check-pack-published.mjs, the publish guard for the pinned pack and player
+                            check-pack-published.mjs, the publish guard for the pinned pack and player,
+                            and the normalizer's `./crc32`
   tests/                    node tests: the generator, text and translations, layouts and schema, the
                             loader, builds with media from disk and a local server, the command, the
-                            quiz format, the check of saved content, the demo's packages among it;
-                            fixtures/ the quiz format's two examples, which apps/skills plays too;
-                            package-types.ts as for the normalizer
+                            quiz format, the check of saved content, the demo's packages among it, and
+                            the page's build (page.test.ts, against Node's); browser/ the page's build in
+                            Chromium, its packages played by the verifier in Node through a Vitest
+                            command (`playUntrusted`, vitest.config.ts); fixtures/ the quiz format's
+                            two examples, which apps/skills plays too; package-types.ts as for the
+                            normalizer, the three entries
   types/                    generated, not in git: the declarations
 
 packages/cmi5/            @missing-elements/h5p-cmi5 — cmi5 for the element, published as a library
@@ -242,7 +257,8 @@ packages/embed/           @missing-elements/h5p-embed — the embed page as a st
   scorm/                    the SCORM package's launch page (index.html, its title, language and
                             build filled in by the writer) and scorm.js, its bridge to the LMS's API
   bin/h5p-embed.mjs         the command
-  scripts/                  check-player-published.mjs, the publish guard for the player it pins exactly (#109)
+  scripts/                  check-published.mjs, the publish guard for the player it pins exactly (#109)
+                            and the normalizer's `./crc32` (#108)
   tests/                    build.test.ts, no browser; site.test.ts, a written site on 127.0.0.1
                             framed by a page on localhost, as deployed; scorm.test.ts, the zip in Node
                             and the launch page under a stand-in for an LMS's player page in
@@ -1998,7 +2014,7 @@ already holds text to the content check's rules, from the pack an untrusted chec
 `apps/skills` plays every example untrusted too. Measured on a five-question quiz, at four
 characters a token: `content.json` was about 3,470 tokens to write by hand, after reading 3,900 to
 9,500 of a type's semantics; the source is 1,000 to 1,800 tokens, written from a type file of 200
-to 3,000. Nine things the code does not say by itself:
+to 3,000. Ten things the code does not say by itself:
 
 - **One generator, three ways to run it.** The third, `saved`, checks content as H5P stores it
   (*Saved content is checked as the build checks what it writes*, below). `ContentGenerator` was the sweep's
@@ -2068,7 +2084,7 @@ to 3,000. Nine things the code does not say by itself:
   needs no project set up; `--libraries` names another `parts/` folder. Each part is checked
   against the index's SHA-256 before it is read. `prepublishOnly` refuses while that version is not
   on npm with this checkout's index (`scripts/check-pack-published.mjs`, which checks the player it
-  pins too, next bullet), as the player's does.
+  pins too, next bullet, and the normalizer's `./crc32`, *A page builds too*), as the player's does.
 - **The player's library rules, not copies of them** (2026-11-02, #106, the owner's rule: reuse what
   another package has, and extend it where needed). Which libraries content names, an addon's
   patterns and what they match, and which parts of the pack a package needs are the player's: the
@@ -2122,6 +2138,41 @@ to 3,000. Nine things the code does not say by itself:
   optional select at its empty choice (`goto.type: ""`). A group that is sub-content now gets an id
   in a build too, as the editor's `initSubContent` gives one: Summary's statements and Single Choice
   Set's choices had none, and Summary names a statement's statements by it.
+- **A page builds too** (2026-11-02, #108). embed-my/creator builds content in a page and in a Tauri
+  window, on the generator it copied from the sweep on 2026-10-18, without the form's checks, the
+  problem paths and the translated defaults; and a paste mode for any content type needs the whole
+  build there. So the package has three entries: `.` for Node, `./core` for what needs neither Node
+  nor a page, and `./browser`, the core and a page's `openPack` and `buildPackage`. They are
+  subpaths and not the `browser` condition, which TypeScript ignores unless a project sets
+  `customConditions`: a page importing `.` would get the page's code typed with Node's declarations,
+  and the two `buildPackage`s take different arguments. One build: everything but where the pack's
+  bytes, a source's files and the package are is `build.mjs`'s and runs in both, and `node.mjs` is
+  the only module that imports `node:`, which `page.test.ts` holds the entries' imports to. Three
+  things follow:
+  - **A part is read whole and hashed with `crypto.subtle`, in Node too.** The reader by range Node
+    had went: the largest part, MathDisplay's, is 2.8 MB, and the hash read every byte anyway. A
+    page cannot read by range in any case: SHA-256 needs every byte and `crypto.subtle.digest`
+    takes no stream, ranges fetched after the check are other responses, whose bytes nobody
+    checked, and jsDelivr cuts a range from its compressed copy.
+  - **What a page names the pack by.** The `pack` export is taken as the page's bundler emitted it.
+    The address of a copy of `parts/` has its `index.json` held to the player's shape by
+    `packLibrariesIn`, which `./plan` exports for this. That is http(s) only, as the player reads
+    a copy, so a Tauri window on macOS, whose own files are `tauri://`, gives the export.
+  - **Media are given as `File`s, by the names the source gives them, and stored with their sizes and
+    CRC in their local headers**, passed through as embed's SCORM writer has stored its entries since
+    #92, so that the player reads each one's size off its header on a host without `Range`. The CRC
+    is the normalizer's, which a page imports through `./crc32`, so embed's copy went. An mp4 is not
+    moved to start before it has arrived whole: that is the normalizer's, which runs in Node.
+
+  A page needs a secure context for `crypto.subtle` and `crypto.randomUUID`, which the generator
+  now takes from `globalThis.crypto`, and fetches media named by web address under CORS, which most
+  image hosts refuse; the build says which, where it can. The page's build, run in Node, writes
+  H5P.Blanks file for file as Node's build does (`page.test.ts`). The Chromium test
+  (`tests/browser/page.test.ts`) builds H5P.Blanks and a Question Set with a picture drawn on a
+  canvas, 0.9 and 1.3 MB, and hands the bytes to Node through a Vitest command, where the verifier
+  plays each untrusted: a pass, no warning, nothing changed by the content check. Of what #108
+  listed for the core, `translateDefaults`, `quizSource` and `quizProblems` stay internal:
+  `loadLibraries` gives the translated defaults, and `buildPackage` takes the quiz format itself.
 - **The skill's type files are partly generated.** `skills/h5p-author/references/types/<Type>.md`
   holds hand-written notes, an example, and the type's fields between two markers, written by
   `schemaOf(…, { markdown: true })`: names, kinds, defaults, options, list sizes, a markup field's
@@ -2345,7 +2396,7 @@ one row each; an LMS added here gets a row there.
   from the player's `./plan` with `refresh` off and nothing provided, over `ownLibraries`,
   `dependenciesIn` and `librariesNamedIn` from the same module. Until #109 (2026-11-02) those were
   copies kept in step by hand, which nothing checked; since then embed pins the player exactly, as
-  h5p-author does, and `scripts/check-player-published.mjs` refuses to publish until the pinned
+  h5p-author does, and `scripts/check-published.mjs` refuses to publish until the pinned
   version is on npm with `./plan`.
   It writes those parts into `libraries/`, with an `index.json` that lists only them, and the page
   names the folder with `libraries="pack"`, `pack-base` and `refresh-libraries="off"`. The element
@@ -2498,9 +2549,10 @@ one row each; an LMS added here gets a row there.
   reader, on Rustici's Java engine, though its code is not public — while Moodle (PHP) and Frappe
   (Python) read the central directory and never noticed. The package, the fonts and the pack's
   parts are stored, so each goes in passed through with `compressionMethod: 0`, its size and its
-  CRC (`fileCrc32`, a second read of the file; `lib/crc32.mjs` is a copy of the normalizer's,
-  native from Node 22.2 and a table before, since the floor is 22 and a named import of a missing
-  builtin export fails the whole module at link time — keep the two in step), which zip.js writes
+  CRC (`fileCrc32`, a second read of the file, by the normalizer's `crc32` from its `./crc32`,
+  zlib's from Node 22.2 and a table before, since the floor is 22 and a named import of a missing
+  builtin export fails the whole module at link time; embed kept a copy of it until #108, when
+  h5p-author's page build needed it too and the table became a module a page imports), which zip.js writes
   as a complete local header and still streams: writing a 433 MB package peaks between 170 and
   230 MB resident, run to run, as the writer before did (170 to 193 in two runs), nowhere near the
   package held whole. zip.js computes nothing for a passed-through entry, so the test holds the

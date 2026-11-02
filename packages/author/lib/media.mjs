@@ -1,16 +1,14 @@
-import { createWriteStream } from 'node:fs'
-import { open, stat } from 'node:fs/promises'
-import { basename, extname, join, resolve } from 'node:path'
-import { Readable, Transform } from 'node:stream'
-import { pipeline } from 'node:stream/promises'
 import { escapeText } from './text.mjs'
 
 /**
  * The files content shows: images, video, audio and other files, named in a source by a path
- * beside it or a web address, copied into the package's `content/` folder with what H5P records
- * of each — its type, an image's size, its copyright. A video on YouTube, Vimeo, Panopto or
- * Echo360 stays there and is played from there, as H5P's editor embeds it (h5peditor-av.js, its
- * `providers`), at an address H5P.Video plays.
+ * beside it, by a name among the files a page was given, or by a web address, copied into the
+ * package's `content/` folder with what H5P records of each — its type, an image's size, its
+ * copyright. A video on YouTube, Vimeo, Panopto or Echo360 stays there and is played from there, as
+ * H5P's editor embeds it (h5peditor-av.js, its `providers`), at an address H5P.Video plays. Where
+ * the files are, and where a download is kept, is the environment's (`MediaAccess`): `node.mjs`
+ * reads them from disk and keeps downloads in a temporary folder, `browser.mjs` takes `File`s and
+ * keeps downloads as `Blob`s.
  */
 
 /** The types H5P accepts for content (`H5PCore::$defaultContentWhitelist`), by what a field takes. */
@@ -89,9 +87,44 @@ const MAX_DOWNLOAD = 1024 ** 3
 const IDLE_MS = 60_000
 
 /**
- * @typedef {{ name: string, from: string }} StagedFile a file to add to the package: its name under `content/`, and where it is on disk
+ * @template F
+ * @typedef {{ name: string, from: F }} StagedFile a file to add to the package: its name under `content/`, and where its bytes are
  * @typedef {{ path: string, message: string }} Problem
  */
+
+/**
+ * Where a build's files are, and where a download is kept, which differ between Node and a page.
+ * @template F a kept file: a path on disk, or a `Blob`
+ * @typedef {{
+ *   what: string,
+ *   name(source: string): string,
+ *   local(source: string): Promise<{ file: F } | { missing: string }>,
+ *   keep(body: ReadableStream<Uint8Array>, extension: string): Promise<F>,
+ *   open(file: F): Promise<{ read(offset: number, length: number): Promise<Uint8Array>, close(): Promise<void> }>
+ * }} MediaAccess
+ *   `what`, what a source's path names, for problems; `name`, the file's own name it names;
+ *   `local`, that file, or why there is none; `keep`, a download's bytes kept; `open`, a kept
+ *   file's bytes read from an offset, fewer at its end
+ */
+
+/**
+ * A file name's extension, lowercased, as Node's `extname` takes it: none for a name that only
+ * starts with a dot.
+ * @param {string} name
+ */
+function extensionOf(name) {
+  const dot = name.lastIndexOf('.')
+  return dot > 0 ? name.slice(dot + 1).toLowerCase() : ''
+}
+
+/**
+ * A path's last segment, past any slash it ends with, as Node's `basename` takes it.
+ * @param {string} path
+ */
+function lastSegment(path) {
+  const trimmed = path.replace(/\/+$/, '')
+  return trimmed.slice(trimmed.lastIndexOf('/') + 1)
+}
 
 /**
  * An image's width and height, read from its header: PNG, JPEG, GIF and BMP. A JPEG's are in its
@@ -130,24 +163,23 @@ export async function imageSize(read) {
   return null
 }
 
+/** @template F */
 export class MediaStore {
   /**
-   * @param {{ base: string, temporary: string, fetch?: typeof fetch, idle?: number }} options
-   *   `base`, the folder a source's relative paths are read from; `temporary`, where downloads land;
-   *   `idle`, the milliseconds a download may go without a byte
+   * @param {MediaAccess<F>} access where the files are, and where a download is kept
+   * @param {{ fetch?: typeof fetch, idle?: number }} [options]
+   *   `fetch`, for media named by web address; `idle`, the milliseconds a download may go without a byte
    */
-  constructor({ base, temporary, fetch: fetchImpl = globalThis.fetch, idle = IDLE_MS }) {
-    this.base = base
-    this.temporary = temporary
+  constructor(access, { fetch: fetchImpl = globalThis.fetch, idle = IDLE_MS } = {}) {
+    this.access = access
     this.fetch = fetchImpl
     this.idle = idle
-    /** @type {StagedFile[]} */
+    /** @type {StagedFile<F>[]} */
     this.files = []
     /** @type {Map<string, { name: string, mime: string, width?: number, height?: number }>} by source, so one file named twice is copied once */
     this.known = new Map()
     /** @type {Set<string>} */
     this.names = new Set()
-    this.downloads = 0
   }
 
   /**
@@ -177,7 +209,7 @@ export class MediaStore {
       }
     }
     if (/^[a-z][a-z0-9+.-]*:/i.test(source) && !web) {
-      report(`${at}.path`, 'expected a file beside the source or an http(s) address')
+      report(`${at}.path`, `expected ${this.access.what} or an http(s) address`)
       return { path: source, copyright }
     }
     const types = /** @type {Record<string, string>} */ (TYPES[kind])
@@ -191,17 +223,13 @@ export class MediaStore {
       /** @type {{ name: string, mime: string, width?: number, height?: number }} */
       const described = { name, mime }
       if (kind === 'image') {
-        const handle = await open(staged.from, 'r')
+        const file = await this.access.open(staged.from)
         try {
-          const size = await imageSize(async (offset, length) => {
-            const bytes = new Uint8Array(length)
-            const { bytesRead } = await handle.read(bytes, 0, length, offset)
-            return bytes.subarray(0, bytesRead)
-          })
+          const size = await imageSize((offset, length) => file.read(offset, length))
           if (!size) report(`${at}.path`, `${source} is not a ${extension.toUpperCase()} image whose size can be read`)
           else Object.assign(described, size)
         } finally {
-          await handle.close()
+          await file.close()
         }
       }
       this.files.push({ name, from: staged.from })
@@ -248,25 +276,23 @@ export class MediaStore {
    * @param {(path: string, message: string) => void} report
    */
   async #local(source, types, at, report) {
-    const from = resolve(this.base, source)
-    const extension = extname(from).slice(1).toLowerCase()
+    const name = this.access.name(source)
+    const extension = extensionOf(name)
     if (!(extension in types)) {
       report(`${at}.path`, `${source}: this field takes ${Object.keys(types).map((each) => `.${each}`).join(', ')}`)
       return null
     }
-    try {
-      const info = await stat(from)
-      if (!info.isFile()) throw new Error('not a file')
-    } catch {
-      report(`${at}.path`, `${source}: no such file beside the source (${from})`)
+    const found = await this.access.local(source)
+    if ('missing' in found) {
+      report(`${at}.path`, `${source}: ${found.missing}`)
       return null
     }
-    return { from, extension, stem: basename(from, extname(from)) }
+    return { from: found.file, extension, stem: name.slice(0, name.length - extension.length - 1) }
   }
 
   /**
-   * A web address downloaded to the temporary folder, its type taken from its name or, failing
-   * that, from what the server says it is.
+   * A web address downloaded and kept, its type taken from its name or, failing that, from what
+   * the server says it is.
    * @param {string} source
    * @param {string} kind
    * @param {Record<string, string>} types
@@ -281,14 +307,20 @@ export class MediaStore {
       report(`${at}.path`, `${source} is not a web address`)
       return null
     }
-    // Started again by every byte that arrives.
     const controller = new AbortController()
     const failed = (/** @type {unknown} */ error) => {
       const cause = controller.signal.aborted ? controller.signal.reason : error
       report(`${at}.path`, `${source} could not be downloaded: ${cause instanceof Error ? cause.message : cause}`)
       return null
     }
-    const timer = setTimeout(() => controller.abort(new Error(`nothing arrived for ${this.idle / 1000} s`)), this.idle)
+    // Started again by every byte that arrives: a page's timers have no `refresh`.
+    /** @type {ReturnType<typeof setTimeout> | undefined} */
+    let timer
+    const wait = () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => controller.abort(new Error(`nothing arrived for ${this.idle / 1000} s`)), this.idle)
+    }
+    wait()
     try {
       let response
       try {
@@ -296,13 +328,13 @@ export class MediaStore {
       } catch (error) {
         return failed(error)
       }
-      timer.refresh()
+      wait()
       if (!response.ok || !response.body) {
         await response.body?.cancel()
         report(`${at}.path`, `${source} answered ${response.status}${kind === 'video' ? '; for a video on YouTube, Vimeo, Panopto or Echo360 give its address there' : ''}`)
         return null
       }
-      const named = extname(new URL(response.url || url.href).pathname).slice(1).toLowerCase()
+      const named = extensionOf(lastSegment(new URL(response.url || url.href).pathname))
       const served = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
       const extension = named in types ? named : Object.keys(types).find((each) => types[each] === served)
       if (!extension) {
@@ -310,22 +342,23 @@ export class MediaStore {
         report(`${at}.path`, `${source} is ${served || 'of an unknown type'}: this field takes ${Object.keys(types).map((each) => `.${each}`).join(', ')}`)
         return null
       }
-      this.downloads += 1
-      const from = join(this.temporary, `download-${this.downloads}.${extension}`)
       let received = 0
-      const limit = new Transform({
-        transform(chunk, _encoding, callback) {
-          timer.refresh()
+      const limited = response.body.pipeThrough(new TransformStream({
+        transform(chunk, stream) {
+          wait()
           received += chunk.length
-          callback(received > MAX_DOWNLOAD ? new Error(`larger than ${MAX_DOWNLOAD / 1024 ** 3} GB`) : null, chunk)
+          if (received > MAX_DOWNLOAD) stream.error(new Error(`larger than ${MAX_DOWNLOAD / 1024 ** 3} GB`))
+          else stream.enqueue(chunk)
         }
-      })
+      }))
+      let from
       try {
-        await pipeline(Readable.fromWeb(/** @type {import('node:stream/web').ReadableStream} */ (response.body)), limit, createWriteStream(from))
+        from = await this.access.keep(limited, extension)
       } catch (error) {
         return failed(error)
       }
-      const stem = basename(decodeURIComponent(new URL(response.url || url.href).pathname), `.${named}`) || kind
+      const last = lastSegment(decodeURIComponent(new URL(response.url || url.href).pathname))
+      const stem = (named && last.endsWith(`.${named}`) && last !== `.${named}` ? last.slice(0, -named.length - 1) : last) || kind
       return { from, extension, stem }
     } finally {
       clearTimeout(timer)

@@ -65,7 +65,7 @@ something else.
   plays a package headless and says whether it works, [`h5p-normalize`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/streaming-video.md)
   rewrites one so its video streams, [`h5p-embed`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#readme)
   writes the embed site, and [`h5p-author`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/author#readme)
-  builds a package of any content type from a short JSON source. The [agent skills](#agent-skills)
+  builds a package of any content type from a short JSON source, in Node or in a page. The [agent skills](#agent-skills)
   cover those workflows and authoring.
 - **Is tested where it runs.** CI runs the browser tests in Chromium, Firefox and WebKit on every
   change, and plays every content type in the library pack, untrusted and trusted, on each change

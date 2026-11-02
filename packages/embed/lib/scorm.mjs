@@ -5,9 +5,9 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { Writable } from 'node:stream'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { BlobReader, TextReader, TextWriter, ZipReader, ZipWriter, configure } from '@zip.js/zip.js'
+import { crc32 } from '@missing-elements/h5p-normalize/crc32'
 import { dependenciesIn, indexLibraryFolders, librariesNamedIn, ownLibraries, planPack, reachableFolder, walkDependencies } from '@missing-elements/h5p-offline-player/plan'
 import { EmbedError, PLAYER_FILES, installed } from './build.mjs'
-import { crc32 } from './crc32.mjs'
 
 /**
  * Writes a SCORM 1.2 package that plays one `.h5p` in an LMS and reports its result there: the

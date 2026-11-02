@@ -24,6 +24,11 @@
       "types": "./types/normalize.d.mts",
       "default": "./lib/normalize.mjs"
     },
+    "./crc32": {
+      "types": "./types/crc32.d.mts",
+      "node": "./lib/crc32.mjs",
+      "default": "./lib/crc32-table.mjs"
+    },
     "./package.json": "./package.json"
   },
   "files": [

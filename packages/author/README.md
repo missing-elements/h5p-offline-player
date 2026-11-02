@@ -176,6 +176,51 @@ it plays. Content saved by the platforms can hold what their editor let an autho
 does not, such as a required text left empty; a tool that changes one part keeps the problems under
 the paths it changed.
 
+## In a page
+
+`@missing-elements/h5p-author/browser` is the same build in a page, or in a Tauri window: the
+source checked, filled in, laid out and checked as above, every problem listed at once. Three
+things differ. The libraries come from a pack the page can reach. A source's files are `File`s or
+`Blob`s the page was given. And the package comes back as a `Blob`.
+
+```js
+import { pack } from '@missing-elements/h5p-libraries'
+import { buildPackage, openPack, SourceError } from '@missing-elements/h5p-author/browser'
+
+const libraries = await openPack(pack) // once, for the page's builds
+const { blob, notes } = await buildPackage(source, { libraries, files: { 'volga.png': input.files[0] } })
+```
+
+- `openPack(pack)` takes either of two things:
+  - the `pack` export, its parts emitted by the page's bundler;
+  - the address of a copy of the pack's `parts/` folder, as a site serves it to `<h5p-player>`'s
+    `pack-base`. Its `index.json` is read from there and held to the shape the player holds it to.
+
+  Each part is fetched whole when a build first needs it, and checked against the index's SHA-256,
+  as in Node. `close()` the pack when the page is done with it.
+- `buildPackage(source, { libraries, files, fetch })` throws a `SourceError` as in Node, and returns
+  `{ blob, manifest, content, libraries, translations, notes, media }`. Its options:
+  - `libraries`: a pack `openPack` opened, or what to open one from for this build alone.
+  - `files`: an object or a `Map` of the files a source names, by the names it gives them:
+    `{ "path": "volga.png" }` takes `files['volga.png']`.
+  - `fetch`: for media named by web address.
+- Media go in last and stored, each with its size and CRC in the header in front of it, as the player
+  reads them on a host without `Range`. An mp4 goes in as it was given. Moving its index to the
+  front, so that it starts before the whole file has arrived, is the normalizer's job, which runs
+  in Node: `npx @missing-elements/h5p-normalize@latest course.h5p`.
+
+A page has two limits that Node does not:
+
+- It needs a secure context, https, `localhost` or a Tauri window, for `crypto.subtle` and
+  `crypto.randomUUID`. Elsewhere `openPack` and `buildPackage` refuse, and say so.
+- It fetches a file named by web address itself, and gets another site's only where that site
+  allows it (CORS). Most image hosts do not, so give the file itself instead, or a `fetch` that may
+  fetch it, such as Tauri's HTTP plugin's.
+
+`@missing-elements/h5p-author/core` is the part of the package that needs neither Node nor a page:
+the generator, `loadLibraries` and `packageLibraries`, `checkContent` and the rules for text, as
+the package's main export has them. A tool beside a build in either imports it from there.
+
 ## What it does not do
 
 It checks structure, not pedagogy: whether the answers are right, the questions fair, or the
