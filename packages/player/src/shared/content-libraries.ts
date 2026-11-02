@@ -11,6 +11,13 @@ export interface LibraryDependency {
   minorVersion: string | number
 }
 
+/** The parts of `h5p.json` the player needs. Everything in it comes from an untrusted archive. */
+export interface PackageManifest {
+  title?: string
+  mainLibrary?: string
+  preloadedDependencies?: LibraryDependency[]
+}
+
 /**
  * Every library a content's parameters name, as sub-content does it: an object whose `library`
  * is `"<machineName> <major>.<minor>"`, anywhere in the tree. In archive order of discovery,

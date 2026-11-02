@@ -19,8 +19,9 @@ import { deferredStream, inflated } from '../shared/stream-utils.js'
 import type { ForwardEntry, ForwardIndexSnapshot } from '../shared/forward-index.js'
 import { indexFingerprint, librariesFingerprint, revisionOf } from '../shared/revision.js'
 import { contentMetadata, type ContentMetadata } from '../shared/metadata.js'
-import { addonPatterns, dependenciesIn, librariesNamedIn, textMatches, type LibraryDependency } from '../shared/content-libraries.js'
-import type { OwnLibrary } from './pack-plan.js'
+import { addonPatterns, dependenciesIn, librariesNamedIn, textMatches, type LibraryDependency, type PackageManifest } from '../shared/content-libraries.js'
+import { findMissingLibraries, indexLibraryFolders, libraryFolderNames, parseLibraryFolder, reachableFolder, resolveLibraryFolder, walkDependencies, type LibraryFolder } from '../shared/library-folders.js'
+import { ownLibraries as carriedLibraries, type OwnLibrary } from './pack-plan.js'
 
 /**
  * The package reader: a zip central directory turned into a name → entry index, plus the decision
@@ -35,13 +36,6 @@ export type Strategy =
   | { kind: 'slice' }
   /** Large and deflated (method 8): the Jobs worker inflates into chunks, served progressively. */
   | { kind: 'chunked' }
-
-/** The parts of `h5p.json` the player needs. Everything in it comes from an untrusted archive. */
-export interface PackageManifest {
-  title?: string
-  mainLibrary?: string
-  preloadedDependencies?: LibraryDependency[]
-}
 
 /** A library that names, in its `library.json`'s `addTo`, the content the platforms add it to. */
 export interface Addon extends LibraryDependency {
@@ -365,48 +359,12 @@ export class PackageReader {
   }
 
   /**
-   * What the package carries of its libraries, for the pack's plan. With `read`, each folder's
-   * `library.json` gives the version, patch included, and the dependencies; without it — a
-   * `library.json` read would be two ranged requests — the folder's name gives the version and
-   * the rest is left unknown, which leaves the library as it is and its dependencies to the next
-   * look; a folder whose name gives no version, an unversioned one, is the library at a version
-   * unknown, which is how the runtime takes it too, falling back to the bare name. A
-   * `library.json` that does not parse, or a folder named for another library, is left out.
+   * What the package carries of its libraries, for the pack's plan: the plan's `ownLibraries` over
+   * this archive's library folders, reading each folder's `library.json` through `read` when the
+   * caller can afford to — over HTTP each read is two ranged requests until the warm has cached it.
    */
   async ownLibraries(read?: (located: LocatedEntry) => Promise<unknown>): Promise<OwnLibrary[]> {
-    const libraries: OwnLibrary[] = []
-    for (const folder of this.ownLibraryFolders()) {
-      if (!read) {
-        const parsed = parseLibraryFolder(folder)
-        libraries.push(
-          parsed
-            ? { folder, machineName: parsed.machineName, major: parsed.major, minor: parsed.minor, patch: null, dependencies: null }
-            : { folder, machineName: folder, major: null, minor: null, patch: null, dependencies: null }
-        )
-        continue
-      }
-      const library = (await read({ reader: this, entry: this.entries.get(`${folder}/library.json`)! }).catch(() => null)) as Record<string, unknown> | null
-      const version = (part: unknown) => (typeof part === 'number' && Number.isInteger(part) && part >= 0 ? part : typeof part === 'string' && /^\d+$/.test(part) ? Number(part) : null)
-      const major = version(library?.majorVersion)
-      const minor = version(library?.minorVersion)
-      const machineName = library?.machineName
-      if (typeof machineName !== 'string' || major === null || minor === null) continue
-      const parsed = parseLibraryFolder(folder)
-      if (parsed ? parsed.machineName !== machineName || parsed.major !== major : folder !== machineName) continue
-      libraries.push({
-        folder,
-        machineName,
-        major,
-        minor,
-        patch: version(library?.patchVersion) ?? 0,
-        dependencies: dependenciesIn(library).map(({ machineName: name, majorVersion, minorVersion }) => ({
-          machineName: name,
-          majorVersion: Number(majorVersion),
-          minorVersion: Number(minorVersion)
-        }))
-      })
-    }
-    return libraries
+    return carriedLibraries(this.ownLibraryFolders(), read && ((folder) => read({ reader: this, entry: this.entries.get(`${folder}/library.json`)! })))
   }
 
   /** The library folders the attached archives provide, a part's or a bundle's. */
@@ -634,49 +592,40 @@ export class PackageReader {
     read: (located: LocatedEntry) => Promise<unknown>,
     offered: ReadonlyArray<{ machineName: string; majorVersion: number }> = []
   ): Promise<{ missing: MissingLibraries | null; downgraded: DowngradedLibrary[] }> {
-    const missing: string[] = []
-    const downgraded = new Map<string, DowngradedLibrary>()
-    const seen = new Set<string>()
     const available = this.availableLibraries()
     const sourced = ({ machineName, majorVersion }: LibraryDependency) =>
       (available.get(machineName) ?? []).some(({ major }) => major === Number(majorVersion)) ||
       offered.some((library) => library.machineName === machineName && library.majorVersion === Number(majorVersion))
-    let level = [...dependenciesIn(manifest), ...(await this.contentLibraries()).filter(sourced)]
+    const roots = [...dependenciesIn(manifest), ...(await this.contentLibraries()).filter(sourced)]
 
-    while (level.length > 0) {
-      const next: LibraryDependency[] = []
-      await Promise.all(
-        level.map(async (dependency) => {
-          const folders = libraryFolderNames(dependency)
-          if (seen.has(folders[0])) return
-          seen.add(folders[0])
-          const located = folders.map((folder) => this.get(`${folder}/library.json`)).find(Boolean)
-          if (!located) {
-            missing.push(folders[0])
-            return
-          }
-          let library: unknown
-          try {
-            library = await read(located)
-          } catch (error) {
-            // Counted as having no dependencies, the walk would pass a tree it did not see, and the
-            // runtime would die on the same file with "Unexpected end of JSON input" and no name.
-            const reason = error instanceof Error ? error.message : String(error)
-            throw new PlayerError('bad-archive', `${folders[0]}/library.json could not be read: ${reason}`, { cause: error })
-          }
-          const older = olderThanAsked(dependency, located, library)
-          if (older) downgraded.set(`${older.library} ${older.from}`, older)
-          next.push(...dependenciesIn(library))
-        })
-      )
-      level = next
+    // The walk is `walkDependencies`, which the SCORM writer runs over a zip too (#109); what it
+    // locates here goes through `get`, so an attached archive and a compatible newer minor count.
+    const { missing, found } = await walkDependencies(
+      roots,
+      (dependency) => libraryFolderNames(dependency).map((folder) => this.get(`${folder}/library.json`)).find(Boolean),
+      async (located, dependency) => {
+        try {
+          return await read(located)
+        } catch (error) {
+          // Counted as having no dependencies, the walk would pass a tree it did not see, and the
+          // runtime would die on the same file with "Unexpected end of JSON input" and no name.
+          const reason = error instanceof Error ? error.message : String(error)
+          throw new PlayerError('bad-archive', `${libraryFolderNames(dependency)[0]}/library.json could not be read: ${reason}`, { cause: error })
+        }
+      }
+    )
+
+    const downgraded = new Map<string, DowngradedLibrary>()
+    for (const { dependency, located, library } of found) {
+      const older = olderThanAsked(dependency, located, library)
+      if (older) downgraded.set(`${older.library} ${older.from}`, older)
     }
-
     const listed = [...downgraded.values()].sort((a, b) => a.library.localeCompare(b.library) || a.from.localeCompare(b.from))
     if (missing.length === 0) return { missing: null, downgraded: listed }
-    const carried = this.withheld.size > 0 && missing.every((folder) => this.withheld.has(`${folder}/library.json`))
+    const folders = missing.map((dependency) => libraryFolderNames(dependency)[0]).sort()
+    const carried = this.withheld.size > 0 && folders.every((folder) => this.withheld.has(`${folder}/library.json`))
     return {
-      missing: { mainLibrary: manifest.mainLibrary, folders: missing.sort(), all: false, ...(carried ? { carried } : {}) },
+      missing: { mainLibrary: manifest.mainLibrary, folders, all: false, ...(carried ? { carried } : {}) },
       downgraded: listed
     }
   }
@@ -1047,130 +996,6 @@ function olderThanAsked(dependency: LibraryDependency, located: LocatedEntry, li
   const patch = (library as { patchVersion?: unknown } | null)?.patchVersion
   const patchVersion = typeof patch === 'number' && Number.isInteger(patch) && patch >= 0 ? patch : typeof patch === 'string' && /^\d+$/.test(patch) ? Number(patch) : 0
   return { library: dependency.machineName, from: `${wanted.major}.${wanted.minor}`, to: `${served.major}.${served.minor}.${patchVersion}` }
-}
-
-/**
- * The two folder names a library may be stored under: the versioned one, and the bare machine
- * name older packages use. Each is tried in that order, as h5p-standalone tried them.
- */
-export function libraryFolderNames(dependency: LibraryDependency): string[] {
-  return [
-    `${dependency.machineName}-${dependency.majorVersion}.${dependency.minorVersion}`,
-    dependency.machineName
-  ]
-}
-
-/**
- * The folder a dependency is served from: its name as written, or the bare machine name
- * h5p-standalone falls back to, when that folder's `library.json` is among `names`; else a
- * compatible newer minor of the same major from `available`, the rule `get()` serves library
- * files by, or with `downgrade` an older one. `bootReady`, `mergedManifest` and
- * `findMissingLibraries` all decide by this, so it lives once.
- */
-function reachableFolder(
-  dependency: LibraryDependency,
-  names: ReadonlySet<string>,
-  available: Map<string, LibraryFolder[]>,
-  downgrade = false
-): string | undefined {
-  return (
-    libraryFolderNames(dependency).find((folder) => names.has(`${folder}/library.json`)) ??
-    resolveLibraryFolder(
-      available,
-      {
-        machineName: dependency.machineName,
-        major: Number(dependency.majorVersion),
-        minor: Number(dependency.minorVersion)
-      },
-      downgrade
-    )
-  )
-}
-
-export interface LibraryFolder {
-  machineName: string
-  major: number
-  minor: number
-  folder: string
-}
-
-/** Splits `H5P.Text-1.1` into its parts, or returns `null` for a folder that is not a library. */
-export function parseLibraryFolder(folder: string): LibraryFolder | null {
-  const match = /^(.+)-(\d+)\.(\d+)$/.exec(folder)
-  if (!match) return null
-  return {
-    machineName: match[1],
-    major: Number(match[2]),
-    minor: Number(match[3]),
-    folder
-  }
-}
-
-/** Every library folder in a set of entry names, grouped by machine name. */
-export function indexLibraryFolders(entryNames: Iterable<string>): Map<string, LibraryFolder[]> {
-  const byName = new Map<string, LibraryFolder[]>()
-
-  for (const name of entryNames) {
-    const slash = name.indexOf('/')
-    if (slash < 0 || name.slice(slash + 1) !== 'library.json') continue
-
-    const parsed = parseLibraryFolder(name.slice(0, slash))
-    if (!parsed) continue
-
-    const existing = byName.get(parsed.machineName)
-    if (existing) existing.push(parsed)
-    else byName.set(parsed.machineName, [parsed])
-  }
-
-  return byName
-}
-
-/**
- * Picks the folder that satisfies a dependency: the same major version, and a minor at least as
- * high as the one asked for. H5P bumps the major for a change content cannot follow, and gives a
- * minor that changed the shape of a library's parameters a step in its `upgrades.js`; the frame
- * runs those steps on content written for an older minor before the runtime starts
- * (`content-upgrade.ts` in the runtime package), as the platforms do when they install a newer one.
- *
- * This matters whenever libraries come from somewhere other than the package: the library pack ships
- * the current `H5P.Text-1.1` while content authored earlier asks for `H5P.Text-1.0`, and without
- * this every such request is a 404.
- *
- * The lowest satisfying version wins, as the closest to what the content was written against.
- *
- * With `downgrade`, a dependency nothing satisfies is served by the newest older minor of the same
- * major: content made on h5p.com after a minor bump the library pack has not caught up with (#85).
- * Three bumps in four add fields the older code ignores; the fourth moved some, which the older
- * code then does not find. The element asks for it only once every library source has been tried
- * for the version named, and never for an archive still arriving, which may yet carry it.
- */
-export function resolveLibraryFolder(
-  available: Map<string, LibraryFolder[]>,
-  dependency: { machineName: string; major: number; minor: number },
-  downgrade = false
-): string | undefined {
-  const sameMajor = (available.get(dependency.machineName) ?? []).filter((candidate) => candidate.major === dependency.major)
-  const satisfying = sameMajor.filter((candidate) => candidate.minor >= dependency.minor).sort((a, b) => a.minor - b.minor)
-  if (satisfying.length > 0 || !downgrade) return satisfying[0]?.folder
-
-  return [...sameMajor].sort((a, b) => b.minor - a.minor)[0]?.folder
-}
-
-/**
- * The dependencies `h5p.json` declares that the archive does not actually carry. Pure, so the
- * rule can be checked without building a zip.
- */
-export function findMissingLibraries(
-  entryNames: ReadonlySet<string>,
-  manifest: PackageManifest,
-  downgrade = false
-): LibraryDependency[] {
-  const dependencies = manifest.preloadedDependencies
-  if (!Array.isArray(dependencies)) return []
-
-  const available = indexLibraryFolders(entryNames)
-
-  return dependencies.filter((dependency) => reachableFolder(dependency, entryNames, available, downgrade) === undefined)
 }
 
 /**

@@ -135,7 +135,7 @@ importers:
         specifier: workspace:^
         version: link:../libraries
       '@missing-elements/h5p-offline-player':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../player
       '@missing-elements/h5p-runtime':
         specifier: workspace:^
