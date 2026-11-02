@@ -2,9 +2,9 @@
  * @missing-elements/h5p-author: a playable .h5p of any content type in the H5P hub's library pack,
  * from a short JSON source. The source writes only what the defaults cannot know; everything else
  * comes from the libraries' own semantics and translations, and the libraries from the pack this
- * package pins, checked against its index. A tool beside the build, which reads or changes content
- * as the build would, takes the libraries as the build loads them (`openPack`, `loadLibraries`)
- * and its rules for text (`markupText`, `plainText`, `allowedTags`).
+ * package pins, checked against its index. A tool beside the build takes the libraries as the build
+ * loads them (`openPack`, `loadLibraries`) and its rules for text (`markupText`, `plainText`,
+ * `allowedTags`).
  */
 
 import { openPack } from './pack.mjs'
@@ -24,8 +24,10 @@ export { allowedTags, markupText, plainText } from './text.mjs'
  * @typedef {import('./build.mjs').BuildOptions} BuildOptions
  * @typedef {import('./generator.mjs').GeneratorOptions} GeneratorOptions
  * @typedef {import('./generator.mjs').PackEntry} PackEntry
+ * @typedef {import('./libraries.mjs').LibraryRecord} LibraryRecord
  * @typedef {import('./libraries.mjs').LibrarySource} LibrarySource
  * @typedef {import('./libraries.mjs').LoadedLibraries} LoadedLibraries
+ * @typedef {import('./translate.mjs').TranslationReport} TranslationReport
  * @typedef {import('./pack.mjs').IndexEntry} IndexEntry
  * @typedef {import('./pack.mjs').PartLibrary} PartLibrary
  */

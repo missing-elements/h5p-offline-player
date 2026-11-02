@@ -134,9 +134,10 @@ async function closure(pack, main, content) {
   /** @type {Map<string, import('./pack.mjs').PartLibrary>} */
   const selected = new Map()
   for (const entry of ordered.values()) selected.set(entry.folder, await pack.open(entry))
-  // Planned without the parameters, nothing matches an addon's pattern: what they add are the addons.
+  // Planned without the parameters, nothing matches an addon's pattern: what they add are the
+  // addons, and of what they add, the addons alone, not what an addon would need in turn.
   const plain = new Set(plan(undefined).map((entry) => entry.folder))
-  const addons = planned.filter((entry) => !plain.has(entry.folder)).map((entry) => `${entry.machineName} ${entry.majorVersion}.${entry.minorVersion}`)
+  const addons = planned.filter((entry) => entry.addTo !== undefined && !plain.has(entry.folder)).map((entry) => `${entry.machineName} ${entry.majorVersion}.${entry.minorVersion}`)
   return { selected, addons }
 }
 

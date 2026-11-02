@@ -2,7 +2,7 @@
 // published declarations, not the source. `pnpm typecheck` writes them first.
 import {
   allowedTags, buildPackage, ContentGenerator, GENERATED_START, loadLibraries, markupText, openPack, plainText, schemaOf, SourceError,
-  type BuildResult, type LibrarySource, type Source
+  type BuildResult, type LibraryRecord, type LibrarySource, type Source, type TranslationReport
 } from '@missing-elements/h5p-author'
 // @ts-expect-error The source reader is internal: a helper the tests import from its module.
 import { readSource } from '@missing-elements/h5p-author'
@@ -26,7 +26,10 @@ export async function beside(): Promise<string> {
   const pack = await openPack('parts')
   try {
     const libraries: LibrarySource = pack
-    const { entries, main } = await loadLibraries(libraries, { type: 'H5P.Blanks', language: 'de', params: {} })
+    const record: LibraryRecord = pack.libraries[0]
+    const { entries, main, translations } = await loadLibraries(libraries, { type: 'H5P.Blanks', language: 'de', params: {} })
+    const reports: TranslationReport[] = translations
+    void [record, reports]
     const content = new ContentGenerator(entries).generate(main, {})
     const part = await pack.open(pack.libraries[0])
     // @ts-expect-error A part's file stays inside the pack.

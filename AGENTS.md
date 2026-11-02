@@ -195,7 +195,7 @@ packages/author/          @missing-elements/h5p-author — a playable .h5p of an
                             quiz format, still built
   scripts/                  sync-skill.mjs writes the skill's type files' generated sections from the
                             pack (`pnpm --filter @missing-elements/h5p-author sync:skill`);
-                            check-pack-published.mjs, the publish guard for the pinned pack
+                            check-pack-published.mjs, the publish guard for the pinned pack and player
   tests/                    node tests: the generator, text and translations, layouts and schema, the
                             loader, builds with media from disk and a local server, the command, the
                             quiz format; fixtures/ the quiz format's two examples, which apps/skills
@@ -2047,7 +2047,8 @@ to 3,000. Eight things the code does not say by itself:
   packages/libraries has, so a release builds with the libraries it was tested with and one command
   needs no project set up; `--libraries` names another `parts/` folder. Each part is checked
   against the index's SHA-256 before it is read. `prepublishOnly` refuses while that version is not
-  on npm with this checkout's index (`scripts/check-pack-published.mjs`), as the player's does.
+  on npm with this checkout's index (`scripts/check-pack-published.mjs`, which checks the player it
+  pins too, next bullet), as the player's does.
 - **The player's library rules, not copies of them** (2026-11-02, #106, the owner's rule: reuse what
   another package has, and extend it where needed). Which libraries content names, an addon's
   patterns and what they match, and which parts of the pack a package needs are the player's: the
@@ -2057,11 +2058,14 @@ to 3,000. Eight things the code does not say by itself:
   since the plan leaves a gap without a word. And the order: depth first from the content type, as
   the closure the plan replaced listed them, which `h5p.json` and the zip's folders follow, because
   the runtime keeps that order between libraries that do not depend on each other and so decides
-  whose stylesheet comes later. All 32 type files' examples came out with the libraries, order,
+  whose stylesheet comes later; `build.test.ts` holds a build's `h5p.json` to it, derived from the
+  parts' own `library.json` files. All 32 type files' examples came out with the libraries, order,
   folders and notes of the build before. The old closure also followed `dynamicDependencies`, which
   no library in the pack has (checked the same day). `./plan` is not covered by
   docs/compatibility.md, so the dependency is `workspace:*`, the player's exact version, published
-  first. A tool beside the build takes what the build loads (`openPack`, and `loadLibraries` over
+  first: `scripts/check-pack-published.mjs` refuses to publish until the pinned version is on npm
+  and exports `./plan`, since a player published before it existed would install and fail on the
+  first import. A tool beside the build takes what the build loads (`openPack`, and `loadLibraries` over
   any source with the pack's members) and its rules for text; not the build's check, which reads a
   source where a tool edits saved content (#107). The runtime's library-name parser, content check
   and content upgrade stay out: they are GPL-3.0-only.

@@ -91,7 +91,8 @@ export async function loadLibraries(pack, { type, language, params }) {
       const files = translationFiles(part.translations, language).map((name) => ({ name, read: () => pack.translation(part, name) }))
       const localized = await localize(semantics, files, libraryString(part.library))
       semantics = patchSemantics(part.library.machineName, localized.semantics)
-      if (part.library.runnable || entry === mainEntry) translations.push(localized.report)
+      // By folder, not identity: a source may build its records anew on each call.
+      if (part.library.runnable || entry.folder === mainEntry.folder) translations.push(localized.report)
       defaults(semantics)
     }
     entries.set(entry.folder, { folder: entry.folder, library: part.library, semantics })

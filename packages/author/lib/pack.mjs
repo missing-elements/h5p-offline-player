@@ -192,18 +192,17 @@ export class Pack {
     return archive.file
   }
 
-  /** Every opened part closed. */
+  /** Every opened part closed, each on its own, so that one that fails to close leaves no other open. */
   async close() {
     await Promise.allSettled(this.#opened.values())
-    for (const { file, reader } of this.#archives.values()) {
+    await Promise.allSettled([...this.#archives.values()].map(async ({ file, reader }) => {
       try {
         await reader.close()
-      } catch {
-        // Nothing of a part that failed to open needs closing but its file.
       } finally {
+        // A part that failed to open has its file to close, whatever its reader makes of closing.
         await file.close()
       }
-    }
+    }))
     this.#archives.clear()
     this.#opened.clear()
   }
