@@ -1,13 +1,18 @@
 import { execFileSync } from 'node:child_process'
-import { resolve } from 'node:path'
+import { mkdtemp } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { splitPack, writePack } from '../../../libraries/scripts/parts.mjs'
 
 /**
  * The library pack's bytes, which the player pins by hash, depend on nothing but its libraries. A
  * zip records a wall-clock time with no zone, and the pack was once written with a date built
  * from UTC fields: the pack built at UTC+2 said 02:00 and CI's said 00:00, so the first weekly
- * refresh after the split rewrote every archive with no library changed (#48, #51).
+ * refresh after the split rewrote every archive with no library changed (#48, #51). Nor do they
+ * depend on the order a hub bundle lists a library's files in, which changed when Branching
+ * Scenario's bundle was rebuilt and rewrote the 30 parts it is the first to carry (#116).
  *
  * Each time zone runs in a process of its own: whether setting `TZ` inside a running test worker
  * moves its clock is the engine's business, and a child process starts in the zone it is given.
@@ -16,22 +21,24 @@ import { describe, expect, it } from 'vitest'
 const librariesDir = resolve(import.meta.dirname, '../../../libraries')
 const parts = pathToFileURL(resolve(librariesDir, 'scripts/parts.mjs')).href
 
-// A pack of one library, written the way apps/demo/scripts/build-libraries.mjs writes the real
-// one, split by the real `splitPack`; prints the bytes' hashes and the first entry's DOS time and date.
+// A pack of one library, written by the `writePack` that apps/demo/scripts/build-libraries.mjs
+// writes the real one with, split by the real `splitPack`; prints the bytes' hashes and the first
+// entry's DOS time and date.
 const build = `
 import { createHash } from 'node:crypto'
 import { mkdtemp, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { BlobWriter, TextReader, ZipWriter, configure } from '@zip.js/zip.js'
-import { FIXED_DATE, splitPack } from ${JSON.stringify(parts)}
+import { splitPack, writePack } from ${JSON.stringify(parts)}
 
-configure({ useWebWorkers: false })
-const writer = new ZipWriter(new BlobWriter('application/zip'), { lastModDate: FIXED_DATE, extendedTimestamp: false })
-await writer.add('h5p.json', new TextReader('{}'))
-await writer.add('H5P.Tiny-1.0/library.json', new TextReader(JSON.stringify({ machineName: 'H5P.Tiny', majorVersion: 1, minorVersion: 0, patchVersion: 3 })))
-await writer.add('H5P.Tiny-1.0/tiny.js', new TextReader('H5P.Tiny = function () {}'))
-const pack = new Uint8Array(await (await writer.close()).arrayBuffer())
+const text = (value) => new TextEncoder().encode(value)
+const pack = await writePack([{
+  folder: 'H5P.Tiny-1.0',
+  files: new Map([
+    ['H5P.Tiny-1.0/library.json', text(JSON.stringify({ machineName: 'H5P.Tiny', majorVersion: 1, minorVersion: 0, patchVersion: 3 }))],
+    ['H5P.Tiny-1.0/tiny.js', text('H5P.Tiny = function () {}')]
+  ])
+}])
 
 const out = await mkdtemp(join(tmpdir(), 'pack-bytes-'))
 const [{ sha256 }] = await splitPack(pack, out)
@@ -68,4 +75,45 @@ describe('the library pack', () => {
     expect(time).toBe(2 << 11)
     expect(date).toBe(((2000 - 1980) << 9) | (1 << 5) | 1)
   }, 30_000)
+
+  // Two libraries' files, as a hub bundle lists them, and the same listed the other way round.
+  const text = (value: string) => new TextEncoder().encode(value)
+  const tiny = (patchVersion: number, script: string) => ({
+    folder: 'H5P.Tiny-1.0',
+    files: new Map([
+      ['H5P.Tiny-1.0/library.json', text(JSON.stringify({ machineName: 'H5P.Tiny', majorVersion: 1, minorVersion: 0, patchVersion }))],
+      ['H5P.Tiny-1.0/tiny.js', text(script)],
+      ['H5P.Tiny-1.0/tiny.css', text('.h5p-tiny { color: teal }')]
+    ])
+  })
+  const other = () => ({
+    folder: 'H5P.Other-1.0',
+    files: new Map([
+      ['H5P.Other-1.0/library.json', text(JSON.stringify({ machineName: 'H5P.Other', majorVersion: 1, minorVersion: 0, patchVersion: 7 }))],
+      ['H5P.Other-1.0/other.js', text('H5P.Other = function () {}')],
+      ['H5P.Other-1.0/language/de.json', text('{"semantics":[]}')]
+    ])
+  })
+  const reversed = ({ folder, files }: { folder: string; files: Map<string, Uint8Array> }) => ({ folder, files: new Map([...files].reverse()) })
+  /** Each part's SHA-256, by folder. */
+  async function partsOf(pack: Uint8Array) {
+    const index = await splitPack(pack, await mkdtemp(join(tmpdir(), 'pack-parts-')))
+    return Object.fromEntries(index.map(({ folder, sha256 }: { folder: string; sha256: string }) => [folder, sha256]))
+  }
+
+  it('keeps the entries of a library whose files are the same, in whatever order a bundle lists them', async () => {
+    const before = await writePack([other(), tiny(1, 'H5P.Tiny = function () {}')])
+    const again = [reversed(other()), reversed(tiny(1, 'H5P.Tiny = function () {}'))]
+    expect(Buffer.compare(await writePack(again, before), before)).toBe(0)
+    // Without the pack before, the bundle's order is the order written: the refresh of #116.
+    expect(Buffer.compare(await writePack(again), before)).not.toBe(0)
+  })
+
+  it("writes again only the library that changed, so only its part's hash moves", async () => {
+    const before = await writePack([other(), tiny(1, 'H5P.Tiny = function () {}')])
+    const after = await writePack([reversed(other()), reversed(tiny(2, 'H5P.Tiny = function (params) {}'))], before)
+    const [partsBefore, partsAfter] = [await partsOf(before), await partsOf(after)]
+    expect(partsAfter['H5P.Other-1.0']).toBe(partsBefore['H5P.Other-1.0'])
+    expect(partsAfter['H5P.Tiny-1.0']).not.toBe(partsBefore['H5P.Tiny-1.0'])
+  })
 })

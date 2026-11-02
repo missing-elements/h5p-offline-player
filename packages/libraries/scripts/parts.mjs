@@ -15,9 +15,10 @@ import { BlobWriter, TextReader, Uint8ArrayReader, Uint8ArrayWriter, ZipReader, 
  * static `new URL` for every part, the one shape Vite, Rollup and webpack 5 emit as an asset.
  *
  * Each part copies its entries from the pack as they are, compressed bytes and dates included,
- * so the parts change exactly when the pack does and the weekly refresh commits only the
+ * so the parts change exactly when the pack does, and the pack keeps a library's entries from the
+ * pack before it when its files are the same (`writePack`), so the weekly refresh commits only the
  * libraries that changed. `pnpm parts` splits the committed `libraries.h5p`;
- * `apps/demo/scripts/build-libraries.mjs` calls `splitPack` after writing a new one.
+ * `apps/demo/scripts/build-libraries.mjs` writes a new one with `writePack` and splits it.
  */
 
 configure({ useWebWorkers: false })
@@ -25,10 +26,10 @@ configure({ useWebWorkers: false })
 const packageDir = resolve(import.meta.dirname, '..')
 
 /**
- * The `h5p.json` every part carries. The player refuses an archive without one, and a part,
- * registered to supply libraries, is never held to what it declares.
+ * The `h5p.json` the pack and every part carry. The player refuses an archive without one, and an
+ * archive registered to supply libraries is never held to what it declares.
  */
-const PART_MANIFEST = JSON.stringify({ title: 'H5P Offline Player library pack', language: 'und', mainLibrary: '', preloadedDependencies: [], embedTypes: ['div'] })
+const PART_MANIFEST =JSON.stringify({ title: 'H5P Offline Player library pack', language: 'und', mainLibrary: '', preloadedDependencies: [], embedTypes: ['div'] })
 
 /**
  * The date every entry of the pack and its parts is written with, so the bytes change only when a
@@ -47,6 +48,56 @@ export const FIXED_DATE = new Date(2000, 0, 1, 2)
  * reads. A dozen libraries are that small; the padding is about 50 kB in all.
  */
 const MIN_PART_SIZE = 8 * 1024 + 1
+
+/**
+ * Writes the pack: its `h5p.json`, then each library's files, in the order given. A library whose
+ * files are those its folder holds in `previous`, the pack this one replaces, keeps that pack's
+ * entries as they are, their order and compressed bytes included, so its part comes out as before.
+ * The build takes each library from the first hub bundle that carries its newest version, with
+ * its files in that bundle's order, and the hub lists them in an order of its own: the refresh of
+ * 2026-11-02 rewrote 30 parts whose libraries had not changed, because the new bundle of Branching
+ * Scenario, the first to carry them, listed their files differently (#116).
+ * @param {{ folder: string, files: Map<string, Uint8Array> }[]} libraries each folder's files, by their names in the pack
+ * @param {Uint8Array} [previous] the pack this one replaces
+ */
+export async function writePack(libraries, previous) {
+  const reader = previous ? new ZipReader(new Uint8ArrayReader(previous)) : null
+  const before = new Map()
+  for (const entry of reader ? await reader.getEntries() : []) {
+    const slash = entry.filename.indexOf('/')
+    if (entry.directory || slash < 0) continue
+    const folder = entry.filename.slice(0, slash)
+    if (!before.has(folder)) before.set(folder, [])
+    before.get(folder).push(entry)
+  }
+
+  const writer = new ZipWriter(new BlobWriter('application/zip'), { lastModDate: FIXED_DATE, extendedTimestamp: false })
+  await writer.add('h5p.json', new TextReader(PART_MANIFEST))
+  for (const { folder, files } of libraries) {
+    const kept = before.get(folder)
+    if (kept && (await holds(kept, files))) {
+      for (const entry of kept) {
+        const raw = await entry.getData(new Uint8ArrayWriter(), { passThrough: true })
+        await writer.add(entry.filename, new Uint8ArrayReader(raw), { passThrough: true, entry })
+      }
+    } else {
+      for (const [name, bytes] of files) await writer.add(name, new Uint8ArrayReader(bytes))
+    }
+  }
+  await reader?.close()
+  return new Uint8Array(await (await writer.close()).arrayBuffer())
+}
+
+/** Whether a folder's entries in a pack hold exactly these files, by name and bytes. */
+async function holds(entries, files) {
+  if (entries.length !== files.size) return false
+  for (const entry of entries) {
+    const bytes = files.get(entry.filename)
+    if (!bytes || bytes.length !== entry.uncompressedSize) return false
+    if (Buffer.compare(await entry.getData(new Uint8ArrayWriter()), bytes) !== 0) return false
+  }
+  return true
+}
 
 /**
  * Writes `<outDir>/<folder>.h5p` for every library folder in the pack and `<outDir>/index.json`,
