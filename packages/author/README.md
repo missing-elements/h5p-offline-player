@@ -139,16 +139,49 @@ try {
 loads what the content brings in: the content type, every library its parameters name and each
 library field's default, with their semantics in the language and marked as the layouts need them.
 `entries` is the map `ContentGenerator` takes, every other library of the pack in it without its
-semantics. It takes any object with `libraries`, `newest`, `open` and `translation`, such as one
-over a package's own library folders. `markupText(value, field, report)`, `plainText(value, note)`
-and `allowedTags(field)` are the build's rules for one text value against its field. What a type's
-editor widget sets, and the check of a source, are the build's own and not exported.
+semantics. It takes any object with `libraries`, `newest`, `open` and `translation`.
+`markupText(value, field, report)`, `plainText(value, note)` and `allowedTags(field)` are the
+build's rules for one text value against its field.
+
+A tool that changes a saved package checks what it is about to write with the check the build runs
+last on what it writes:
+
+```js
+import { checkContent, loadLibraries, openPack, packageLibraries } from '@missing-elements/h5p-author'
+
+// `names`, the package's entry names; `read(name)`, an entry's text: from zip.js, or any reader.
+const manifest = JSON.parse(await read('h5p.json'))
+const main = manifest.preloadedDependencies.find((each) => each.machineName === manifest.mainLibrary)
+const params = edited(JSON.parse(await read('content/content.json')))
+const content = { type: `${main.machineName} ${main.majorVersion}.${main.minorVersion}`, language: manifest.language, params }
+const pack = await openPack()
+try {
+  const libraries = await loadLibraries(await packageLibraries({ names, read }, pack), content)
+  const { params: checked, problems, notes } = checkContent(libraries, content)
+} finally {
+  await pack.close()
+}
+```
+
+`packageLibraries(files, pack)` serves the package's own libraries where it carries a major of one,
+and the pack's for the rest: content is in the shape of the version it was saved with. `checkContent`
+checks every value against its field, as the build does, and takes what H5P saves as it is: files and
+sub-content metadata, held to what the platforms keep of them, and each part's `subContentId`, which
+the core names the part's statements by, so a learner's record stays the part's after an edit; a part
+without one, or with another part's, gets a new one. It places what nobody placed and checks what a
+content type's editor would, as the build does, and returns the content as checked with `problems`
+and `notes`, each `{ path, message }`. Where the content names an older minor of a library than the
+one it is checked against, a field only that minor has is a note: the player upgrades such content as
+it plays. Content saved by the platforms can hold what their editor let an author save and the build
+does not, such as a required text left empty; a tool that changes one part keeps the problems under
+the paths it changed.
 
 ## What it does not do
 
 It checks structure, not pedagogy: whether the answers are right, the questions fair, or the
 pictures placed well is for a person to judge, in
 [h5p-verify](https://www.npmjs.com/package/@missing-elements/h5p-verify)'s `--preview`. It does not
-edit an existing package. The licence of each library is in the pack's `libraries.txt`.
+edit an existing package itself: `checkContent` is the check for a tool that does. The licence of
+each library is in the pack's `libraries.txt`.
 
 MIT.

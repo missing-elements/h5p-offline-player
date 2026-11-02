@@ -61,12 +61,12 @@
     "test": "pnpm --filter @missing-elements/h5p-offline-player build && vitest run",
     "typecheck": "pnpm types && tsc -p tsconfig.json",
     "prepack": "node -e \"require('node:fs').copyFileSync('../../LICENSE', 'LICENSE')\" && pnpm types",
-    "prepublishOnly": "node -e \"if (!/^pnpm\\//.test(process.env.npm_config_user_agent || '')) { console.error('Publish with pnpm publish: npm would ship the workspace:^ dependency ranges as they are, and the package would not install.'); process.exit(1) }\" && pnpm typecheck && pnpm test",
-    "types": "node -e \"require('node:fs').rmSync('types', { recursive: true, force: true })\" && tsc -p tsconfig.types.json"
+    "prepublishOnly": "node -e \"if (!/^pnpm\\//.test(process.env.npm_config_user_agent || '')) { console.error('Publish with pnpm publish: npm would ship the workspace: dependency ranges as they are, and the package would not install.'); process.exit(1) }\" && node scripts/check-player-published.mjs && pnpm typecheck && pnpm test",
+    "types": "pnpm --filter @missing-elements/h5p-offline-player exec tsc -b && node -e \"require('node:fs').rmSync('types', { recursive: true, force: true })\" && tsc -p tsconfig.types.json"
   },
   "dependencies": {
     "@missing-elements/h5p-libraries": "workspace:^",
-    "@missing-elements/h5p-offline-player": "workspace:^",
+    "@missing-elements/h5p-offline-player": "workspace:*",
     "@missing-elements/h5p-runtime": "workspace:^",
     "@zip.js/zip.js": "^2.24.0"
   },

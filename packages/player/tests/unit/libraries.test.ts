@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { explainMissingLibraries, findMissingLibraries, servedWhenUntrusted } from '../../src/sw/package-reader'
+import { findMissingLibraries } from '../../src/shared/library-folders'
+import { explainMissingLibraries, servedWhenUntrusted } from '../../src/sw/package-reader'
 
 /**
  * An export that carries content but not the libraries it names is the single most common broken

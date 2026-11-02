@@ -23,13 +23,13 @@ function generate(semantics: unknown[], written?: unknown, others: Parameters<ty
 }
 
 describe('content generated from semantics, as the sweep runs it', () => {
-  it('saves a group of one field as that field, and a group default as the whole value', () => {
+  it('saves a group of one field as that field, unless it is sub-content, which has an id, and a group default as the whole value', () => {
     const { params } = generate([
       { name: 'single', type: 'group', fields: [{ name: 'only', type: 'text', default: 'x' }] },
       { name: 'sub', type: 'group', isSubContent: true, fields: [{ name: 'only', type: 'text', default: 'y' }] },
       { name: 'size', type: 'group', default: { width: 620, height: 310 }, fields: [{ name: 'width', type: 'number' }, { name: 'height', type: 'number' }] }
     ])
-    expect(params).toEqual({ single: 'x', sub: { only: 'y' }, size: { width: 620, height: 310 } })
+    expect(params).toEqual({ single: 'x', sub: { only: 'y', subContentId: '00000000-0000-4000-8000-000000000001' }, size: { width: 620, height: 310 } })
   })
 
   it('fills an optional group nobody wrote with defaults only, as the editor saves one left closed', () => {
@@ -263,5 +263,120 @@ describe('content authored from semantics', () => {
     expect(media.map(({ path, value }) => [path, value.path])).toEqual([['params.picture', 'a.png'], ['params.clips', 'b.mp4']])
     expect(params.clips).toHaveLength(1)
     expect(unset.map(({ path }) => path)).toEqual(['params.x'])
+  })
+})
+
+describe('content as H5P saves it', () => {
+  const SAVED: GeneratorOptions = { saved: true, id: (count) => `00000000-0000-4000-8000-${count.toString(16).padStart(12, '0')}` }
+  const [FIRST, SECOND] = ['6f1d2c3b-4a5e-4f60-8a7b-9c0d1e2f3a4b', '0b9a8c7d-6e5f-4a3b-9c2d-1e0f2a3b4c5d']
+  const IMAGE = { machineName: 'H5P.Image', semantics: [{ name: 'file', type: 'image' }, { name: 'alt', type: 'text' }] }
+  const holding = (library: string) => [{ name: 'content', type: 'library', options: [library] }]
+
+  it('takes files, sub-content metadata and each part\'s id as saved', () => {
+    const saved = {
+      content: {
+        library: 'H5P.Image 1.0',
+        params: { file: { path: 'images/river.png', mime: 'image/png', width: 480, height: 270, copyright: { license: 'CC BY', author: 'Ann' } }, alt: 'A river' },
+        subContentId: FIRST,
+        metadata: { contentType: 'Image', license: 'CC BY', title: 'River', authors: [{ name: 'Ann', role: 'Author' }], extraTitle: 'River' }
+      }
+    }
+    const { params, problems, notes, media } = generate(holding('H5P.Image 1.0'), saved, [IMAGE], SAVED)
+    expect(problems).toEqual([])
+    expect(notes).toEqual([])
+    expect(params).toEqual(saved)
+    expect(media.map(({ value }) => value.path)).toEqual(['images/river.png'])
+  })
+
+  it('refuses what H5P would not keep of a file, of sub-content and of its metadata', () => {
+    const { problems } = generate(holding('H5P.Image 1.0'), {
+      content: {
+        library: 'H5P.Image 1.0',
+        params: { file: { path: 'images/river.png', mime: 'image/png', width: '480', aspectRatio: '16:9' }, alt: 'A river' },
+        subContentId: FIRST,
+        metadata: { license: 'MIT', authors: [{ name: 'Ann', role: 'Writer' }] },
+        userDatas: {}
+      }
+    }, [IMAGE], SAVED)
+    expect(problems.map(({ path }) => path)).toEqual([
+      'params.content.userDatas', 'params.content.metadata.license', 'params.content.metadata.authors[0].role',
+      'params.content.params.file.aspectRatio', 'params.content.params.file.width'
+    ])
+    expect(problems[3].message).toBe('is not part of a file as H5P stores it; it keeps path, mime, copyright, width, height, originalImage')
+  })
+
+  it('gives a part without an id, with one H5P would not keep, or with another part\'s, a new one', () => {
+    const text = (subContentId?: string) => ({ library: 'H5P.AdvancedText 1.1', params: { text: '<p>Hi</p>' }, ...(subContentId ? { subContentId } : {}), metadata: { contentType: 'Text', license: 'U', title: 'Text' } })
+    const semantics = [{ name: 'items', type: 'list', field: { name: 'item', type: 'library', options: ['H5P.AdvancedText 1.1'] } }]
+    const { params, notes } = generate(semantics, { items: [text(FIRST), text(FIRST), text('not-an-id'), text()] }, [TEXT], SAVED)
+    expect(params.items.map(({ subContentId }: { subContentId: string }) => subContentId)).toEqual([
+      FIRST, '00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000003'
+    ])
+    expect(notes).toEqual([
+      { path: 'params.items[1].subContentId', message: 'is another part\'s id too, so this part has a new one' },
+      { path: 'params.items[2].subContentId', message: 'is not an id H5P keeps, so the part has a new one' }
+    ])
+  })
+
+  it('notes and keeps a field only another minor of its library names, and refuses one at the same minor', () => {
+    // Question Set 1.21's step moved 1.20's background image into `override`.
+    const generator = new ContentGenerator(pack([{ machineName: 'H5P.Test', minor: 21, semantics: [{ name: 'override', type: 'group', optional: true, fields: [{ name: 'backgroundImage', type: 'image', optional: true }] }] }]), SAVED)
+    const saved = { backgroundImage: { path: 'images/sky.png', mime: 'image/png' } }
+    expect(generator.generate(generator.find('H5P.Test')!, saved, 'params', 20)).toMatchObject(saved)
+    expect(generator.problems).toEqual([])
+    expect(generator.notes).toEqual([{ path: 'params.backgroundImage', message: 'is not a field of H5P.Test 1.21; the content names 1.20, which the player upgrades to 1.21 as it plays, and that may move it' }])
+    const same = new ContentGenerator(generator.pack, SAVED)
+    expect(same.generate(same.find('H5P.Test')!, saved, 'params', 21)).not.toHaveProperty('backgroundImage')
+    expect(same.problems).toEqual([{ path: 'params.backgroundImage', message: 'is not a field here; the fields are override' }])
+  })
+
+  it('keeps what a group\'s own default carries beyond its fields', () => {
+    // Drag and Drop's task size, whose default names the field its widget sizes it by.
+    const semantics = [{ name: 'size', type: 'group', widget: 'dimensions', default: { width: 620, height: 310, field: 'background' }, fields: [{ name: 'width', type: 'number' }, { name: 'height', type: 'number' }] }]
+    const { params, problems } = generate(semantics, { size: { width: 800, height: 400, field: 'background' } }, [], SAVED)
+    expect(problems).toEqual([])
+    expect(params.size).toEqual({ width: 800, height: 400, field: 'background' })
+  })
+
+  it('keeps a markup field\'s text as stored, without wrapping it again', () => {
+    const { params, problems } = generate([{ name: 'text', type: 'text', widget: 'html', tags: ['strong'] }], { text: 'Rivers &amp; lakes, 1 < 2' }, [], SAVED)
+    expect(problems).toEqual([])
+    expect(params.text).toBe('Rivers &amp; lakes, 1 &lt; 2')
+  })
+
+  it('asks nothing of what the editor saves for an author who never touched it', () => {
+    // Interactive Video's shapes: an adaptivity nobody set, a goto nobody chose, and the subtitle
+    // track its editor starts an optional list with.
+    const semantics = [
+      { name: 'adaptivity', type: 'group', optional: true, fields: [
+        { name: 'correct', type: 'group', fields: [{ name: 'seekTo', type: 'number' }, { name: 'allowOptOut', type: 'boolean' }, { name: 'message', type: 'text', widget: 'html', tags: ['strong'] }] },
+        { name: 'requireCompletion', type: 'boolean' }
+      ] },
+      { name: 'goto', type: 'group', fields: [{ name: 'type', type: 'select', optional: true, options: [{ value: 'timecode' }, { value: 'url' }] }, { name: 'visualize', type: 'boolean' }] },
+      { name: 'tracks', type: 'list', optional: true, defaultNum: 1, field: { name: 'track', type: 'group', fields: [{ name: 'label', type: 'text', default: 'Subtitles' }, { name: 'track', type: 'file' }] } }
+    ]
+    const saved = { adaptivity: { correct: { allowOptOut: false, message: '' }, requireCompletion: true }, goto: { type: '', visualize: false }, tracks: [{ label: 'Subtitles' }] }
+    const untouched = generate(semantics, saved, [], SAVED)
+    expect(untouched.problems).toEqual([])
+    expect(untouched.params).toEqual(saved)
+    // Once an author writes what the group asks for, all of it is asked for.
+    const started = generate(semantics, { ...saved, adaptivity: { correct: { seekTo: 10, allowOptOut: false, message: '' } } }, [], SAVED)
+    expect(started.problems.map(({ path }) => path)).toEqual(['params.adaptivity.correct.message'])
+  })
+
+  it('asks nothing of content a field gives as its default, as the editor started it', () => {
+    // Interactive Video's summary task, with the statement its editor starts with.
+    const SUMMARY = {
+      machineName: 'H5P.Summary',
+      semantics: [
+        { name: 'intro', type: 'text', default: 'Choose the correct statement.' },
+        { name: 'summaries', type: 'list', min: 1, field: { name: 'statements', type: 'group', isSubContent: true, fields: [{ name: 'summary', type: 'list', min: 2, field: { name: 'text', type: 'text', widget: 'html', tags: [] } }, { name: 'tip', type: 'text', optional: true }] } }
+      ]
+    }
+    const semantics = [{ name: 'task', type: 'library', default: { library: 'H5P.Summary 1.0', params: {} }, options: ['H5P.Summary 1.0'] }]
+    const saved = { task: { library: 'H5P.Summary 1.0', params: { intro: 'Choose the correct statement.', summaries: [{ subContentId: SECOND, tip: '' }] }, subContentId: FIRST, metadata: { contentType: 'Summary', license: 'U', title: 'Untitled Summary' } } }
+    const { params, problems, notes } = generate(semantics, saved, [SUMMARY], SAVED)
+    expect([problems, notes]).toEqual([[], []])
+    expect(params).toEqual(saved)
   })
 })

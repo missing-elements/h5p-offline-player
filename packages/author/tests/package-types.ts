@@ -1,8 +1,8 @@
 // The package as a caller sees it, by its own name: through the `types` condition, so this checks the
 // published declarations, not the source. `pnpm typecheck` writes them first.
 import {
-  allowedTags, buildPackage, ContentGenerator, GENERATED_START, loadLibraries, markupText, openPack, plainText, schemaOf, SourceError,
-  type BuildResult, type LibraryRecord, type LibrarySource, type Source, type TranslationReport
+  allowedTags, buildPackage, checkContent, ContentGenerator, GENERATED_START, loadLibraries, markupText, openPack, packageLibraries, plainText, schemaOf, SourceError,
+  type BuildResult, type CheckedContent, type LibraryRecord, type LibrarySource, type PackageFiles, type Source, type TranslationReport
 } from '@missing-elements/h5p-author'
 // @ts-expect-error The source reader is internal: a helper the tests import from its module.
 import { readSource } from '@missing-elements/h5p-author'
@@ -39,6 +39,24 @@ export async function beside(): Promise<string> {
     const field = (main.semantics ?? [])[0]
     const notes: string[] = []
     return [markupText('<p>Rivers</p>', field, (message) => notes.push(message)), plainText('Rivers', (message) => notes.push(message)), [...(allowedTags(field) ?? [])].join(' '), JSON.stringify(content)].join('\n')
+  } finally {
+    await pack.close()
+  }
+}
+
+/** A tool that edits a saved package: its own libraries over the pack, and the check of what it writes. */
+export async function edit(names: string[], read: (name: string) => Promise<string>): Promise<CheckedContent> {
+  const pack = await openPack()
+  try {
+    const files: PackageFiles = { names, read }
+    const content = { type: 'H5P.Blanks 1.14', language: 'de', params: JSON.parse(await read('content/content.json')) }
+    const libraries = await loadLibraries(await packageLibraries(files, pack), content)
+    const checked = checkContent(libraries, content)
+    const kept: Record<string, unknown> = checked.params
+    // @ts-expect-error The content is checked in the form H5P saves it, not written as a source.
+    checkContent(libraries, { title: 'Rivers', params: {} })
+    void [kept, checked.problems.map(({ path, message }) => `${path}: ${message}`), checked.notes]
+    return checked
   } finally {
     await pack.close()
   }

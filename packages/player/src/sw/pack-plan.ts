@@ -1,5 +1,6 @@
 import type { PackDependency, PackLibrary, PackPart, PackPlan, RefreshedLibrary } from '../shared/protocol.js'
-import { addonPatterns, textMatches } from '../shared/content-libraries.js'
+import { addonPatterns, dependenciesIn, textMatches } from '../shared/content-libraries.js'
+import { parseLibraryFolder } from '../shared/library-folders.js'
 
 /**
  * Which parts of the library pack a package needs, and which of its own library folders the
@@ -52,6 +53,54 @@ export interface ProvidedLibrary {
   machineName: string
   major: number
   minor: number
+}
+
+/**
+ * What a package carries of its libraries, for the plan, from its library folders: the top-level
+ * folders holding a `library.json`. With `read`, each folder's `library.json` gives the version,
+ * patch included, and the dependencies; without it — a `library.json` read is two ranged requests
+ * over HTTP until the warm has cached it — the folder's name gives the version and the rest is
+ * left unknown, which leaves the library as it is and its dependencies to the next look; a folder
+ * whose name gives no version, an unversioned one, is the library at a version unknown, which is
+ * how the runtime takes it too, falling back to the bare name. A `library.json` that does not
+ * parse, or a folder named for another library, is left out. `PackageReader.ownLibraries` and the
+ * SCORM writer both take what a package carries through here (#109).
+ */
+export async function ownLibraries(folders: Iterable<string>, read?: (folder: string) => Promise<unknown>): Promise<OwnLibrary[]> {
+  const version = (part: unknown) => (typeof part === 'number' && Number.isInteger(part) && part >= 0 ? part : typeof part === 'string' && /^\d+$/.test(part) ? Number(part) : null)
+  const libraries: OwnLibrary[] = []
+  for (const folder of folders) {
+    const parsed = parseLibraryFolder(folder)
+    if (!read) {
+      libraries.push(
+        parsed
+          ? { folder, machineName: parsed.machineName, major: parsed.major, minor: parsed.minor, patch: null, dependencies: null }
+          : { folder, machineName: folder, major: null, minor: null, patch: null, dependencies: null }
+      )
+      continue
+    }
+    const library = (await Promise.resolve()
+      .then(() => read(folder))
+      .catch(() => null)) as Record<string, unknown> | null
+    const major = version(library?.majorVersion)
+    const minor = version(library?.minorVersion)
+    const machineName = library?.machineName
+    if (typeof machineName !== 'string' || major === null || minor === null) continue
+    if (parsed ? parsed.machineName !== machineName || parsed.major !== major : folder !== machineName) continue
+    libraries.push({
+      folder,
+      machineName,
+      major,
+      minor,
+      patch: version(library?.patchVersion) ?? 0,
+      dependencies: dependenciesIn(library).map(({ machineName: name, majorVersion, minorVersion }) => ({
+        machineName: name,
+        majorVersion: Number(majorVersion),
+        minorVersion: Number(minorVersion)
+      }))
+    })
+  }
+  return libraries
 }
 
 export interface PlanInput {

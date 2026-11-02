@@ -1,3 +1,4 @@
+import { ownLibraries } from '@missing-elements/h5p-offline-player/plan'
 import { libraryString } from './generator.mjs'
 import { SourceError } from './source-error.mjs'
 import { localize, translationFiles } from './translate.mjs'
@@ -6,12 +7,18 @@ import { patchSemantics } from './types.mjs'
 /**
  * The libraries content brings in, loaded as a build loads them, for the build and for a tool
  * beside it that reads or changes content as the build would. No Node import of its own: the pack
- * the libraries come from is handed in.
+ * the libraries come from is handed in, and a package's files are read through the caller.
  */
 
 /**
  * A library as a pack's index lists it.
  * @typedef {{ folder: string, machineName: string, majorVersion: number, minorVersion: number }} LibraryRecord
+ */
+
+/**
+ * A package's files, as a tool that has it open reads them: the names of its entries, and an
+ * entry's text.
+ * @typedef {{ names: Iterable<string>, read(name: string): Promise<string> }} PackageFiles
  */
 
 /**
@@ -103,4 +110,62 @@ export async function loadLibraries(pack, { type, language, params }) {
     if (!entries.has(entry.folder)) entries.set(entry.folder, { folder: entry.folder, library: { machineName: entry.machineName, majorVersion: entry.majorVersion, minorVersion: entry.minorVersion, title: entry.machineName }, semantics: null })
   }
   return { entries, main: /** @type {PackEntry} */ (entries.get(mainEntry.folder)), translations }
+}
+
+/**
+ * The libraries a saved package's content is checked against: the package's own, where it carries
+ * a major of a library, and the fallback's, the pack's, where it does not. Content is in the shape
+ * of the version it was saved with, which a package that carries its libraries carries, and which
+ * the pack, keeping the newest minor of each major, may have moved past. A package's own library
+ * is a folder the player takes as one (its `ownLibraries`): a `library.json` naming the library its
+ * folder's name does.
+ * @param {PackageFiles} files the package's
+ * @param {LibrarySource} [fallback] for what the package does not carry: the pack `openPack` opens
+ * @returns {Promise<LibrarySource>}
+ */
+export async function packageLibraries({ names, read }, fallback) {
+  const entries = new Set(names)
+  const json = async (/** @type {string} */ name) => JSON.parse(await read(name))
+  const folders = [...entries].flatMap((name) => /^([^/]+)\/library\.json$/.exec(name)?.slice(1) ?? [])
+  /** @type {(LibraryRecord & { patchVersion: number })[]} */
+  const own = []
+  for (const { folder, machineName, major, minor, patch } of await ownLibraries(folders, (folder) => json(`${folder}/library.json`))) {
+    if (major !== null && minor !== null) own.push({ folder, machineName, majorVersion: major, minorVersion: minor, patchVersion: patch ?? 0 })
+  }
+  const carried = new Set(own.map(({ machineName, majorVersion }) => `${machineName} ${majorVersion}`))
+  const mine = new Set(own.map(({ folder }) => folder))
+  const libraries = [...own, ...(fallback?.libraries ?? []).filter(({ machineName, majorVersion }) => !carried.has(`${machineName} ${majorVersion}`))]
+  /** @type {Map<string, string[]>} each own folder's translation files, by name without `.json` */
+  const languages = new Map()
+  for (const name of entries) {
+    const match = /^([^/]+)\/language\/([^/]+)\.json$/.exec(name)
+    if (match && mine.has(match[1])) languages.set(match[1], [...(languages.get(match[1]) ?? []), match[2]])
+  }
+  /** @param {any} record */
+  const patchOf = (record) => Number(record.patchVersion ?? 0)
+  return {
+    libraries,
+    newest(machineName, major) {
+      /** @type {LibraryRecord | null} */
+      let best = null
+      for (const entry of libraries) {
+        if (entry.machineName !== machineName || (major !== undefined && entry.majorVersion !== major)) continue
+        if (!best || entry.majorVersion > best.majorVersion || (entry.majorVersion === best.majorVersion && (entry.minorVersion > best.minorVersion || (entry.minorVersion === best.minorVersion && patchOf(entry) > patchOf(best))))) best = entry
+      }
+      return best
+    },
+    async open(entry) {
+      if (!mine.has(entry.folder)) {
+        if (!fallback) throw new Error(`${entry.folder} is not one of the package's libraries`)
+        return fallback.open(entry)
+      }
+      const semantics = entries.has(`${entry.folder}/semantics.json`) ? await json(`${entry.folder}/semantics.json`) : null
+      return { folder: entry.folder, library: await json(`${entry.folder}/library.json`), semantics, translations: languages.get(entry.folder) ?? [] }
+    },
+    async translation(part, name) {
+      if (!mine.has(part.folder)) return fallback?.translation(part, name)
+      if (!languages.get(part.folder)?.includes(name)) return undefined
+      return (await json(`${part.folder}/language/${name}.json`))?.semantics
+    }
+  }
 }

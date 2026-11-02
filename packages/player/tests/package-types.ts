@@ -8,7 +8,7 @@
  */
 import { H5PPlayerElement, type PackageMetadata, type PlayerErrorDetail, type ReadyDetail } from '@missing-elements/h5p-offline-player'
 import { mountH5P } from '@missing-elements/h5p-offline-player/sw'
-import { librariesNamedIn, planPack, type PackPlan } from '@missing-elements/h5p-offline-player/plan'
+import { librariesNamedIn, ownLibraries, planPack, reachableFolder, walkDependencies, type PackPlan } from '@missing-elements/h5p-offline-player/plan'
 
 export function asACallerWould(worker: ServiceWorkerGlobalScope): string[] {
   const player: H5PPlayerElement | null = document.querySelector('h5p-player')
@@ -19,6 +19,11 @@ export function asACallerWould(worker: ServiceWorkerGlobalScope): string[] {
   const plan: PackPlan | null = planPack({ own: [], provided: [], roots, params: {}, pack: [], refresh: false, fill: true })
   // @ts-expect-error the parts are a list
   const parts: PackPlan['parts'] = 'H5P.Blanks-1.14'
+  // The folder rule and the walk, as embed's SCORM writer runs them over a zip.
+  const names = new Set(['H5P.Blanks-1.14/library.json'])
+  const folder: string | undefined = reachableFolder(roots[0], names, new Map())
+  const walked: Promise<{ missing: { machineName: string }[] }> = walkDependencies(roots, (dependency) => reachableFolder(dependency, names, new Map()), async (located: string) => ({ located }))
+  const own: Promise<{ folder: string; major: number | null }[]> = ownLibraries(['H5P.Blanks-1.14'])
 
   // @ts-expect-error not an error code
   const code: PlayerErrorDetail['code'] = 'offline'
@@ -29,6 +34,6 @@ export function asACallerWould(worker: ServiceWorkerGlobalScope): string[] {
   // @ts-expect-error the title is a string
   const title: PackageMetadata['title'] = 1
 
-  void [player, code, folders, source, title, plan, parts]
+  void [player, code, folders, source, title, plan, parts, folder, walked, own]
   return player?.libraryBundle?.refreshed?.map(({ library, to }) => `${library} ${to}`) ?? []
 }

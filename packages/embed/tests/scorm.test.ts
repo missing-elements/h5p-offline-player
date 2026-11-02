@@ -12,7 +12,7 @@ import { BlobReader, BlobWriter, TextWriter, Uint8ArrayReader, Uint8ArrayWriter,
 import { chromium, type Browser, type BrowserContext, type Frame, type Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { EmbedError } from '../lib/build.mjs'
-import { buildScorm, servingFolder } from '../lib/scorm.mjs'
+import { buildScorm } from '../lib/scorm.mjs'
 
 /**
  * The SCORM package `--scorm` writes: what is in the zip and what is refused, in Node; and in
@@ -195,14 +195,6 @@ describe('the package', () => {
     const refused = buildScorm({ h5p: source, out })
     await expect(refused).rejects.toThrow(/neither it nor the library pack carries: H5P\.Nowhere 1\.0, H5P\.QuestionSet 1\.99 \(the pack has 1\.\d+\)\./)
     expect(existsSync(out)).toBe(false)
-  })
-
-  it('takes a newer minor of the same major, and only that, as the player serves libraries', () => {
-    const names = new Set(['H5P.Text-1.3/library.json', 'H5P.Text-1.5/library.json', 'H5P.Text-2.0/library.json', 'Bare/library.json'])
-    expect(servingFolder({ machineName: 'H5P.Text', major: 1, minor: 1 }, names)).toBe('H5P.Text-1.3')
-    expect(servingFolder({ machineName: 'H5P.Text', major: 1, minor: 4 }, names)).toBe('H5P.Text-1.5')
-    expect(servingFolder({ machineName: 'H5P.Text', major: 1, minor: 6 }, names)).toBeUndefined()
-    expect(servingFolder({ machineName: 'Bare', major: 3, minor: 0 }, names)).toBe('Bare')
   })
 
   it('refuses what is not a package, and a zip already there unless forced', async () => {

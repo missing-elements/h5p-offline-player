@@ -3,8 +3,9 @@
  * from a short JSON source. The source writes only what the defaults cannot know; everything else
  * comes from the libraries' own semantics and translations, and the libraries from the pack this
  * package pins, checked against its index. A tool beside the build takes the libraries as the build
- * loads them (`openPack`, `loadLibraries`) and its rules for text (`markupText`, `plainText`,
- * `allowedTags`).
+ * loads them (`openPack`, `loadLibraries`, and `packageLibraries` for a package's own), its rules
+ * for text (`markupText`, `plainText`, `allowedTags`), and the check it runs last on what it writes,
+ * for saved content (`checkContent`).
  */
 
 import { openPack } from './pack.mjs'
@@ -12,8 +13,9 @@ import { schemaLines, schemaMarkdown } from './schema.mjs'
 import { LAYOUTS } from './types.mjs'
 
 export { buildPackage, SourceError } from './build.mjs'
+export { checkContent } from './check.mjs'
 export { ContentGenerator, librariesIn, libraryString } from './generator.mjs'
-export { loadLibraries } from './libraries.mjs'
+export { loadLibraries, packageLibraries } from './libraries.mjs'
 export { openPack } from './pack.mjs'
 export { GENERATED_END, GENERATED_START } from './schema.mjs'
 export { allowedTags, markupText, plainText } from './text.mjs'
@@ -22,11 +24,13 @@ export { allowedTags, markupText, plainText } from './text.mjs'
  * @typedef {import('./build.mjs').Source} Source
  * @typedef {import('./build.mjs').BuildResult} BuildResult
  * @typedef {import('./build.mjs').BuildOptions} BuildOptions
+ * @typedef {import('./check.mjs').CheckedContent} CheckedContent
  * @typedef {import('./generator.mjs').GeneratorOptions} GeneratorOptions
  * @typedef {import('./generator.mjs').PackEntry} PackEntry
  * @typedef {import('./libraries.mjs').LibraryRecord} LibraryRecord
  * @typedef {import('./libraries.mjs').LibrarySource} LibrarySource
  * @typedef {import('./libraries.mjs').LoadedLibraries} LoadedLibraries
+ * @typedef {import('./libraries.mjs').PackageFiles} PackageFiles
  * @typedef {import('./translate.mjs').TranslationReport} TranslationReport
  * @typedef {import('./pack.mjs').IndexEntry} IndexEntry
  * @typedef {import('./pack.mjs').PartLibrary} PartLibrary

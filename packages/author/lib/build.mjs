@@ -5,9 +5,11 @@ import { Readable, Writable } from 'node:stream'
 import { TextReader, ZipWriter } from '@zip.js/zip.js'
 import { normalizeArchive } from '@missing-elements/h5p-normalize'
 import { librariesNamedIn, planPack } from '@missing-elements/h5p-offline-player/plan'
-import { ContentGenerator } from './generator.mjs'
+import { checkContent, layoutContext, valueAt } from './check.mjs'
+import { ContentGenerator, libraryString } from './generator.mjs'
 import { loadLibraries } from './libraries.mjs'
 import { MediaStore } from './media.mjs'
+import { CC_VERSIONS, LICENSES, ROLES } from './metadata.mjs'
 import { openPack } from './pack.mjs'
 import { quizProblems, quizSource } from './quiz.mjs'
 import { SourceError } from './source-error.mjs'
@@ -18,15 +20,11 @@ export { SourceError }
 
 /**
  * A source made a package: validated, filled in from the pack's semantics and translations,
- * laid out, its media copied and described, and written with the libraries it needs, each part
- * checked against the pack's index. Nothing is written unless all of it is right: every problem
- * the source has is listed at once, each by its path, so a fix takes one round.
+ * its media copied and described, checked as saved content is and laid out, and written with the
+ * libraries it needs, each part checked against the pack's index. Nothing is written unless all of
+ * it is right: every problem the source has is listed at once, each by its path, so a fix takes one
+ * round.
  */
-
-/** The licences H5P's metadata takes. */
-const LICENSES = ['U', 'CC BY', 'CC BY-SA', 'CC BY-ND', 'CC BY-NC', 'CC BY-NC-SA', 'CC BY-NC-ND', 'CC0 1.0', 'CC PDM', 'GNU GPL', 'PD', 'ODC PDDL', 'C']
-const CC_VERSIONS = ['4.0', '3.0', '2.5', '2.0', '1.0']
-const ROLES = ['Author', 'Editor', 'Licensee', 'Originator']
 
 /**
  * @typedef {{ name: string, role: string }} Author
@@ -192,24 +190,12 @@ export async function buildPackage(input, output, options = {}) {
     if (!mainLibrary.semantics) report('type', `${source.type} has no semantics: it is not a content type an author fills in`)
     else if (!mainLibrary.library.runnable) report('type', `${mainLibrary.library.machineName} is a part other content holds, not a content type on its own: put it in one, such as H5P.Column`)
 
-    // Layouts that adjust what is written, before it is generated.
-    const context = (/** @type {string} */ machineName) => {
-      const entry = [...entries.values()].find((each) => each.library.machineName === machineName && each.semantics)
-      return {
-        report, note,
-        semantics: entry?.semantics ?? [],
-        library: entry?.library,
-        title: (/** @type {string} */ library) => {
-          const name = String(library).split(' ')[0]
-          const found = [...entries.values()].find((each) => each.library.machineName === name && each.semantics)
-          return String(found?.library.title ?? name)
-        }
-      }
-    }
+    // Layouts that turn what a source writes into what H5P stores, before it is generated.
+    const layout = layoutContext(entries, report, note)
     const written = structuredClone(source.params)
-    for (const place of placesOf(main, written)) LAYOUTS[place.library]?.before?.(place.params, place.path, context(place.library))
+    for (const place of placesOf(main, written)) LAYOUTS[place.library]?.before?.(place.params, place.path, layout(place.library))
 
-    const content = generator.generate(mainLibrary, written)
+    const generated = generator.generate(mainLibrary, written)
     problems.push(...generator.problems)
     notes.push(...generator.notes)
 
@@ -222,15 +208,18 @@ export async function buildPackage(input, output, options = {}) {
       Object.assign(value, resolved)
     }
 
-    // Layouts that set what the editor's widgets set, and check what they would not let pass.
-    for (const place of placesOf(main, content)) LAYOUTS[place.library]?.after?.(place.params, place.path, context(place.library))
-    for (const place of placesOf(main, content)) {
-      if (place.holder && isObject(place.holder.metadata) && place.holder.metadata.title === undefined) place.holder.metadata.title = place.holder.metadata.contentType
-    }
-    for (const { field, path } of generator.unset) {
-      if (valueAt(content, path) === undefined && !problems.some((problem) => problem.path === path)) report(path, `is required (${field.type}), and nothing set it`)
-    }
+    // Checked last as saved content is, as a tool that changes a package checks it: the layouts set
+    // what the editor's widgets set and check what they would not let pass. Where the source has a
+    // problem already, the check finds the same one again, or the gap it left: a value missing
+    // where the generator refused what was written inside it. Only what it finds elsewhere is added.
+    const checked = checkContent({ entries, main: mainLibrary, translations }, { type: libraryString(mainLibrary.library), params: generated })
+    const fromSource = [...problems]
+    const known = (/** @type {Problem} */ problem) => fromSource.some(({ path }) => path === problem.path || inside(problem.path, path) ||
+      (inside(path, problem.path) && valueAt(checked.params, problem.path) === undefined))
+    for (const problem of checked.problems) if (!known(problem)) problems.push(problem)
+    for (const added of checked.notes) if (!notes.some(({ path, message }) => path === added.path && message === added.message)) notes.push(added)
     if (problems.length) throw new SourceError(problems)
+    const content = checked.params
 
     const { selected, addons } = await closure(pack, mainLibrary.library, content)
     if (addons.length) notes.push({ path: 'params', message: `its text matches ${addons.join(', ')}, which the package carries, as a site with it installed would add it` })
@@ -295,15 +284,10 @@ export async function buildPackage(input, output, options = {}) {
 }
 
 /**
- * The value at a generator path, `params.a[0].b`, in the content.
- * @param {any} content
- * @param {string} path
+ * Whether a path lies inside another: `params.a[0].b` inside `params.a`.
+ * @param {string} inner
+ * @param {string} outer
  */
-function valueAt(content, path) {
-  let value = { params: content }
-  for (const part of path.replace(/\[(\d+)\]/g, '.$1').split('.')) {
-    if (value === undefined || value === null) return undefined
-    value = /** @type {any} */ (value)[part]
-  }
-  return value
+function inside(inner, outer) {
+  return inner.startsWith(`${outer}.`) || inner.startsWith(`${outer}[`)
 }

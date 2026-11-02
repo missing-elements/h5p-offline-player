@@ -416,7 +416,9 @@ const branchingScenario = {
  * ways, as the editor's map widget keeps them. Each gets the id that widget gives it, a UUID, and a
  * `type`, `stage` or `special-stage`, which the widget keeps on its own element rather than in the
  * content and the runtime works out from `specialStageType` again: the field is hidden and
- * required, and would be reported unset.
+ * required, and would be reported unset. A source's numbers and labels become that text before
+ * generation; what the map widget would not let pass is checked on the stored form, as saved
+ * content has it.
  * @type {Layout}
  */
 const gameMap = {
@@ -436,7 +438,8 @@ const gameMap = {
     elements.forEach((/** @type {any} */ element, /** @type {number} */ i) => {
       if (!isObject(element)) return
       const at = `${path}.gamemapSteps.gamemap.elements[${i}]`
-      // Positions are kept as text; a source writes numbers, percent of the map from the top left.
+      // Positions are kept as text; a source writes numbers, percent of the map from the top left,
+      // or leaves a stage to a grid.
       const telemetry = isObject(element.telemetry) ? element.telemetry : {}
       const columns = Math.ceil(Math.sqrt(elements.length))
       const position = {
@@ -445,33 +448,20 @@ const gameMap = {
         width: telemetry.width ?? 6,
         height: telemetry.height ?? 10
       }
-      for (const [key, value] of Object.entries(position)) {
-        if (typeof value !== 'number' || value < 0 || value > 100) context.report(`${at}.telemetry.${key}`, 'expected a number from 0 to 100, percent of the map')
-      }
-      element.telemetry = Object.fromEntries(Object.entries(position).map(([key, value]) => [key, String(Math.round(Number(value) * 100) / 100)]))
-      if (element.neighbors !== undefined) {
-        if (!Array.isArray(element.neighbors)) {
-          context.report(`${at}.neighbors`, 'expected a list of stages, by label or index')
-          element.neighbors = []
-          return
-        }
+      element.telemetry = Object.fromEntries(Object.entries(position).map(([key, value]) => [key, typeof value === 'number' ? String(Math.round(value * 100) / 100) : value]))
+      // A neighbour by label is stored as its index; one no label names stays as written, for the
+      // check of the stored form not to report again.
+      if (element.neighbors !== undefined && !Array.isArray(element.neighbors)) {
+        context.report(`${at}.neighbors`, 'expected a list of stages, by label or index')
+        element.neighbors = []
+      } else if (Array.isArray(element.neighbors)) {
         element.neighbors = element.neighbors.map((/** @type {unknown} */ neighbor, /** @type {number} */ j) => {
-          const index = typeof neighbor === 'number' ? neighbor : labels.indexOf(String(neighbor).trim())
-          if (!Number.isInteger(index) || index < 0 || index >= elements.length || index === i) {
-            context.report(`${at}.neighbors[${j}]`, `${JSON.stringify(neighbor)} names no other stage; the stages are ${labels.map((label) => JSON.stringify(label)).join(', ')}`)
-            return null
-          }
-          return String(index)
-        }).filter((/** @type {unknown} */ each) => each !== null)
-      }
-    })
-    // A connection goes both ways, as the editor draws it.
-    elements.forEach((/** @type {any} */ element, /** @type {number} */ i) => {
-      for (const neighbor of element?.neighbors ?? []) {
-        const other = elements[Number(neighbor)]
-        if (!isObject(other)) continue
-        other.neighbors = Array.isArray(other.neighbors) ? other.neighbors : []
-        if (!other.neighbors.includes(String(i))) other.neighbors.push(String(i))
+          if (typeof neighbor === 'number') return String(neighbor)
+          const index = labels.indexOf(String(neighbor).trim())
+          if (index >= 0 && index !== i) return String(index)
+          context.report(`${at}.neighbors[${j}]`, `${JSON.stringify(neighbor)} names no other stage; the stages are ${labels.map((label) => JSON.stringify(label)).join(', ')}`)
+          return neighbor
+        })
       }
     })
   },
@@ -480,14 +470,34 @@ const gameMap = {
     const elements = gamemap?.elements
     if (!Array.isArray(elements)) return
     if (!elements.some((/** @type {any} */ element) => element?.canBeStartStage)) context.report(`${path}.gamemapSteps.gamemap.elements`, 'has no stage a learner can start at: set "canBeStartStage": true on one')
+    const labels = elements.map((/** @type {any} */ element) => (typeof element?.label === 'string' ? element.label.trim() : ''))
     elements.forEach((/** @type {any} */ element, /** @type {number} */ i) => {
       const at = `${path}.gamemapSteps.gamemap.elements[${i}]`
+      for (const key of ['x', 'y', 'width', 'height']) {
+        const value = element.telemetry?.[key]
+        if (value !== undefined && !(typeof value === 'string' && value.trim() !== '' && Number(value) >= 0 && Number(value) <= 100)) context.report(`${at}.telemetry.${key}`, 'expected a number from 0 to 100, percent of the map')
+      }
       if (element.id === undefined) element.id = randomUUID()
       if (element.type === undefined) element.type = element.specialStageType ? 'special-stage' : 'stage'
       if (!Array.isArray(element.neighbors)) element.neighbors = []
+      element.neighbors.forEach((/** @type {unknown} */ neighbor, /** @type {number} */ j) => {
+        if (!(typeof neighbor === 'string' && /^\d+$/.test(neighbor) && Number(neighbor) < elements.length && Number(neighbor) !== i)) {
+          context.report(`${at}.neighbors[${j}]`, `${JSON.stringify(neighbor)} names no other stage; the stages are ${labels.map((/** @type {string} */ label) => JSON.stringify(label)).join(', ')}, by their index from 0`)
+        }
+      })
       if (element.type === 'stage' && !(Array.isArray(element.contentsList) && element.contentsList.length)) context.report(`${at}.contentsList`, 'is required for a stage: write at least 1 content')
       if (element.specialStageType === 'link' && !element.specialStageLinkURL) context.report(`${at}.specialStageLinkURL`, 'is required for a link stage')
-      if (!element.neighbors.length && elements.length > 1) context.note(at, 'is joined to no other stage')
+    })
+    // A connection goes both ways, as the editor draws it.
+    elements.forEach((/** @type {any} */ element, /** @type {number} */ i) => {
+      for (const neighbor of element.neighbors) {
+        const other = elements[Number(neighbor)]
+        if (Number(neighbor) === i || !isObject(other) || !Array.isArray(other.neighbors)) continue
+        if (!other.neighbors.includes(String(i))) other.neighbors.push(String(i))
+      }
+    })
+    elements.forEach((/** @type {any} */ element, /** @type {number} */ i) => {
+      if (!element.neighbors.length && elements.length > 1) context.note(`${path}.gamemapSteps.gamemap.elements[${i}]`, 'is joined to no other stage')
     })
     if (gamemap.paths === undefined) gamemap.paths = []
   }

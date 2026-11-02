@@ -3,8 +3,9 @@ import { createReadStream, createWriteStream, openAsBlob } from 'node:fs'
 import { readdir, readFile, rename, rm, stat } from 'node:fs/promises'
 import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { Writable } from 'node:stream'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { BlobReader, TextReader, TextWriter, ZipReader, ZipWriter, configure } from '@zip.js/zip.js'
+import { dependenciesIn, indexLibraryFolders, librariesNamedIn, ownLibraries, planPack, reachableFolder, walkDependencies } from '@missing-elements/h5p-offline-player/plan'
 import { EmbedError, PLAYER_FILES, installed } from './build.mjs'
 import { crc32 } from './crc32.mjs'
 
@@ -34,264 +35,20 @@ const PACKAGE = 'package.h5p'
 const LIBRARIES = 'libraries'
 
 /**
- * A dependency as `h5p.json` and every `library.json` list them, or nothing for an entry that is
- * not one.
- * @param {unknown} json
- * @returns {{ machineName: string, major: number, minor: number }[]}
- */
-function dependenciesIn(json) {
-  const list = /** @type {{ preloadedDependencies?: unknown }} */ (json ?? {}).preloadedDependencies
-  if (!Array.isArray(list)) return []
-  return list.flatMap((dependency) => {
-    const major = Number(dependency?.majorVersion)
-    const minor = Number(dependency?.minorVersion)
-    return typeof dependency?.machineName === 'string' && Number.isInteger(major) && Number.isInteger(minor)
-      ? [{ machineName: dependency.machineName, major, minor }]
-      : []
-  })
-}
-
-/**
- * The folder that serves a dependency, by the player's own rule: its versioned or bare name when
- * that folder has a `library.json`, else the lowest versioned folder of the same major with a
- * minor at least as high (`reachableFolder` in the player's `package-reader.ts`).
- * @internal
- * @param {{ machineName: string, major: number, minor: number }} dependency
- * @param {ReadonlySet<string>} names the archive's entry names
- * @returns {string | undefined}
- */
-export function servingFolder({ machineName, major, minor }, names) {
-  const own = [`${machineName}-${major}.${minor}`, machineName].find((folder) => names.has(`${folder}/library.json`))
-  if (own) return own
-  let best
-  for (const name of names) {
-    const match = /^(.+)-(\d+)\.(\d+)\/library\.json$/.exec(name)
-    if (!match || match[1] !== machineName || Number(match[2]) !== major || Number(match[3]) < minor) continue
-    if (!best || Number(match[3]) < best.minor) best = { folder: `${match[1]}-${match[2]}.${match[3]}`, minor: Number(match[3]) }
-  }
-  return best?.folder
-}
-
-/**
- * What the content asks for, and what those libraries need in turn, that no folder in `names`
- * serves: the player refuses such a package when it opens it, and the deep walk is the one it makes
- * before the runtime boots (`missingDependencies`). The sub-content the parameters name counts
- * too, which the player finds missing only when the runtime reaches it.
- * @param {{ machineName: string, major: number, minor: number }[]} roots
- * @param {ReadonlySet<string>} names
- * @param {(name: string) => Promise<unknown>} read a `library.json` among `names`, parsed
- * @returns {Promise<{ machineName: string, major: number, minor: number }[]>}
- */
-async function missingLibraries(roots, names, read) {
-  /** @type {Map<string, { machineName: string, major: number, minor: number }>} */
-  const missing = new Map()
-  const seen = new Set()
-  let level = roots
-  while (level.length > 0) {
-    const next = []
-    for (const dependency of level) {
-      const key = `${dependency.machineName} ${dependency.major}.${dependency.minor}`
-      if (seen.has(key)) continue
-      seen.add(key)
-      const folder = servingFolder(dependency, names)
-      if (!folder) missing.set(key, dependency)
-      else next.push(...dependenciesIn(await read(`${folder}/library.json`)))
-    }
-    level = next
-  }
-  return [...missing].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([, dependency]) => dependency)
-}
-
-/*
- * The library pack's part of the work: which of its parts the package needs. These follow the
- * player's own functions, named on each, so that the element, planning from the zip's index,
- * asks for exactly the parts the zip carries; keep them in step.
- */
-
-/**
- * The sub-content libraries the parameters name, by each object's `library` string, as
- * `"H5P.MultiChoice 1.16"`: what a full export's `h5p.json` lists and a stripped one's does not.
- * The player's `librariesNamedIn`.
- * @param {unknown} params
- * @returns {{ machineName: string, major: number, minor: number }[]}
- */
-function librariesNamedIn(params) {
-  /** @type {Map<string, { machineName: string, major: number, minor: number }>} */
-  const found = new Map()
-  /** @param {unknown} value @param {number} depth */
-  const walk = (value, depth) => {
-    if (depth > 64 || !value || typeof value !== 'object') return
-    if (Array.isArray(value)) {
-      for (const item of value) walk(item, depth + 1)
-      return
-    }
-    const library = /** @type {{ library?: unknown }} */ (value).library
-    if (typeof library === 'string') {
-      const match = /^([A-Za-z0-9_.-]+) (\d+)\.(\d+)$/.exec(library)
-      if (match && !found.has(match[1])) found.set(match[1], { machineName: match[1], major: Number(match[2]), minor: Number(match[3]) })
-    }
-    for (const child of Object.values(value)) walk(child, depth + 1)
-  }
-  walk(params, 0)
-  return [...found.values()]
-}
-
-/**
- * An addon's patterns, under `addTo.content.types[].text.regex`, PHP's `/…/flags` made
- * JavaScript's; one JavaScript cannot read, or with a flag it has no counterpart for, is left out.
- * The player's `addonPatterns`.
- * @param {unknown} addTo
- * @returns {RegExp[]}
- */
-function addonPatterns(addTo) {
-  const types = /** @type {{ content?: { types?: unknown } } | null | undefined} */ (addTo)?.content?.types
-  if (!Array.isArray(types)) return []
-  const patterns = []
-  for (const type of types) {
-    const source = type?.text?.regex
-    if (typeof source !== 'string' || source.length < 2) continue
-    const delimiter = source[0]
-    if (/[\p{L}\p{N}\\\s([{<]/u.test(delimiter)) continue
-    const end = source.lastIndexOf(delimiter)
-    const flags = source.slice(end + 1)
-    if (end < 1 || /[^imsu]/.test(flags)) continue
-    try {
-      patterns.push(new RegExp(source.slice(1, end), flags))
-    } catch {
-      // PCRE that JavaScript does not read.
-    }
-  }
-  return patterns
-}
-
-/**
- * Whether a string anywhere in the parameters matches one of the patterns. The player's
- * `textMatches`.
- * @param {unknown} params
- * @param {RegExp[]} patterns
- */
-function textMatches(params, patterns) {
-  /** @param {unknown} value @param {number} depth @returns {boolean} */
-  const walk = (value, depth) => {
-    if (typeof value === 'string') return patterns.some((pattern) => pattern.test(value))
-    if (depth > 64 || !value || typeof value !== 'object') return false
-    return Object.values(value).some((child) => walk(child, depth + 1))
-  }
-  return patterns.length > 0 && walk(params, 0)
-}
-
-/**
- * The library folders the package carries, each as its `library.json` says: the player's
- * `ownLibraries` once every `library.json` is at hand. One that does not parse, or a folder named
- * for another library, is left out.
- * @param {Iterable<string>} names
- * @param {(name: string) => Promise<unknown>} read
- */
-async function ownLibraries(names, read) {
-  /** @param {unknown} part */
-  const version = (part) => (typeof part === 'number' && Number.isInteger(part) && part >= 0 ? part : typeof part === 'string' && /^\d+$/.test(part) ? Number(part) : null)
-  const libraries = []
-  for (const name of names) {
-    const slash = name.indexOf('/')
-    if (slash < 0 || name.slice(slash + 1) !== 'library.json') continue
-    const folder = name.slice(0, slash)
-    const library = /** @type {{ machineName?: unknown, majorVersion?: unknown, minorVersion?: unknown } | null} */ (await read(name).catch(() => null))
-    const major = version(library?.majorVersion)
-    const minor = version(library?.minorVersion)
-    const machineName = library?.machineName
-    if (typeof machineName !== 'string' || major === null || minor === null) continue
-    const versioned = /^(.+)-(\d+)\.(\d+)$/.exec(folder)
-    if (versioned ? versioned[1] !== machineName || Number(versioned[2]) !== major : folder !== machineName) continue
-    libraries.push({ folder, machineName, major, minor, dependencies: dependenciesIn(library) })
-  }
-  return libraries
-}
-
-/**
- * The library pack's index, its `parts/index.json`, as the plan reads it. `entry` is the library's
- * own record, which the zip's index repeats.
+ * The library pack's index, its `parts/index.json`, as the plan takes it: each library's record,
+ * which the zip's index repeats as `record`, with the part's file as `url`. A record the index got
+ * wrong is left out.
  * @param {unknown} index
+ * @param {string} packDir the folder holding the index and the parts
  */
-function packLibraries(index) {
+function packLibraries(index, packDir) {
   const list = /** @type {{ libraries?: unknown } | null} */ (index)?.libraries
-  return (Array.isArray(list) ? list : []).flatMap((entry) => {
-    const { folder, machineName, majorVersion, minorVersion, sha256, addTo } = entry ?? {}
-    return typeof folder === 'string' && typeof machineName === 'string' && Number.isInteger(majorVersion) && Number.isInteger(minorVersion) && typeof sha256 === 'string'
-      ? [{ folder, machineName, major: Number(majorVersion), minor: Number(minorVersion), sha256, dependencies: dependenciesIn(entry), addTo, entry: /** @type {object} */ (entry) }]
-      : []
+  return (Array.isArray(list) ? list : []).flatMap((record) => {
+    const { folder, machineName, majorVersion, minorVersion, patchVersion, size, sha256 } = record ?? {}
+    if (typeof folder !== 'string' || typeof machineName !== 'string' || ![majorVersion, minorVersion, patchVersion, size].every(Number.isInteger) || typeof sha256 !== 'string') return []
+    const library = /** @type {import('@missing-elements/h5p-offline-player/plan').PackLibrary} */ (record)
+    return [{ ...library, url: pathToFileURL(join(packDir, `${folder}.h5p`)).href, record: library }]
   })
-}
-
-/**
- * The parts of the library pack the package needs, and the folders of its own they replace: the
- * player's `planPack` (`sw/pack-plan.ts`) as the launch page has the element run it, filling gaps
- * with nothing attached before (`refresh-libraries="off"`).
- * - What the content asks for, and the package carries at that major and at no lower minor, plays
- *   from the package. Anything else comes from the pack, which has one version of each major, and
- *   so does whatever a part needs; an older minor the package carries gives way to the part.
- * - Once anything comes from the pack, so do the addons whose pattern matches a string in the
- *   parameters: H5P.MathDisplay, for LaTeX.
- * @param {object} input
- * @param {Awaited<ReturnType<typeof ownLibraries>>} input.own
- * @param {{ machineName: string, major: number, minor: number }[]} input.roots what `h5p.json`
- *   declares and the parameters name as sub-content
- * @param {unknown} input.params
- * @param {ReturnType<typeof packLibraries>} input.pack
- */
-function planParts({ own, roots, params, pack }) {
-  const byLibrary = new Map(pack.map((library) => [`${library.machineName} ${library.major}`, library]))
-  /** @type {Map<string, ReturnType<typeof packLibraries>[number]>} */
-  const planned = new Map()
-  /** @type {string[]} */
-  const superseded = []
-  let carried = own
-  const queue = [...roots]
-  const seen = new Set()
-
-  /**
-   * @param {{ machineName: string, major: number, minor: number }} version
-   * @param {{ machineName: string, major: number, minor: number }} dependency
-   */
-  const satisfies = (version, dependency) =>
-    version.machineName === dependency.machineName && version.major === dependency.major && version.minor >= dependency.minor
-  /** @param {ReturnType<typeof packLibraries>[number]} library */
-  const plan = (library) => {
-    if (planned.has(library.folder)) return
-    planned.set(library.folder, library)
-    queue.push(...library.dependencies)
-  }
-  const follow = () => {
-    for (let next = queue.shift(); next; next = queue.shift()) {
-      const dependency = next
-      const key = `${dependency.machineName} ${dependency.major}.${dependency.minor}`
-      if (seen.has(key)) continue
-      seen.add(key)
-      const ownVersion = carried.find((library) => satisfies(library, dependency))
-      if (ownVersion) {
-        queue.push(...ownVersion.dependencies)
-        continue
-      }
-      if ([...planned.values()].some((library) => satisfies(library, dependency))) continue
-      const candidate = byLibrary.get(`${dependency.machineName} ${dependency.major}`)
-      if (!candidate || candidate.minor < dependency.minor) continue
-      const older = carried.find((library) => library.machineName === dependency.machineName && library.major === dependency.major)
-      if (older) {
-        carried = carried.filter((library) => library !== older)
-        superseded.push(older.folder)
-      }
-      plan(candidate)
-    }
-  }
-
-  follow()
-  if (planned.size > 0) {
-    for (const addon of pack) {
-      if (addon.addTo === undefined || carried.some((library) => library.machineName === addon.machineName)) continue
-      if (textMatches(params, addonPatterns(addon.addTo))) plan(addon)
-    }
-    follow()
-  }
-  return { parts: [...planned.values()].sort((a, b) => (a.folder < b.folder ? -1 : a.folder > b.folder ? 1 : 0)), superseded }
 }
 
 /** @param {string} text */
@@ -443,13 +200,13 @@ export async function buildScorm({ h5p, out, force = false }) {
   if (targetInfo && !force) throw new EmbedError(`${out} exists. Pass --force to replace it.`)
 
   const packDir = dirname(installed('@missing-elements/h5p-libraries/parts/index.json', 'Reinstall this package.'))
-  const pack = packLibraries(JSON.parse(await readFile(join(packDir, 'index.json'), 'utf8')))
+  const pack = packLibraries(JSON.parse(await readFile(join(packDir, 'index.json'), 'utf8')), packDir)
 
   // What the package declares and carries, and what the pack adds, read before anything is written.
   /** @type {any} `h5p.json`, parsed */
   let manifest
-  /** @type {ReturnType<typeof planParts>} */
-  let plan
+  /** @type {typeof pack} the parts of the pack the zip carries, by folder */
+  let parts
   let reader
   try {
     reader = new ZipReader(new BlobReader(await openAsBlob(source)))
@@ -473,22 +230,39 @@ export async function buildScorm({ h5p, out, force = false }) {
       throw new EmbedError(`${basename(h5p)}: h5p.json names no libraries, so there is nothing to play.`)
     }
     const params = await readJson('content/content.json')
-    const roots = [...dependenciesIn(manifest), ...librariesNamedIn(params)]
-    plan = planParts({ own: await ownLibraries(byName.keys(), readJson), roots, params, pack })
+    /** @param {{ machineName: string, majorVersion: string | number, minorVersion: string | number }} dependency */
+    const numbered = ({ machineName, majorVersion, minorVersion }) => ({ machineName, majorVersion: Number(majorVersion), minorVersion: Number(minorVersion) })
+    const roots = [...dependenciesIn(manifest), ...librariesNamedIn(params)].map(numbered)
+    const folders = [...byName.keys()].flatMap((name) => {
+      const match = /^([^/]+)\/library\.json$/.exec(name)
+      return match ? [match[1]] : []
+    })
+    // The player's own plan, as the launch page has the element run it: gaps filled from the pack,
+    // nothing provided before, no refresh (`refresh-libraries="off"`).
+    const plan = planPack({ own: await ownLibraries(folders, (folder) => readJson(`${folder}/library.json`)), provided: [], roots, params, pack, refresh: false, fill: true })
+    const byFolder = new Map(pack.map((library) => [library.folder, library]))
+    parts = (plan?.parts ?? []).map((part) => /** @type {typeof pack[number]} */ (byFolder.get(part.folder))).sort((a, b) => (a.folder < b.folder ? -1 : a.folder > b.folder ? 1 : 0))
 
     // Held to its libraries as the player holds it once the parts are attached: the folders they
     // replace withheld, and each part's `library.json` naming what its record in the index does.
-    const parts = new Map(plan.parts.map((part) => [`${part.folder}/library.json`, part.entry]))
-    const withheld = new Set(plan.superseded)
+    const records = new Map(parts.map((part) => [`${part.folder}/library.json`, part.record]))
+    const withheld = new Set(plan?.superseded ?? [])
     const names = new Set([...byName.keys()].filter((name) => !withheld.has(name.split('/')[0])))
-    for (const name of parts.keys()) names.add(name)
-    const missing = await missingLibraries(roots, names, async (name) => parts.get(name) ?? readJson(name))
+    for (const name of records.keys()) names.add(name)
+    const available = indexLibraryFolders(names)
+    const { missing } = await walkDependencies(
+      roots,
+      (dependency) => reachableFolder(dependency, names, available),
+      async (folder) => records.get(`${folder}/library.json`) ?? readJson(`${folder}/library.json`)
+    )
     if (missing.length > 0) {
-      const packed = new Map(pack.map((library) => [`${library.machineName} ${library.major}`, library]))
-      const listed = missing.map(({ machineName, major, minor }) => {
-        const older = packed.get(`${machineName} ${major}`)
-        return `${machineName} ${major}.${minor}${older ? ` (the pack has ${older.major}.${older.minor})` : ''}`
-      })
+      const packed = new Map(pack.map((library) => [`${library.machineName} ${library.majorVersion}`, library]))
+      const listed = missing
+        .map(({ machineName, majorVersion, minorVersion }) => {
+          const older = packed.get(`${machineName} ${Number(majorVersion)}`)
+          return `${machineName} ${majorVersion}.${minorVersion}${older ? ` (the pack has ${older.majorVersion}.${older.minorVersion})` : ''}`
+        })
+        .sort()
       throw new EmbedError(
         `${basename(h5p)} needs libraries that neither it nor the library pack carries: ${listed.join(', ')}. ` +
           'Export the package with its libraries, as Lumi and the H5P plugins of Moodle, WordPress and Drupal do.'
@@ -506,12 +280,12 @@ export async function buildScorm({ h5p, out, force = false }) {
   const title = named || basename(h5p, extname(h5p))
   // The learner's saved place is kept against the libraries too, as the player keeps it against
   // the revision: a zip written with others starts learners over, as a refreshed package does.
-  const hashes = [await sha256(source), ...plan.parts.map((part) => part.sha256)]
+  const hashes = [await sha256(source), ...parts.map((part) => part.sha256)]
   const build = (hashes.length === 1 ? hashes[0] : createHash('sha256').update(hashes.join('\n')).digest('hex')).slice(0, 16)
   const player = dirname(installed('@missing-elements/h5p-offline-player/dist/h5p-player.js', 'Run `pnpm build` in the workspace, or reinstall this package.'))
   const runtime = dirname(installed('@missing-elements/h5p-runtime/dist/h5p.css', 'Run `pnpm build` in the workspace, or reinstall this package.'))
   const version = (await readFile(join(player, 'VERSION'), 'utf8').catch(() => 'unknown')).trim()
-  const packVersion = plan.parts.length > 0 ? String(JSON.parse(await readFile(join(dirname(packDir), 'package.json'), 'utf8')).version) : null
+  const packVersion = parts.length > 0 ? String(JSON.parse(await readFile(join(dirname(packDir), 'package.json'), 'utf8')).version) : null
 
   const page = (await readFile(join(SCORM, 'index.html'), 'utf8'))
     .replace('%LANG%', languageTag(manifest.defaultLanguage))
@@ -531,8 +305,8 @@ export async function buildScorm({ h5p, out, force = false }) {
     [PACKAGE, { file: source }]
   ]
   if (packVersion) {
-    files.push([`${LIBRARIES}/index.json`, { text: `${JSON.stringify({ libraries: plan.parts.map((part) => part.entry) }, null, 2)}\n` }])
-    for (const part of plan.parts) files.push([`${LIBRARIES}/${part.folder}.h5p`, { file: join(packDir, `${part.folder}.h5p`) }])
+    files.push([`${LIBRARIES}/index.json`, { text: `${JSON.stringify({ libraries: parts.map((part) => part.record) }, null, 2)}\n` }])
+    for (const part of parts) files.push([`${LIBRARIES}/${part.folder}.h5p`, { file: join(packDir, `${part.folder}.h5p`) }])
     files.push(['libraries.txt', { file: join(dirname(packDir), 'libraries.txt') }])
   }
   files.push(['NOTICE.txt', { text: notice({ version, source: basename(h5p), pack: packVersion }) }])
@@ -566,5 +340,5 @@ export async function buildScorm({ h5p, out, force = false }) {
     throw error
   }
 
-  return { out: target, title, version, libraries: plan.parts.map((part) => part.folder), build, size: (await stat(target)).size }
+  return { out: target, title, version, libraries: parts.map((part) => part.folder), build, size: (await stat(target)).size }
 }
