@@ -1,15 +1,15 @@
 import { openAsBlob } from 'node:fs'
-import { writeFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { BlobReader, BlobWriter, TextReader, Uint8ArrayReader, Uint8ArrayWriter, ZipReader, ZipWriter, configure } from '@zip.js/zip.js'
+import { BlobReader, Uint8ArrayWriter, ZipReader, configure } from '@zip.js/zip.js'
 import { formatBytes } from '@missing-elements/h5p-normalize'
-import { FIXED_DATE, splitPack, writePackModule } from '../../../packages/libraries/scripts/parts.mjs'
+import { splitPack, writePack, writePackModule } from '../../../packages/libraries/scripts/parts.mjs'
 import { HUB, download as cachedDownload, hubBundle as cachedBundle } from './lib/hub.mjs'
 
 /**
  * Builds the library pack, `@missing-elements/h5p-libraries`: `packages/libraries/libraries.h5p`,
  * the same split into one archive per library under `parts/` with its `index.json` and the
- * `index.js` a bundler reads (`splitPack` and `writePackModule` in that package's
+ * `index.js` a bundler reads (`writePack`, `splitPack` and `writePackModule` in that package's
  * `scripts/parts.mjs`), and the licence notice, `packages/libraries/libraries.txt`. Exports from
  * h5p.com and h5p.org carry no libraries, and the player fetches the parts such a package needs;
  * it also plays the pack's newer version of a library a package carries.
@@ -157,22 +157,12 @@ if (unknown.length > 0) {
   process.exit(1)
 }
 
-// A bundle registered to supply libraries is never held to its own manifest, but the player
-// refuses any archive without an h5p.json.
-// A fixed date, the same in any time zone (see `FIXED_DATE`), so the pack's bytes change only when
-// a library does: the weekly refresh (.github/workflows/libraries.yml) opens a pull request only
-// on a real difference.
-const writer = new ZipWriter(new BlobWriter('application/zip'), { lastModDate: FIXED_DATE, extendedTimestamp: false })
-await writer.add(
-  'h5p.json',
-  new TextReader(
-    JSON.stringify({ title: 'H5P Offline Player library pack', language: 'und', mainLibrary: '', preloadedDependencies: [], embedTypes: ['div'] })
-  )
-)
-for (const { files } of libraries) {
-  for (const [name, bytes] of files) await writer.add(name, new Uint8ArrayReader(bytes))
-}
-const pack = new Uint8Array(await (await writer.close()).arrayBuffer())
+// Written with a fixed date, the same in any time zone (see `FIXED_DATE`), and with a library's
+// entries kept from the committed pack while its files are the same, so the pack's bytes change
+// only where a library does: the weekly refresh (.github/workflows/libraries.yml) opens a pull
+// request only on a real difference, and commits only the parts of the libraries that changed.
+const previous = await readFile(join(outDir, 'libraries.h5p')).then((bytes) => new Uint8Array(bytes), () => undefined)
+const pack = await writePack(libraries, previous)
 await writeFile(join(outDir, 'libraries.h5p'), pack)
 const parts = await splitPack(pack, join(outDir, 'parts'))
 await writePackModule(parts, outDir)

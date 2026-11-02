@@ -51,6 +51,20 @@ jobs:
             git status --short -- packages/libraries | head -20
             exit 1
           fi
+          # The same for one part: a part whose library did not change is written as it was, so a
+          # new hash would make every browser download it again and give every package played
+          # with it a new revision, for no library's sake (#116).
+          stray=""
+          for part in $(git diff --name-only -- packages/libraries/parts | sed -n 's|^packages/libraries/parts/\(.*\)\.h5p$|\1|p'); do
+            case "$changes" in
+              *"+$part  "* | *"-$part  "*) ;;
+              *) stray="$stray $part" ;;
+            esac
+          done
+          if [ -n "$stray" ]; then
+            echo "::error::These parts changed, but their libraries in libraries.txt did not:$stray. Compare the archives' entries before releasing anything."
+            exit 1
+          fi
 
           version=$(node -e "
             const fs = require('fs'), path = 'packages/libraries/package.json'

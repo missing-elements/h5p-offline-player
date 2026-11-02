@@ -154,9 +154,10 @@ packages/libraries/       @missing-elements/h5p-libraries — the hub's runtime 
                           SHA-256; index.js, the `pack` export a bundler reads, a static `new URL` per part,
                           and index.d.ts; libraries.h5p, the whole pack as one archive; libraries.txt, the
                           licences. All committed, built by apps/demo/scripts/build-libraries.mjs (`pnpm
-                          libraries`), the parts split from the pack by scripts/parts.mjs (`splitPack`, also
-                          `pnpm parts` there; the player's fixture builder uses it too). The demo pages import
-                          `pack`; jsDelivr serves the package versioned with CORS
+                          libraries`), the pack written by scripts/parts.mjs (`writePack`, which keeps an
+                          unchanged library's entries from the pack before, #116) and split into parts by
+                          it (`splitPack`, also `pnpm parts` there; the player's fixture builder uses it
+                          too). The demo pages import `pack`; jsDelivr serves the package versioned with CORS
 
 packages/normalize/       @missing-elements/h5p-normalize — the package rewriter, published as a command
   bin/h5p-normalize.mjs     the command
@@ -1211,7 +1212,13 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   first refresh after the split rewrote all 106 archives with no library changed (#48, closed
   unmerged; #51). `tests/unit/pack-bytes.test.ts` in the player builds in four zones, and the
   workflow stops with an error when the files change and no library's line in `libraries.txt`
-  does. Measured on the demo's packages: 2 to 16 parts, 0.04 to 1.5 MB, 4.0 MB for formulas
+  does. A library whose files are unchanged keeps its entries from the committed pack, order
+  and compressed bytes included (`writePack`, #116): the build takes each library from the first
+  hub bundle that carries its newest version, in that bundle's order, and the refresh of
+  2026-11-02 (#111) rewrote 30 parts with no library changed, because the hub had rebuilt Branching
+  Scenario's bundle, the first to carry them, with their files in another order. The workflow
+  also stops when a part changes and its library's line does not, and the test holds both cases.
+  Measured on the demo's packages: 2 to 16 parts, 0.04 to 1.5 MB, 4.0 MB for formulas
   (MathDisplay is 2.8 MB), against 14 MB whole. **Planning is the worker's** (`planFromPack` in
   `mount.ts`, the rules in `sw/pack-plan.ts`): an `index` that offers the pack (`pack` on the
   message: `{ pinned: true }` for `LIBRARY_PACK_BASE`, whose index the worker carries compiled in
