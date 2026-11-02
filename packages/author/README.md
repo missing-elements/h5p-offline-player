@@ -119,6 +119,30 @@ const { output, manifest, content, libraries, translations, notes, media } =
 libraries })` returns the field list. `ContentGenerator` is the engine underneath, also run by the
 repository's sweep of every content type.
 
+A tool beside the build, which reads or changes content as the build would, takes the libraries as
+the build loads them, and its rules for text:
+
+```js
+import { ContentGenerator, loadLibraries, markupText, openPack } from '@missing-elements/h5p-author'
+
+const params = { questions: ['Die *Donau* mündet ins Schwarze Meer.'] }
+const pack = await openPack()
+try {
+  const { entries, main, translations } = await loadLibraries(pack, { type: 'H5P.Blanks', language: 'de', params })
+  const content = new ContentGenerator(entries).generate(main, params)
+} finally {
+  await pack.close()
+}
+```
+
+`openPack(libraries)` opens the pinned pack, or another copy's `parts/` folder. `loadLibraries`
+loads what the content brings in: the content type, every library its parameters name and each
+library field's default, with their semantics in the language and marked as the layouts need them.
+`entries` is the map `ContentGenerator` takes, every other library of the pack in it without its
+semantics. It takes any object with `libraries`, `newest`, `open` and `translation`, such as one
+over a package's own library folders. `markupText(value, field, report)`, `plainText(value, note)`
+and `allowedTags(field)` are the build's rules for one text value against its field.
+
 ## What it does not do
 
 It checks structure, not pedagogy: whether the answers are right, the questions fair, or the

@@ -24,11 +24,9 @@ import { Reader, TextWriter, ZipReader } from '@zip.js/zip.js'
 
 /**
  * A library whose part has been opened: what the generator reads (`folder`, `library`,
- * `semantics`) and what a build copies.
- * @typedef {{
- *   folder: string, library: any, semantics: any[] | null, index: IndexEntry,
- *   translations: Map<string, import('@zip.js/zip.js').FileEntry>, file: PartFile, reader: ZipReader<unknown>
- * }} PartLibrary
+ * `semantics`), its record in the index, and the names of its translation files, which
+ * `translation` reads. The part's file stays inside the pack, which copies from it for a build.
+ * @typedef {{ folder: string, library: any, semantics: any[] | null, index: IndexEntry, translations: string[] }} PartLibrary
  */
 
 /**
@@ -80,15 +78,23 @@ class PartFile extends Reader {
 }
 
 export class Pack {
+  /** @type {Map<string, Promise<PartLibrary>>} */
+  #opened = new Map()
+  /**
+   * Each opened part's file, its reader, and its translation files by name.
+   * @type {Map<string, { file: PartFile, reader: ZipReader<unknown>, translations: Map<string, import('@zip.js/zip.js').FileEntry> }>}
+   */
+  #archives = new Map()
+  /** @type {string} where the pack came from, for messages */
+  #origin
+
   /**
    * @param {IndexEntry[]} libraries
    * @param {string} origin where the pack came from, for messages
    */
   constructor(libraries, origin) {
     this.libraries = libraries
-    this.origin = origin
-    /** @type {Map<string, Promise<PartLibrary>>} */
-    this.opened = new Map()
+    this.#origin = origin
   }
 
   /**
@@ -113,26 +119,33 @@ export class Pack {
    * @returns {Promise<PartLibrary>}
    */
   open(entry) {
-    let opened = this.opened.get(entry.folder)
+    let opened = this.#opened.get(entry.folder)
     if (!opened) {
       opened = this.#open(entry)
-      this.opened.set(entry.folder, opened)
+      this.#opened.set(entry.folder, opened)
     }
     return opened
   }
 
-  /** @param {IndexEntry} entry */
+  /**
+   * @param {IndexEntry} entry
+   * @returns {Promise<PartLibrary>}
+   */
   async #open(entry) {
     const path = fileURLToPath(entry.url)
     const hash = createHash('sha256')
     try {
       for await (const chunk of createReadStream(path)) hash.update(chunk)
     } catch (error) {
-      throw new Error(`Cannot read the library part ${entry.folder} from ${this.origin}`, { cause: error })
+      throw new Error(`Cannot read the library part ${entry.folder} from ${this.#origin}`, { cause: error })
     }
     if (hash.digest('hex') !== entry.sha256) throw new Error(`The library part ${entry.folder} does not match the pack's index (SHA-256): reinstall the pack.`)
     const file = new PartFile(path)
     const reader = new ZipReader(file, { checkSignature: true })
+    // Kept before anything is read, so that `close` closes a part that then fails to open.
+    /** @type {Map<string, import('@zip.js/zip.js').FileEntry>} */
+    const translations = new Map()
+    this.#archives.set(entry.folder, { file, reader, translations })
     const entries = (await reader.getEntries()).filter((item) => !item.directory && item.filename.startsWith(`${entry.folder}/`))
     /** @param {string} name */
     const json = async (name) => {
@@ -145,21 +158,21 @@ export class Pack {
       throw new Error(`The library part ${entry.folder} disagrees with the pack's index`)
     }
     const languages = `${entry.folder}/language/`
-    const translations = new Map(
-      entries
-        .filter((item) => item.filename.startsWith(languages) && item.filename.endsWith('.json'))
-        .map((item) => [item.filename.slice(languages.length, -'.json'.length), /** @type {import('@zip.js/zip.js').FileEntry} */ (item)])
-    )
-    return { folder: entry.folder, library, semantics: await json('semantics.json'), index: entry, translations, file, reader }
+    for (const item of entries) {
+      if (item.filename.startsWith(languages) && item.filename.endsWith('.json')) {
+        translations.set(item.filename.slice(languages.length, -'.json'.length), /** @type {import('@zip.js/zip.js').FileEntry} */ (item))
+      }
+    }
+    return { folder: entry.folder, library, semantics: await json('semantics.json'), index: entry, translations: [...translations.keys()] }
   }
 
   /**
    * A translation file of an opened library, parsed: its `semantics`.
-   * @param {PartLibrary} part
+   * @param {{ folder: string }} part
    * @param {string} name
    */
   async translation(part, name) {
-    const file = part.translations.get(name)
+    const file = this.#archives.get(part.folder)?.translations.get(name)
     if (!file) return undefined
     try {
       return JSON.parse(await file.getData(new TextWriter())).semantics
@@ -168,21 +181,31 @@ export class Pack {
     }
   }
 
+  /**
+   * The part an opened library came from, as zip.js reads it, for a build to copy its files.
+   * @param {{ folder: string }} part
+   * @internal
+   */
+  archiveOf(part) {
+    const archive = this.#archives.get(part.folder)
+    if (!archive) throw new Error(`The library part ${part.folder} is not open`)
+    return archive.file
+  }
+
   /** Every opened part closed. */
   async close() {
-    for (const opened of this.opened.values()) {
+    await Promise.allSettled(this.#opened.values())
+    for (const { file, reader } of this.#archives.values()) {
       try {
-        const part = await opened
-        try {
-          await part.reader.close()
-        } finally {
-          await part.file.close()
-        }
+        await reader.close()
       } catch {
-        // A part that failed to open has nothing to close.
+        // Nothing of a part that failed to open needs closing but its file.
+      } finally {
+        await file.close()
       }
     }
-    this.opened.clear()
+    this.#archives.clear()
+    this.#opened.clear()
   }
 }
 
