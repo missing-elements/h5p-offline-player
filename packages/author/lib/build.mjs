@@ -1,16 +1,9 @@
-import { constants, createReadStream } from 'node:fs'
-import { copyFile, lstat, mkdtemp, open, rm, stat } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
-import { Readable, Writable } from 'node:stream'
-import { TextReader, ZipWriter } from '@zip.js/zip.js'
-import { normalizeArchive } from '@missing-elements/h5p-normalize'
+import { TextReader } from '@zip.js/zip.js'
 import { librariesNamedIn, planPack } from '@missing-elements/h5p-offline-player/plan'
 import { checkContent, layoutContext, valueAt } from './check.mjs'
 import { ContentGenerator, libraryString } from './generator.mjs'
 import { loadLibraries } from './libraries.mjs'
-import { MediaStore } from './media.mjs'
 import { CC_VERSIONS, LICENSES, ROLES } from './metadata.mjs'
-import { openPack } from './pack.mjs'
 import { quizProblems, quizSource } from './quiz.mjs'
 import { SourceError } from './source-error.mjs'
 import { escapeText } from './text.mjs'
@@ -23,7 +16,8 @@ export { SourceError }
  * its media copied and described, checked as saved content is and laid out, and written with the
  * libraries it needs, each part checked against the pack's index. Nothing is written unless all of
  * it is right: every problem the source has is listed at once, each by its path, so a fix takes one
- * round.
+ * round. All of it but where the files are and where the package goes is the same in Node
+ * (`node.mjs`) and in a page (`browser.mjs`), and is here.
  */
 
 /**
@@ -34,13 +28,6 @@ export { SourceError }
  * }} Source a package's source: the content type, its metadata, and the parameters that differ from the defaults
  * @typedef {{ path: string, message: string }} Problem
  * @typedef {import('./translate.mjs').TranslationReport} TranslationReport
- * @typedef {{
- *   output: string, manifest: Record<string, unknown>, content: Record<string, unknown>,
- *   libraries: string[], translations: TranslationReport[], notes: Problem[], media: string[]
- * }} BuildResult what was written, and what is worth telling about it
- * @typedef {{ libraries?: string, base?: string, fetch?: typeof fetch }} BuildOptions
- *   `libraries`, a library pack's parts folder in place of the pinned pack; `base`, the folder a
- *   source's file paths are read from; `fetch`, for media named by web address
  */
 
 /** @param {unknown} value @returns {value is Record<string, any>} */
@@ -140,147 +127,110 @@ async function closure(pack, main, content) {
 }
 
 /**
- * The refusal of an output that exists, with the file system's code, so a caller tells it from
- * a source's problems.
- * @param {string} output
+ * A source made what a package holds, its media resolved through `media`: the manifest, the content,
+ * the libraries' parts in the order the package lists them, and what is worth telling. Nothing is
+ * written: the caller writes the package (`writePackage`) and its media.
+ * @template F
+ * @param {Source} source as `readSource` returned it
+ * @param {import('./pack.mjs').Pack} pack
+ * @param {import('./media.mjs').MediaStore<F>} media
+ * @returns {Promise<{ manifest: Record<string, unknown>, content: Record<string, unknown>, selected: Map<string, import('./pack.mjs').PartLibrary>, translations: TranslationReport[], notes: Problem[] }>}
+ * @internal
  */
-function exists(output) {
-  return Object.assign(new Error(`${output} exists, and a build never writes over a file: name a new one`), { code: 'EEXIST' })
+export async function composePackage(source, pack, media) {
+  /** @type {Problem[]} */
+  const problems = []
+  /** @type {Problem[]} */
+  const notes = []
+  const report = (/** @type {string} */ path, /** @type {string} */ message) => problems.push({ path, message })
+  const note = (/** @type {string} */ path, /** @type {string} */ message) => notes.push({ path, message })
+  const { entries, main: mainLibrary, translations } = await loadLibraries(pack, source)
+  const main = mainLibrary.library.machineName
+  const authors = source.authors.map((author) => ({ name: escapeText(author.name), role: author.role }))
+  const generator = new ContentGenerator(entries, {
+    metadata(entry, written, path) {
+      const title = written?.title
+      if (title !== undefined && (typeof title !== 'string' || !title.trim())) report(`${path}.metadata.title`, 'expected a title')
+      else if (typeof title === 'string' && title.length > 255) report(`${path}.metadata.title`, 'takes at most 255 characters')
+      return {
+        contentType: escapeText(String(entry.library.title ?? entry.library.machineName)),
+        license: source.license,
+        ...(source.licenseVersion ? { licenseVersion: source.licenseVersion } : {}),
+        authors: authors.map((author) => ({ ...author })),
+        ...(typeof title === 'string' && title.trim() ? { title: escapeText(title) } : {})
+      }
+    }
+  })
+  if (!mainLibrary.semantics) report('type', `${source.type} has no semantics: it is not a content type an author fills in`)
+  else if (!mainLibrary.library.runnable) report('type', `${mainLibrary.library.machineName} is a part other content holds, not a content type on its own: put it in one, such as H5P.Column`)
+
+  // Layouts that turn what a source writes into what H5P stores, before it is generated.
+  const layout = layoutContext(entries, report, note)
+  const written = structuredClone(source.params)
+  for (const place of placesOf(main, written)) LAYOUTS[place.library]?.before?.(place.params, place.path, layout(place.library))
+
+  const generated = generator.generate(mainLibrary, written)
+  problems.push(...generator.problems)
+  notes.push(...generator.notes)
+
+  // Media: copied, described, put in place of what was written.
+  for (const { field, value, path } of generator.media) {
+    const resolved = await media.resolve(field, value, path, report)
+    for (const key of Object.keys(value)) delete value[key]
+    Object.assign(value, resolved)
+  }
+
+  // Checked last as saved content is, as a tool that changes a package checks it: the layouts set
+  // what the editor's widgets set and check what they would not let pass. Where the source has a
+  // problem already, the check finds the same one again, or the gap it left: a value missing
+  // where the generator refused what was written inside it. Only what it finds elsewhere is added.
+  const checked = checkContent({ entries, main: mainLibrary, translations }, { type: libraryString(mainLibrary.library), params: generated })
+  const fromSource = [...problems]
+  const known = (/** @type {Problem} */ problem) => fromSource.some(({ path }) => path === problem.path || inside(problem.path, path) ||
+    (inside(path, problem.path) && valueAt(checked.params, problem.path) === undefined))
+  for (const problem of checked.problems) if (!known(problem)) problems.push(problem)
+  for (const added of checked.notes) if (!notes.some(({ path, message }) => path === added.path && message === added.message)) notes.push(added)
+  if (problems.length) throw new SourceError(problems)
+  const content = checked.params
+
+  const { selected, addons } = await closure(pack, mainLibrary.library, content)
+  if (addons.length) notes.push({ path: 'params', message: `its text matches ${addons.join(', ')}, which the package carries, as a site with it installed would add it` })
+
+  // As H5P's exports write it, unescaped: the platforms check it when they load content.
+  const manifest = {
+    title: source.title,
+    language: source.language,
+    defaultLanguage: source.language,
+    license: source.license,
+    ...(source.licenseVersion ? { licenseVersion: source.licenseVersion } : {}),
+    authors: source.authors.map(({ name, role }) => ({ name, role })),
+    ...(source.source ? { source: source.source } : {}),
+    ...(source.yearFrom !== undefined ? { yearFrom: source.yearFrom } : {}),
+    ...(source.yearTo !== undefined ? { yearTo: source.yearTo } : {}),
+    mainLibrary: mainLibrary.library.machineName,
+    embedTypes: ['div'],
+    preloadedDependencies: [...selected.values()].map((part) => ({
+      machineName: part.library.machineName, majorVersion: String(part.library.majorVersion), minorVersion: String(part.library.minorVersion)
+    }))
+  }
+  return { manifest, content, selected, translations, notes }
 }
 
 /**
- * Builds a package from a source and writes it to `output`, which must not exist yet.
- * @param {unknown} input the source: `{ type, title, language, license, authors, params }`, or a quiz in the published quiz format
- * @param {string} output
- * @param {BuildOptions} [options]
- * @returns {Promise<BuildResult>}
+ * What a package holds but its media, in the order a package streams in: its manifest, the
+ * libraries, each part's own files copied as they are, then the content. The caller adds the media
+ * after it, last.
+ * @param {import('@zip.js/zip.js').ZipWriter<unknown>} writer
+ * @param {{ manifest: Record<string, unknown>, content: Record<string, unknown>, selected: Map<string, import('./pack.mjs').PartLibrary> }} built
+ * @param {import('./pack.mjs').Pack} pack
+ * @internal
  */
-export async function buildPackage(input, output, options = {}) {
-  output = resolve(output)
-  // Before any work, and again as the package lands, for a file that appears in between.
-  if (await lstat(output).then(() => true, () => false)) throw exists(output)
-  if (!(await stat(dirname(output)).catch(() => null))?.isDirectory()) throw new Error(`${dirname(output)} is not a folder to write the package in`)
-  const source = readSource(input)
-  const pack = await openPack(options.libraries)
-  let temporary
-  try {
-    /** @type {Problem[]} */
-    const problems = []
-    /** @type {Problem[]} */
-    const notes = []
-    const report = (/** @type {string} */ path, /** @type {string} */ message) => problems.push({ path, message })
-    const note = (/** @type {string} */ path, /** @type {string} */ message) => notes.push({ path, message })
-    const { entries, main: mainLibrary, translations } = await loadLibraries(pack, source)
-    const main = mainLibrary.library.machineName
-    const authors = source.authors.map((author) => ({ name: escapeText(author.name), role: author.role }))
-    const generator = new ContentGenerator(entries, {
-      metadata(entry, written, path) {
-        const title = written?.title
-        if (title !== undefined && (typeof title !== 'string' || !title.trim())) report(`${path}.metadata.title`, 'expected a title')
-        else if (typeof title === 'string' && title.length > 255) report(`${path}.metadata.title`, 'takes at most 255 characters')
-        return {
-          contentType: escapeText(String(entry.library.title ?? entry.library.machineName)),
-          license: source.license,
-          ...(source.licenseVersion ? { licenseVersion: source.licenseVersion } : {}),
-          authors: authors.map((author) => ({ ...author })),
-          ...(typeof title === 'string' && title.trim() ? { title: escapeText(title) } : {})
-        }
-      }
-    })
-    if (!mainLibrary.semantics) report('type', `${source.type} has no semantics: it is not a content type an author fills in`)
-    else if (!mainLibrary.library.runnable) report('type', `${mainLibrary.library.machineName} is a part other content holds, not a content type on its own: put it in one, such as H5P.Column`)
-
-    // Layouts that turn what a source writes into what H5P stores, before it is generated.
-    const layout = layoutContext(entries, report, note)
-    const written = structuredClone(source.params)
-    for (const place of placesOf(main, written)) LAYOUTS[place.library]?.before?.(place.params, place.path, layout(place.library))
-
-    const generated = generator.generate(mainLibrary, written)
-    problems.push(...generator.problems)
-    notes.push(...generator.notes)
-
-    // Media: copied, described, put in place of what was written.
-    temporary = await mkdtemp(join(dirname(output), '.h5p-author-'))
-    const media = new MediaStore({ base: options.base ?? process.cwd(), temporary, fetch: options.fetch })
-    for (const { field, value, path } of generator.media) {
-      const resolved = await media.resolve(field, value, path, report)
-      for (const key of Object.keys(value)) delete value[key]
-      Object.assign(value, resolved)
-    }
-
-    // Checked last as saved content is, as a tool that changes a package checks it: the layouts set
-    // what the editor's widgets set and check what they would not let pass. Where the source has a
-    // problem already, the check finds the same one again, or the gap it left: a value missing
-    // where the generator refused what was written inside it. Only what it finds elsewhere is added.
-    const checked = checkContent({ entries, main: mainLibrary, translations }, { type: libraryString(mainLibrary.library), params: generated })
-    const fromSource = [...problems]
-    const known = (/** @type {Problem} */ problem) => fromSource.some(({ path }) => path === problem.path || inside(problem.path, path) ||
-      (inside(path, problem.path) && valueAt(checked.params, problem.path) === undefined))
-    for (const problem of checked.problems) if (!known(problem)) problems.push(problem)
-    for (const added of checked.notes) if (!notes.some(({ path, message }) => path === added.path && message === added.message)) notes.push(added)
-    if (problems.length) throw new SourceError(problems)
-    const content = checked.params
-
-    const { selected, addons } = await closure(pack, mainLibrary.library, content)
-    if (addons.length) notes.push({ path: 'params', message: `its text matches ${addons.join(', ')}, which the package carries, as a site with it installed would add it` })
-
-    // As H5P's exports write it, unescaped: the platforms check it when they load content.
-    const manifest = {
-      title: source.title,
-      language: source.language,
-      defaultLanguage: source.language,
-      license: source.license,
-      ...(source.licenseVersion ? { licenseVersion: source.licenseVersion } : {}),
-      authors: source.authors.map(({ name, role }) => ({ name, role })),
-      ...(source.source ? { source: source.source } : {}),
-      ...(source.yearFrom !== undefined ? { yearFrom: source.yearFrom } : {}),
-      ...(source.yearTo !== undefined ? { yearTo: source.yearTo } : {}),
-      mainLibrary: mainLibrary.library.machineName,
-      embedTypes: ['div'],
-      preloadedDependencies: [...selected.values()].map((part) => ({
-        machineName: part.library.machineName, majorVersion: String(part.library.majorVersion), minorVersion: String(part.library.minorVersion)
-      }))
-    }
-
-    const staged = join(temporary, 'package.h5p')
-    const file = await open(staged, 'wx')
-    try {
-      const writer = new ZipWriter(Writable.toWeb(file.createWriteStream()), { useWebWorkers: false })
-      await writer.add('h5p.json', new TextReader(JSON.stringify(manifest)))
-      for (const part of selected.values()) {
-        await writer.appendZip(pack.archiveOf(part), { filter: (entry) => !entry.directory && entry.filename.startsWith(`${part.folder}/`) })
-      }
-      await writer.add('content/content.json', new TextReader(JSON.stringify(content)))
-      for (const item of media.files) {
-        await writer.add(`content/${item.name}`, /** @type {ReadableStream<Uint8Array>} */ (Readable.toWeb(createReadStream(item.from))), { level: 0 })
-      }
-      await writer.close()
-    } finally {
-      await file.close()
-    }
-    let final = staged
-    if (media.files.length) {
-      // Media stored and last, an mp4's index first: the layout a package streams in.
-      final = join(temporary, 'normalized.h5p')
-      await normalizeArchive({ input: staged, output: final })
-    }
-    // Unlike a hard link, an exclusive copy also works on FAT/exFAT destinations.
-    await copyFile(final, output, constants.COPYFILE_EXCL).catch((error) => {
-      throw error?.code === 'EEXIST' ? exists(output) : error
-    })
-    return {
-      output,
-      manifest,
-      content,
-      libraries: [...selected.keys()],
-      translations,
-      notes,
-      media: media.files.map((item) => item.name)
-    }
-  } finally {
-    await pack.close()
-    if (temporary) await rm(temporary, { recursive: true, force: true })
+export async function writePackage(writer, { manifest, content, selected }, pack) {
+  await writer.add('h5p.json', new TextReader(JSON.stringify(manifest)))
+  for (const part of selected.values()) {
+    await writer.appendZip(pack.archiveOf(part), { filter: (entry) => !entry.directory && entry.filename.startsWith(`${part.folder}/`) })
   }
+  await writer.add('content/content.json', new TextReader(JSON.stringify(content)))
 }
 
 /**

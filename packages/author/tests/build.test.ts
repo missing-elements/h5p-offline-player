@@ -11,6 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { buildPackage, librariesIn, SourceError } from '../lib/author.mjs'
 import { readSource } from '../lib/build.mjs'
 import { MediaStore } from '../lib/media.mjs'
+import { nodeMedia } from '../lib/node.mjs'
 import { quizProblems } from '../lib/quiz.mjs'
 import { jpeg, mp4, png } from './helpers/media'
 
@@ -478,7 +479,7 @@ describe('media', () => {
   it('gives a download up once nothing has arrived for a while, however long a slow one takes', async () => {
     const reported: string[] = []
     const report = (path: string, message: string) => reported.push(`${path}: ${message}`)
-    const store = new MediaStore({ base: dir, temporary: dir, idle: 300 })
+    const store = new MediaStore(nodeMedia({ base: dir, temporary: dir }), { idle: 300 })
     expect(await store.resolve({ type: 'image' }, { path: `${origin}/trickle.png` }, 'params.slow', report)).toMatchObject({ path: 'images/trickle.png', width: 40, height: 30 })
     expect(await store.resolve({ type: 'image' }, { path: `${origin}/stalled.png` }, 'params.silent', report)).toEqual({ path: `${origin}/stalled.png`, copyright: { license: 'U' } })
     expect(reported).toEqual([`params.silent.path: ${origin}/stalled.png could not be downloaded: nothing arrived for 0.3 s`])

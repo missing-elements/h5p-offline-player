@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { newId } from './generator.mjs'
 
 /**
  * What a content type needs beyond its semantics. H5P's editor has a widget of its own for some
@@ -477,7 +477,7 @@ const gameMap = {
         const value = element.telemetry?.[key]
         if (value !== undefined && !(typeof value === 'string' && value.trim() !== '' && Number(value) >= 0 && Number(value) <= 100)) context.report(`${at}.telemetry.${key}`, 'expected a number from 0 to 100, percent of the map')
       }
-      if (element.id === undefined) element.id = randomUUID()
+      if (element.id === undefined) element.id = newId()
       if (element.type === undefined) element.type = element.specialStageType ? 'special-stage' : 'stage'
       if (!Array.isArray(element.neighbors)) element.neighbors = []
       element.neighbors.forEach((/** @type {unknown} */ neighbor, /** @type {number} */ j) => {

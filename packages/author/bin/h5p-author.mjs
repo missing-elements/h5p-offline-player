@@ -2,7 +2,7 @@
 import { readFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { buildPackage, schemaOf, SourceError } from '../lib/author.mjs'
-import { packVersion } from '../lib/pack.mjs'
+import { packVersion } from '../lib/node.mjs'
 
 const USAGE = `Usage:
   h5p-author build <source.json> <output.h5p> [--libraries <parts folder>]

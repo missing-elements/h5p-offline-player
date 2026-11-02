@@ -8,5 +8,5 @@
     "rootDir": "lib",
     "outDir": "types"
   },
-  "include": ["lib/normalize.mjs"]
+  "include": ["lib/normalize.mjs", "lib/crc32.mjs"]
 }

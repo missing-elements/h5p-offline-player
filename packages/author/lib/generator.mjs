@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import { checkMetadata } from './metadata.mjs'
 import { markupText, plainText } from './text.mjs'
 
@@ -232,7 +231,7 @@ export class ContentGenerator {
   /** A sub-content id: random, or the caller's, numbered, where it wants the same bytes every run. */
   nextId() {
     this.ids += 1
-    return this.options.id ? this.options.id(this.ids) : randomUUID()
+    return this.options.id ? this.options.id(this.ids) : newId()
   }
 
   /**
@@ -713,6 +712,16 @@ export class ContentGenerator {
     }
     return many ? files : files[0]
   }
+}
+
+/**
+ * A new id, random, as H5P's editor gives each part one: crypto's, which Node has, and a page in a
+ * secure context only, https, localhost or a Tauri window.
+ * @internal
+ */
+export function newId() {
+  if (typeof globalThis.crypto?.randomUUID !== 'function') throw new Error('Content takes ids from crypto.randomUUID, which a page has in a secure context only: https, localhost, or a Tauri window')
+  return globalThis.crypto.randomUUID()
 }
 
 /** Every `library` string in the parameters: the sub-content a package plays. */
