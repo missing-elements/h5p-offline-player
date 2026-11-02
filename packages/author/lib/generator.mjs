@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { checkMetadata } from './metadata.mjs'
 import { markupText, plainText } from './text.mjs'
 
 /**
@@ -8,12 +9,20 @@ import { markupText, plainText } from './text.mjs'
  * the same way. So a source states only what the defaults cannot know, and a list in it is as long
  * as it is written.
  *
- * Two ways to run it. Authoring, the default, checks every written value against its field, as the
- * editor's form would: a field the semantics do not name, a select's unknown option, a list too
+ * Three ways to run it. Authoring, the default, checks every written value against its field, as
+ * the editor's form would: a field the semantics do not name, a select's unknown option, a list too
  * short or too long, a tag a markup field does not take, a required field with neither a written
  * value nor a default — each a problem named by its path. The content-type sweep runs it
  * `lenient`, taking what is written as it is and filling a required field from `fill`, so that
- * every content type in the pack plays (apps/demo/scripts/sweep-content-types.mjs).
+ * every content type in the pack plays (apps/demo/scripts/sweep-content-types.mjs). And `saved`, as
+ * `checkContent` runs it (check.mjs), checks content in the form H5P stores it rather than the form
+ * a source writes it: files and sub-content metadata as saved, held to what the platforms keep of
+ * them; each sub-content's `subContentId` kept, since the core names a part's statements by it; a
+ * markup field's text not wrapped again; and an optional group that holds nothing an author has to
+ * write taken as one the editor saved closed. A field the semantics do not name is kept and noted,
+ * not a problem, where the content names another minor of its library than the semantics are of:
+ * the player upgrades content written for an older minor, which may be what moves it, and plays
+ * content written for a newer one without it.
  *
  * The editor is h5p-editor-php-library's form at commit 3bec2594356cf1be4e6401f7e7e557650720aa9b
  * (2026-10-08), and H5PEditor.ShowWhen 1.0.9 at 93678737300e084cb9390a691d3e1ad4e793fbaa for
@@ -36,11 +45,27 @@ import { markupText, plainText } from './text.mjs'
 const MAX_DEPTH = 4
 
 /**
+ * The shape H5P keeps a sub-content id in (H5PContentValidator's `validateLibrary`, at the commit
+ * the runtime's content check names); one in any other is removed, and the part's statements then
+ * name it as the content itself.
+ */
+const SUB_CONTENT_ID = /^\{?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\}?$/
+
+/**
+ * What the platforms keep of a saved file beside `path`, `mime` and `copyright`, by its field's
+ * type (H5PContentValidator's `_validateFilelike` and its callers); a field's `extraAttributes` add
+ * to it.
+ * @type {Record<string, string[]>}
+ */
+const FILE_KEYS = { file: [], image: ['width', 'height', 'originalImage'], video: ['width', 'height', 'codecs', 'quality', 'bitrate'], audio: [] }
+
+/**
  * @typedef {{ folder: string, library: any, semantics: any[] | null }} PackEntry
  * @typedef {{ path: string, message: string }} Problem
  * @typedef {{ field: any, value: any, path: string }} MediaReference
  * @typedef {{
  *   lenient?: boolean,
+ *   saved?: boolean,
  *   fill?: (field: any, context: { generator: ContentGenerator, stack: string[], path: string }) => unknown,
  *   id?: (count: number) => string,
  *   metadata?: (entry: PackEntry, written: any, path: string) => any
@@ -49,6 +74,13 @@ const MAX_DEPTH = 4
 
 export class ContentGenerator {
   /**
+   * The library whose parameters are being made, while the content names another minor of it than
+   * its semantics are of.
+   * @type {{ library: any, minor: number } | null}
+   */
+  #other = null
+
+  /**
    * @param {Map<string, PackEntry>} pack every library folder the content may use, by folder name
    * @param {GeneratorOptions} [options]
    */
@@ -56,12 +88,15 @@ export class ContentGenerator {
     this.pack = pack
     this.options = options
     this.lenient = options.lenient ?? false
+    this.saved = options.saved ?? false
     this.ids = 0
-    /** @type {Problem[]} what is wrong with the written content, authoring only */
+    /** @type {Set<string>} the sub-content ids given, so that no two parts have one */
+    this.taken = new Set()
+    /** @type {Problem[]} what is wrong with the content, written or saved; never lenient */
     this.problems = []
     /** @type {Problem[]} what is worth saying about it and does not stop a build */
     this.notes = []
-    /** @type {MediaReference[]} the files the written content names, for the caller to copy */
+    /** @type {MediaReference[]} the files the content names: written, for the caller to copy; saved, as they are */
     this.media = []
     /** @type {WeakSet<object>} fields a content type's own widget draws: numbers take decimals, lists start empty */
     this.drawn = new WeakSet()
@@ -168,15 +203,55 @@ export class ContentGenerator {
    * @param {PackEntry} entry
    * @param {any} [written]
    * @param {string} [path] where the parameters sit, for problems: `params` by default
+   * @param {number} [minor] the minor of the library the content names, where it may be another
+   *   than the entry's, as saved content's may
    */
-  generate(entry, written, path = 'params') {
-    return this.fields(entry.semantics ?? [], written, [entry.library.machineName], false, path)
+  generate(entry, written, path = 'params', minor) {
+    return this.#of(entry, minor, () => this.fields(entry.semantics ?? [], written, [entry.library.machineName], false, path))
+  }
+
+  /**
+   * What a callback makes of a library's parameters, knowing whether the content names another
+   * minor of the library than its semantics are of.
+   * @template T
+   * @param {PackEntry} entry
+   * @param {number | undefined} minor
+   * @param {() => T} generate
+   * @returns {T}
+   */
+  #of(entry, minor, generate) {
+    const outer = this.#other
+    this.#other = minor === undefined || minor === entry.library.minorVersion ? null : { library: entry.library, minor }
+    try {
+      return generate()
+    } finally {
+      this.#other = outer
+    }
   }
 
   /** A sub-content id: random, or the caller's, numbered, where it wants the same bytes every run. */
   nextId() {
     this.ids += 1
     return this.options.id ? this.options.id(this.ids) : randomUUID()
+  }
+
+  /**
+   * The id of a part: saved, the one it has, unless H5P would not keep it or another part took it
+   * first; else a new one, as the editor gives new sub-content one (h5peditor-library.js,
+   * `loadLibrary`, and h5peditor-group.js, `initSubContent`).
+   * @param {unknown} saved
+   * @param {string} path the part's
+   */
+  #id(saved, path) {
+    let id = this.saved && typeof saved === 'string' && SUB_CONTENT_ID.test(saved) && !this.taken.has(saved) ? saved : undefined
+    if (this.saved && saved !== undefined && id === undefined) {
+      this.note(`${path}.subContentId`, typeof saved === 'string' && this.taken.has(saved)
+        ? 'is another part\'s id too, so this part has a new one'
+        : 'is not an id H5P keeps, so the part has a new one')
+    }
+    id ??= this.nextId()
+    this.taken.add(id)
+    return id
   }
 
   /** @param {string} path @param {string} message */
@@ -196,8 +271,10 @@ export class ContentGenerator {
    * @param {boolean} lenient inside an optional group nobody wrote: defaults only, as the editor
    *   saves a group left closed — and so nothing asked for a field required only within it
    * @param {string} path
+   * @param {string[]} [kept] saved, keys these fields do not name that are kept as they are: what
+   *   the group's own default carries, and a part's id
    */
-  fields(fields, written, stack, lenient, path) {
+  fields(fields, written, stack, lenient, path, kept = []) {
     /** @type {Record<string, unknown>} */
     const out = {}
     if (!this.lenient && written !== undefined && !isObject(written)) {
@@ -217,6 +294,10 @@ export class ContentGenerator {
       // it, which a sweep file may mean to test.
       if (this.lenient) {
         if (value !== null) out[key] = value
+      } else if (this.saved && kept.includes(key)) out[key] = value
+      else if (this.saved && this.#other) {
+        out[key] = value
+        this.note(`${path}.${key}`, otherMinor(this.#other))
       } else this.report(`${path}.${key}`, `is not a field here; the fields are ${names(fields)}`)
     }
     return out
@@ -260,17 +341,26 @@ export class ContentGenerator {
         if (field.widget && field.widget !== 'showWhen' && field.widget !== 'none') this.#draw(children)
         // Saved even when optional and untouched, as the editor saves every group in its form
         // (h5peditor-group.js): content types read into one without looking (Personality Quiz's
-        // `image.file`).
-        return this.fields(children, written, stack, optional && written === undefined, path)
+        // `image.file`). Saved, a group that holds nothing an author has to write is one of those,
+        // whoever wrote it, and nothing is asked of it either.
+        const closed = optional && (written === undefined || (this.saved && !holds(field, written)))
+        const kept = isObject(field.default) ? Object.keys(field.default) : []
+        if (field.isSubContent) kept.push('subContentId')
+        const value = this.fields(children, written, stack, closed, path, kept)
+        if (field.isSubContent) value.subContentId = this.#id(isObject(written) ? written.subContentId : undefined, path)
+        return value
       }
       case 'list': {
         const item = this.#copy(field.field, { optional: false })
         if (Array.isArray(written)) {
           if (!this.lenient) {
-            if (field.min !== undefined && written.length < field.min) this.report(path, `has ${written.length} item${written.length === 1 ? '' : 's'}; it takes at least ${field.min}`)
+            if (field.min !== undefined && written.length < field.min && !lenient) this.report(path, `has ${written.length} item${written.length === 1 ? '' : 's'}; it takes at least ${field.min}`)
             if (field.max !== undefined && written.length > field.max) this.report(path, `has ${written.length} items; it takes at most ${field.max}`)
           }
-          return this.#level([], {}, () => written.map((each, index) => this.field(item, each, stack, false, `${path}[${index}]`)).filter((each) => each !== undefined))
+          // Saved, an item that holds nothing an author has to write is one the editor started an
+          // optional list with, and nobody filled: nothing is asked of it.
+          return this.#level([], {}, () => written.map((each, index) =>
+            this.field(item, each, stack, lenient || (this.saved && field.optional === true && !holds(item, each)), `${path}[${index}]`)).filter((each) => each !== undefined))
         }
         if (written !== undefined && !this.lenient) {
           this.report(path, 'expected a list')
@@ -311,7 +401,8 @@ export class ContentGenerator {
         }
         return optional ? undefined : this.missing(field, stack, path)
       case 'text':
-        if (written !== undefined) return this.lenient ? written : this.text(field, written, path)
+        // Within what nothing is asked of, an empty text is what the editor saved there.
+        if (written !== undefined) return this.lenient ? written : this.text(lenient ? this.#optional(field) : field, written, path)
         // A default of null, which Course Presentation gives its colours, is stored as nothing: the
         // platforms' check would turn it into an empty text.
         if (field.default === null && !this.lenient) return undefined
@@ -326,6 +417,8 @@ export class ContentGenerator {
         // The editor's checkbox saves false when nobody ticked it (h5peditor-boolean.js).
         return written ?? field.default ?? false
       case 'select':
+        // Saved, an optional select left at the editor's empty choice holds "".
+        if (this.saved && optional && written === '') return written
         if (written !== undefined) return this.lenient ? written : this.select(field, written, path)
         if (field.default !== undefined) return structuredClone(field.default)
         return optional ? undefined : this.missing(field, stack, path)
@@ -463,6 +556,18 @@ export class ContentGenerator {
       this.report(`${path}.library`, `the library pack has no ${machineName}${major === undefined ? '' : ` ${major}.x`}`)
       return undefined
     }
+    if (this.saved) {
+      // As H5P keeps sub-content (validateLibrary): these four, and what the field adds.
+      const keys = ['library', 'params', 'subContentId', 'metadata', ...extraAttributes(field)]
+      for (const key of Object.keys(written)) if (!keys.includes(key)) this.report(`${path}.${key}`, `is not part of sub-content; H5P keeps ${keys.join(', ')}`)
+      if (written.metadata !== undefined) checkMetadata(written.metadata, `${path}.metadata`, (at, message) => this.report(at, message))
+      // Content a field gives as its default, Interactive Video's summary task, is as the editor
+      // started it until an author opens it, which saved content does not tell: what it holds is
+      // checked, and nothing asked of it.
+      const started = isObject(field?.default) && typeof field.default.library === 'string' && field.default.library.trim().split(/\s+/)[0] === machineName
+      const minor = match[3] === undefined ? undefined : Number(match[3])
+      return this.subContent(entry, written.params, written.metadata, stack, path, { id: written.subContentId, minor, closed: started })
+    }
     for (const key of Object.keys(written)) {
       if (!['library', 'params', 'metadata'].includes(key)) this.report(`${path}.${key}`, 'is not part of sub-content; write library, params and metadata')
     }
@@ -479,15 +584,20 @@ export class ContentGenerator {
    * @param {any} metadata its written metadata
    * @param {string[]} stack
    * @param {string} path
+   * @param {{ id?: unknown, minor?: number, closed?: boolean }} [saved] saved sub-content's id, the
+   *   minor of its library it names, and whether nothing is asked of it
    */
-  subContent(entry, written, metadata, stack, path) {
+  subContent(entry, written, metadata, stack, path, { id, minor, closed = false } = {}) {
+    const params = this.#of(entry, minor, () => this.fields(entry.semantics ?? [], written, [...stack, entry.library.machineName], closed, `${path}.params`))
     return {
       library: libraryString(entry.library),
-      params: this.fields(entry.semantics ?? [], written, [...stack, entry.library.machineName], false, `${path}.params`),
-      subContentId: this.nextId(),
-      metadata: this.options.metadata
-        ? this.options.metadata(entry, metadata, path)
-        : { contentType: entry.library.title, license: 'U', title: entry.library.title }
+      params,
+      subContentId: this.#id(id, path),
+      metadata: this.saved && isObject(metadata)
+        ? structuredClone(metadata)
+        : this.options.metadata
+          ? this.options.metadata(entry, metadata, path)
+          : { contentType: entry.library.title, license: 'U', title: entry.library.title }
     }
   }
 
@@ -503,7 +613,7 @@ export class ContentGenerator {
     }
     const stored = field.tags === undefined || field.tags === null
       ? plainText(written, (message) => this.note(path, message))
-      : markupText(written, field, (message) => this.report(path, message))
+      : markupText(written, field, (message) => this.report(path, message), { saved: this.saved })
     const length = Array.from(stored).length
     if (typeof field.maxLength === 'number' && length > field.maxLength) this.report(path, `is ${length} characters as stored; it takes at most ${field.maxLength}`)
     if (field.regexp?.pattern && !(stored === '' && field.optional)) {
@@ -563,7 +673,9 @@ export class ContentGenerator {
   /**
    * A written file: `{ "path": … }`, a file beside the source or a web address, with `copyright`
    * when known. A video or an audio field takes a list of them, one per format, or one alone.
-   * Checked for its shape here; the caller copies it and fills in its type and size.
+   * Checked for its shape here; the caller copies it and fills in its type and size. Saved, a file
+   * is as H5P stores it, its path in the package or a web address, and holds what the platforms
+   * keep of one.
    * @param {any} field
    * @param {unknown} written
    * @param {string} path
@@ -583,12 +695,19 @@ export class ContentGenerator {
     for (const [index, each] of list.entries()) {
       const at = many && Array.isArray(written) ? `${path}[${index}]` : path
       if (!isObject(each) || typeof each.path !== 'string' || !each.path.trim()) {
-        this.report(at, `expected a file, { "path": "picture.jpg" }, a file beside the source or a web address`)
+        this.report(at, this.saved
+          ? 'expected a file as H5P stores it, { "path": "images/picture.jpg", "mime": "image/jpeg" }'
+          : 'expected a file, { "path": "picture.jpg" }, a file beside the source or a web address')
         continue
       }
-      for (const key of Object.keys(each)) if (!['path', 'copyright'].includes(key)) this.report(`${at}.${key}`, 'is not part of a file here; write path and, when known, copyright')
+      if (this.saved) {
+        const keys = ['path', 'mime', 'copyright', ...(FILE_KEYS[field.type] ?? []), ...extraAttributes(field)]
+        for (const key of Object.keys(each)) if (!keys.includes(key)) this.report(`${at}.${key}`, `is not part of a file as H5P stores it; it keeps ${keys.join(', ')}`)
+        if (each.mime !== undefined && typeof each.mime !== 'string') this.report(`${at}.mime`, 'expected a MIME type, such as "image/jpeg"')
+        for (const key of ['width', 'height']) if (each[key] !== undefined && !(Number.isInteger(each[key]) && each[key] >= 0)) this.report(`${at}.${key}`, 'expected a whole number of pixels')
+      } else for (const key of Object.keys(each)) if (!['path', 'copyright'].includes(key)) this.report(`${at}.${key}`, 'is not part of a file here; write path and, when known, copyright')
       if (each.copyright !== undefined && !isObject(each.copyright)) this.report(`${at}.copyright`, 'expected an object, such as { "license": "CC BY", "author": "…" }')
-      const value = { ...each }
+      const value = this.saved ? structuredClone(each) : { ...each }
       this.media.push({ field, value, path: at })
       files.push(value)
     }
@@ -622,6 +741,41 @@ function libraryOptions(field) {
 /** @param {any} field */
 function optionNames(field) {
   return libraryOptions(field).map((option) => option.machineName)
+}
+
+/** What a field's semantics add to what the platforms keep of its value. @param {any} field @returns {string[]} */
+function extraAttributes(field) {
+  return Array.isArray(field?.extraAttributes) ? field.extraAttributes.filter((/** @type {unknown} */ name) => typeof name === 'string') : []
+}
+
+/**
+ * Whether a saved value holds something an author has to write: a value for a required field
+ * without a default, in it or in a group or list in it. What the editor saves for an author who
+ * never touched it holds nothing of the kind: an optional group left closed, with its defaults
+ * alone, and an empty text or list among them, as Interactive Video's editor saves an adaptivity
+ * nobody set; the item it starts an optional list with, as its text tracks.
+ * @param {any} field
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function holds(field, value) {
+  if (value === undefined || value === null || value === '') return false
+  if (field.type === 'list') return Array.isArray(value) && value.some((item) => holds(field.field ?? {}, item))
+  if (field.type !== 'group' || ((field.fields ?? []).length === 1 && !field.isSubContent)) return true
+  return isObject(value) && (field.fields ?? []).some((/** @type {any} */ child) =>
+    !child.optional && child.default === undefined && child.type !== 'boolean' && holds(child, value[child.name]))
+}
+
+/**
+ * Why saved content may hold a field the semantics it is checked against do not name.
+ * @param {{ library: any, minor: number }} other
+ */
+function otherMinor({ library, minor }) {
+  const named = `${library.majorVersion}.${minor}`
+  const served = `${library.majorVersion}.${library.minorVersion}`
+  return minor < library.minorVersion
+    ? `is not a field of ${libraryString(library)}; the content names ${named}, which the player upgrades to ${served} as it plays, and that may move it`
+    : `is not a field of ${libraryString(library)}; the content names ${named}, newer, which the player plays at ${served} without it`
 }
 
 /** @param {any} field @returns {string[]} */

@@ -2,8 +2,8 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { crc32, deflateSync } from 'node:zlib'
-import { BlobReader, Uint8ArrayWriter, ZipReader } from '@zip.js/zip.js'
-import { buildPackage, schemaOf } from '@missing-elements/h5p-author'
+import { BlobReader, TextWriter, Uint8ArrayWriter, ZipReader, type FileEntry } from '@zip.js/zip.js'
+import { buildPackage, checkContent, loadLibraries, packageLibraries, schemaOf } from '@missing-elements/h5p-author'
 import { verifyPackage } from '@missing-elements/h5p-verify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -105,8 +105,30 @@ async function playsBothWays(file: string) {
   }
 }
 
+/**
+ * The check a tool that edits a saved package runs on what it writes (#107), on what a build wrote:
+ * the content its `h5p.json` names, against the libraries it carries, comes back with nothing
+ * reported and nothing changed.
+ */
+async function checksAsSaved(file: string) {
+  const reader = new ZipReader(new BlobReader(new Blob([await readFile(file)])))
+  try {
+    const entries = new Map((await reader.getEntries()).filter((entry) => !entry.directory).map((entry) => [entry.filename, entry as FileEntry]))
+    const files = { names: entries.keys(), read: (name: string) => entries.get(name)!.getData(new TextWriter()) }
+    const manifest = JSON.parse(await files.read('h5p.json'))
+    const params = JSON.parse(await files.read('content/content.json'))
+    const main = manifest.preloadedDependencies.find((dependency: { machineName: string }) => dependency.machineName === manifest.mainLibrary)
+    const content = { type: `${main.machineName} ${main.majorVersion}.${main.minorVersion}`, language: manifest.language, params }
+    const checked = checkContent(await loadLibraries(await packageLibraries(files), content), content)
+    expect([checked.problems, checked.notes]).toEqual([[], []])
+    expect(checked.params).toEqual(params)
+  } finally {
+    await reader.close()
+  }
+}
+
 describe.concurrent('every type file', () => {
-  it.each(files)('%s: its example builds, and plays trusted and untrusted without warnings', async (file) => {
+  it.each(files)('%s: its example builds, checks as saved content unchanged, and plays trusted and untrusted without warnings', async (file) => {
     const source = await exampleOf(file)
     const folder = join(dir, file.slice(0, -'.md'.length))
     await mkdir(folder, { recursive: true })
@@ -114,6 +136,7 @@ describe.concurrent('every type file', () => {
     const output = join(folder, 'example.h5p')
     const result = await buildPackage(source, output, { base: folder })
     expect(result.notes).toEqual([])
+    await checksAsSaved(output)
     await playsBothWays(output)
   }, 180_000)
 
@@ -138,9 +161,10 @@ describe.concurrent('the quiz format', () => {
       questions: example.questions.map((question: { title: string }) => ({ ...question, title: `${question.title}'s "draft" <b> & co` }))
     }]
   ]
-  it.each(quizzes)('%s plays trusted and untrusted without warnings', async (name, source) => {
+  it.each(quizzes)('%s checks as saved content unchanged, and plays trusted and untrusted without warnings', async (name, source) => {
     const output = join(dir, `${name.replaceAll(' ', '-')}.h5p`)
     await buildPackage(source, output)
+    await checksAsSaved(output)
     await playsBothWays(output)
   }, 180_000)
 })

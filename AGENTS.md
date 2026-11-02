@@ -184,28 +184,35 @@ packages/author/          @missing-elements/h5p-author — a playable .h5p of an
                           source, published as a command (see *The author package*)
   bin/h5p-author.mjs        the command: `build` and `schema`
   lib/build.mjs             the source read and checked, the libraries loaded, the content generated,
-                            media copied, layouts run, the parts planned with the player's `planPack`,
-                            the archive written
+                            media copied, the content checked as saved, the parts planned with the
+                            player's `planPack`, the archive written
+  lib/check.mjs             `checkContent`: content in the form H5P saves it checked, the layouts' `after`
+                            run, for a tool that edits a saved package and for the build, which runs it
+                            last on what it writes (#107); no Node import of its own
   lib/libraries.mjs         `loadLibraries`: the libraries content brings in, loaded and localized as
-                            the build loads them, for the build and for a tool beside it; no Node
+                            the build loads them, for the build and for a tool beside it;
+                            `packageLibraries`, a package's own over the pack's (#107); no Node
                             import of its own, nor has lib/source-error.mjs, `SourceError` (#106)
   lib/generator.mjs         `ContentGenerator`: content from a type's `semantics.json`, authoring
-                            (every written value checked as the editor's form would) or lenient, as
-                            the sweep runs it; moved out of the demo on 2026-11-01 (#100)
+                            (every written value checked as the editor's form would), lenient, as
+                            the sweep runs it, or saved, as `checkContent` runs it; moved out of the
+                            demo on 2026-11-01 (#100)
   lib/types.mjs             what the editor's own widgets set and check, per content type: Course
                             Presentation's layout, Interactive Video's placement, Branching
                             Scenario's paths, Game Map's stages, Find the Hotspot's areas
-  lib/text.mjs, translate.mjs, media.mjs, pack.mjs, schema.mjs, quiz.mjs   text as H5P stores it; the
-                            libraries' translations; files and web addresses; the pinned pack read
-                            by part; the field list a source is written from; the first skill's
-                            quiz format, still built
+  lib/text.mjs, translate.mjs, media.mjs, metadata.mjs, pack.mjs, schema.mjs, quiz.mjs   text as H5P
+                            stores it; the libraries' translations; files and web addresses; the
+                            licences and roles H5P's metadata takes; the pinned pack read by part;
+                            the field list a source is written from; the first skill's quiz format,
+                            still built
   scripts/                  sync-skill.mjs writes the skill's type files' generated sections from the
                             pack (`pnpm --filter @missing-elements/h5p-author sync:skill`);
                             check-pack-published.mjs, the publish guard for the pinned pack and player
   tests/                    node tests: the generator, text and translations, layouts and schema, the
                             loader, builds with media from disk and a local server, the command, the
-                            quiz format; fixtures/ the quiz format's two examples, which apps/skills
-                            plays too; package-types.ts as for the normalizer
+                            quiz format, the check of saved content, the demo's packages among it;
+                            fixtures/ the quiz format's two examples, which apps/skills plays too;
+                            package-types.ts as for the normalizer
   types/                    generated, not in git: the declarations
 
 packages/cmi5/            @missing-elements/h5p-cmi5 — cmi5 for the element, published as a library
@@ -328,9 +335,11 @@ apps/skills/              the skills' test project, a project of the kind a skil
                           it installs the commands the skills run with npx, the author package and
                           the verifier, and the library pack; nothing in it ships. Out of the demo
                           since 2026-10-23, by the owner's choice
-  tests/author-verify.test.ts  every h5p-author type file's example built, with sample media, and
-                            played trusted and untrusted through the verifier's published API, each
-                            a pass with no warnings; each file's generated section compared with
+  tests/author-verify.test.ts  every h5p-author type file's example built, with sample media, checked
+                            as saved content against the libraries it carries with nothing reported
+                            and nothing changed (#107), and played trusted and untrusted through the
+                            verifier's published API, each a pass with no warnings; each file's
+                            generated section compared with
                             the pack's, so a pack refresh shows a change; and the quiz format, from
                             the author package's fixtures: both kinds, the eight-scenario example,
                             a quiz in Ukrainian and one whose titles and author carry quotes and
@@ -1989,9 +1998,10 @@ already holds text to the content check's rules, from the pack an untrusted chec
 `apps/skills` plays every example untrusted too. Measured on a five-question quiz, at four
 characters a token: `content.json` was about 3,470 tokens to write by hand, after reading 3,900 to
 9,500 of a type's semantics; the source is 1,000 to 1,800 tokens, written from a type file of 200
-to 3,000. Eight things the code does not say by itself:
+to 3,000. Nine things the code does not say by itself:
 
-- **One generator, two ways to run it.** `ContentGenerator` was the sweep's
+- **One generator, three ways to run it.** The third, `saved`, checks content as H5P stores it
+  (*Saved content is checked as the build checks what it writes*, below). `ContentGenerator` was the sweep's
   (`apps/demo/scripts/lib/sweep-content.mjs`), and moved here so there is one copy; the sweep runs
   it `lenient`, keeping what its files write as written and filling every required field from its
   own samples, and its 55 types came out byte for byte the same after the move. Authoring checks
@@ -2032,7 +2042,9 @@ to 3,000. Eight things the code does not say by itself:
   given ids and types, neighbours named by label made indices both ways; end screens numbered. It
   checks what those widgets would not let pass: a scenario node with no next, a link to no node, a
   loop no path leaves; a map with no start; a hotspot question with no right area. A hidden field
-  nothing set is reported. Lists such a widget draws start empty.
+  nothing set is reported. Lists such a widget draws start empty. All of that runs on content in
+  the form H5P stores it, in `checkContent`, so it holds saved content too; only a layout's
+  `before`, Game Map's, works on the source, turning its numbers and labels into the stored text.
 - **Media are copied and described.** A file is `{ path }`, beside the source or an `http(s)`
   address, downloaded at build time; it lands under `content/images|videos|audios|files/` with its
   MIME type, an image's size read from its header (PNG, JPEG, GIF, BMP; a JPEG's segments walked to
@@ -2074,9 +2086,42 @@ to 3,000. Eight things the code does not say by itself:
   first: `scripts/check-pack-published.mjs` refuses to publish until the pinned version is on npm
   and exports `./plan`, since a player published before it existed would install and fail on the
   first import. A tool beside the build takes what the build loads (`openPack`, and `loadLibraries` over
-  any source with the pack's members) and its rules for text; not the build's check, which reads a
-  source where a tool edits saved content (#107). The runtime's library-name parser, content check
-  and content upgrade stay out: they are GPL-3.0-only.
+  any source with the pack's members), its rules for text, and since #107 the check it runs last
+  (next bullet). The runtime's library-name parser, content check and content upgrade stay out:
+  they are GPL-3.0-only.
+- **Saved content is checked as the build checks what it writes** (2026-11-02, #107). A tool that
+  changes a saved package, the agent toolset's `apply` in embed-my/creator, could not take the
+  build's check, which reads a source: it refused every saved file (`mime`, `width`, `height`), every
+  part's metadata, a Game Map's stored stages and a field only an older minor has, and gave every
+  part a new `subContentId`, which the core names a part's statements by, so after each edit an LRS
+  would have counted every question as new. `checkContent` runs the generator `saved`: files and
+  metadata taken as saved and held to what the platforms keep of them (H5PContentValidator's
+  `_validateFilelike` and `validateLibrary`, and the licences the core's copyright dialog looks up
+  without a check, `lib/metadata.mjs`); each part's id kept, unless H5P would not keep it or an
+  earlier part has it, which copy and paste in the editor leaves; a markup field's text not wrapped
+  again. Then the layouts' `after`, the titles and the hidden fields nothing set, all moved out of
+  the build into it, and Game Map's checks with them, its `before` keeping only the conversion of a
+  source's numbers and labels. The build runs it last, on what it writes, and adds what it finds
+  except where the source has that problem already or the generator refused what was written
+  there, so the two hold content to one set of rules. The semantics, the owner's call the same day:
+  the package's own where it carries a library's major (`packageLibraries`, over the player's
+  `ownLibraries`), the pack's otherwise; where the content names another minor than the one checked
+  against, a field only that minor has is noted and kept, since the player upgrades it as it plays
+  (steps the runtime runs, GPL, in its frame) or plays newer content without it. Every type file's
+  example, built and then checked against its own libraries and against the pack, comes back with
+  nothing reported and nothing changed (`apps/skills`); the demo's packages report nothing but
+  `markup.h5p`'s markup, which it carries to be removed. Content written without its defaults, as
+  the demo's is, comes back with them, as the editor saves it. Run over the 88 real packages of the
+  owner's corpus, 61 report nothing; the others hold what their editor let an author save and the
+  build does not, a required alt text or scenario title left empty, keys an older editor wrote
+  (Drag and Drop's `dropZones[].type`, Branching Scenario's `contentId`), styles pasted from Word,
+  so a tool that changes one part keeps the problems under the paths it changed. Three things the
+  editor saves for an author who never touched them are taken as such, found on that corpus: an
+  optional group holding nothing an author has to write, empty texts in it included (Interactive
+  Video's adaptivity); the item it starts an optional list with (its subtitle track); and an
+  optional select at its empty choice (`goto.type: ""`). A group that is sub-content now gets an id
+  in a build too, as the editor's `initSubContent` gives one: Summary's statements and Single Choice
+  Set's choices had none, and Summary names a statement's statements by it.
 - **The skill's type files are partly generated.** `skills/h5p-author/references/types/<Type>.md`
   holds hand-written notes, an example, and the type's fields between two markers, written by
   `schemaOf(…, { markdown: true })`: names, kinds, defaults, options, list sizes, a markup field's
@@ -2110,8 +2155,9 @@ to 3,000. Eight things the code does not say by itself:
   out of the content. Both fields are still written, being hidden and required, and the runtime
   ignores the first and works the second out again.
 
-Not built: editing an existing package, layout for Drag and Drop and Crossword, and any judgement
-of whether content is right, which stays the person's, in the verifier's preview.
+Not built: editing an existing package, which a tool beside it does with `checkContent` as its
+check; layout for Drag and Drop and Crossword; and any judgement of whether content is right, which
+stays the person's, in the verifier's preview.
 
 ## The VS Code extension
 

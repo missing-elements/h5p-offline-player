@@ -98,10 +98,12 @@ export function hasMarkup(value) {
  * @param {string} value
  * @param {any} field
  * @param {(message: string) => void} report
+ * @param {{ saved?: boolean }} [options] `saved`, a value as H5P stores it: text without markup is
+ *   kept as it is, but for a lone `<` or `>`, where typed text is wrapped as the editor wraps it
  */
-export function markupText(value, field, report) {
+export function markupText(value, field, report, { saved = false } = {}) {
   const tags = allowedTags(field) ?? new Set()
-  if (!hasMarkup(value)) {
+  if (!hasMarkup(value) && !saved) {
     const block = blockTag(field)
     const paragraphs = value.trim().split(/\n[ \t]*\n+/).filter((paragraph) => paragraph.trim())
     if (!paragraphs.length) return ''
