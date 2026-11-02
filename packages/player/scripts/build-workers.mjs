@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { transform } from 'esbuild'
-import { buildJobsWorker, buildMountModule, buildServiceWorker, playerNotice } from './lib/worker-bundle.mjs'
+import { buildJobsWorker, buildMountModule, buildPlanModule, buildServiceWorker, playerNotice } from './lib/worker-bundle.mjs'
 
 /**
  * Builds the artefacts Vite's library build cannot produce.
@@ -10,7 +10,8 @@ import { buildJobsWorker, buildMountModule, buildServiceWorker, playerNotice } f
  * URL and has to run on a site with no build step at all. `dist/h5p-sw-mount.js` is the same
  * handlers as an ES module, for hosts that enforce a single worker per origin and mount ours
  * into theirs. `dist/h5p-jobs.js` is the Jobs worker the element otherwise spawns from a `blob:`
- * URL, for a page whose policy does not allow one.
+ * URL, for a page whose policy does not allow one. `dist/h5p-plan.js` is the player's library
+ * rules, `./plan`, for the packages that write what it plays.
  */
 
 const rootDir = resolve(import.meta.dirname, '..')
@@ -19,6 +20,7 @@ const distDir = resolve(rootDir, 'dist')
 await buildServiceWorker(resolve(distDir, 'h5p-sw.js'))
 await buildMountModule(resolve(distDir, 'h5p-sw-mount.js'))
 await buildJobsWorker(resolve(distDir, 'h5p-jobs.js'))
+await buildPlanModule(resolve(distDir, 'h5p-plan.js'))
 
 // Vite leaves an ES library's whitespace and comments alone on purpose: esbuild drops the
 // `/* @__PURE__ */` annotations when it minifies whitespace, and a consumer's bundler tree-shakes
@@ -43,4 +45,4 @@ await writeFile(
   'utf8'
 )
 
-console.log(`[build-workers] ${await sizeOf('h5p-player.js')} (minified after Vite), ${await sizeOf('h5p-sw.js')}, ${await sizeOf('h5p-sw-mount.js')}, ${await sizeOf('h5p-jobs.js')}`)
+console.log(`[build-workers] ${await sizeOf('h5p-player.js')} (minified after Vite), ${await sizeOf('h5p-sw.js')}, ${await sizeOf('h5p-sw-mount.js')}, ${await sizeOf('h5p-jobs.js')}, ${await sizeOf('h5p-plan.js')}`)

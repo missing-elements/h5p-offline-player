@@ -8,7 +8,7 @@ import { promisify } from 'node:util'
 import { BlobReader, TextWriter, Uint8ArrayWriter, ZipReader } from '@zip.js/zip.js'
 import { pack } from '@missing-elements/h5p-libraries'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { buildPackage, SourceError } from '../lib/author.mjs'
+import { buildPackage, librariesIn, SourceError } from '../lib/author.mjs'
 import { readSource } from '../lib/build.mjs'
 import { MediaStore } from '../lib/media.mjs'
 import { quizProblems } from '../lib/quiz.mjs'
@@ -305,6 +305,34 @@ describe('any content type in the pack', () => {
     expect(content.content[0].content).toMatchObject({ library: expect.stringMatching(/^H5P\.TrueFalse 1\.\d+$/), metadata: { title: 'The Rhine', contentType: 'True/False Question' } })
     expect(content.content[1].content.metadata.title).toBe('Text')
     expect(manifest.preloadedDependencies.map(({ machineName }: { machineName: string }) => machineName)).toEqual(expect.arrayContaining(['H5P.Column', 'H5P.TrueFalse', 'H5P.AdvancedText']))
+  })
+
+  it('lists the libraries depth first from the content type, the order the runtime keeps between libraries that do not depend on each other', async () => {
+    const { content, manifest, files } = await build({
+      ...META,
+      type: 'H5P.Column',
+      params: { content: [{ content: { library: 'H5P.TrueFalse', params: { question: 'The Rhine reaches the sea.' } } }, { content: { library: 'H5P.AdvancedText', params: { text: 'Done.' } } }] }
+    })
+    // The order the build has always written, from the libraries the zip carries: the content type,
+    // then each library the content names, each followed by its own dependencies before the next.
+    const libraries = new Map<string, { preloadedDependencies?: { machineName: string }[] }>()
+    for (const [name, json] of files) {
+      if (!name.endsWith('/library.json')) continue
+      const library = JSON.parse(json)
+      libraries.set(library.machineName, library)
+    }
+    const expected: string[] = []
+    const visit = (machineName: string) => {
+      if (expected.includes(machineName)) return
+      expected.push(machineName)
+      for (const dependency of libraries.get(machineName)?.preloadedDependencies ?? []) visit(dependency.machineName)
+    }
+    for (const name of ['H5P.Column', ...librariesIn(content)]) visit(name.split(' ')[0])
+    const listed = manifest.preloadedDependencies.map(({ machineName }: { machineName: string }) => machineName)
+    expect(listed).toEqual(expected)
+    // Depth first, not breadth first: True/False's own dependencies come before the text beside it.
+    const [dependency] = libraries.get('H5P.TrueFalse')!.preloadedDependencies!
+    expect(listed.indexOf(dependency.machineName)).toBeLessThan(listed.indexOf('H5P.AdvancedText'))
   })
 
   it('adds the formula addon the pack carries when the text holds LaTeX, as a site with it installed exports it', async () => {

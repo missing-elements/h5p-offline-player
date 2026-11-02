@@ -133,7 +133,9 @@ warning can come in any release.
   with the pack.
 - Exports and files this page does not name: a package's other exports, the rest of the
   player's `dist/`, the files inside the runtime's. Nor anything reached by a path a package does
-  not export.
+  not export. Among them the player's `./plan`, its library rules for the packages of this
+  repository that write what it plays, which depend on an exact version of the player for that
+  reason.
 - The demo site, including `/app/` and `/embed` there, and this repository's scripts and
   workflows.
 

@@ -93,6 +93,9 @@ importers:
       '@missing-elements/h5p-normalize':
         specifier: workspace:^
         version: link:../normalize
+      '@missing-elements/h5p-offline-player':
+        specifier: workspace:*
+        version: link:../player
       '@zip.js/zip.js':
         specifier: ^2.24.0
         version: 2.24.0

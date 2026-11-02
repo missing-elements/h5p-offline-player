@@ -95,6 +95,20 @@ export async function buildJobsWorker(outfile) {
 }
 
 /**
+ * `h5p-plan.js`: the player's library rules (`src/plan.ts`) as an ES module, for the packages that
+ * write what it plays, in Node or a page. Not minified, so that a stack trace in a caller names the
+ * function; it is a few kilobytes. It must stay free of zip.js, which a careless import of
+ * `package-reader.ts` would bring along with its side effects, so the build fails on one.
+ */
+export async function buildPlanModule(outfile) {
+  const { banner, plugins, minify, ...options } = await shared()
+  const result = await build({ ...options, platform: 'neutral', banner: { js: await playerNotice() }, plugins: [], metafile: true, entryPoints: [resolve(rootDir, 'src/plan.ts')], outfile, format: 'esm' })
+  const zipJs = Object.keys(result.metafile.inputs).find((input) => input.includes('@zip.js'))
+  if (zipJs) throw new Error(`[plan] dist/h5p-plan.js must not bundle zip.js, and imports ${zipJs}`)
+  return result
+}
+
+/**
  * Resolves `@missing-elements/h5p-offline-player/sw` to the mount's source, the way the demo's
  * Vite config resolves the element's name, so a worker in this repository imports the handlers
  * by the name a host uses and is still built from source.

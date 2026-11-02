@@ -1,5 +1,6 @@
 import type { LibraryLoad } from '../shared/protocol.js'
-import { dependenciesIn, type LibraryDependency, type PackageManifest } from './package-reader.js'
+import { dependenciesIn, type LibraryDependency } from '../shared/content-libraries.js'
+import type { PackageManifest } from './package-reader.js'
 
 /**
  * What the frame loads, and in what order: every library the content needs, its scripts and its

@@ -8,10 +8,17 @@
  */
 import { H5PPlayerElement, type PackageMetadata, type PlayerErrorDetail, type ReadyDetail } from '@missing-elements/h5p-offline-player'
 import { mountH5P } from '@missing-elements/h5p-offline-player/sw'
+import { librariesNamedIn, planPack, type PackPlan } from '@missing-elements/h5p-offline-player/plan'
 
 export function asACallerWould(worker: ServiceWorkerGlobalScope): string[] {
   const player: H5PPlayerElement | null = document.querySelector('h5p-player')
   mountH5P(worker, { scope: '/h5p/' })
+
+  // The library rules, as h5p-author runs them.
+  const roots = librariesNamedIn({ library: 'H5P.Blanks 1.14' }).map(({ machineName, majorVersion, minorVersion }) => ({ machineName, majorVersion: Number(majorVersion), minorVersion: Number(minorVersion) }))
+  const plan: PackPlan | null = planPack({ own: [], provided: [], roots, params: {}, pack: [], refresh: false, fill: true })
+  // @ts-expect-error the parts are a list
+  const parts: PackPlan['parts'] = 'H5P.Blanks-1.14'
 
   // @ts-expect-error not an error code
   const code: PlayerErrorDetail['code'] = 'offline'
@@ -22,6 +29,6 @@ export function asACallerWould(worker: ServiceWorkerGlobalScope): string[] {
   // @ts-expect-error the title is a string
   const title: PackageMetadata['title'] = 1
 
-  void [player, code, folders, source, title]
+  void [player, code, folders, source, title, plan, parts]
   return player?.libraryBundle?.refreshed?.map(({ library, to }) => `${library} ${to}`) ?? []
 }

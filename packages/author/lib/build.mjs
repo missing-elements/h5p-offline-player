@@ -4,13 +4,17 @@ import { dirname, join, resolve } from 'node:path'
 import { Readable, Writable } from 'node:stream'
 import { TextReader, ZipWriter } from '@zip.js/zip.js'
 import { normalizeArchive } from '@missing-elements/h5p-normalize'
-import { ContentGenerator, librariesIn, libraryString } from './generator.mjs'
+import { librariesNamedIn, planPack } from '@missing-elements/h5p-offline-player/plan'
+import { ContentGenerator } from './generator.mjs'
+import { loadLibraries } from './libraries.mjs'
 import { MediaStore } from './media.mjs'
 import { openPack } from './pack.mjs'
 import { quizProblems, quizSource } from './quiz.mjs'
+import { SourceError } from './source-error.mjs'
 import { escapeText } from './text.mjs'
-import { localize, translationFiles } from './translate.mjs'
-import { LAYOUTS, patchSemantics, placesOf } from './types.mjs'
+import { LAYOUTS, placesOf } from './types.mjs'
+
+export { SourceError }
 
 /**
  * A source made a package: validated, filled in from the pack's semantics and translations,
@@ -40,16 +44,6 @@ const ROLES = ['Author', 'Editor', 'Licensee', 'Originator']
  *   `libraries`, a library pack's parts folder in place of the pinned pack; `base`, the folder a
  *   source's file paths are read from; `fetch`, for media named by web address
  */
-
-/** A source's problems, all of them, each named by its path. */
-export class SourceError extends Error {
-  /** @param {Problem[]} problems */
-  constructor(problems) {
-    super(`The source has ${problems.length} problem${problems.length === 1 ? '' : 's'}:\n${problems.map(({ path, message }) => `  ${path}: ${message}`).join('\n')}`)
-    this.name = 'SourceError'
-    this.problems = problems
-  }
-}
 
 /** @param {unknown} value @returns {value is Record<string, any>} */
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -102,128 +96,49 @@ export function readSource(input) {
 }
 
 /**
- * The libraries a source can bring in, opened and localized before generation: the content type,
- * every library the written parameters name, and every one a library field names as its default.
+ * The libraries a package carries: what the content names, what those need in turn, and the addons
+ * the pack has whose pattern its text matches, as a site with the addon installed exports it. It is
+ * the player's own plan (`planPack`) for a package that carries nothing yet, so that a package
+ * carries the parts the player would take from the pack for it. The plan leaves out what the pack
+ * cannot supply, which a package would then miss as it played, so that is checked.
  * @param {import('./pack.mjs').Pack} pack
- * @param {Source} source
- * @param {(path: string, message: string) => void} report
- */
-async function loadLibraries(pack, source, report) {
-  /** @type {Map<string, { folder: string, library: any, semantics: any[] | null }>} */
-  const entries = new Map()
-  /** @type {TranslationReport[]} */
-  const translations = []
-  /** @type {Map<string, import('./pack.mjs').PartLibrary>} */
-  const parts = new Map()
-  const main = /^(\S+?)(?:\s+(\d+)\.\d+)?$/.exec(source.type)
-  const mainEntry = main ? pack.newest(main[1], main[2] === undefined ? undefined : Number(main[2])) : null
-  if (!mainEntry) {
-    report('type', `the library pack has no content type ${source.type}`)
-    return null
-  }
-  /** @type {{ machineName: string, major?: number }[]} */
-  const queue = [{ machineName: mainEntry.machineName, major: mainEntry.majorVersion }]
-  /** @param {unknown} value */
-  const named = (value) => {
-    if (Array.isArray(value)) value.forEach(named)
-    else if (isObject(value)) {
-      const match = typeof value.library === 'string' ? /^\s*(\S+?)(?:\s+(\d+)\.\d+)?\s*$/.exec(value.library) : null
-      // A name without a version is resolved by the field's options, which may name any major the
-      // pack has: each is loaded.
-      if (match && match[2] !== undefined) queue.push({ machineName: match[1], major: Number(match[2]) })
-      else if (match) for (const entry of pack.libraries) if (entry.machineName === match[1]) queue.push({ machineName: match[1], major: entry.majorVersion })
-      Object.values(value).forEach(named)
-    }
-  }
-  named(source.params)
-  /** @param {any[]} fields */
-  const defaults = (fields) => {
-    for (const field of fields) {
-      if (field.type === 'library' && isObject(field.default)) named(field.default)
-      if (field.fields) defaults(field.fields)
-      if (field.field) defaults([field.field])
-    }
-  }
-  while (queue.length) {
-    const { machineName, major } = /** @type {{ machineName: string, major?: number }} */ (queue.shift())
-    const entry = pack.newest(machineName, major)
-    if (!entry || parts.has(entry.folder)) continue
-    const part = await pack.open(entry)
-    parts.set(entry.folder, part)
-    let semantics = part.semantics
-    if (semantics) {
-      const files = translationFiles([...part.translations.keys()], source.language).map((name) => ({ name, read: () => pack.translation(part, name) }))
-      const localized = await localize(semantics, files, libraryString(part.library))
-      semantics = patchSemantics(part.library.machineName, localized.semantics)
-      if (part.library.runnable || entry === mainEntry) translations.push(localized.report)
-      defaults(semantics)
-    }
-    entries.set(entry.folder, { folder: entry.folder, library: part.library, semantics })
-  }
-  // Every library the index knows stays findable, so a name the pre-pass did not see is reported
-  // as a library of the pack and not as an unknown one; its semantics are read when it is found.
-  for (const entry of pack.libraries) {
-    if (!entries.has(entry.folder)) entries.set(entry.folder, { folder: entry.folder, library: { machineName: entry.machineName, majorVersion: entry.majorVersion, minorVersion: entry.minorVersion, title: entry.machineName }, semantics: null })
-  }
-  return { entries, mainEntry, translations, parts }
-}
-
-/**
- * The libraries a package carries: what the content names, its dependencies, and the addons the
- * pack has whose pattern its text matches, as a site with the addon installed exports it.
- * @param {import('./pack.mjs').Pack} pack
- * @param {string[]} named library strings, the main library first
+ * @param {any} main the content type's `library.json`
  * @param {Record<string, unknown>} content
  */
-async function closure(pack, named, content) {
+async function closure(pack, main, content) {
+  const roots = [main, ...librariesNamedIn(content)].map(({ machineName, majorVersion, minorVersion }) => ({ machineName, majorVersion: Number(majorVersion), minorVersion: Number(minorVersion) }))
+  /** @param {unknown} params */
+  const plan = (params) => (planPack({ own: [], provided: [], roots, params, pack: pack.libraries, refresh: false, fill: true })?.parts ?? [])
+    .map((part) => /** @type {import('./pack.mjs').IndexEntry} */ (pack.libraries.find((entry) => entry.folder === part.folder)))
+  const planned = plan(content)
+  /** @param {{ machineName: string, majorVersion: string | number, minorVersion: string | number }} dependency */
+  const supplied = (dependency) => planned.some((entry) => entry.machineName === dependency.machineName && entry.majorVersion === Number(dependency.majorVersion) && entry.minorVersion >= Number(dependency.minorVersion))
+  for (const dependency of [...roots, ...planned.flatMap((entry) => entry.preloadedDependencies ?? [])]) {
+    if (!supplied(dependency)) throw new Error(`The library pack cannot supply ${dependency.machineName} ${dependency.majorVersion}.${dependency.minorVersion}`)
+  }
+  // Listed as the build has always listed them, depth first from the content type with each
+  // library's dependencies after it, the addons last: the runtime sorts libraries by their
+  // dependencies and keeps this order between two that do not depend on each other, which decides
+  // whose stylesheet comes later.
+  const byLibrary = new Map(planned.map((entry) => [`${entry.machineName} ${entry.majorVersion}`, entry]))
+  /** @type {Map<string, import('./pack.mjs').IndexEntry>} */
+  const ordered = new Map()
+  /** @param {{ machineName: string, majorVersion: string | number }} dependency */
+  const visit = (dependency) => {
+    const entry = byLibrary.get(`${dependency.machineName} ${Number(dependency.majorVersion)}`)
+    if (!entry || ordered.has(entry.folder)) return
+    ordered.set(entry.folder, entry)
+    for (const each of entry.preloadedDependencies ?? []) visit(each)
+  }
+  for (const each of [...roots, ...planned]) visit(each)
   /** @type {Map<string, import('./pack.mjs').PartLibrary>} */
   const selected = new Map()
-  /** @param {string} machineName @param {number} [major] @param {number} [minor] */
-  const use = async (machineName, major, minor = 0) => {
-    const entry = pack.newest(machineName, major)
-    if (!entry || entry.minorVersion < minor) throw new Error(`The library pack cannot supply ${machineName} ${major ?? ''}.${minor}`)
-    if (selected.has(entry.folder)) return
-    const part = await pack.open(entry)
-    selected.set(entry.folder, part)
-    for (const dependency of [...(part.library.preloadedDependencies ?? []), ...(part.library.dynamicDependencies ?? [])]) {
-      await use(dependency.machineName, Number(dependency.majorVersion), Number(dependency.minorVersion))
-    }
-  }
-  for (const name of named) {
-    const [machineName, version] = name.split(' ')
-    const [major, minor] = version.split('.').map(Number)
-    await use(machineName, major, minor)
-  }
-  const addons = []
-  for (const entry of pack.libraries) {
-    const patterns = entry.addTo?.content?.types ?? []
-    for (const type of patterns) {
-      const regex = type?.text?.regex
-      if (typeof regex !== 'string') continue
-      const match = /^\/(.*)\/([a-z]*)$/s.exec(regex)
-      if (!match) continue
-      let pattern
-      try {
-        pattern = new RegExp(match[1], match[2].replace(/[^imsuy]/g, ''))
-      } catch {
-        continue
-      }
-      if (strings(content).some((each) => pattern.test(each))) {
-        addons.push(entry)
-        break
-      }
-    }
-  }
-  for (const addon of addons) await use(addon.machineName, addon.majorVersion, addon.minorVersion)
-  return { selected, addons: addons.map((addon) => `${addon.machineName} ${addon.majorVersion}.${addon.minorVersion}`) }
-}
-
-/** Every string in a value. @param {unknown} value @param {string[]} [found] */
-function strings(value, found = []) {
-  if (typeof value === 'string') found.push(value)
-  else if (Array.isArray(value)) value.forEach((item) => strings(item, found))
-  else if (isObject(value)) Object.values(value).forEach((item) => strings(item, found))
-  return found
+  for (const entry of ordered.values()) selected.set(entry.folder, await pack.open(entry))
+  // Planned without the parameters, nothing matches an addon's pattern: what they add are the
+  // addons, and of what they add, the addons alone, not what an addon would need in turn.
+  const plain = new Set(plan(undefined).map((entry) => entry.folder))
+  const addons = planned.filter((entry) => entry.addTo !== undefined && !plain.has(entry.folder)).map((entry) => `${entry.machineName} ${entry.majorVersion}.${entry.minorVersion}`)
+  return { selected, addons }
 }
 
 /**
@@ -257,9 +172,8 @@ export async function buildPackage(input, output, options = {}) {
     const notes = []
     const report = (/** @type {string} */ path, /** @type {string} */ message) => problems.push({ path, message })
     const note = (/** @type {string} */ path, /** @type {string} */ message) => notes.push({ path, message })
-    const loaded = await loadLibraries(pack, source, report)
-    if (!loaded) throw new SourceError(problems)
-    const { entries, mainEntry, translations } = loaded
+    const { entries, main: mainLibrary, translations } = await loadLibraries(pack, source)
+    const main = mainLibrary.library.machineName
     const authors = source.authors.map((author) => ({ name: escapeText(author.name), role: author.role }))
     const generator = new ContentGenerator(entries, {
       metadata(entry, written, path) {
@@ -275,8 +189,6 @@ export async function buildPackage(input, output, options = {}) {
         }
       }
     })
-    const main = /** @type {NonNullable<typeof mainEntry>} */ (mainEntry)
-    const mainLibrary = /** @type {{ folder: string, library: any, semantics: any[] | null }} */ (entries.get(main.folder))
     if (!mainLibrary.semantics) report('type', `${source.type} has no semantics: it is not a content type an author fills in`)
     else if (!mainLibrary.library.runnable) report('type', `${mainLibrary.library.machineName} is a part other content holds, not a content type on its own: put it in one, such as H5P.Column`)
 
@@ -295,7 +207,7 @@ export async function buildPackage(input, output, options = {}) {
       }
     }
     const written = structuredClone(source.params)
-    for (const place of placesOf(main.machineName, written)) LAYOUTS[place.library]?.before?.(place.params, place.path, context(place.library))
+    for (const place of placesOf(main, written)) LAYOUTS[place.library]?.before?.(place.params, place.path, context(place.library))
 
     const content = generator.generate(mainLibrary, written)
     problems.push(...generator.problems)
@@ -311,8 +223,8 @@ export async function buildPackage(input, output, options = {}) {
     }
 
     // Layouts that set what the editor's widgets set, and check what they would not let pass.
-    for (const place of placesOf(main.machineName, content)) LAYOUTS[place.library]?.after?.(place.params, place.path, context(place.library))
-    for (const place of placesOf(main.machineName, content)) {
+    for (const place of placesOf(main, content)) LAYOUTS[place.library]?.after?.(place.params, place.path, context(place.library))
+    for (const place of placesOf(main, content)) {
       if (place.holder && isObject(place.holder.metadata) && place.holder.metadata.title === undefined) place.holder.metadata.title = place.holder.metadata.contentType
     }
     for (const { field, path } of generator.unset) {
@@ -320,8 +232,7 @@ export async function buildPackage(input, output, options = {}) {
     }
     if (problems.length) throw new SourceError(problems)
 
-    const named = [libraryString(mainLibrary.library), ...[...librariesIn(content)].filter((name) => name !== libraryString(mainLibrary.library))]
-    const { selected, addons } = await closure(pack, named, content)
+    const { selected, addons } = await closure(pack, mainLibrary.library, content)
     if (addons.length) notes.push({ path: 'params', message: `its text matches ${addons.join(', ')}, which the package carries, as a site with it installed would add it` })
 
     // As H5P's exports write it, unescaped: the platforms check it when they load content.
@@ -348,7 +259,7 @@ export async function buildPackage(input, output, options = {}) {
       const writer = new ZipWriter(Writable.toWeb(file.createWriteStream()), { useWebWorkers: false })
       await writer.add('h5p.json', new TextReader(JSON.stringify(manifest)))
       for (const part of selected.values()) {
-        await writer.appendZip(part.file, { filter: (entry) => !entry.directory && entry.filename.startsWith(`${part.folder}/`) })
+        await writer.appendZip(pack.archiveOf(part), { filter: (entry) => !entry.directory && entry.filename.startsWith(`${part.folder}/`) })
       }
       await writer.add('content/content.json', new TextReader(JSON.stringify(content)))
       for (const item of media.files) {

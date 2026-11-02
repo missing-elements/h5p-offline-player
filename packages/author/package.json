@@ -42,17 +42,18 @@
     "agent-skill"
   ],
   "scripts": {
-    "test": "vitest run",
-    "test:unit": "vitest run",
+    "test": "pnpm --filter @missing-elements/h5p-offline-player build:plan && vitest run",
+    "test:unit": "pnpm --filter @missing-elements/h5p-offline-player build:plan && vitest run",
     "typecheck": "pnpm types && tsc -p tsconfig.json",
     "sync:skill": "node scripts/sync-skill.mjs",
     "prepack": "node -e \"require('node:fs').copyFileSync('../../LICENSE', 'LICENSE')\" && pnpm types",
     "prepublishOnly": "node -e \"if (!/^pnpm\\//.test(process.env.npm_config_user_agent || '')) { console.error('Publish with pnpm publish: npm would ship the workspace: dependency ranges as they are, and the package would not install.'); process.exit(1) }\" && node scripts/check-pack-published.mjs && pnpm typecheck && pnpm test",
-    "types": "node -e \"require('node:fs').rmSync('types', { recursive: true, force: true })\" && tsc -p tsconfig.types.json"
+    "types": "pnpm --filter @missing-elements/h5p-offline-player exec tsc -b && node -e \"require('node:fs').rmSync('types', { recursive: true, force: true })\" && tsc -p tsconfig.types.json"
   },
   "dependencies": {
     "@missing-elements/h5p-libraries": "workspace:*",
     "@missing-elements/h5p-normalize": "workspace:^",
+    "@missing-elements/h5p-offline-player": "workspace:*",
     "@zip.js/zip.js": "^2.24.0"
   },
   "devDependencies": {

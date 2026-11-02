@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { filesIn, libraryLoad, loadOrder, toposort, walkLibraries, type LibraryLookup } from '../../src/sw/library-load'
-import type { LibraryDependency } from '../../src/sw/package-reader'
+import type { LibraryDependency } from '../../src/shared/content-libraries'
 
 /**
  * The order the frame loads libraries in has to be h5p-standalone's, which every content type has

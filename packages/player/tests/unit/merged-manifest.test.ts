@@ -1,6 +1,7 @@
 import { memoryHandle, zipOf } from './helpers/archives'
 import { describe, expect, it } from 'vitest'
-import { PackageReader, addonPatterns, librariesNamedIn, textMatches } from '../../src/sw/package-reader'
+import { addonPatterns, librariesNamedIn, textMatches } from '../../src/shared/content-libraries'
+import { PackageReader } from '../../src/sw/package-reader'
 import type { SourceHandle } from '../../src/shared/source'
 
 /**
