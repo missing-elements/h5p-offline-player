@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -96,10 +97,11 @@ describe('the build in a page', () => {
     const node = await buildInNode(BLANKS, join(dir, 'blanks.h5p'))
     expect(page.blob.type).toBe('application/zip')
     expect([page.manifest, page.content, page.libraries, page.notes, page.media]).toEqual([node.manifest, node.content, node.libraries, node.notes, node.media])
+    // Each file by its name and hash, in order: comparing the bytes themselves with toEqual takes seconds.
+    const hashes = ({ files }: { files: Map<string, Uint8Array> }) => [...files].map(([name, bytes]) => [name, createHash('sha256').update(bytes).digest('hex')])
     const fromPage = await archive(new Uint8Array(await page.blob.arrayBuffer()))
     const fromNode = await archive(new Uint8Array(await readFile(node.output)))
-    expect([...fromPage.files.keys()]).toEqual([...fromNode.files.keys()])
-    for (const [name, bytes] of fromPage.files) expect(bytes, name).toEqual(fromNode.files.get(name))
+    expect(hashes(fromPage)).toEqual(hashes(fromNode))
   })
 
   it('stores media last, with their size and CRC in their local headers, and describes them as H5P records them', async () => {
