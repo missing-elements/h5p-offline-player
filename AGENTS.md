@@ -95,8 +95,8 @@ packages/player/          @missing-elements/h5p-offline-player — the published
       warm.ts               walks the library spans off one ranged request each and caches their entries
   scripts/                  sync-h5p-assets (builds the runtime package and copies its dist/ to public/frame-assets/,
                             writes frame-fonts.ts and pack-index.ts, stamps the versions), build-workers,
-                            build-plan (dist/h5p-plan.js alone, which `prepare:dev` and h5p-author's tests
-                            run, since h5p-author imports it), build-fixtures, prepack;
+                            build-plan (dist/h5p-plan.js alone, which `prepare:dev`, h5p-author's tests
+                            and its `sync:skill` run, since h5p-author imports it), build-fixtures, prepack;
                             scripts/lib/worker-bundle.mjs builds both workers, and a host's own worker with the
                             handlers mounted (the demo uses it for h5p-sw.js and the app's sw.js)
   vite.config.ts            the library build and the test runner
