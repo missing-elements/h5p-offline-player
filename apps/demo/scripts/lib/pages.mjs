@@ -13,6 +13,7 @@ export const PAGES = [
   { name: 'normalize', file: 'demo/normalize.html', path: '/demo/normalize.html' },
   { name: 'xapi', file: 'demo/xapi.html', path: '/demo/xapi.html' },
   { name: 'cmi5', file: 'demo/cmi5.html', path: '/demo/cmi5.html' },
+  { name: 'scorm', file: 'demo/scorm.html', path: '/demo/scorm.html' },
   { name: 'local-file', file: 'demo/local-file.html', path: '/demo/local-file.html' },
   { name: 'two-players', file: 'demo/two-players.html', path: '/demo/two-players.html' },
   { name: 'demo-embed', file: 'demo/embed.html', path: '/demo/embed.html' }

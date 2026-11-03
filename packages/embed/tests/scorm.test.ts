@@ -8,20 +8,20 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join, normalize, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { crc32 } from 'node:zlib'
-import { BlobReader, BlobWriter, TextWriter, Uint8ArrayReader, Uint8ArrayWriter, ZipReader, ZipWriter } from '@zip.js/zip.js'
+import { BlobReader, ZipReader } from '@zip.js/zip.js'
 import { chromium, type Browser, type BrowserContext, type Frame, type Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { EmbedError } from '../lib/build.mjs'
 import { buildScorm } from '../lib/scorm.mjs'
+import { changedQuiz, entriesOf, formulas, quiz } from './helpers/zip.js'
 
 /**
  * The SCORM package `--scorm` writes: what is in the zip and what is refused, in Node; and in
  * Chromium, the launch page framed by a stand-in for an LMS's player page, which puts the SCORM
- * 1.2 API in its window and keeps the values, as Moodle's does, across launches.
+ * 1.2 API in its window and keeps the values, as Moodle's does, across launches. The same zip
+ * built in a page is `scorm-browser.test.ts`'s and `scorm-page.test.ts`'s.
  */
 
-const quiz = resolve(import.meta.dirname, '../../../apps/demo/demo/content/quiz.h5p')
-const formulas = resolve(import.meta.dirname, '../../../apps/demo/demo/content/formulas.h5p')
 const bin = resolve(import.meta.dirname, '../bin/h5p-embed.mjs')
 let dir: string
 
@@ -31,38 +31,6 @@ beforeAll(async () => {
 afterAll(async () => {
   await rm(dir, { recursive: true, force: true })
 })
-
-/** A zip's entries, by name, with a way to read each as text. */
-async function entriesOf(path: string) {
-  const reader = new ZipReader(new BlobReader(new Blob([await readFile(path)])))
-  const entries = await reader.getEntries()
-  const file = (name: string) => {
-    const entry = entries.find((candidate) => candidate.filename === name)
-    if (!entry || entry.directory) throw new Error(`${name} is not in ${path}`)
-    return entry
-  }
-  const text = async (name: string) => file(name).getData!(new TextWriter())
-  const bytes = async (name: string) => file(name).getData!(new Uint8ArrayWriter())
-  return { names: entries.filter((entry) => !entry.directory).map((entry) => entry.filename), text, bytes, close: () => reader.close() }
-}
-
-/** The quiz, changed: its `h5p.json` edited, and the entries `drop` names left out. */
-async function changedQuiz(path: string, edit: (manifest: Record<string, any>) => void, drop: (name: string) => boolean = () => false) {
-  const reader = new ZipReader(new BlobReader(new Blob([await readFile(quiz)])))
-  const writer = new ZipWriter(new BlobWriter('application/zip'))
-  for (const entry of await reader.getEntries()) {
-    if (entry.directory || drop(entry.filename)) continue
-    let bytes = await entry.getData!(new Uint8ArrayWriter())
-    if (entry.filename === 'h5p.json') {
-      const manifest = JSON.parse(new TextDecoder().decode(bytes))
-      edit(manifest)
-      bytes = new TextEncoder().encode(JSON.stringify(manifest))
-    }
-    await writer.add(entry.filename, new Uint8ArrayReader(bytes))
-  }
-  await reader.close()
-  await writeFile(path, new Uint8Array(await (await writer.close()).arrayBuffer()))
-}
 
 describe('the package', () => {
   it('carries the launch page, the player, the runtime and the package, every file in the manifest', async () => {

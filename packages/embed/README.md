@@ -3,7 +3,8 @@
 Writes the H5P embed page as a static site for a player domain of your own. Any site then embeds
 a package with an iframe and one script line. No H5P server, no backend, no third-party service.
 With `--scorm`, it writes one package as a SCORM zip instead, for an LMS such as Moodle, ILIAS,
-OpenOLAT or Chamilo to play and grade (see
+OpenOLAT or Chamilo to play and grade, and the site it writes carries a page that builds the same
+zip in the browser, for anyone with a `.h5p` and no terminal (see
 [A SCORM package, for an LMS](#a-scorm-package-for-an-lms)).
 
 Needs Node 22 or later. Write `@latest`: without it, npm on an older Node quietly installs the
@@ -159,6 +160,14 @@ complete such an activity on viewing it instead. Replacing the zip with one writ
 `.h5p`, or with other libraries from the pack, starts learners over, since their saved state
 belongs to what it was saved in.
 
+### In the browser
+
+The site `h5p-embed` writes carries the same converter as a page, `scorm.html`: a `.h5p` chosen
+or dropped on it becomes the same zip, built in the browser from the site's own copies of the
+player, the runtime and the library pack, and offered as a download. Nothing is uploaded and no
+`npx` is needed; the page says which LMSs the zip is checked in and what each needs. The demo
+site has it at [/demo/scorm.html](https://h5p-offline-player.vercel.app/demo/scorm.html).
+
 ### Supported LMSs
 
 Checked at these versions, as a learner in Chrome. Other LMSs have not been tried yet.
@@ -225,6 +234,17 @@ export, which `libraries=pack` then plays from) or `packBase` (the folder of a c
 `force`, and returns the zip's path, its title, size, the `libraries` it carries from the pack,
 and `build`, the stamp saved state is kept against. Every entry ships with TypeScript declarations.
 
+`buildScormInPage` from `@missing-elements/h5p-embed/scorm/browser` is the same build in a page:
+it takes `file`, a `File` or `Blob`; `base`, the folder with the player's three files and
+`frame-assets/` (the page's own by default); `pack` or `packBase`, as `startEmbed` takes them;
+`assets`, for a page that bundles the launch page's template, its bridge, `embed.css` and the
+pack's `libraries.txt` rather than serving them beside the player as the written site does;
+`version` and `packVersion`, for the zip's notice; and `onProgress`. It returns the zip as a
+`Blob`, with its `name`, `title`, `libraries`, `build` and `size`. `startScormPage` from
+`@missing-elements/h5p-embed/scorm-page.js` is the page's script, which reads the page's
+`#file`, `#status`, `#download` and `#notice` (see `site/scorm.html`); the written site loads it
+bundled, with zip.js inside, and a page that bundles imports the source.
+
 ```js
 import '@missing-elements/h5p-offline-player'
 import { runtime } from '@missing-elements/h5p-runtime'
@@ -252,4 +272,5 @@ under the GPL-3.0, as `frame-assets/` with its `LICENSE.txt` and `NOTICE.txt`, a
 `--no-libraries`, the hub's libraries under their own licences, listed in `libraries.txt`. The
 folder's `NOTICE.txt` says which file is what. A SCORM zip carries the runtime the same way, the
 package under its own licences, and any libraries from the pack as the folder does; its
-`NOTICE.txt` says the same.
+`NOTICE.txt` says the same. The folder's `scorm-page.js` carries zip.js, BSD-3-Clause, with its
+licence in its header, as the player's workers do.

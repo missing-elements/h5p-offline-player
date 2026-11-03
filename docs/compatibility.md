@@ -96,6 +96,9 @@ What is covered of the pack itself: the `pack` export, `parts/` with its `index.
   `cmi.core.lesson_status`, `cmi.core.session_time`, `cmi.core.exit`), and what it keeps in
   `cmi.suspend_data`, which a zip written by a later version reads back unless the libraries it
   carries from the pack have changed.
+- **The SCORM page**, `scorm.html` on a written site, and **`buildScormInPage()`** and
+  **`startScormPage()`**, with their options and types: the same zip as `buildScorm()`'s, built in
+  the browser.
 
 A written site is a folder of copies and changes only when it is written again: upgrading is
 running the new version of the command and deploying the folder. A SCORM zip likewise, replaced in
