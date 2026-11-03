@@ -93,7 +93,7 @@ describe('the site', () => {
     const out = join(dir, 'locked')
     const site = await buildSite({ out, packages: 'https://cdn.example.org', ancestors: ['https://school.example'] })
 
-    for (const name of ['index.html', 'main.js', 'embed.js', 'embed.css', 'resizer.js', 'config.js', 'h5p-player.js', 'h5p-sw.js', 'h5p-jobs.js', 'libraries/index.json', 'libraries.txt', 'NOTICE.txt', '_headers', 'vercel.json', 'Caddyfile', 'nginx.conf', '.htaccess']) {
+    for (const name of ['index.html', 'main.js', 'embed.js', 'embed.css', 'resizer.js', 'config.js', 'scorm.html', 'scorm-main.js', 'scorm-page.js', 'scorm-page.css', 'scorm-launch.html', 'scorm.js', 'h5p-player.js', 'h5p-sw.js', 'h5p-jobs.js', 'libraries/index.json', 'libraries.txt', 'NOTICE.txt', '_headers', 'vercel.json', 'Caddyfile', 'nginx.conf', '.htaccess']) {
       expect(existsSync(join(out, name)), name).toBe(true)
     }
     for (const name of ['frame-boot.js', 'frame.bundle.js', 'h5p.css', 'LICENSE.txt', 'NOTICE.txt']) {
@@ -116,7 +116,7 @@ describe('the site', () => {
     for (const folder of ['/frame-assets/', '/libraries/']) {
       expect(vercel.headers.find((rule: { source: string }) => rule.source.startsWith(folder)).headers).toEqual([{ key: 'Cache-Control', value: 'no-cache' }])
     }
-    expect(await readFile(join(out, 'config.js'), 'utf8')).toContain('{"libraries":true,"packages":["https://cdn.example.org"],"defaultLibraries":null}')
+    expect(await readFile(join(out, 'config.js'), 'utf8')).toContain('{"libraries":true,"packages":["https://cdn.example.org"],"defaultLibraries":null,"version":"' + site.version + '","packVersion":"')
 
     // The three server formats say the same as the two host files, each in its own syntax.
     const caddy = await readFile(join(out, 'Caddyfile'), 'utf8')
@@ -139,9 +139,9 @@ describe('the site', () => {
 
   it('leaves the library pack out when asked, and says so to the page', async () => {
     const out = join(dir, 'lean')
-    await buildSite({ out, libraries: false })
+    const site = await buildSite({ out, libraries: false })
     expect(existsSync(join(out, 'libraries'))).toBe(false)
-    expect(await readFile(join(out, 'config.js'), 'utf8')).toContain('{"libraries":false,"packages":null,"defaultLibraries":null}')
+    expect(await readFile(join(out, 'config.js'), 'utf8')).toContain('{"libraries":false,"packages":null,"defaultLibraries":null,"version":"' + site.version + '","packVersion":null}')
     expect(await readFile(join(out, 'NOTICE.txt'), 'utf8')).not.toContain('libraries/')
   })
 

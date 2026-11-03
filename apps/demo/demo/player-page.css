@@ -547,7 +547,10 @@ label.file:has(input:focus-visible) { outline: 2px solid var(--accent); outline-
 .status[data-state="error"] { border-left-color: var(--danger); }
 .status[data-state="probing"],
 .status[data-state="downloading"],
-.status[data-state="indexing"] { border-left-color: var(--accent); }
+.status[data-state="indexing"],
+.status[data-state="building"] { border-left-color: var(--accent); }
+/* The SCORM page's link to the zip it built, at the strip's right. */
+.status a { margin-left: auto; font-weight: 600; }
 
 .badge {
   display: inline-flex;

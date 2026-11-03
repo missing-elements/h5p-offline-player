@@ -29,6 +29,8 @@ const rootDir = import.meta.dirname
 const repositoryRoot = resolve(rootDir, '..', '..')
 const playerDir = resolve(repositoryRoot, 'packages', 'player')
 const ELEMENT = resolve(playerDir, 'src', 'h5p-offline-player.ts')
+// What the SCORM page's zip names as the player's version, since the pages build the element from source.
+const PLAYER_VERSION: string = JSON.parse(readFileSync(resolve(playerDir, 'package.json'), 'utf8')).version
 // The cmi5 wiring from its source too, so the demo needs no build of it either.
 const CMI5 = resolve(repositoryRoot, 'packages', 'cmi5', 'src', 'index.ts')
 
@@ -86,6 +88,35 @@ function appWorkerPlugin(): Plugin {
 }
 
 /**
+ * Serves the player's built element and Jobs worker at the site root in dev, for the SCORM page,
+ * which puts them into the zip it builds and so needs the files a host deploys, not the modules
+ * the pages run from source. They are the player's `dist/`, which `pnpm build` writes; before
+ * that the page says so. The build emits `h5p-player.js` there itself and `scripts/build-demo.mjs`
+ * writes `h5p-jobs.js` beside it.
+ */
+function playerDistPlugin(): Plugin {
+  const dist = resolve(playerDir, 'dist')
+  return {
+    name: 'h5p-player-dist',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const path = req.url?.split('?')[0]
+        if (path !== '/h5p-player.js' && path !== '/h5p-jobs.js') return next()
+        try {
+          const source = readFileSync(resolve(dist, path.slice(1)))
+          res.setHeader('content-type', 'text/javascript; charset=utf-8')
+          res.setHeader('cache-control', 'no-store')
+          res.end(source)
+        } catch {
+          res.statusCode = 404
+          res.end(`// ${path} is not built: run pnpm build in the repository first.`)
+        }
+      })
+    }
+  }
+}
+
+/**
  * Serves `/resizer.js` in dev from the embed package, where the script lives; the build copies the
  * same file to the site root (`scripts/build-demo.mjs`).
  */
@@ -112,6 +143,7 @@ export default defineConfig(({ command }) => ({
     devServiceWorkerPlugin(),
     appWorkerPlugin(),
     resizerPlugin(),
+    playerDistPlugin(),
     // The demo content first, then the player's fixtures: the pages use the former, and the
     // latter stay reachable for trying a fixture against the dev server.
     noRangeFixturesPlugin([resolve(rootDir, 'demo', 'content'), PLAYER_FIXTURES]),
@@ -121,6 +153,10 @@ export default defineConfig(({ command }) => ({
     // After the site URL, so a snippet shows the real address.
     codeBlocksPlugin()
   ],
+
+  define: {
+    __PLAYER_VERSION__: JSON.stringify(PLAYER_VERSION)
+  },
 
   resolve: {
     alias: [

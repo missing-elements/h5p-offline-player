@@ -248,23 +248,36 @@ packages/embed/           @missing-elements/h5p-embed — the embed page as a st
   site/                     the page: index.html (its CSP a placeholder the writer fills), main.js,
                             embed.js (startEmbed, also what the demo's /embed runs), embed.css,
                             resizer.js (the page-side half of the resizer protocol, served at the
-                            folder's root, and at /resizer.js on the demo)
+                            folder's root, and at /resizer.js on the demo); and the SCORM page:
+                            scorm.html, scorm-main.js, scorm-page.js (startScormPage, also what the
+                            demo's /demo/scorm.html runs) and scorm-page.css (#122)
   lib/build.mjs             buildSite(): copies the page, the player's dist/, the runtime's dist/ as
                             frame-assets/ and the library pack; writes config.js, the policy into the
                             page, the headers for five kinds of host and NOTICE.txt
   lib/scorm.mjs             buildScorm(), `--scorm`: one .h5p, the player, the runtime and the parts of the
                             pack it needs as a SCORM 1.2 zip, planned with the player's `./plan`; refused for
                             a library neither the package nor the pack carries
+  lib/scorm-core.mjs        what the SCORM zip is wherever it is written, and no Node import: the
+                            package read and its parts planned, the entries laid out, the zip written
+                            into a zip.js writer; lib/scorm-browser.mjs, `./scorm/browser`,
+                            buildScormInPage(): the same zip in a page, from a File, the files
+                            fetched from the site and the zip a Blob; lib/shared.mjs, EmbedError and
+                            the player's file names, for the modules that import no Node (#122)
   scorm/                    the SCORM package's launch page (index.html, its title, language and
                             build filled in by the writer) and scorm.js, its bridge to the LMS's API
   bin/h5p-embed.mjs         the command
-  scripts/                  check-published.mjs, the publish guard for the player it pins exactly (#109)
-                            and the normalizer's `./crc32` (#108)
+  scripts/                  build.mjs, dist/scorm-page.js: the SCORM page's script bundled with zip.js
+                            and the player's `./plan` for a written site, which has no bundler
+                            (#122); check-published.mjs, the publish guard for the player it pins
+                            exactly (#109) and the normalizer's `./crc32` (#108)
   tests/                    build.test.ts, no browser; site.test.ts, a written site on 127.0.0.1
                             framed by a page on localhost, as deployed; scorm.test.ts, the zip in Node
                             and the launch page under a stand-in for an LMS's player page in
-                            Chromium; package-types.ts as for the normalizer
-  types/                    generated, not in git: the declarations of the three entries
+                            Chromium; scorm-browser.test.ts, the page's builder run in Node against
+                            the command's zip, entry for entry; scorm-page.test.ts, the page itself
+                            in Chromium; helpers/, the static host and the quiz helpers those share;
+                            package-types.ts as for the normalizer
+  types/                    generated, not in git: the declarations of the five entries
 
 packages/vscode/          h5p-preview, "H5P Preview by Missing Elements" — the VS Code extension, a .vsix
                           for the Visual Studio Marketplace and Open VSX, not on npm (see *The VS Code
@@ -297,7 +310,9 @@ apps/demo/                the demo app: the dev server for the whole repository,
   demo/                     demo/index.html is the examples index, demo/setup.html the setup page for
                             integrators, demo/compare.html how it compares with h5p.com, the H5P
                             plugins, Lumi and h5p-standalone, demo/normalize.html why deflated media cannot stream and how
-                            the normalizer fixes it (prose and a CSS-only diagram, no script), the rest
+                            the normalizer fixes it (prose and a CSS-only diagram, no script),
+                            demo/scorm.html the H5P-to-SCORM page, the embed package's run with the
+                            demo's own copies (demo/scorm-page.js, #122), the rest
                             the individual embedding demos, all sharing demo/player-page.css;
                             demo/cmi5.html with demo/cmi5-page.js is a cmi5 assignable unit around
                             the element, on @missing-elements/h5p-cmi5, and demo/cmi5-course.zip the
@@ -2574,6 +2589,36 @@ one row each; an LMS added here gets a row there.
   its success unknown. The pack, its parts, the demo packages (the normalizer's) and h5p-author's
   quiz have no stored entry with a descriptor, so nothing else needed the change.
 
+- **The same zip is built in a page, with nothing uploaded** (#122, 2026-11-03). The people who
+  need a SCORM package, designers and teachers with Canvas, Moodle or Blackboard, do not run `npx`:
+  their route, H5P → Lumi → SCORM, which UBC, UFL, ISU, the University of Alberta and others
+  publish guides for, has had Lumi's export broken since April 2026, and no converter ran in the
+  browser. So `scorm.mjs` was split as #108 split h5p-author's build. `scorm-core.mjs` reads the
+  package, plans the parts, lays out the entries and writes them, and imports no Node; `scorm.mjs`
+  is the Node side, the files from the installed packages and the zip to a path, its API unchanged;
+  `scorm-browser.mjs`, `./scorm/browser`, is the page's, `buildScormInPage()`: the package a
+  `File`, the player's files, the runtime and the pack fetched from the site the page is on (`base`,
+  `pack` or `packBase`, or `assets` for a page that bundles the launch page, the bridge, the
+  stylesheet and the licence list), each part checked against the index's SHA-256 since it came
+  over the network, and the zip a `Blob`. The runtime's files are named by a list,
+  `RUNTIME_FILES`, plus the fonts from its `MANIFEST.json`, since a folder on a server cannot be
+  listed; `scorm-browser.test.ts` runs the builder in Node, which has `fetch`, `File` and
+  `crypto.subtle`, against a written site and holds its zip to the command's entry for entry, so a
+  file the runtime adds shows up there. `site/scorm-page.js` is the page's script,
+  `startScormPage()`, which reads `#file`, `#status`, `#download` and `#notice`, and a `#state`
+  badge where the page has one; the written site loads it as `scripts/build.mjs` bundles it with
+  zip.js and the player's `./plan` (`dist/scorm-page.js`, zip.js's licence in its header, since the
+  site has no bundler), from `scorm.html`, with the launch page and the bridge copied beside it as
+  `scorm-launch.html` and `scorm.js` and the player's and the pack's versions in `config.js`. The
+  demo reuses the source at `/demo/scorm.html` in the site's own design: the pack's parts as Vite
+  emits them, the four files as `?raw` strings, the player's version from a `define`, and the
+  player's built files from the site root, which a dev middleware serves from the player's `dist/`
+  (`playerDistPlugin`). Decided with the owner that day: SCORM 1.2 only, H5P's result rule kept,
+  the tested LMSs the supported ones. Canvas, the audience's LMS, runs its SCORM on Rustici's
+  SCORM Cloud by all accounts and cannot be tested here, since Canvas Free-for-Teacher has no SCORM
+  upload. `scorm-page.test.ts` drives the page in Chromium: a chosen file, the download, which is
+  the command's zip and plays unpacked, a refusal, and the next file after it.
+
 `tests/scorm.test.ts` checks the zip, the parts it carries, its stored entries' local headers and
 its refusals in Node. In Chromium it plays the unpacked zip under a page that holds the API and
 frames the launch page, as Moodle's player does. It covers:
@@ -2755,6 +2800,7 @@ Three artefacts, built three different ways, because they are consumed three dif
 | `dist/h5p-sw-mount.js` | esbuild, ESM | For hosts that enforce one worker per origin |
 | `dist/h5p-jobs.js` | esbuild, IIFE | The Jobs worker as a file, for a page whose CSP refuses a `blob:` worker |
 | `dist/h5p-plan.js` | esbuild, ESM, not minified | The player's library rules, `./plan`, for the packages that write what it plays; the build fails if zip.js gets in |
+| `packages/embed/dist/scorm-page.js` | esbuild, ESM | The SCORM page's script for a written site, which has no bundler: zip.js and the player's `./plan` inside, zip.js's licence in its header |
 | `packages/runtime/dist/` | `packages/runtime/scripts/build.mjs` | The H5P core from `vendor/h5p-core/`, its scripts joined and minified under a licence header, its stylesheets rebuilt to stand alone, and the boot script; a package of its own, GPL |
 | `apps/demo/dist-demo/` | `apps/demo/scripts/build-demo.mjs` | The hosted demo: the pages, and `dist/`'s layout at the site root |
 
@@ -3608,7 +3654,8 @@ deliberate additions to it, not drift:
 - A VS Code extension. The design has the player on websites; the extension plays a package in
   the editor, from a server on the author's own computer.
 - A SCORM package. The design emits results and stores none; `h5p-embed --scorm` puts one package
-  in an LMS, which records its score, result, time and the learner's place.
+  in an LMS, which records its score, result, time and the learner's place; since #122 a page on
+  the written site, and on the demo, builds the same zip in the browser.
 - The libraries are warmed into the cache before the frame boots on a `Range` host. The design
   reads every entry on demand; on a high-latency host that made the boot a matter of minutes.
 - A library source that cannot be reached falls back to a bundle downloaded whole from the same

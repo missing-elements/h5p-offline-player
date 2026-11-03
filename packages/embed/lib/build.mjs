@@ -2,6 +2,7 @@ import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promi
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { EmbedError, PLAYER_FILES } from './shared.mjs'
 
 /**
  * Writes the embed page as a static site: one folder, deployable to any static host, that a site
@@ -9,22 +10,30 @@ import { fileURLToPath } from 'node:url'
  * and its workers from the player's `dist/`, the H5P runtime from its own package as
  * `frame-assets/`, the library pack's parts from `@missing-elements/h5p-libraries` as
  * `libraries/` — so the versions are the ones this package was published with, and nothing is
- * fetched.
+ * fetched. The SCORM page goes in beside it, with the launch page's template and bridge it
+ * builds a zip from, so a teacher on the site makes one with nothing but a browser.
  */
 
-export class EmbedError extends Error {}
+export { EmbedError } from './shared.mjs'
 
 const require = createRequire(import.meta.url)
 // `fileURLToPath` rather than `import.meta.dirname`, which Node 20 has only from 20.11.
 const SITE = fileURLToPath(new URL('../site', import.meta.url))
+const SCORM = fileURLToPath(new URL('../scorm', import.meta.url))
+const DIST = fileURLToPath(new URL('../dist', import.meta.url))
 
-/** The page's own files, copied as they are; `index.html` is written, not copied. */
-const PAGE_FILES = ['embed.js', 'embed.css', 'main.js', 'resizer.js']
+/** The page's own files, copied as they are; `index.html` and `scorm.html` are written, not copied. */
+const PAGE_FILES = ['embed.js', 'embed.css', 'main.js', 'resizer.js', 'scorm-main.js', 'scorm-page.css']
 /**
- * The player's files, by the names the element looks for beside itself.
- * @internal
+ * What the SCORM page builds a zip from, under the names its script fetches them by: the launch
+ * page's template and its bridge, from `scorm/`; and the page's script as `scripts/build.mjs`
+ * bundles it, since the site has no bundler and the script imports zip.js.
  */
-export const PLAYER_FILES = ['h5p-player.js', 'h5p-sw.js', 'h5p-jobs.js']
+const SCORM_FILES = [
+  ['scorm-launch.html', join(SCORM, 'index.html')],
+  ['scorm.js', join(SCORM, 'scorm.js')],
+  ['scorm-page.js', join(DIST, 'scorm-page.js')]
+]
 
 /**
  * Where an installed package's file is, or a message that says which one is missing.
@@ -305,6 +314,10 @@ function notice({ version, libraries }) {
 
   index.html, main.js, embed.js, embed.css, resizer.js, config.js
                     the embed page and the sizing script: MIT
+  scorm.html, scorm-main.js, scorm-page.js, scorm-page.css, scorm-launch.html, scorm.js
+                    the SCORM page, which builds a SCORM package of a .h5p in the browser, and
+                    the launch page it puts in the zip: MIT. scorm-page.js also carries zip.js,
+                    BSD-3-Clause, its licence in its header.
   Caddyfile, nginx.conf, .htaccess, _headers, vercel.json
                     the same headers for five kinds of host; use the one yours reads
   h5p-player.js, h5p-sw.js, h5p-jobs.js
@@ -386,9 +399,14 @@ export async function buildSite({ out, libraries = true, packages = null, ancest
   const runtime = dirname(installed('@missing-elements/h5p-runtime/dist/h5p.css', 'Run `pnpm build` in the workspace, or reinstall this package.'))
   const pack = libraries ? dirname(installed('@missing-elements/h5p-libraries/parts/index.json', 'Reinstall this package, or pass --no-libraries.')) : null
   const version = (await readFile(join(player, 'VERSION'), 'utf8').catch(() => 'unknown')).trim()
+  const packVersion = pack ? String(JSON.parse(await readFile(join(dirname(pack), 'package.json'), 'utf8')).version) : null
+  for (const [, file] of SCORM_FILES) {
+    if (!(await stat(file).catch(() => null))?.isFile()) throw new EmbedError(`${file} is missing. Run \`pnpm build\` in packages/embed, or reinstall this package.`)
+  }
 
   await mkdir(target, { recursive: true })
   for (const name of PAGE_FILES) await cp(join(SITE, name), join(target, name))
+  for (const [name, file] of SCORM_FILES) await cp(file, join(target, name))
   for (const name of PLAYER_FILES) await cp(join(player, name), join(target, name))
   await rm(join(target, 'frame-assets'), { recursive: true, force: true })
   await cp(runtime, join(target, 'frame-assets'), { recursive: true })
@@ -402,11 +420,15 @@ export async function buildSite({ out, libraries = true, packages = null, ancest
     await rm(join(target, 'libraries.txt'), { force: true })
   }
 
-  const html = await readFile(join(SITE, 'index.html'), 'utf8')
-  await writeFile(join(target, 'index.html'), html.replace('%CSP%', contentSecurityPolicy({ packages: allowedPackages, meta: true })))
+  const metaPolicy = contentSecurityPolicy({ packages: allowedPackages, meta: true })
+  for (const page of ['index.html', 'scorm.html']) {
+    const html = await readFile(join(SITE, page), 'utf8')
+    await writeFile(join(target, page), html.replace('%CSP%', metaPolicy))
+  }
+  // The versions are for the SCORM page's notice: its zip names what it carries, as the command's does.
   await writeFile(
     join(target, 'config.js'),
-    `// Written by h5p-embed: what main.js hands the page.\nexport default ${JSON.stringify({ libraries: Boolean(pack), packages: allowedPackages, defaultLibraries: fallbackLibraries })}\n`
+    `// Written by h5p-embed: what main.js and scorm-main.js hand their pages.\nexport default ${JSON.stringify({ libraries: Boolean(pack), packages: allowedPackages, defaultLibraries: fallbackLibraries, version, packVersion })}\n`
   )
 
   const csp = contentSecurityPolicy({ packages: allowedPackages, ancestors: allowedAncestors })
