@@ -8,7 +8,7 @@ export const MAJOR_VERSION = 1
  * The version of `@missing-elements/h5p-libraries` that `libraries="pack"` plays against. Stamped
  * from the checkout by scripts/sync-h5p-assets.mjs, so each player release pins one pack.
  */
-export const LIBRARY_PACK_VERSION = '1.0.0'
+export const LIBRARY_PACK_VERSION = '1.0.1'
 
 /**
  * `libraries="pack"` with no copy of the host's own: every H5P hub content type's runtime

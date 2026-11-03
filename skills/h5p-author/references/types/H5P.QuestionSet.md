@@ -93,6 +93,6 @@ A quiz: questions one after another, then a result page with the score.
   - `retryButton` one of "on" | "off"; only when checkButton is true — Override "Retry" button: This option determines if the "Retry" button will be shown for all questions, disabled for all or configured for each question individually.
   - `backgroundImage` image file — Background image
 
-15 interface texts are left out: they come from the libraries' translations. `h5p-author schema H5P.QuestionSet --all` lists them, for a source to set one.
+16 interface texts are left out: they come from the libraries' translations. `h5p-author schema H5P.QuestionSet --all` lists them, for a source to set one.
 
 <!-- End of the generated section. -->
