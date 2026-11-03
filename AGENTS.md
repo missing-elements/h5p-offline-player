@@ -2613,7 +2613,13 @@ one row each; an LMS added here gets a row there.
   demo reuses the source at `/demo/scorm.html` in the site's own design: the pack's parts as Vite
   emits them, the four files as `?raw` strings, the player's version from a `define`, and the
   player's built files from the site root, which a dev middleware serves from the player's `dist/`
-  (`playerDistPlugin`). Decided with the owner that day: SCORM 1.2 only, H5P's result rule kept,
+  (`playerDistPlugin`). The page's builder imports the player's `./plan`, which is its built
+  `dist/h5p-plan.js`, so the demo's build makes that file first, as `pnpm dev` does. The merge
+  failed on Vercel without it, since the deploy builds no player and CI built the demo only after
+  `pnpm build`; CI now builds the demo straight after the install, as Vercel does. Aliased to the
+  player's source instead, as the element is, the plan shared its modules with the element, and
+  the build split them into a chunk `h5p-player.js` imports, a file the page's zip carries alone.
+  Decided with the owner that day: SCORM 1.2 only, H5P's result rule kept,
   the tested LMSs the supported ones. Canvas, the audience's LMS, runs its SCORM on Rustici's
   SCORM Cloud by all accounts and cannot be tested here, since Canvas Free-for-Teacher has no SCORM
   upload. `scorm-page.test.ts` drives the page in Chromium: a chosen file, the download, which is

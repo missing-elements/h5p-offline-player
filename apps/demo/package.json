@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm --filter @missing-elements/h5p-offline-player prepare:dev && vite",
-    "build": "pnpm --filter @missing-elements/h5p-offline-player sync:assets && node scripts/build-demo.mjs",
+    "build": "pnpm --filter @missing-elements/h5p-offline-player sync:assets && pnpm --filter @missing-elements/h5p-offline-player build:plan && node scripts/build-demo.mjs",
     "preview": "vite preview",
     "test": "pnpm --filter @missing-elements/h5p-offline-player prepare:dev && vitest run",
     "demo:content": "node scripts/build-demo-content.mjs",

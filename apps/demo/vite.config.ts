@@ -159,6 +159,10 @@ export default defineConfig(({ command }) => ({
   },
 
   resolve: {
+    // Not the player's `./plan`, which the SCORM page's builder imports. Taken from source, its
+    // modules are the element's too, and the build split them into a chunk `h5p-player.js`
+    // imports, while the page's zip carries that file alone. So the build makes the player's
+    // `dist/h5p-plan.js` first (`build` in package.json), as `pnpm dev` does.
     alias: [
       { find: /^@missing-elements\/h5p-offline-player$/, replacement: ELEMENT },
       { find: /^@missing-elements\/h5p-cmi5$/, replacement: CMI5 }

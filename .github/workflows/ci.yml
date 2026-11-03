@@ -23,6 +23,9 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # The demo first, from a checkout with nothing built, as Vercel builds it. Run after `pnpm
+      # build`, it found the player's dist/ there, and passed while the deploy of #123 failed.
+      - run: pnpm build:demo
       # Without --with-deps: the runner image ships Chrome and Firefox, so the libraries they link
       # against are there, and what apt would add (fonts, Xvfb, FFmpeg's codecs) a headless suite that
       # decodes no video does not use. Some runners reach Ubuntu's mirror at 40 kB/s, where that took
@@ -31,7 +34,6 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
-      - run: pnpm build:demo
 
   # The player's browser suite and the installable app's tests in the other two engines; the job above runs
   # them in Chromium. One engine per job: the dev server's switches are shared, and two engines
