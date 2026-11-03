@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0
+
+The library pack inside is 1.0.1, with the H5P hub's newer Branching Scenario, Flashcards, Memory
+Game and Question Set, and H5P.Components, which most question types use. Flashcards moves focus to
+its results and says whether each answer was right, Memory Game labels its audio buttons Play and
+Pause, and a Question Set with no questions says so. Player 1.4.0 inside.
+
 ## 0.3.0
 
 VS Code plays video and audio with fewer codecs than a browser: an MP4's sound, M4A audio, WebM
