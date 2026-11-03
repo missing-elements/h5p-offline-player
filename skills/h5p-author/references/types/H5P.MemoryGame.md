@@ -40,6 +40,6 @@ Cards face down, turned two at a time, until every pair is found.
   - `themeColor` text = "#707070" — Theme Color: Choose a color to create a theme for your card game.
   - `cardBack` image file — Card Back
 
-14 interface texts are left out: they come from the libraries' translations. `h5p-author schema H5P.MemoryGame --all` lists them, for a source to set one.
+16 interface texts are left out: they come from the libraries' translations. `h5p-author schema H5P.MemoryGame --all` lists them, for a source to set one.
 
 <!-- End of the generated section. -->
