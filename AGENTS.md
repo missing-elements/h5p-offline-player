@@ -1177,6 +1177,18 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
   `saveFreq` the frame is handed, ten seconds by default, read once per load the same way; the
   CMS plugins default to thirty and make it a setting. `resume.test.ts`
   drives all of it through the fixture content type, which counts presses of Complete.
+  **The content's id is the same on every load of a package** (#127, 2026-11-04), as a site's row
+  number is: a number made from the package's id, twelve of its hex digits (`contentIdOf` in the
+  boot script), so that it names what the saved state is kept under. Content types keep places by
+  it: Interactive Book stores its chapter under it, in its state and in the page's address
+  (`urlFragments`, `h5pbookid`), and takes it back only when the id matches; Cornell Notes keeps a
+  copy of its notes in `localStorage` under it, read only for a number (`typeof … === 'number'`,
+  which is why the id is one, and why it has twelve digits, which a double holds exactly: the core
+  reads it back through jQuery's `.data()`, which turns a string of digits into a number). Until
+  then it was random, as h5p-standalone gave it, so every book reopened on its first chapter, with
+  its answers, in any `resume` mode and in the SCORM zip, measured in Moodle and in the player.
+  One consequence: two players of one book on one page share the address's chapter and turn
+  pages together, as two copies of one content do on a site.
 - **`libraries="pack"` is the library pack the release pins, and the H5P hub is not asked.**
   Decided on 2026-10-10. H5P Group moved the hub from `api.h5p.org` to `hub-api.h5p.org` in 2026,
   with a newer catalogue behind it; the new host sends no `Access-Control-Allow-Origin` header, so
@@ -1482,8 +1494,8 @@ element, and the element acts. That relay is why `frame-document.ts` has a `mess
 - **`H5P.getContentPath` answers the content's own folder.** The core builds it as
   `H5PIntegration.url + '/content/' + id`, which on a site is the H5P folder and each content's
   own below it; here the content is the package's `content/`, one level below `url`, which the
-  boot script sets to the package's root (h5p-standalone set the content id, so it answered
-  `<id>/content/<id>`, relative to nothing). The core's own `H5P.getPath` reads
+  boot script sets to the package's root (h5p-standalone set the content id, a random one then,
+  so it answered `<id>/content/<id>`, relative to nothing). The core's own `H5P.getPath` reads
   `contents['cid-<id>'].contentUrl` first, which the boot script sets, and it makes
   `getContentPath` do the same (2026-10-13). IFrame Embedder is the one
   content type in the pack that asks, for a page the package carries — so it showed nothing, in
@@ -2516,10 +2528,10 @@ one row each; an LMS added here gets a row there.
   compressed, base64 costing a third. The 12-chapter book read to its last chapter in Moodle wrote
   996 characters and came back with its chapters' state, and on its first chapter: Interactive
   Book takes its saved place (`urlFragments`, with `h5pbookid`) back only when that id is the
-  content id, which the boot script draws at random on every load (`integrationFor`), so no book
-  returns to its chapter in any `resume` mode, a runtime bug outside #124 (#127), measured the same day
-  in the plain player with `resume="device"`. Two corpus books carry Interactive Book 1.3, which
-  keeps no state at all.
+  content id, which the boot script drew at random on every load, so no book returned to its
+  chapter in any `resume` mode, measured the same day in the plain player with `resume="device"`
+  too. Fixed in the runtime by #127 (the content's id under *The saved state never leaves the
+  page*). Two corpus books carry Interactive Book 1.3, which keeps no state at all.
 - **Outside an LMS** the page finds no API, plays the package and reports nothing.
 - **Frappe LMS plays it too, and records less.** Checked on 2026-10-30 against Frappe LMS's
   `develop` branch in its own Docker setup, as an enrolled student in Chrome, with the demo's quiz,

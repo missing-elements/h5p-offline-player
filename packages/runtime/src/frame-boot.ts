@@ -225,14 +225,28 @@ var flag = function (value: boolean | undefined, otherwise: boolean) {
 var translations = coreTranslations(window.H5PRuntimeL10n, config.language);
 
 /**
+ * The content's id. A site gives each content its row's number, the same on every load, and
+ * content types rely on both: Interactive Book keeps its place under the id, in its saved state and
+ * in the address, and takes it back only when the id matches (#127); Cornell Notes reads the copy
+ * of its notes it keeps by the id only when the id is a number. So a number made from the package's
+ * id, which names the same package on every load and is what the learner's state is kept under:
+ * twelve of its hex digits, which a double holds exactly, since the core reads the id back through
+ * jQuery's `.data()`, which turns a string of digits into a number. Until #127 it was random, as
+ * h5p-standalone gave it, and nothing that kept a place by it ever found it again.
+ */
+var contentIdOf = function (pkgId: string): number {
+  return parseInt(String(pkgId).slice(0, 12), 16) || 1;
+};
+
+/**
  * The core's settings for this one content, as a site's H5P plugin writes them and as
- * h5p-standalone wrote them here before the core was vendored. A random content id, as it gave.
- * `url` is the package's root rather than that id: the core joins it with `/content/<id>` only
- * where a content's own `contentUrl` is missing, and `H5P.getContentPath`, which joins it always,
- * is answered from `contentUrl` below.
+ * h5p-standalone wrote them here before the core was vendored. `url` is the package's root rather
+ * than the content's id: the core joins it with `/content/<id>` only where a content's own
+ * `contentUrl` is missing, and `H5P.getContentPath`, which joins it always, is answered from
+ * `contentUrl` below.
  */
 var integrationFor = function (load: LibraryLoad, jsonContent: string, preload: UserDataPreload | null): Integration {
-  var contentId = Math.random().toString(36).substring(2, 9);
+  var contentId = contentIdOf(config.pkgId);
   var base = config.h5pJsonPath;
   var file = function (path: string) { return base + '/' + path; };
   var content: IntegrationContent & Record<string, unknown> = {

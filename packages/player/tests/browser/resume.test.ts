@@ -61,6 +61,22 @@ describe('resume', () => {
     expect((await completeAndSave(again)).data).toBe('{"clicks":3}')
   })
 
+  it('gives the content the same id on every load of a package, a number as a site gives one', async () => {
+    // Interactive Book keeps its place under the content's id and takes it back only when the id
+    // matches, and Cornell Notes reads the copy it keeps by the id only for a number (#127). Until
+    // then the id was random on every load.
+    const contentId = (player: H5PPlayerElement) => {
+      const view = frameWindow(player) as unknown as { H5P: { instances: Array<{ contentId: unknown }> }; H5PIntegration: { contents: Record<string, unknown> } }
+      return { instance: view.H5P.instances[0].contentId, key: Object.keys(view.H5PIntegration.contents)[0] }
+    }
+    const player = await play(FIXTURES.basic)
+    const first = contentId(player)
+    expect(first.instance).toBe(parseInt((player.pkgId as string).slice(0, 12), 16))
+    expect(first.key).toBe(`cid-${first.instance}`)
+    expect(contentId(await play(FIXTURES.basic))).toEqual(first)
+    expect(contentId(await play(FIXTURES.english)).instance).not.toBe(first.instance)
+  })
+
   it('saves every ten seconds by default, and as often as save-interval asks', async () => {
     type Integration = Window & { H5PIntegration?: { saveFreq?: unknown } }
     const standard = await play(FIXTURES.basic, { resume: '' })
