@@ -33,6 +33,17 @@ function countingBody(bytes: Uint8Array, piece = 1024) {
   return { stream, pulled: () => pulled, cancelled: () => cancelled }
 }
 
+/**
+ * Whether two byte arrays are equal, compared directly. `toEqual` walks a typed array element by
+ * element through its generic equality, which took seconds on a megabyte and timed the case out on
+ * CI's runners.
+ */
+function sameBytes(actual: Uint8Array, expected: Uint8Array): boolean {
+  if (actual.length !== expected.length) return false
+  for (let i = 0; i < actual.length; i += 1) if (actual[i] !== expected[i]) return false
+  return true
+}
+
 /** A host that honours `Range` over `bytes`, keeping the ranges it was asked for. */
 function rangeHost(bytes: Uint8Array) {
   const asked: string[] = []
@@ -96,7 +107,7 @@ describe('RangeHttpHandle.read', () => {
     const handle = await openSource('pkg', descriptor)
     const long = { start: 10, end: 10 + BLOCK_CACHE_MAX_READ }
 
-    expect(await handle.read(long)).toEqual(archive.subarray(long.start, long.end + 1))
+    expect(sameBytes(await handle.read(long), archive.subarray(long.start, long.end + 1))).toBe(true)
     await handle.read(long)
     expect(asked).toEqual([`bytes=${long.start}-${long.end}`, `bytes=${long.start}-${long.end}`])
   })
@@ -112,7 +123,7 @@ describe('RangeHttpHandle.stream', () => {
     expect(asked).toHaveLength(1)
 
     const media = { start: 200_000, end: 600_000 }
-    expect(await collect(await handle.stream(media))).toEqual(archive.subarray(media.start, media.end + 1))
+    expect(sameBytes(await collect(await handle.stream(media)), archive.subarray(media.start, media.end + 1))).toBe(true)
     expect(asked).toEqual([`bytes=0-${BLOCK_SIZE - 1}`, `bytes=${media.start}-${media.end}`])
     // Not kept: the cache holds index reads and small entries, not media.
     await handle.stream(media).then(collect)
