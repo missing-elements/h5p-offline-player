@@ -2498,7 +2498,7 @@ one row each; an LMS added here gets a row there.
   996 characters and came back with its chapters' state, and on its first chapter: Interactive
   Book takes its saved place (`urlFragments`, with `h5pbookid`) back only when that id is the
   content id, which the boot script draws at random on every load (`integrationFor`), so no book
-  returns to its chapter in any `resume` mode, a runtime bug outside #124, measured the same day
+  returns to its chapter in any `resume` mode, a runtime bug outside #124 (#127), measured the same day
   in the plain player with `resume="device"`. Two corpus books carry Interactive Book 1.3, which
   keeps no state at all.
 - **Outside an LMS** the page finds no API, plays the package and reports nothing.
