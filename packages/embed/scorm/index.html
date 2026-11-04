@@ -17,7 +17,9 @@
       <span class="loader-text">Loading…</span>
     </div>
     <h5p-player%LIBRARIES%></h5p-player>
-    <p class="notice error" id="notice" role="alert" hidden></p>
-    <p class="notice" id="saving" role="status" hidden></p>
+    <!-- The live regions are on the page from the start, empty, so that a notice put into one is
+         announced: a region that appears with its text is not, by every screen reader. -->
+    <div role="alert"><p class="notice error" id="notice" hidden></p></div>
+    <div role="status"><p class="notice" id="saving" hidden></p></div>
   </body>
 </html>

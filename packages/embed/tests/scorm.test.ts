@@ -309,6 +309,11 @@ describe('in an LMS', () => {
       }
       await zip.close()
     }
+    // The quiz's launch page without the compressor, as the page builder writes it for a page that
+    // bundles the launch files and gives none (`scorm-browser.test.ts`).
+    const launchPage = await readFile(join(root, 'index.html'), 'utf8')
+    expect(launchPage).toContain('<script src="./lz-string.js"></script>')
+    await writeFile(join(root, 'plain.html'), launchPage.replace(/\n[ \t]*<script src="\.\/lz-string\.js"><\/script>/, ''))
 
     server = createServer(async (request, response) => {
       const path = decodeURIComponent(new URL(request.url ?? '/', 'http://x').pathname)
@@ -472,6 +477,12 @@ describe('in an LMS', () => {
     const warnings: string[] = []
     page.on('console', (message) => { if (message.type() === 'warning') warnings.push(message.text()) })
     const { sco } = await launch(page)
+    // Both notices sit in a live region that is on the page from the start, empty, so that what is
+    // put into one is announced.
+    expect(await sco.evaluate(() => ['saving', 'notice'].map((id) => {
+      const region = document.getElementById(id)?.parentElement
+      return `${region?.getAttribute('role')} ${region?.closest('[hidden]') === null} ${region?.textContent}`
+    }))).toEqual(['status true ', 'alert true '])
 
     // A state that compresses: four times what SCORM 1.2 keeps, as JSON repeats itself, fits.
     const long = JSON.stringify(Array.from({ length: 400 }, (_, i) => ({ question: i, answers: [0, 2], checked: true })))
@@ -533,6 +544,11 @@ describe('in an LMS', () => {
       }, { verb: ANSWERED, sub, text, definition, result })
 
     await answer(first.sco, 'a', 'Which <em>rivers</em> cross Germany?')
+    // The question and its id go with the state as it is answered, and are committed: content that
+    // keeps no state of its own sends nothing else that would keep them.
+    const [wrote, committed] = (await calls(page)).slice(-2)
+    expect([wrote[0], wrote[1], committed[0]]).toEqual(['LMSSetValue', 'cmi.suspend_data', 'LMSCommit'])
+    expect((await decoded(first.sco, wrote[2])).questions).toEqual([['a', 'which-rivers-cross-germany']])
     // Another question with the same words takes another id.
     await answer(first.sco, 'b', 'Which rivers cross Germany?')
     let kept = await values(page)
@@ -566,16 +582,22 @@ describe('in an LMS', () => {
     expect(kept['cmi.interactions.2.latency']).toBeUndefined()
     expect(kept['cmi.interactions.3.type']).toBeUndefined()
 
-    // The questions go with the state, so the next session of the attempt keeps their indexes.
-    await save(first.sco, 'place')
-    expect((await decoded(first.sco, (await values(page))['cmi.suspend_data'])).questions).toEqual(['a', 'b', 'c', 'd'])
+    // The questions go with the state, with no save of the content's, so the next session of the
+    // attempt keeps their indexes and their ids.
+    expect((await decoded(first.sco, (await values(page))['cmi.suspend_data'])).questions).toEqual([
+      ['a', 'which-rivers-cross-germany'],
+      ['b', 'which-rivers-cross-germany-2'],
+      ['c', 'c'],
+      ['d', 'other']
+    ])
     await page.evaluate(() => (window as unknown as { leave: () => void }).leave())
     await page.waitForFunction(() => (window as unknown as { calls: string[][] }).calls.some((call) => call[0] === 'LMSFinish'))
     const second = await launch(page)
+    // The second of two questions with the same words, answered first this time, keeps its own id.
     await answer(second.sco, 'b', 'Which rivers cross Germany?', {}, { response: '2' })
     await answer(second.sco, 'e', 'A new one')
     kept = await values(page)
-    expect(kept).toMatchObject({ 'cmi.interactions.1.student_response': '2', 'cmi.interactions.4.id': 'a-new-one' })
+    expect(kept).toMatchObject({ 'cmi.interactions.1.id': 'which-rivers-cross-germany-2', 'cmi.interactions.1.student_response': '2', 'cmi.interactions.4.id': 'a-new-one' })
     expect(kept['cmi.interactions.5.id']).toBeUndefined()
 
     // An attempt the LMS started over, its interactions gone: they start again from the first index.
@@ -610,8 +632,13 @@ describe('in an LMS', () => {
     await first.h5p.getByRole('radio', { name: 'In your browser, straight out of the zip' }).click()
     await first.h5p.getByRole('button', { name: /^Check/ }).click()
     await first.h5p.getByRole('button', { name: /^Next/ }).click()
-    // H5P saves three seconds after a `progressed` statement.
-    await page.waitForFunction(() => (window as unknown as { values: Record<string, string> }).values['cmi.suspend_data'] !== '', null, { timeout: 30_000 })
+    // H5P saves three seconds after a `progressed` statement; the answer wrote the state before
+    // that, with the question and none of the content's.
+    await first.sco.waitForFunction(() => {
+      const text = (parent as unknown as { values: Record<string, string> }).values['cmi.suspend_data']
+      const json = text && (window as unknown as { LZString: { decompressFromBase64: (s: string) => string | null } }).LZString.decompressFromBase64(text)
+      return Boolean(json && JSON.parse(json).entries.length > 0)
+    }, null, { timeout: 30_000 })
     const kept = await decoded(first.sco, (await values(page))['cmi.suspend_data'])
     expect(kept.build).toMatch(/^[0-9a-f]{16}$/)
     expect(kept.entries.length).toBeGreaterThan(0)
@@ -684,6 +711,16 @@ describe('in an LMS', () => {
     }, build)
     const { sco } = await launch(page)
     expect(await sco.evaluate(() => (document.querySelector('h5p-player') as { userData?: unknown[] }).userData)).toEqual([{ dataType: 'state', subContentId: 'kept', data: '{"progress":1}' }])
+    await context.close()
+  })
+
+  it('writes the state plain where the launch page has no compressor', async () => {
+    const { context, page } = await lmsPage()
+    const { sco } = await launch(page, '/plain.html')
+    expect(await sco.evaluate(() => 'LZString' in window)).toBe(false)
+    const kept = await save(sco, 'kept')
+    expect(kept.said).toBe(false)
+    expect(JSON.parse(kept.after).entries).toContainEqual(['state', 'large', 'kept'])
     await context.close()
   })
 

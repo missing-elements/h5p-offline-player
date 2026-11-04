@@ -245,8 +245,11 @@ and `build`, the stamp saved state is kept against. Every entry ships with TypeS
 `buildScormInPage` from `@missing-elements/h5p-embed/scorm/browser` is the same build in a page:
 it takes `file`, a `File` or `Blob`; `base`, the folder with the player's three files and
 `frame-assets/` (the page's own by default); `pack` or `packBase`, as `startEmbed` takes them;
-`assets`, for a page that bundles the launch page's template, its bridge, `embed.css` and the
-pack's `libraries.txt` rather than serving them beside the player as the written site does;
+`assets`, for a page that bundles the launch page's template, its bridge, its compressor
+(`lz`, `scorm/lz-string.js`), `embed.css` and the pack's `libraries.txt` rather than serving them
+beside the player as the written site does, where a page that gives the template and not the
+compressor gets the one at `base`, or a zip without it that keeps the saved state plain, as 1.4
+did;
 `version` and `packVersion`, for the zip's notice; and `onProgress`. It returns the zip as a
 `Blob`, with its `name`, `title`, `libraries`, `build` and `size`. `startScormPage` from
 `@missing-elements/h5p-embed/scorm-page.js` is the page's script, which reads the page's

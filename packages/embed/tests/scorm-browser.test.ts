@@ -125,4 +125,42 @@ describe('built in a page', () => {
     await expect(buildScormInPage({ file: await picked(quiz, 'quiz.h5p'), ...withoutPack })).resolves.toMatchObject({ libraries: [] })
     await expect(buildScormInPage({ file: await picked(quiz, 'quiz.h5p'), ...onSite(site), base: `${site.origin}/nowhere/` })).rejects.toThrow(/is not at .*\/nowhere\/.*: it answered 404\./)
   })
+
+  it('writes a zip without the compressor for a page that bundles the launch files and has none, and refuses a site without it', async () => {
+    // A page bundled before 1.5 gives the launch page, the bridge and the stylesheet, and serves
+    // only the player's files: no `lz-string.js` where it serves them.
+    const withoutCompressor: typeof fetch = (input, init) =>
+      String(input).endsWith('/lz-string.js') ? Promise.resolve(new Response('', { status: 404 })) : fetch(input, init)
+    const assets = {
+      launch: await readFile(join(import.meta.dirname, '../scorm/index.html'), 'utf8'),
+      bridge: await readFile(join(import.meta.dirname, '../scorm/scorm.js'), 'utf8'),
+      css: await readFile(join(import.meta.dirname, '../site/embed.css'), 'utf8')
+    }
+    const built = await buildScormInPage({ file: await picked(quiz, 'quiz.h5p'), ...onSite(site), assets, fetch: withoutCompressor })
+    const out = join(dir, 'quiz.plain.zip')
+    await writeFile(out, new Uint8Array(await built.blob.arrayBuffer()))
+    const zip = await entriesOf(out)
+    expect(zip.names).not.toContain('lz-string.js')
+    const page = await zip.text('index.html')
+    expect(page).not.toContain('lz-string')
+    expect(page).toContain('<script type="module" src="./scorm.js"></script>')
+    const listed = [...(await zip.text('imsmanifest.xml')).matchAll(/<file href="([^"]+)"\/>/g)].map((match) => match[1])
+    expect(listed.sort()).toEqual([...zip.names].sort())
+    expect(await zip.text('NOTICE.txt')).not.toContain('lz-string')
+    await zip.close()
+
+    // Given it, the zip carries it, as from the site.
+    const given = await buildScormInPage({ file: await picked(quiz, 'quiz.h5p'), ...onSite(site), assets: { ...assets, lz: 'var LZString = {}' }, fetch: withoutCompressor })
+    await writeFile(out, new Uint8Array(await given.blob.arrayBuffer()))
+    const withIt = await entriesOf(out)
+    expect(await withIt.text('lz-string.js')).toBe('var LZString = {}')
+    expect(await withIt.text('index.html')).toContain('<script src="./lz-string.js"></script>')
+    await withIt.close()
+
+    // A page that takes the launch files from the site takes the compressor from it too, and a
+    // site without it is refused, naming it.
+    await expect(buildScormInPage({ file: await picked(quiz, 'quiz.h5p'), ...onSite(site), fetch: withoutCompressor })).rejects.toThrow(
+      /The launch page's compressor is not at .*\/lz-string\.js: it answered 404\./
+    )
+  })
 })

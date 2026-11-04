@@ -2459,10 +2459,15 @@ one row each; an LMS added here gets a row there.
   `result.duration` as `latency`, the time of day. **One index per question, written over on a
   retry**, read in Moodle's code: its interactions report has one column per index for every
   learner (`get_scorm_question_count` takes the highest index found), so an entry per attempt
-  would set one learner's columns against another's. The index comes from the questions kept with
-  the state (`questions` in `suspend_data`, by index), after `cmi.interactions._count`, which 1.2
-  lets a SCO read and Moodle reloads from the attempt's tracks; an attempt the LMS started over
-  counts none, and they start again. The fields are write-only; the reports read them. The commit is ILIAS's (#94, under *ILIAS plays it too*), and
+  would set one learner's columns against another's. The index and the id come from the
+  questions kept with the state (`questions` in `suspend_data`, a `[key, id]` per index, so that
+  the second of two questions with the same words keeps its `-2` in a later session), after
+  `cmi.interactions._count`, which 1.2 lets a SCO read and Moodle reloads from the attempt's
+  tracks; an attempt the LMS started over counts none, and they start again. The state is written
+  and committed with each answer as well as with each of the content's saves, since content that
+  keeps no state of its own sends no `userdata`, and its questions would otherwise take a new
+  index in every session; where the state cannot be written, the answer is still committed (both
+  found in #126's review). The fields are write-only; the reports read them. The commit is ILIAS's (#94, under *ILIAS plays it too*), and
   only a commit: the content's last save comes after it, and the learner may stay. Moodle's API
   sends with `navigator.sendBeacon` while unloading, and the `exit` it stored showed that the call
   arrived. Content with no result of its own stays `incomplete`. Moodle takes `score.raw` as the
@@ -2486,6 +2491,10 @@ one row each; an LMS added here gets a row there.
   4,096 characters; a larger state is not written, and the last one that fitted stays. Until #124
   that was silent; now the page says so once, under the content (`#saving`), and in the console,
   as it does when the LMS refuses the write, which the bridge checks `LMSSetValue`'s answer for.
+  `#saving` and the launch page's error, `#notice`, each sit in a live region that is on the page
+  from the start, empty (`role="status"`, `role="alert"`), as `ACCESSIBILITY.md` asks of a host,
+  since a region that appears with its text is not announced by every screen reader; until #126's
+  review each was the region itself, hidden.
   Moodle takes 64,000 when its administrator turns "SCORM 1.2 standard mode" off
   (`scormstandard` in `public/mod/scorm/datamodels/scorm_12.php`). Checked in
   Moodle: a learner left after the first question, the next launch's `entry` was `resume`, and the
@@ -2641,7 +2650,10 @@ one row each; an LMS added here gets a row there.
   `scorm-browser.mjs`, `./scorm/browser`, is the page's, `buildScormInPage()`: the package a
   `File`, the player's files, the runtime and the pack fetched from the site the page is on (`base`,
   `pack` or `packBase`, or `assets` for a page that bundles the launch page, the bridge, the
-  stylesheet and the licence list), each part checked against the index's SHA-256 since it came
+  compressor, the stylesheet and the licence list; a page that gives the launch page and not the
+  compressor, as one bundled for 1.4 does, gets the one at `base` or a zip without it, whose page
+  names none and whose bridge writes the state plain, rather than an export that fails for a file
+  it never had to serve), each part checked against the index's SHA-256 since it came
   over the network, and the zip a `Blob`. The runtime's files are named by a list,
   `RUNTIME_FILES`, plus the fonts from its `MANIFEST.json`, since a folder on a server cannot be
   listed; `scorm-browser.test.ts` runs the builder in Node, which has `fetch`, `File` and
@@ -2675,11 +2687,13 @@ frames the launch page, as Moodle's player does. It covers:
 - a passed and a failed result, the end of the session, resume, and refusing state saved by
   another build, and reading one a zip up to 1.4 wrote plain;
 - the quiz's four answers as interactions, and, through dispatched `xapi` events, the id from
-  the words and from the key, the second id for the same words, the type map, the 255 cut, the
-  result from `success` and from the score, one index per question across a retry and a second
-  session, and an attempt started over;
-- a state that fits only compressed, one that does not fit at all and the notice said once, and
-  a write the LMS refuses;
+  the words and from the key, the second id for the same words, kept in a later session, the
+  type map, the 255 cut, the result from `success` and from the score, the questions written and
+  committed with each answer, one index per question across a retry and a second session, and an
+  attempt started over;
+- a state that fits only compressed, one that does not fit at all and the notice said once,
+  both notices' live regions on the page from the start, a write the LMS refuses, and a launch
+  page without the compressor, which writes the state plain;
 - the commit on `beforeunload` and the finish on `pagehide`, by the event the launch page was
   dispatching when it called, which is what ILIAS goes by, and a leave the learner stays from;
 - a result with no score, and a state past 4,096 characters, through the element's events

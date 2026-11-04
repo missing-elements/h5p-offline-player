@@ -211,13 +211,16 @@ if (initialized) {
  * the whole of it goes into `cmi.suspend_data`, compressed, stamped with the package's build so
  * that a teacher who replaces the package does not hand its learners state saved against another
  * one. With it go the questions answered, by interaction index, so that a question keeps its
- * index across the sessions of an attempt (below). A state written plain, by a zip from before
- * 1.5, is read as it is.
+ * index and its id across the sessions of an attempt (below). A state written plain, by a zip
+ * from before 1.5, is read as it is.
  */
 
 /** @type {Map<string, { dataType: string, subContentId: string, data: string }>} */
 const saved = new Map()
-/** The question each interaction index is about, by index; kept with the state. @type {(string | null)[]} */
+/**
+ * The question each interaction index is about and the id written for it, by index; kept with
+ * the state. @type {([key: string, id: string] | null)[]}
+ */
 let questions = []
 
 /**
@@ -243,7 +246,9 @@ if (initialized) {
     for (const [dataType, subContentId, data] of kept.entries) {
       if (typeof data === 'string') saved.set(`${dataType}\n${subContentId}`, { dataType: String(dataType), subContentId: String(subContentId), data })
     }
-    if (Array.isArray(kept.questions)) questions = kept.questions.map((key) => (typeof key === 'string' ? key : null))
+    if (Array.isArray(kept.questions)) {
+      questions = kept.questions.map((entry) => (Array.isArray(entry) && typeof entry[0] === 'string' && typeof entry[1] === 'string' ? [entry[0], entry[1]] : null))
+    }
   }
   player.setAttribute('resume', 'host')
   player.userData = [...saved.values()]
@@ -265,15 +270,24 @@ function unsaved(reason) {
   saving.hidden = false
 }
 
-/** Writes the state and commits it; says so when it cannot. */
+/**
+ * Writes the state and commits it; says so when it cannot.
+ * @returns {boolean} whether it was written and committed
+ */
 function saveState() {
   const json = JSON.stringify({ build, entries: [...saved.values()].map((entry) => [entry.dataType, entry.subContentId, entry.data]), questions })
   const value = lz ? lz.compressToBase64(json) : json
   // A state larger than SCORM 1.2 keeps is not written, rather than written cut short; the last
   // one that fitted stays.
-  if (value.length > SUSPEND_DATA_LIMIT) return unsaved(`it is ${value.length} characters, and SCORM 1.2 keeps ${SUSPEND_DATA_LIMIT}.`)
-  if (!set('cmi.suspend_data', value)) return unsaved('the LMS refused to keep it.')
-  commit()
+  if (value.length > SUSPEND_DATA_LIMIT) {
+    unsaved(`it is ${value.length} characters, and SCORM 1.2 keeps ${SUSPEND_DATA_LIMIT}.`)
+    return false
+  }
+  if (!set('cmi.suspend_data', value)) {
+    unsaved('the LMS refused to keep it.')
+    return false
+  }
+  return commit()
 }
 
 player.addEventListener('userdata', (event) => {
@@ -289,47 +303,42 @@ player.addEventListener('userdata', (event) => {
  * Each question's answer, as `cmi.interactions`: what Moodle's interactions report shows, a
  * column per interaction index for every learner. So a question keeps one index, written over
  * when it is answered again, rather than taking a new one on every attempt, which would set one
- * learner's columns against another's. The index comes from the questions kept with the state,
- * after what the LMS already counts; a new attempt, where the LMS counts none, starts them again.
- * SCORM 1.2 lets the content write the fields and never read them, which the report does.
+ * learner's columns against another's. The index and the id come from the questions kept with
+ * the state, after what the LMS already counts; a new attempt, where the LMS counts none, starts
+ * them again. They are kept with each answer, not only with the content's own saves, since
+ * content that keeps no state of its own sends none. SCORM 1.2 lets the content write the fields
+ * and never read them, which the report does.
  */
 
-/** @type {Map<string, string>} the id written for each question, so two with the same words differ */
-const ids = new Map()
-
-/** @param {string} key @param {AnsweredStatement} statement */
-function idFor(key, statement) {
-  const known = ids.get(key)
-  if (known) return known
-  const base = interactionId(questionText(statement, language), key)
-  const taken = new Set(ids.values())
-  let id = base
-  for (let n = 2; taken.has(id); n++) id = `${base.slice(0, IDENTIFIER_LIMIT - 1 - String(n).length)}-${n}`
-  ids.set(key, id)
-  return id
-}
-
-/** @param {string} key */
-function interactionIndex(key) {
+/**
+ * The question's index and the id it was written under: those it has, else the next index and
+ * an id no other question has, so that two with the same words differ.
+ * @param {AnsweredStatement} statement
+ * @returns {{ index: number, id: string }}
+ */
+function interactionFor(statement) {
+  const key = questionKey(statement)
   const count = Math.max(0, Number(get('cmi.interactions._count')) || 0)
   // The LMS counts fewer than the state names: a new attempt, which starts them again.
   if (questions.length > count) questions = questions.slice(0, count)
-  let index = questions.indexOf(key)
-  if (index === -1) {
-    index = Math.max(questions.length, count)
-    questions[index] = key
-  }
-  return index
+  const known = questions.findIndex((entry) => entry?.[0] === key)
+  if (known !== -1) return { index: known, id: /** @type {[string, string]} */ (questions[known])[1] }
+  const base = interactionId(questionText(statement, language), key)
+  const taken = new Set(questions.map((entry) => entry?.[1]))
+  let id = base
+  for (let n = 2; taken.has(id); n++) id = `${base.slice(0, IDENTIFIER_LIMIT - 1 - String(n).length)}-${n}`
+  const index = Math.max(questions.length, count)
+  questions[index] = [key, id]
+  return { index, id }
 }
 
 /** @param {AnsweredStatement} statement */
 function recordAnswer(statement) {
-  const key = questionKey(statement)
-  const index = interactionIndex(key)
+  const { index, id } = interactionFor(statement)
   /** @param {string} field */
   const at = (field) => `cmi.interactions.${index}.${field}`
   // The id first: it is the field that makes the record.
-  set(at('id'), idFor(key, statement))
+  set(at('id'), id)
   const definition = statement.object?.definition
   const type = typeof definition?.interactionType === 'string' ? INTERACTION_TYPES[definition.interactionType] : undefined
   if (type) set(at('type'), type)
@@ -349,6 +358,9 @@ player.addEventListener('xapi', (event) => {
   const { statement, verb } = /** @type {CustomEvent<{ statement?: AnsweredStatement, verb?: string }>} */ (event).detail
   if (verb !== ANSWERED || !statement) return
   recordAnswer(statement)
+  // The questions go with the state; where the state cannot be written, the answer is still
+  // committed.
+  if (!saveState()) commit()
 })
 
 /*
