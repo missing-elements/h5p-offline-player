@@ -70,6 +70,17 @@ export const SEGMENT_CONCURRENCY = 4
 /** Below this, one request is better: the overlap cannot pay back its own latency. */
 export const SEGMENT_MIN_SPAN = 8 * 1024 * 1024
 
+/**
+ * Small reads of an archive over HTTP go through a cache of `BLOCK_SIZE` blocks, aligned from the
+ * start of the archive — pdf.js's chunk size, and zip.js's own step through an index. At most
+ * `BLOCK_CACHE_MAX_BYTES` are held per worker, the least recently used going first. A read longer
+ * than `BLOCK_CACHE_MAX_READ` bypasses the cache, and so does a stream longer than one block that
+ * the cache does not already hold, so media never passes through it. See `block-cache.ts`.
+ */
+export const BLOCK_SIZE = 64 * 1024
+export const BLOCK_CACHE_MAX_BYTES = 4 * 1024 * 1024
+export const BLOCK_CACHE_MAX_READ = 1024 * 1024
+
 /** Reserved chunk-store entry name for the archive itself (chunked adapter). */
 export const ARCHIVE_ENTRY = '__archive__'
 

@@ -1,4 +1,5 @@
-import { ARCHIVE_ENTRY } from './constants.js'
+import { BlockCache } from './block-cache.js'
+import { ARCHIVE_ENTRY, BLOCK_CACHE_MAX_BYTES, BLOCK_CACHE_MAX_READ, BLOCK_SIZE } from './constants.js'
 import { ChunkStore } from './chunk-store.js'
 import { PlayerError, type RemoteSourceDescriptor, type SourceDescriptor } from './protocol.js'
 import type { ByteRange } from './range.js'
@@ -184,13 +185,29 @@ async function sizeFromOpenRange(url: string, signal?: AbortSignal): Promise<num
 
 /* ------------------------------------------------------------------ handles */
 
+/**
+ * The small reads of every archive this worker reads over HTTP, shared by all its handles: the
+ * reader the Service Worker builds again once libraries are attached gets a new handle, and finds
+ * the blocks the first one fetched. See `BlockCache`.
+ */
+const blocks = new BlockCache(BLOCK_SIZE, BLOCK_CACHE_MAX_BYTES)
+
+/** Forgets every block this worker holds. For tests, whose cases share one module. */
+export function forgetBlocks(): void {
+  blocks.clear()
+}
+
 class RangeHttpHandle implements SourceHandle {
   received = 0
+  /** What names these bytes in the block cache: the package id's ingredients, and the size. */
+  private readonly blockKey: string
 
   constructor(
     readonly descriptor: Extract<SourceDescriptor, { type: 'range-http' }>,
     readonly size: number
-  ) {}
+  ) {
+    this.blockKey = `${descriptor.url}\u0000${descriptor.validator ?? ''}\u0000${size}`
+  }
 
   /** Counts a body's bytes as they pass, without holding any of them. */
   private counted(body: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
@@ -238,17 +255,47 @@ class RangeHttpHandle implements SourceHandle {
     return response.status === 200 ? sliceStream(body, range) : body
   }
 
+  /**
+   * A read of at most `BLOCK_CACHE_MAX_READ` — the index, a local header, a small entry — goes
+   * through the block cache, which fetches whole blocks and keeps them. A longer one is fetched
+   * as asked and kept nowhere.
+   */
   async read(range: ByteRange): Promise<Uint8Array> {
-    return new Uint8Array(await new Response(await this.stream(range)).arrayBuffer())
+    if (range.end - range.start + 1 > BLOCK_CACHE_MAX_READ) return this.fetchBytes(range)
+    return blocks.read(this.blockKey, this.size, range, (missing) => this.fetchBytes(missing))
   }
 
   /**
-   * Every range, streamed or read whole, goes through `resilientStream`: a request that goes
-   * quiet or fails is opened again from the byte it reached. That covers the segments of a large
-   * span, the local header a Service Worker reads before an inline entry, and the central
-   * directory alike — a link that drops for a moment costs a moment, not the job.
+   * A range of at most one block comes out of the block cache, as does a longer one the cache
+   * holds whole: zip.js streams an entry's data right after reading its header, and the block that
+   * held the header usually holds the data too. Anything else streams from the network as it is
+   * asked for, so a video's bytes never pass through the cache.
    */
   async stream(range: ByteRange): Promise<ReadableStream<Uint8Array>> {
+    const length = range.end - range.start + 1
+    if (length <= BLOCK_SIZE || (length <= BLOCK_CACHE_MAX_READ && blocks.holds(this.blockKey, range))) {
+      const bytes = await this.read(range)
+      return new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(bytes)
+          controller.close()
+        }
+      })
+    }
+    return this.network(range)
+  }
+
+  private async fetchBytes(range: ByteRange): Promise<Uint8Array> {
+    return new Uint8Array(await new Response(this.network(range)).arrayBuffer())
+  }
+
+  /**
+   * Every request, for a block or a span, goes through `resilientStream`: one that goes quiet or
+   * fails is opened again from the byte it reached. That covers the segments of a large span, the
+   * blocks a local header or the central directory lies in, and a warm span alike — a link that
+   * drops for a moment costs a moment, not the job.
+   */
+  private network(range: ByteRange): ReadableStream<Uint8Array> {
     return resilientStream(range, (remaining, signal) => this.attempt(remaining, signal), {
       // Bytes on any request of this archive: a segment waiting its turn behind one that flows
       // is not a stalled link.

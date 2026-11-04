@@ -145,10 +145,11 @@ Node 22 LTS or 24 LTS: the commands the packages ship need 22, and the browser p
 
 ### Serving archives: [`design/serving.md`](design/serving.md)
 
-Read it before changing the Service Worker's file server (`src/sw/mount.ts`, `package-reader.ts`, `routes.ts`, `watermark-wait.ts`), how a source is read (`src/shared/source.ts`, `source-reader.ts`, `span-stream.ts`, `resilient-stream.ts`, `range.ts`, `local-header.ts`, `forward-index.ts`, `mime.ts`) or the warm (`src/jobs/warm.ts`).
+Read it before changing the Service Worker's file server (`src/sw/mount.ts`, `package-reader.ts`, `routes.ts`, `watermark-wait.ts`), how a source is read (`src/shared/source.ts`, `block-cache.ts`, `source-reader.ts`, `span-stream.ts`, `resilient-stream.ts`, `range.ts`, `local-header.ts`, `forward-index.ts`, `mime.ts`) or the warm (`src/jobs/warm.ts`).
 
 - `SourceReader` overrides `createReadable`.
 - A large span over HTTP is then pulled by several connections at once.
+- Small reads over HTTP go through a block cache, and a rebuilt reader finds it.
 - Waiting on the watermark is bounded by a stall, not by a wall clock.
 - A ranged read survives the link, and a body the server gives up on ends short.
 - A body that streams holds its fetch event open.

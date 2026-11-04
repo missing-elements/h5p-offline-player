@@ -1,6 +1,6 @@
 # Serving archives
 
-How a package's bytes reach the H5P runtime: the Service Worker's virtual file server, how a source is read (one request, several at once, again after a stall), media that streams and media that cannot, the warm, and the index built while a download is still arriving. The code: `packages/player/src/sw/` (`mount.ts`, `package-reader.ts`, `routes.ts`, `watermark-wait.ts`), `src/shared/` (`source.ts`, `source-reader.ts`, `span-stream.ts`, `resilient-stream.ts`, `range.ts`, `local-header.ts`, `forward-index.ts`, `mime.ts`) and `src/jobs/warm.ts`.
+How a package's bytes reach the H5P runtime: the Service Worker's virtual file server, how a source is read (one request, several at once, small reads from a block cache, again after a stall), media that streams and media that cannot, the warm, and the index built while a download is still arriving. The code: `packages/player/src/sw/` (`mount.ts`, `package-reader.ts`, `routes.ts`, `watermark-wait.ts`), `src/shared/` (`source.ts`, `block-cache.ts`, `source-reader.ts`, `span-stream.ts`, `resilient-stream.ts`, `range.ts`, `local-header.ts`, `forward-index.ts`, `mime.ts`) and `src/jobs/warm.ts`.
 
 ## Invariants
 
@@ -36,6 +36,34 @@ How a package's bytes reach the H5P runtime: the Service Worker's virtual file s
   keeps a request's bytes as they arrive and the consumer follows it live when its turn comes,
   and the window fills only after the first byte, which costs a per-connection-capped host one
   round trip and nothing else. Same 40 MB at 4 Mbit/s now: first byte in under two seconds.
+- **Small reads over HTTP go through a block cache, and a rebuilt reader finds it.** zip.js reads
+  an index in pieces, one after another: 65,557 bytes from the end to find the end-of-central-
+  directory record, then the directory — which in a package of a few hundred entries lies inside
+  those same bytes — then each entry's 30-byte local header, its extra field when it has one, and
+  its data. Over HTTP every piece was a request, and the reader the Service Worker builds again
+  after `attach-libraries` — on every load that names the pack, since the pack attaches its newer
+  parts — read them all again. Measured on 2026-11-04 with the demo's 1.5 MB quiz from a Lovable
+  site (Cloudflare in front) and from Vercel: fourteen ranged requests to `ready`, thirteen of them
+  small and in sequence at 0.2–0.4 s each, about 2.4 s of a 5.5 s first load; an archive zip.js
+  wrote, with extra fields, paid three requests an entry (#133). So `RangeHttpHandle.read` takes a
+  range of at most `BLOCK_CACHE_MAX_READ` from a `BlockCache`, pdf.js's design
+  (`ChunkedStreamManager`): blocks of `BLOCK_SIZE`, 64 kB, aligned from the start of the archive,
+  the missing ones fetched in one request per contiguous run, each fetched once and shared while
+  on its way, at most `BLOCK_CACHE_MAX_BYTES` (4 MB) held per worker, the least recently used going
+  first. `stream` serves a range of at most one block from it too, and a longer one the cache holds
+  whole, since zip.js streams an entry's data right after reading its header; anything else
+  streams from the network as before, so media never passes through the cache. And
+  `PackageReader.inflate` pulls a small entry's header and data in one read before zip.js reads
+  them as two (`blocksFor`). The cache is module-level, keyed by the archive's URL, validator and
+  size — the package id's ingredients — so the new handle a rebuilt reader opens finds the blocks
+  the first one fetched; it dies with the worker, and it is never authority. The quiz now costs
+  four: the probe, the tail, the head and the warm. Two things left out on purpose, by the owner's
+  decision the same day: a whole-file download below a size, which with the cache saves one
+  request and needs a threshold; and rules per content type for what to fetch first, which would
+  tie the player to the libraries. `tests/unit/block-cache.test.ts` pins the cache,
+  `tests/unit/range-http-handle.test.ts` a real archive's index over a host that honours `Range`,
+  and `tests/browser/range-requests.test.ts` counts what a load costs at `/counted/`, a host that
+  writes down every request it takes.
 - **Waiting on the watermark is bounded by a stall, not by a wall clock.** Inflating a few hundred
   megabytes over a network legitimately takes minutes, and a request for the *tail* of such an
   entry cannot be answered until it finishes: an mp4 whose `moov` index sits at the end — common,
@@ -58,8 +86,9 @@ How a package's bytes reach the H5P runtime: the Service Worker's virtual file s
   handler throwing on the way and leaving its play icon on. A media element never asks again
   after that. The extraction, alive throughout, finished a minute later, which is why a reload
   played from cache. A host that dropped the connection did the same by a shorter path: the
-  fetch rejected, the job failed, same error. Three things now hold. `RangeHttpHandle.stream` —
-  and `read`, which goes through it — is a `resilientStream`: a request that delivers nothing for
+  fetch rejected, the job failed, same error. Three things now hold. Every request
+  `RangeHttpHandle` makes — a span for `stream`, the blocks behind `read` — is a
+  `resilientStream`: a request that delivers nothing for
   `READ_STALL_MS`, fails, or ends early is opened again from the byte it reached, after a delay
   that doubles from `READ_RETRY_DELAY_MS`, and `READ_RETRIES` consecutive attempts without a byte
   fail it; the count starts over whenever bytes arrive, so a link that stalls now and then over a
@@ -158,8 +187,8 @@ How a package's bytes reach the H5P runtime: the Service Worker's virtual file s
   the fallback with CORS-filtered headers.
 - **On a host that honours `Range`, the libraries are pulled whole before the frame boots.** The
   runtime reads them exhaustively at boot — every `library.json`, script and stylesheet — and an
-  inline entry read on demand costs two ranged requests, the 30-byte local header and then the
-  data. Measured against a real host (nginx in front of a store, `stream.dev.mkis.fwu.de`): a
+  inline entry read on demand cost two ranged requests, the 30-byte local header and then the
+  data (one since the block cache, or none when its block is already held). Measured against a real host (nginx in front of a store, `stream.dev.mkis.fwu.de`): a
   90 MB package with 53 libraries took 136 s to `ready`, 128 of them in 156 requests for 0.54 MB,
   because that host answers one client's requests roughly one at a time — eight small ranges
   fired together took 4.8 to 14 s each, the same eight in sequence 0.5 to 0.7 s. Its non-media
