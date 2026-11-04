@@ -1,4 +1,4 @@
-// Written by scripts/sync-h5p-assets.mjs from @missing-elements/h5p-runtime 1.0.0's
+// Written by scripts/sync-h5p-assets.mjs from @missing-elements/h5p-runtime 1.0.1's
 // MANIFEST.json (the H5P core at cb64a1f388). Do not edit; run `pnpm sync:assets` in packages/player.
 
 /**

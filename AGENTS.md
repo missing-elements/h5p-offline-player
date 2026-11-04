@@ -2502,6 +2502,12 @@ one row each; an LMS added here gets a row there.
   interactions in the attempt's tracks with the ids from the questions' words, the types, the
   patterns and responses, `correct` three times and `wrong` once, the weightings and latencies,
   `get_scorm_question_count` 4, and the interactions report with a Response column per index.
+  Checked in SCORM Cloud the same day, through its v2 API, with a zip carrying the count read at
+  launch: over two sessions of one registration, the second reopened on question 2 with
+  `cmi.interactions._count` 1 at launch and put its answer on index 1, and the registration ended
+  with the four interactions, their ids from the words, `correct` three times and `incorrect`
+  (SCORM Cloud's word for 1.2's `wrong`), the weightings 1, 1, 4 and 3, passed at 66.67, and
+  26.73 s over the two sessions.
 - **Resume through `cmi.suspend_data`.** The element plays with `resume="host"`. Every `userdata`
   event rewrites `{ build, entries, questions }` into `suspend_data`, compressed with lz-string's
   `compressToBase64` since embed 1.5 (#124: ASCII, as 1.2's `CMIString4096` asks, and
@@ -2534,7 +2540,9 @@ one row each; an LMS added here gets a row there.
   content id, which the boot script drew at random on every load, so no book returned to its
   chapter in any `resume` mode, measured the same day in the plain player with `resume="device"`
   too. Fixed in the runtime by #127 (the content's id under *The saved state never leaves the
-  page*). Two corpus books carry Interactive Book 1.3, which keeps no state at all.
+  page*): the book then reopened on its last chapter in Moodle, and in SCORM Cloud, which kept
+  1,008 characters for it. Two corpus books carry Interactive Book 1.3, which keeps no state at
+  all.
 - **Outside an LMS** the page finds no API, plays the package and reports nothing.
 - **Frappe LMS plays it too, and records less.** Checked on 2026-10-30 against Frappe LMS's
   `develop` branch in its own Docker setup, as an enrolled student in Chrome, with the demo's quiz,
