@@ -66,7 +66,7 @@
   },
   "devDependencies": {
     "@missing-elements/h5p-verify": "workspace:*",
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.6",
     "@vitest/browser": "^5.0.5",
     "@vitest/browser-playwright": "^5.0.5",
     "playwright": "^1.64.1",
