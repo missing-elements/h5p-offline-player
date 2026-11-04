@@ -89,11 +89,14 @@ ${files.map((file) => `      <file href="${escapeXml(file)}"/>`).join('\n')}
 /** @param {{ version: string, source: string, pack: string | null }} zip `pack`, the library pack's version when the zip carries parts of it */
 function notice({ version, source, pack }) {
   return `This is a SCORM 1.2 package written by @missing-elements/h5p-embed. It plays ${source} in an
-LMS and reports its score, its result and the time spent, and keeps the learner's place.
+LMS and reports its score, its result, each question's answer and the time spent, and keeps the
+learner's place.
 
   imsmanifest.xml   the package's manifest
   index.html, scorm.js, embed.css
                     the launch page and its bridge to the LMS: MIT
+  lz-string.js      lz-string 1.5.0, which the bridge compresses the learner's saved state
+                    with: MIT, its licence in its header.
   h5p-player.js, h5p-sw.js, h5p-jobs.js
                     @missing-elements/h5p-offline-player ${version}: MIT. The Service Worker,
                     h5p-sw.js, also carries zip.js, BSD-3-Clause, its licence in its header.
@@ -257,6 +260,7 @@ export async function readPackage(blob, name, pack, { useWebWorkers = false } = 
  * @typedef {object} ScormFiles
  * @property {string} launch the launch page's template, `scorm/index.html`
  * @property {Blob} bridge `scorm/scorm.js`
+ * @property {Blob} lz `scorm/lz-string.js`, which the bridge compresses the saved state with
  * @property {Blob} css `embed.css`
  * @property {Map<string, Blob>} player the player's files, by name
  * @property {Map<string, Blob>} runtime the runtime's files, by path under `frame-assets/`
@@ -301,6 +305,7 @@ export function scormEntries({ manifest, source, title, build, version, packVers
   const entries = [
     { name: 'index.html', text: page },
     { name: 'scorm.js', blob: files.bridge },
+    { name: 'lz-string.js', blob: files.lz },
     { name: 'embed.css', blob: files.css },
     ...PLAYER_FILES.map((name) => ({ name, blob: given(files.player, name, "The player's file") })),
     ...[...files.runtime.keys()].sort().map((name) => ({ name: `frame-assets/${name}`, blob: given(files.runtime, name, "The runtime's file") })),

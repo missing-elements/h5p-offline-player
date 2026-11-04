@@ -140,10 +140,18 @@ page that reports to the LMS. Add it to a course as a SCORM activity, in one of 
 
 - the score out of 100, and `passed` or `failed` when the content says whether it was passed,
   `completed` when it does not. The content's last result counts, as on an H5P site;
+- each question's answer, as `cmi.interactions`: the question's words as the id, its type, the
+  answer given and the right one, `correct` or `wrong`, the marks it was worth and the time it
+  took. One interaction per question, written over when it is answered again, which is how
+  Moodle's interactions report lines learners up. SCORM 1.2 lets the content write these and
+  never read them; the LMS's reports do;
 - the time spent in each session;
-- the learner's place: the content's saved state goes into `cmi.suspend_data`, and the next
-  launch continues from it. SCORM 1.2 keeps 4,096 characters, enough for a quiz; a larger state is
-  not saved.
+- the learner's place: the content's saved state goes into `cmi.suspend_data`, compressed, and
+  the next launch continues from it. SCORM 1.2 keeps 4,096 characters; compressed, a quiz's state
+  takes about 200, a twelve-chapter Interactive Book about 1,000, and none of 23 real packages
+  measured passed 1,100. One that does not fit is not saved, the last that fitted stays, and
+  the page says so under the content, once. Moodle keeps 64,000 when its administrator turns
+  "SCORM 1.2 standard mode" off.
 
 An export from h5p.com or h5p.org, which leaves the libraries out, works as well: the zip carries
 the ones it needs from the library pack, and only those. For a quiz with formulas, that is 11

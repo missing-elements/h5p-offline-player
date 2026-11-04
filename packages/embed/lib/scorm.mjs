@@ -138,6 +138,7 @@ export async function buildScorm({ h5p, out, force = false }) {
     files: {
       launch: await readFile(join(SCORM, 'index.html'), 'utf8'),
       bridge: await openAsBlob(join(SCORM, 'scorm.js')),
+      lz: await openAsBlob(join(SCORM, 'lz-string.js')),
       css: await openAsBlob(join(SITE, 'embed.css')),
       player: await blobs(PLAYER_FILES, (name) => join(player, name)),
       runtime: await blobs(await filesUnder(runtime), (name) => join(runtime, name)),

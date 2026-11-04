@@ -4,14 +4,14 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Convert H5P to SCORM in your browser — h5p-offline-player</title>
-    <meta name="description" content="Drop a .h5p file and download it as a SCORM 1.2 package for Moodle, ILIAS, OpenOLAT, Chamilo or SCORM Cloud. Built in your browser with nothing uploaded; the LMS records the score, the result, the time and the learner's place." />
+    <meta name="description" content="Drop a .h5p file and download it as a SCORM 1.2 package for Moodle, ILIAS, OpenOLAT, Chamilo or SCORM Cloud. Built in your browser with nothing uploaded; the LMS records the score, the result, each answer, the time and the learner's place." />
     <link rel="canonical" href="%SITE_URL%/demo/scorm.html" />
     <meta name="theme-color" content="#2f6df6" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="h5p-offline-player by Missing Elements" />
     <meta property="og:locale" content="en_US" />
     <meta property="og:title" content="Convert H5P to SCORM in your browser — h5p-offline-player" />
-    <meta property="og:description" content="Drop a .h5p file and download it as a SCORM 1.2 package for Moodle, ILIAS, OpenOLAT, Chamilo or SCORM Cloud. Built in your browser with nothing uploaded; the LMS records the score, the result, the time and the learner's place." />
+    <meta property="og:description" content="Drop a .h5p file and download it as a SCORM 1.2 package for Moodle, ILIAS, OpenOLAT, Chamilo or SCORM Cloud. Built in your browser with nothing uploaded; the LMS records the score, the result, each answer, the time and the learner's place." />
     <meta property="og:url" content="%SITE_URL%/demo/scorm.html" />
     <meta property="og:image" content="%SITE_URL%/demo/og-image.png" />
     <meta property="og:image:width" content="1200" />
@@ -19,7 +19,7 @@
     <meta property="og:image:alt" content="h5p-offline-player: self-hosted H5P, with no H5P server" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Convert H5P to SCORM in your browser — h5p-offline-player" />
-    <meta name="twitter:description" content="Drop a .h5p file and download it as a SCORM 1.2 package for Moodle, ILIAS, OpenOLAT, Chamilo or SCORM Cloud. Built in your browser with nothing uploaded; the LMS records the score, the result, the time and the learner's place." />
+    <meta name="twitter:description" content="Drop a .h5p file and download it as a SCORM 1.2 package for Moodle, ILIAS, OpenOLAT, Chamilo or SCORM Cloud. Built in your browser with nothing uploaded; the LMS records the score, the result, each answer, the time and the learner's place." />
     <meta name="twitter:image" content="%SITE_URL%/demo/og-image.png" />
     <!-- partial: head -->
     <script type="module" src="/demo/scorm-page.js"></script>
@@ -59,10 +59,11 @@
       <h2>In the LMS</h2>
       <p>
         Add the zip to a course as a SCORM activity. The LMS records the score out of 100, whether
-        the content was passed or failed, or completed when it does not say, the time spent, and
-        the learner's place, so the next launch continues where they left off. Content that reports
-        no result of its own, an Accordion or a Virtual Tour, stays incomplete. The package plays
-        with its own code on the LMS's origin, as every SCORM package does.
+        the content was passed or failed, or completed when it does not say, each question's
+        answer, the time spent, and the learner's place, so the next launch continues where they
+        left off. Content that reports no result of its own, an Accordion or a Virtual Tour, stays
+        incomplete. The package plays with its own code on the LMS's origin, as every SCORM
+        package does.
       </p>
       <table class="table">
         <thead>
@@ -80,8 +81,9 @@
       <p>
         Another LMS that takes SCORM 1.2 may work as well; these are the ones checked, as a learner
         in Chrome. The LMS has to be served over https, since the player needs its Service Worker.
-        SCORM 1.2 keeps 4,096 characters of saved state, enough for a quiz; a larger state is not
-        saved.
+        SCORM 1.2 keeps 4,096 characters of saved state; the zip writes it compressed, so a quiz
+        takes about 200 and a twelve-chapter Interactive Book about 1,000. One that does not fit is
+        not saved, and the learner is told under the content.
       </p>
 
       <h2>What goes in the zip</h2>

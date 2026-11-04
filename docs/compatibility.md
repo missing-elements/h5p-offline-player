@@ -93,9 +93,10 @@ What is covered of the pack itself: the `pack` export, `parts/` with its `index.
   their options and their types; and `resizer.js`, which speaks H5P's own resizer protocol.
 - **The SCORM package `--scorm` writes**, and **`buildScorm()`**, with its options and types: SCORM
   1.2, the elements its page sets (`cmi.core.score.raw`, `.min` and `.max`,
-  `cmi.core.lesson_status`, `cmi.core.session_time`, `cmi.core.exit`), and what it keeps in
-  `cmi.suspend_data`, which a zip written by a later version reads back unless the libraries it
-  carries from the pack have changed.
+  `cmi.core.lesson_status`, `cmi.core.session_time`, `cmi.core.exit`, and since 1.5 each
+  question's `cmi.interactions.n`), and what it keeps in `cmi.suspend_data`, which a zip written
+  by a later version reads back unless the libraries it carries from the pack have changed: 1.5
+  writes it compressed and still reads what 1.4 wrote plain.
 - **The SCORM page**, `scorm.html` on a written site, and **`buildScormInPage()`** and
   **`startScormPage()`**, with their options and types: the same zip as `buildScorm()`'s, built in
   the browser.

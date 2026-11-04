@@ -95,7 +95,8 @@ if (values.scorm !== undefined) {
 with the player ${zip.version}${supplied}.
 
 Add it to a course as a SCORM package. The LMS gets the content's score and whether it passed,
-when the content reports them, and the time spent; the learner's place is kept between sessions.
+when the content reports them, each question's answer, and the time spent; the learner's place is
+kept between sessions.
 The LMS must be served over https, as the player's Service Worker needs.`)
   } catch (error) {
     if (error instanceof EmbedError) {
