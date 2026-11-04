@@ -27,16 +27,19 @@ import { EmbedError, PLAYER_FILES } from './shared.mjs'
  * @property {string} [name] its file name, for the zip's name, the title's fallback and the
  *   messages; a `File`'s own by default
  * @property {string | URL} [base] the folder that holds the player's three files and
- *   `frame-assets/`, and, unless `assets` gives them, `scorm-launch.html`, `scorm.js`, `embed.css`
- *   and `libraries.txt`: this page's own folder by default
+ *   `frame-assets/`, and, unless `assets` gives them, `scorm-launch.html`, `scorm.js`,
+ *   `lz-string.js`, `embed.css` and `libraries.txt`: this page's own folder by default
  * @property {PackIndex | null} [pack] the library pack, as the `pack` export a bundler resolves;
  *   it wins over `packBase`
  * @property {string | URL | null} [packBase] the folder of a copy of the pack's `parts/`, which
  *   the written site has as `libraries/`. Without either, a package that does not carry its
  *   libraries is refused
- * @property {{ launch?: string, bridge?: string | Blob, css?: string | Blob, libraries?: string | Blob }} [assets]
- *   the launch page's template, its bridge, the stylesheet and the pack's licence list, for a page
- *   that bundles them rather than serving them beside the player
+ * @property {{ launch?: string, bridge?: string | Blob, lz?: string | Blob, css?: string | Blob, libraries?: string | Blob }} [assets]
+ *   the launch page's template, its bridge, the compressor the bridge keeps the saved state with
+ *   (`scorm/lz-string.js`), the stylesheet and the pack's licence list, for a page that bundles
+ *   them rather than serving them beside the player. A page that gives the launch page and not the
+ *   compressor gets the one at `base`, or a zip without it, whose bridge writes the saved state
+ *   plain, as embed 1.4 did
  * @property {string} [version] the player's version, for the notice; `unknown` if not given
  * @property {string | null} [packVersion] the pack's, the same way
  * @property {(progress: ScormProgress) => void} [onProgress]
@@ -134,6 +137,17 @@ export async function buildScormInPage(options) {
   onProgress({ step: 'libraries', libraries: parts.length })
   /** @param {string} url @param {string} what */
   const blob = async (url, what) => (await fetched(fetchImpl, url, what)).blob()
+  // The compressor came in 1.5, after pages that bundle the launch files were written: such a page
+  // that does not give it plays on without it, its state plain, rather than fail for a file it
+  // never had to serve.
+  const compressor = async () => {
+    try {
+      return await blob(at('lz-string.js'), "The launch page's compressor")
+    } catch (error) {
+      if (assets.launch !== undefined && error instanceof EmbedError) return null
+      throw error
+    }
+  }
   /** @param {string[]} names @param {(name: string) => string} url @param {string} what */
   const blobs = async (names, url, what) => new Map(await Promise.all(names.map(async (item) => /** @type {[string, Blob]} */ ([item, await blob(url(item), `${what} ${item}`)]))))
   const partBlobs = await blobs(parts.map((part) => part.folder), (folder) => /** @type {import('./scorm-core.mjs').PackPart} */ (parts.find((part) => part.folder === folder)).url, 'The library part')
@@ -148,6 +162,7 @@ export async function buildScormInPage(options) {
   const files = {
     launch: assets.launch ?? (await (await fetched(fetchImpl, at('scorm-launch.html'), "The launch page's template")).text()),
     bridge: assets.bridge !== undefined ? asBlob(assets.bridge) : await blob(at('scorm.js'), 'The launch page\'s script'),
+    lz: assets.lz !== undefined ? asBlob(assets.lz) : await compressor(),
     css: assets.css !== undefined ? asBlob(assets.css) : await blob(at('embed.css'), 'The stylesheet'),
     player: await blobs(PLAYER_FILES, at, "The player's file"),
     runtime: await blobs(runtimeFiles(runtimeManifest), (path) => at(`frame-assets/${path}`), "The runtime's file"),

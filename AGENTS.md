@@ -264,7 +264,9 @@ packages/embed/           @missing-elements/h5p-embed — the embed page as a st
                             fetched from the site and the zip a Blob; lib/shared.mjs, EmbedError and
                             the player's file names, for the modules that import no Node (#122)
   scorm/                    the SCORM package's launch page (index.html, its title, language and
-                            build filled in by the writer) and scorm.js, its bridge to the LMS's API
+                            build filled in by the writer), scorm.js, its bridge to the LMS's API,
+                            and lz-string.js, lz-string 1.5.0 as npm publishes it (MIT, its licence
+                            in its header), which the bridge compresses the saved state with (#124)
   bin/h5p-embed.mjs         the command
   scripts/                  build.mjs, dist/scorm-page.js: the SCORM page's script bundled with zip.js
                             and the player's `./plan` for a written site, which has no bundler
@@ -2443,22 +2445,71 @@ one row each; an LMS added here gets a row there.
 
   The last `finished` counts, as `setFinished` does on an H5P site. On `beforeunload` it sets the
   session time and `cmi.core.exit` (`suspend` unless finished) and commits; on `pagehide` it sets
-  both again and calls `LMSFinish`. The commit is ILIAS's (#94, under *ILIAS plays it too*), and
+  both again and calls `LMSFinish`.
+  **Each answer goes into `cmi.interactions`** (#124, 2026-11-04, asked for by two of three
+  commenters on the Reddit demand check): every `answered` statement the element relays, by the
+  part's `subContentId`, with the question's words as the id, since 1.2 has no description field
+  and the id is what a report shows (a slug in printable ASCII, which 1.2's `CMIIdentifier`
+  allows and nothing else; the key for a question with no words; `-2` on a second question with
+  the same words), the xAPI type as 1.2 names it (`long-fill-in` as `fill-in`, `other` and an
+  unknown type left out), the pattern and the response cut to 255 (`CMIFeedback`; H5P's `0[,]2`
+  goes in as it is, which Moodle takes), `correct` or `wrong` from `success`, or from the score
+  where the content says nothing, as Fill in the Blanks does not (full marks, none, or the marks
+  themselves, a number 1.2 takes there), `neutral` with neither, the marks as `weighting`,
+  `result.duration` as `latency`, the time of day. **One index per question, written over on a
+  retry**, read in Moodle's code: its interactions report has one column per index for every
+  learner (`get_scorm_question_count` takes the highest index found), so an entry per attempt
+  would set one learner's columns against another's. The index and the id come from the
+  questions kept with the state (`questions` in `suspend_data`, a `[key, id]` per index, so that
+  the second of two questions with the same words keeps its `-2` in a later session), after
+  `cmi.interactions._count`, which 1.2 lets a SCO read and Moodle reloads from the attempt's
+  tracks; an attempt the LMS started over counts none, and they start again. The state is written
+  and committed with each answer as well as with each of the content's saves, since content that
+  keeps no state of its own sends no `userdata`, and its questions would otherwise take a new
+  index in every session; where the state cannot be written, the answer is still committed (both
+  found in #126's review). The fields are write-only; the reports read them. The commit is ILIAS's (#94, under *ILIAS plays it too*), and
   only a commit: the content's last save comes after it, and the learner may stay. Moodle's API
   sends with `navigator.sendBeacon` while unloading, and the `exit` it stored showed that the call
   arrived. Content with no result of its own stays `incomplete`. Moodle takes `score.raw` as the
   grade, against the activity's maximum grade (`grademax` is its `maxgrade` in
   `scorm_grade_item_update`), so the README says to leave that at 100, Moodle's default.
+  Checked in Moodle 4.5.15 on 2026-11-04 with the demo quiz, three answers right: the four
+  interactions in the attempt's tracks with the ids from the questions' words, the types, the
+  patterns and responses, `correct` three times and `wrong` once, the weightings and latencies,
+  `get_scorm_question_count` 4, and the interactions report with a Response column per index.
 - **Resume through `cmi.suspend_data`.** The element plays with `resume="host"`. Every `userdata`
-  event rewrites `{ build, entries }` into `suspend_data` and commits. A launch hands `userData`
-  back before `src` when the stamp matches. The stamp is the first 16 hex digits of the package's
+  event rewrites `{ build, entries, questions }` into `suspend_data`, compressed with lz-string's
+  `compressToBase64` since embed 1.5 (#124: ASCII, as 1.2's `CMIString4096` asks, and
+  synchronous, so the content's last save on `beforeunload` still lands, where the browser's
+  `CompressionStream` is asynchronous and could lose it), and commits. A state that begins with
+  `{`, written plain by a zip up to 1.4, is read as it is, so a learner's place survives the
+  upgrade. A launch hands `userData` back before `src` when the stamp matches. The stamp is the first 16 hex digits of the package's
   SHA-256, or, with parts of the pack, of one over the package's and theirs, written into the page's
   `<meta name="h5p-package-build">`. So a teacher who replaces the zip with another package does not
   hand learners state saved against the old one, and a zip written with other parts starts them
   over, as a refreshed package does in the player (the owner's rule of 2026-10-18). SCORM 1.2 keeps
-  4,096 characters; a larger state is not written, and the last one that fitted stays. Checked in
+  4,096 characters; a larger state is not written, and the last one that fitted stays. Until #124
+  that was silent; now the page says so once, under the content (`#saving`), and in the console,
+  as it does when the LMS refuses the write, which the bridge checks `LMSSetValue`'s answer for.
+  `#saving` and the launch page's error, `#notice`, each sit in a live region that is on the page
+  from the start, empty (`role="status"`, `role="alert"`), as `ACCESSIBILITY.md` asks of a host,
+  since a region that appears with its text is not announced by every screen reader; until #126's
+  review each was the region itself, hidden.
+  Moodle takes 64,000 when its administrator turns "SCORM 1.2 standard mode" off
+  (`scormstandard` in `public/mod/scorm/datamodels/scorm_12.php`). Checked in
   Moodle: a learner left after the first question, the next launch's `entry` was `resume`, and the
-  quiz reopened on the second question.
+  quiz reopened on the second question; with the compressed state (220 characters) the same on
+  2026-11-04, in standard mode. Measured that day on 23 packages of the corpus, the state as the
+  bridge writes it after a generic click-through: a quiz 170 to 240 plain and 180 to 210
+  compressed, Course Presentations 150 to 370 and 180 to 280, Interactive Books 630 to 2,330 and
+  420 to 1,040, so nothing near the limit; a state under about 150 characters comes out longer
+  compressed, base64 costing a third. The 12-chapter book read to its last chapter in Moodle wrote
+  996 characters and came back with its chapters' state, and on its first chapter: Interactive
+  Book takes its saved place (`urlFragments`, with `h5pbookid`) back only when that id is the
+  content id, which the boot script draws at random on every load (`integrationFor`), so no book
+  returns to its chapter in any `resume` mode, a runtime bug outside #124 (#127), measured the same day
+  in the plain player with `resume="device"`. Two corpus books carry Interactive Book 1.3, which
+  keeps no state at all.
 - **Outside an LMS** the page finds no API, plays the package and reports nothing.
 - **Frappe LMS plays it too, and records less.** Checked on 2026-10-30 against Frappe LMS's
   `develop` branch in its own Docker setup, as an enrolled student in Chrome, with the demo's quiz,
@@ -2599,7 +2650,10 @@ one row each; an LMS added here gets a row there.
   `scorm-browser.mjs`, `./scorm/browser`, is the page's, `buildScormInPage()`: the package a
   `File`, the player's files, the runtime and the pack fetched from the site the page is on (`base`,
   `pack` or `packBase`, or `assets` for a page that bundles the launch page, the bridge, the
-  stylesheet and the licence list), each part checked against the index's SHA-256 since it came
+  compressor, the stylesheet and the licence list; a page that gives the launch page and not the
+  compressor, as one bundled for 1.4 does, gets the one at `base` or a zip without it, whose page
+  names none and whose bridge writes the state plain, rather than an export that fails for a file
+  it never had to serve), each part checked against the index's SHA-256 since it came
   over the network, and the zip a `Blob`. The runtime's files are named by a list,
   `RUNTIME_FILES`, plus the fonts from its `MANIFEST.json`, since a folder on a server cannot be
   listed; `scorm-browser.test.ts` runs the builder in Node, which has `fetch`, `File` and
@@ -2609,7 +2663,8 @@ one row each; an LMS added here gets a row there.
   badge where the page has one; the written site loads it as `scripts/build.mjs` bundles it with
   zip.js and the player's `./plan` (`dist/scorm-page.js`, zip.js's licence in its header, since the
   site has no bundler), from `scorm.html`, with the launch page and the bridge copied beside it as
-  `scorm-launch.html` and `scorm.js` and the player's and the pack's versions in `config.js`. The
+  `scorm-launch.html`, `scorm.js` and `lz-string.js` and the player's and the pack's versions in
+  `config.js`. The
   demo reuses the source at `/demo/scorm.html` in the site's own design: the pack's parts as Vite
   emits them, the four files as `?raw` strings, the player's version from a `define`, and the
   player's built files from the site root, which a dev middleware serves from the player's `dist/`
@@ -2630,7 +2685,15 @@ its refusals in Node. In Chromium it plays the unpacked zip under a page that ho
 frames the launch page, as Moodle's player does. It covers:
 
 - a passed and a failed result, the end of the session, resume, and refusing state saved by
-  another build;
+  another build, and reading one a zip up to 1.4 wrote plain;
+- the quiz's four answers as interactions, and, through dispatched `xapi` events, the id from
+  the words and from the key, the second id for the same words, kept in a later session, the
+  type map, the 255 cut, the result from `success` and from the score, the questions written and
+  committed with each answer, one index per question across a retry and a second session, and an
+  attempt started over;
+- a state that fits only compressed, one that does not fit at all and the notice said once,
+  both notices' live regions on the page from the start, a write the LMS refuses, and a launch
+  page without the compressor, which writes the state plain;
 - the commit on `beforeunload` and the finish on `pagehide`, by the event the launch page was
   dispatching when it called, which is what ILIAS goes by, and a leave the learner stays from;
 - a result with no score, and a state past 4,096 characters, through the element's events

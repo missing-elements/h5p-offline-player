@@ -93,7 +93,7 @@ describe('the site', () => {
     const out = join(dir, 'locked')
     const site = await buildSite({ out, packages: 'https://cdn.example.org', ancestors: ['https://school.example'] })
 
-    for (const name of ['index.html', 'main.js', 'embed.js', 'embed.css', 'resizer.js', 'config.js', 'scorm.html', 'scorm-main.js', 'scorm-page.js', 'scorm-page.css', 'scorm-launch.html', 'scorm.js', 'h5p-player.js', 'h5p-sw.js', 'h5p-jobs.js', 'libraries/index.json', 'libraries.txt', 'NOTICE.txt', '_headers', 'vercel.json', 'Caddyfile', 'nginx.conf', '.htaccess']) {
+    for (const name of ['index.html', 'main.js', 'embed.js', 'embed.css', 'resizer.js', 'config.js', 'scorm.html', 'scorm-main.js', 'scorm-page.js', 'scorm-page.css', 'scorm-launch.html', 'scorm.js', 'lz-string.js', 'h5p-player.js', 'h5p-sw.js', 'h5p-jobs.js', 'libraries/index.json', 'libraries.txt', 'NOTICE.txt', '_headers', 'vercel.json', 'Caddyfile', 'nginx.conf', '.htaccess']) {
       expect(existsSync(join(out, name)), name).toBe(true)
     }
     for (const name of ['frame-boot.js', 'frame.bundle.js', 'h5p.css', 'LICENSE.txt', 'NOTICE.txt']) {

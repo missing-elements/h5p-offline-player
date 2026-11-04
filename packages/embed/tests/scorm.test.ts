@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { createHash } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createServer, type Server } from 'node:http'
@@ -41,7 +41,7 @@ describe('the package', () => {
     expect(built).toMatchObject({ out, title: 'Do you know what just happened?', libraries: [], build })
 
     const zip = await entriesOf(out)
-    for (const name of ['imsmanifest.xml', 'index.html', 'scorm.js', 'embed.css', 'h5p-player.js', 'h5p-sw.js', 'h5p-jobs.js', 'package.h5p', 'NOTICE.txt']) {
+    for (const name of ['imsmanifest.xml', 'index.html', 'scorm.js', 'lz-string.js', 'embed.css', 'h5p-player.js', 'h5p-sw.js', 'h5p-jobs.js', 'package.h5p', 'NOTICE.txt']) {
       expect(zip.names).toContain(name)
     }
     expect(zip.names.filter((name) => name.startsWith('libraries'))).toEqual([])
@@ -250,8 +250,17 @@ const LMS_PAGE = `<!doctype html>
   window.API = {
     LMSInitialize: record('LMSInitialize', () => 'true'),
     LMSFinish: record('LMSFinish', sent('LMSFinish')),
-    LMSGetValue: record('LMSGetValue', (element) => window.values[element] ?? ''),
+    // The interactions' count, which SCORM 1.2 lets the content read: one past the highest index written.
+    LMSGetValue: record('LMSGetValue', (element) => {
+      if (element === 'cmi.interactions._count') {
+        const indexes = Object.keys(window.values).map((key) => /^cmi\\.interactions\\.(\\d+)\\.id$/.exec(key)).filter(Boolean).map((match) => Number(match[1]))
+        return String(indexes.length ? Math.max(...indexes) + 1 : 0)
+      }
+      return window.values[element] ?? ''
+    }),
+    // An LMS that refuses the saved state, when a test says so.
     LMSSetValue: record('LMSSetValue', (element, value) => {
+      if (window.refuse && element === 'cmi.suspend_data') return 'false'
       window.values[element] = value
       return 'true'
     }),
@@ -300,6 +309,11 @@ describe('in an LMS', () => {
       }
       await zip.close()
     }
+    // The quiz's launch page without the compressor, as the page builder writes it for a page that
+    // bundles the launch files and gives none (`scorm-browser.test.ts`).
+    const launchPage = await readFile(join(root, 'index.html'), 'utf8')
+    expect(launchPage).toContain('<script src="./lz-string.js"></script>')
+    await writeFile(join(root, 'plain.html'), launchPage.replace(/\n[ \t]*<script src="\.\/lz-string\.js"><\/script>/, ''))
 
     server = createServer(async (request, response) => {
       const path = decodeURIComponent(new URL(request.url ?? '/', 'http://x').pathname)
@@ -379,6 +393,15 @@ describe('in an LMS', () => {
     const kept = await values(page)
     expect(kept).toMatchObject({ 'cmi.core.score.min': '0', 'cmi.core.score.max': '100', 'cmi.core.score.raw': '66.67' })
     expect(kept['cmi.core.session_time']).toMatch(/^\d{2,4}:\d{2}:\d{2}\.\d{2}$/)
+    // Each question's answer as an interaction, by index, as Moodle's report reads them: the
+    // question's words as the id, since SCORM 1.2 has no description field.
+    expect(Object.keys(kept).filter((key) => /^cmi\.interactions\.\d+\.id$/.test(key))).toHaveLength(4)
+    expect(kept['cmi.interactions.0.id']).toMatch(/^[a-z0-9-]{3,80}$/)
+    expect(kept).toMatchObject({ 'cmi.interactions.0.type': 'choice', 'cmi.interactions.0.result': 'correct', 'cmi.interactions.1.type': 'true-false', 'cmi.interactions.1.result': 'correct', 'cmi.interactions.2.type': 'fill-in', 'cmi.interactions.2.result': 'correct' })
+    expect(kept['cmi.interactions.0.student_response']).toBe(kept['cmi.interactions.0.correct_responses.0.pattern'])
+    expect(kept['cmi.interactions.0.weighting']).toMatch(/^\d+$/)
+    expect(kept['cmi.interactions.0.latency']).toMatch(/^\d{2,4}:\d{2}:\d{2}\.\d{2}$/)
+    expect(kept['cmi.interactions.0.time']).toMatch(/^\d{2}:\d{2}:\d{2}$/)
     const made = await calls(page)
     expect(made[0]).toEqual(['LMSInitialize', ''])
     expect(made).toContainEqual(['LMSSetValue', 'cmi.core.lesson_status', 'incomplete'])
@@ -434,25 +457,158 @@ describe('in an LMS', () => {
     await context.close()
   })
 
-  it('writes no state larger than SCORM 1.2 keeps, and keeps the last that fitted', async () => {
-    const { context, page } = await lmsPage()
-    const { sco } = await launch(page)
-    /** What `suspend_data` holds before and after the element saves `data`. */
-    const save = (data: string) =>
-      sco.evaluate((data) => {
-        const lms = parent as unknown as { values: Record<string, string> }
-        const before = lms.values['cmi.suspend_data']
-        const player = document.querySelector('h5p-player') as HTMLElement
-        player.dispatchEvent(new CustomEvent('userdata', { detail: { dataType: 'state', subContentId: 'large', data } }))
-        return { before, after: lms.values['cmi.suspend_data'] }
-      }, data)
+  /** What `suspend_data` holds before and after the element saves `data`, and whether the page says it could not. */
+  const save = (sco: Frame, data: string) =>
+    sco.evaluate((data) => {
+      const lms = parent as unknown as { values: Record<string, string> }
+      const before = lms.values['cmi.suspend_data']
+      const player = document.querySelector('h5p-player') as HTMLElement
+      player.dispatchEvent(new CustomEvent('userdata', { detail: { dataType: 'state', subContentId: 'large', data } }))
+      const saying = document.getElementById('saving') as HTMLElement
+      return { before, after: lms.values['cmi.suspend_data'], said: !saying.hidden, text: saying.textContent }
+    }, data)
 
-    const large = await save('x'.repeat(5000))
-    expect(large.after).toBe(large.before)
-    const small = await save('small')
-    expect(JSON.parse(small.after).entries).toContainEqual(['state', 'large', 'small'])
+  /** `suspend_data` read back as the bridge reads it: compressed, by the page's own lz-string. */
+  const decoded = (sco: Frame, text: string) =>
+    sco.evaluate((text) => JSON.parse((window as unknown as { LZString: { decompressFromBase64: (s: string) => string } }).LZString.decompressFromBase64(text)), text)
+
+  it('writes the state compressed, no larger than SCORM 1.2 keeps, and says once when it does not fit', async () => {
+    const { context, page } = await lmsPage()
+    const warnings: string[] = []
+    page.on('console', (message) => { if (message.type() === 'warning') warnings.push(message.text()) })
+    const { sco } = await launch(page)
+    // Both notices sit in a live region that is on the page from the start, empty, so that what is
+    // put into one is announced.
+    expect(await sco.evaluate(() => ['saving', 'notice'].map((id) => {
+      const region = document.getElementById(id)?.parentElement
+      return `${region?.getAttribute('role')} ${region?.closest('[hidden]') === null} ${region?.textContent}`
+    }))).toEqual(['status true ', 'alert true '])
+
+    // A state that compresses: four times what SCORM 1.2 keeps, as JSON repeats itself, fits.
+    const long = JSON.stringify(Array.from({ length: 400 }, (_, i) => ({ question: i, answers: [0, 2], checked: true })))
+    expect(long.length).toBeGreaterThan(4096 * 4)
+    const fits = await save(sco, long)
+    expect(fits.after).not.toBe(fits.before)
+    expect(fits.after).toMatch(/^[A-Za-z0-9+/=]+$/)
+    expect(fits.after.length).toBeLessThanOrEqual(4096)
+    expect(fits.said).toBe(false)
+    expect((await decoded(sco, fits.after)).entries).toContainEqual(['state', 'large', long])
+
+    // One that does not: random text has nothing to compress. The last state that fitted stays,
+    // and the page says so, once.
+    const random = randomBytes(6000).toString('base64')
+    const large = await save(sco, random)
+    expect(large.after).toBe(fits.after)
+    expect(large.said).toBe(true)
+    expect(large.text).toMatch(/may not be saved/)
+    expect(warnings.filter((text) => /SCORM 1\.2 keeps 4096/.test(text))).toHaveLength(1)
+    const again = await save(sco, `${random}x`)
+    expect(again.after).toBe(fits.after)
+    expect(warnings.filter((text) => /SCORM 1\.2 keeps 4096/.test(text))).toHaveLength(2)
+    expect(await sco.locator('#saving').count()).toBe(1)
+
     const written = (await calls(page)).filter((call) => call[0] === 'LMSSetValue' && call[1] === 'cmi.suspend_data')
     expect(Math.max(...written.map((call) => call[2].length))).toBeLessThanOrEqual(4096)
+    await context.close()
+  })
+
+  it('says once when the LMS refuses the state, and keeps playing', async () => {
+    const { context, page } = await lmsPage()
+    const warnings: string[] = []
+    page.on('console', (message) => { if (message.type() === 'warning') warnings.push(message.text()) })
+    const { sco } = await launch(page)
+    const kept = await save(sco, 'kept')
+    expect(kept.said).toBe(false)
+    await page.evaluate(() => { (window as unknown as { refuse: boolean }).refuse = true })
+    const refused = await save(sco, 'refused')
+    expect(refused.after).toBe(kept.after)
+    expect(refused.said).toBe(true)
+    expect(warnings.filter((text) => /the LMS refused/.test(text))).toHaveLength(1)
+    expect(await sco.evaluate(() => (document.querySelector('h5p-player') as { state?: string }).state)).toBe('ready')
+    await context.close()
+  })
+
+  it('writes each answer as an interaction, one index per question, written over when answered again', async () => {
+    const ANSWERED = 'http://adlnet.gov/expapi/verbs/answered'
+    const { context, page } = await lmsPage()
+    const first = await launch(page)
+    /** A statement about the part `sub`, as the core writes one, dispatched as the element dispatches it. */
+    const answer = (sco: Frame, sub: string, text: string, definition: Record<string, unknown> = {}, result: Record<string, unknown> = {}) =>
+      sco.evaluate(({ verb, sub, text, definition, result }) => {
+        const statement = {
+          verb: { id: verb },
+          object: { id: `http://lms.example/package.h5p?subContentId=${sub}`, definition: { description: { 'en-US': text }, interactionType: 'choice', correctResponsesPattern: ['0[,]2'], extensions: { 'http://h5p.org/x-api/h5p-subContentId': sub }, ...definition } },
+          result: { response: '0[,]1', success: false, score: { raw: 0, max: 2 }, duration: 'PT12.5S', ...result }
+        }
+        ;(document.querySelector('h5p-player') as HTMLElement).dispatchEvent(new CustomEvent('xapi', { detail: { statement, verb } }))
+      }, { verb: ANSWERED, sub, text, definition, result })
+
+    await answer(first.sco, 'a', 'Which <em>rivers</em> cross Germany?')
+    // The question and its id go with the state as it is answered, and are committed: content that
+    // keeps no state of its own sends nothing else that would keep them.
+    const [wrote, committed] = (await calls(page)).slice(-2)
+    expect([wrote[0], wrote[1], committed[0]]).toEqual(['LMSSetValue', 'cmi.suspend_data', 'LMSCommit'])
+    expect((await decoded(first.sco, wrote[2])).questions).toEqual([['a', 'which-rivers-cross-germany']])
+    // Another question with the same words takes another id.
+    await answer(first.sco, 'b', 'Which rivers cross Germany?')
+    let kept = await values(page)
+    expect(kept).toMatchObject({
+      'cmi.interactions.0.id': 'which-rivers-cross-germany',
+      'cmi.interactions.0.type': 'choice',
+      'cmi.interactions.0.correct_responses.0.pattern': '0[,]2',
+      'cmi.interactions.0.student_response': '0[,]1',
+      'cmi.interactions.0.result': 'wrong',
+      'cmi.interactions.0.weighting': '2',
+      'cmi.interactions.0.latency': '00:00:12.50',
+      'cmi.interactions.1.id': 'which-rivers-cross-germany-2'
+    })
+    expect(kept['cmi.interactions.0.time']).toMatch(/^\d{2}:\d{2}:\d{2}$/)
+
+    // Answered again: the same index, the new answer, nothing added.
+    await answer(first.sco, 'a', 'Which <em>rivers</em> cross Germany?', {}, { response: '0[,]2', success: true, score: { raw: 2, max: 2 } })
+    kept = await values(page)
+    expect(kept).toMatchObject({ 'cmi.interactions.0.student_response': '0[,]2', 'cmi.interactions.0.result': 'correct' })
+    expect(kept['cmi.interactions.2.id']).toBeUndefined()
+
+    // An Essay's long answer, as `fill-in`, cut to what 1.2 keeps; a type 1.2 has not, left out;
+    // a question with no words, named by its id; a result that says nothing, neutral; one that
+    // says nothing but scores, as Fill in the Blanks does, by its marks.
+    await answer(first.sco, 'c', '', { interactionType: 'long-fill-in', correctResponsesPattern: [] }, { response: 'x'.repeat(300), success: undefined, score: undefined, duration: undefined })
+    await answer(first.sco, 'd', 'Other', { interactionType: 'other' }, { success: undefined, score: { raw: 1, max: 2 } })
+    kept = await values(page)
+    expect(kept).toMatchObject({ 'cmi.interactions.2.id': 'c', 'cmi.interactions.2.type': 'fill-in', 'cmi.interactions.2.result': 'neutral', 'cmi.interactions.3.id': 'other', 'cmi.interactions.3.result': '1' })
+    expect(kept['cmi.interactions.2.student_response']).toHaveLength(255)
+    expect(kept['cmi.interactions.2.correct_responses.0.pattern']).toBeUndefined()
+    expect(kept['cmi.interactions.2.latency']).toBeUndefined()
+    expect(kept['cmi.interactions.3.type']).toBeUndefined()
+
+    // The questions go with the state, with no save of the content's, so the next session of the
+    // attempt keeps their indexes and their ids.
+    expect((await decoded(first.sco, (await values(page))['cmi.suspend_data'])).questions).toEqual([
+      ['a', 'which-rivers-cross-germany'],
+      ['b', 'which-rivers-cross-germany-2'],
+      ['c', 'c'],
+      ['d', 'other']
+    ])
+    await page.evaluate(() => (window as unknown as { leave: () => void }).leave())
+    await page.waitForFunction(() => (window as unknown as { calls: string[][] }).calls.some((call) => call[0] === 'LMSFinish'))
+    const second = await launch(page)
+    // The second of two questions with the same words, answered first this time, keeps its own id.
+    await answer(second.sco, 'b', 'Which rivers cross Germany?', {}, { response: '2' })
+    await answer(second.sco, 'e', 'A new one')
+    kept = await values(page)
+    expect(kept).toMatchObject({ 'cmi.interactions.1.id': 'which-rivers-cross-germany-2', 'cmi.interactions.1.student_response': '2', 'cmi.interactions.4.id': 'a-new-one' })
+    expect(kept['cmi.interactions.5.id']).toBeUndefined()
+
+    // An attempt the LMS started over, its interactions gone: they start again from the first index.
+    await page.evaluate(() => {
+      const lms = window as unknown as { values: Record<string, string> }
+      for (const key of Object.keys(lms.values)) if (key.startsWith('cmi.interactions.')) delete lms.values[key]
+    })
+    await answer(second.sco, 'e', 'A new one', {}, { response: '1' })
+    kept = await values(page)
+    expect(kept).toMatchObject({ 'cmi.interactions.0.id': 'a-new-one', 'cmi.interactions.0.student_response': '1' })
+    expect(kept['cmi.interactions.1.id']).toBeUndefined()
     await context.close()
   })
 
@@ -476,11 +632,18 @@ describe('in an LMS', () => {
     await first.h5p.getByRole('radio', { name: 'In your browser, straight out of the zip' }).click()
     await first.h5p.getByRole('button', { name: /^Check/ }).click()
     await first.h5p.getByRole('button', { name: /^Next/ }).click()
-    // H5P saves three seconds after a `progressed` statement.
-    await page.waitForFunction(() => (window as unknown as { values: Record<string, string> }).values['cmi.suspend_data'] !== '', null, { timeout: 30_000 })
-    const kept = JSON.parse((await values(page))['cmi.suspend_data'])
+    // H5P saves three seconds after a `progressed` statement; the answer wrote the state before
+    // that, with the question and none of the content's.
+    await first.sco.waitForFunction(() => {
+      const text = (parent as unknown as { values: Record<string, string> }).values['cmi.suspend_data']
+      const json = text && (window as unknown as { LZString: { decompressFromBase64: (s: string) => string | null } }).LZString.decompressFromBase64(text)
+      return Boolean(json && JSON.parse(json).entries.length > 0)
+    }, null, { timeout: 30_000 })
+    const kept = await decoded(first.sco, (await values(page))['cmi.suspend_data'])
     expect(kept.build).toMatch(/^[0-9a-f]{16}$/)
     expect(kept.entries.length).toBeGreaterThan(0)
+    // The first question's answer, as an interaction.
+    expect((await values(page))['cmi.interactions.0.result']).toBe('correct')
 
     await page.evaluate(() => (window as unknown as { leave: () => void }).leave())
     await page.waitForFunction(() => (window as unknown as { calls: string[][] }).calls.some((call) => call[0] === 'LMSFinish'))
@@ -535,6 +698,29 @@ describe('in an LMS', () => {
     const { sco, h5p } = await launch(page)
     expect(await sco.evaluate(() => (document.querySelector('h5p-player') as { userData?: unknown[] }).userData?.length)).toBe(0)
     await h5p.getByRole('button', { name: 'Start' }).waitFor({ state: 'visible', timeout: 10_000 })
+    await context.close()
+  })
+
+  it('reads a state a zip from before wrote plain, so a learner keeps their place across the upgrade', async () => {
+    const { context, page } = await lmsPage()
+    const build = createHash('sha256').update(await readFile(quiz)).digest('hex').slice(0, 16)
+    await page.evaluate((build) => {
+      const lms = window as unknown as { values: Record<string, string> }
+      lms.values['cmi.core.exit'] = 'suspend'
+      lms.values['cmi.suspend_data'] = JSON.stringify({ build, entries: [['state', 'kept', '{"progress":1}']] })
+    }, build)
+    const { sco } = await launch(page)
+    expect(await sco.evaluate(() => (document.querySelector('h5p-player') as { userData?: unknown[] }).userData)).toEqual([{ dataType: 'state', subContentId: 'kept', data: '{"progress":1}' }])
+    await context.close()
+  })
+
+  it('writes the state plain where the launch page has no compressor', async () => {
+    const { context, page } = await lmsPage()
+    const { sco } = await launch(page, '/plain.html')
+    expect(await sco.evaluate(() => 'LZString' in window)).toBe(false)
+    const kept = await save(sco, 'kept')
+    expect(kept.said).toBe(false)
+    expect(JSON.parse(kept.after).entries).toContainEqual(['state', 'large', 'kept'])
     await context.close()
   })
 

@@ -32,6 +32,7 @@ const PAGE_FILES = ['embed.js', 'embed.css', 'main.js', 'resizer.js', 'scorm-mai
 const SCORM_FILES = [
   ['scorm-launch.html', join(SCORM, 'index.html')],
   ['scorm.js', join(SCORM, 'scorm.js')],
+  ['lz-string.js', join(SCORM, 'lz-string.js')],
   ['scorm-page.js', join(DIST, 'scorm-page.js')]
 ]
 
@@ -318,6 +319,8 @@ function notice({ version, libraries }) {
                     the SCORM page, which builds a SCORM package of a .h5p in the browser, and
                     the launch page it puts in the zip: MIT. scorm-page.js also carries zip.js,
                     BSD-3-Clause, its licence in its header.
+  lz-string.js      lz-string 1.5.0, which the zip's launch page compresses the learner's saved
+                    state with: MIT, its licence in its header.
   Caddyfile, nginx.conf, .htaccess, _headers, vercel.json
                     the same headers for five kinds of host; use the one yours reads
   h5p-player.js, h5p-sw.js, h5p-jobs.js

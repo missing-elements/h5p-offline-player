@@ -45,6 +45,7 @@
     "./scorm-page.css": "./site/scorm-page.css",
     "./scorm/index.html": "./scorm/index.html",
     "./scorm/scorm.js": "./scorm/scorm.js",
+    "./scorm/lz-string.js": "./scorm/lz-string.js",
     "./package.json": "./package.json"
   },
   "files": [
