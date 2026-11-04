@@ -250,12 +250,10 @@ const LMS_PAGE = `<!doctype html>
   window.API = {
     LMSInitialize: record('LMSInitialize', () => 'true'),
     LMSFinish: record('LMSFinish', sent('LMSFinish')),
-    // The interactions' count, which SCORM 1.2 lets the content read: one past the highest index written.
+    // The interactions' count, which SCORM 1.2 lets the content read: one past the highest index
+    // written, or, for an LMS whose count does not follow what is written, what it counted at launch.
     LMSGetValue: record('LMSGetValue', (element) => {
-      if (element === 'cmi.interactions._count') {
-        const indexes = Object.keys(window.values).map((key) => /^cmi\\.interactions\\.(\\d+)\\.id$/.exec(key)).filter(Boolean).map((match) => Number(match[1]))
-        return String(indexes.length ? Math.max(...indexes) + 1 : 0)
-      }
+      if (element === 'cmi.interactions._count') return String(window.lagging ? window.launchCount : interactionCount())
       return window.values[element] ?? ''
     }),
     // An LMS that refuses the saved state, when a test says so.
@@ -269,8 +267,13 @@ const LMS_PAGE = `<!doctype html>
     LMSGetErrorString: () => '',
     LMSGetDiagnostic: () => ''
   }
+  function interactionCount() {
+    const indexes = Object.keys(window.values).map((key) => /^cmi\\.interactions\\.(\\d+)\\.id$/.exec(key)).filter(Boolean).map((match) => Number(match[1]))
+    return indexes.length ? Math.max(...indexes) + 1 : 0
+  }
   // A launch after a suspended session resumes it, as the LMS says with cmi.core.entry.
   window.launch = (path) => {
+    window.launchCount = interactionCount()
     window.values['cmi.core.entry'] = window.values['cmi.core.exit'] === 'suspend' ? 'resume' : window.calls.length ? '' : 'ab-initio'
     document.getElementById('sco')?.remove()
     const frame = document.createElement('iframe')
@@ -528,20 +531,27 @@ describe('in an LMS', () => {
     await context.close()
   })
 
+  /** A statement about the part `sub`, as the core writes one, dispatched as the element dispatches it. */
+  const answer = (sco: Frame, sub: string, text: string, definition: Record<string, unknown> = {}, result: Record<string, unknown> = {}) =>
+    sco.evaluate(({ verb, sub, text, definition, result }) => {
+      const statement = {
+        verb: { id: verb },
+        object: { id: `http://lms.example/package.h5p?subContentId=${sub}`, definition: { description: { 'en-US': text }, interactionType: 'choice', correctResponsesPattern: ['0[,]2'], extensions: { 'http://h5p.org/x-api/h5p-subContentId': sub }, ...definition } },
+        result: { response: '0[,]1', success: false, score: { raw: 0, max: 2 }, duration: 'PT12.5S', ...result }
+      }
+      ;(document.querySelector('h5p-player') as HTMLElement).dispatchEvent(new CustomEvent('xapi', { detail: { statement, verb } }))
+    }, { verb: 'http://adlnet.gov/expapi/verbs/answered', sub, text, definition, result })
+
+  /** Ends the session as the page going does, and waits for the LMS to hear this session's finish. */
+  const leave = async (page: Page) => {
+    const before = await page.evaluate(() => (window as unknown as { calls: string[][] }).calls.length)
+    await page.evaluate(() => (window as unknown as { leave: () => void }).leave())
+    await page.waitForFunction((before) => (window as unknown as { calls: string[][] }).calls.slice(before).some((call) => call[0] === 'LMSFinish'), before)
+  }
+
   it('writes each answer as an interaction, one index per question, written over when answered again', async () => {
-    const ANSWERED = 'http://adlnet.gov/expapi/verbs/answered'
     const { context, page } = await lmsPage()
     const first = await launch(page)
-    /** A statement about the part `sub`, as the core writes one, dispatched as the element dispatches it. */
-    const answer = (sco: Frame, sub: string, text: string, definition: Record<string, unknown> = {}, result: Record<string, unknown> = {}) =>
-      sco.evaluate(({ verb, sub, text, definition, result }) => {
-        const statement = {
-          verb: { id: verb },
-          object: { id: `http://lms.example/package.h5p?subContentId=${sub}`, definition: { description: { 'en-US': text }, interactionType: 'choice', correctResponsesPattern: ['0[,]2'], extensions: { 'http://h5p.org/x-api/h5p-subContentId': sub }, ...definition } },
-          result: { response: '0[,]1', success: false, score: { raw: 0, max: 2 }, duration: 'PT12.5S', ...result }
-        }
-        ;(document.querySelector('h5p-player') as HTMLElement).dispatchEvent(new CustomEvent('xapi', { detail: { statement, verb } }))
-      }, { verb: ANSWERED, sub, text, definition, result })
 
     await answer(first.sco, 'a', 'Which <em>rivers</em> cross Germany?')
     // The question and its id go with the state as it is answered, and are committed: content that
@@ -590,8 +600,7 @@ describe('in an LMS', () => {
       ['c', 'c'],
       ['d', 'other']
     ])
-    await page.evaluate(() => (window as unknown as { leave: () => void }).leave())
-    await page.waitForFunction(() => (window as unknown as { calls: string[][] }).calls.some((call) => call[0] === 'LMSFinish'))
+    await leave(page)
     const second = await launch(page)
     // The second of two questions with the same words, answered first this time, keeps its own id.
     await answer(second.sco, 'b', 'Which rivers cross Germany?', {}, { response: '2' })
@@ -600,15 +609,38 @@ describe('in an LMS', () => {
     expect(kept).toMatchObject({ 'cmi.interactions.1.id': 'which-rivers-cross-germany-2', 'cmi.interactions.1.student_response': '2', 'cmi.interactions.4.id': 'a-new-one' })
     expect(kept['cmi.interactions.5.id']).toBeUndefined()
 
-    // An attempt the LMS started over, its interactions gone: they start again from the first index.
+    // An attempt the LMS started over, which it does at a launch, its interactions gone: they start
+    // again from the first index.
+    await leave(page)
     await page.evaluate(() => {
       const lms = window as unknown as { values: Record<string, string> }
       for (const key of Object.keys(lms.values)) if (key.startsWith('cmi.interactions.')) delete lms.values[key]
     })
-    await answer(second.sco, 'e', 'A new one', {}, { response: '1' })
+    const third = await launch(page)
+    await answer(third.sco, 'e', 'A new one', {}, { response: '1' })
     kept = await values(page)
     expect(kept).toMatchObject({ 'cmi.interactions.0.id': 'a-new-one', 'cmi.interactions.0.student_response': '1' })
     expect(kept['cmi.interactions.1.id']).toBeUndefined()
+    await context.close()
+  })
+
+  it('keeps one index per question where the LMS counts only what it loaded at launch', async () => {
+    // An LMS whose count does not follow what is written in the session (#130): the bridge reads it
+    // once, at launch, and keeps its own record from there.
+    const { context, page } = await lmsPage()
+    await page.evaluate(() => { (window as unknown as { lagging: boolean }).lagging = true })
+    const first = await launch(page)
+    for (const sub of ['a', 'b', 'c']) await answer(first.sco, sub, `Question ${sub}`)
+    let kept = await values(page)
+    expect([0, 1, 2].map((index) => kept[`cmi.interactions.${index}.id`])).toEqual(['question-a', 'question-b', 'question-c'])
+
+    // The next session of the attempt: the count it loaded, and new questions after it.
+    await leave(page)
+    const second = await launch(page)
+    await answer(second.sco, 'b', 'Question b', {}, { response: '2' })
+    for (const sub of ['d', 'e']) await answer(second.sco, sub, `Question ${sub}`)
+    kept = await values(page)
+    expect(kept).toMatchObject({ 'cmi.interactions.1.student_response': '2', 'cmi.interactions.3.id': 'question-d', 'cmi.interactions.4.id': 'question-e' })
     await context.close()
   })
 

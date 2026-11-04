@@ -304,11 +304,21 @@ player.addEventListener('userdata', (event) => {
  * column per interaction index for every learner. So a question keeps one index, written over
  * when it is answered again, rather than taking a new one on every attempt, which would set one
  * learner's columns against another's. The index and the id come from the questions kept with
- * the state, after what the LMS already counts; a new attempt, where the LMS counts none, starts
- * them again. They are kept with each answer, not only with the content's own saves, since
+ * the state, after what the LMS counted at launch; a new attempt, where the LMS counts none,
+ * starts them again. They are kept with each answer, not only with the content's own saves, since
  * content that keeps no state of its own sends none. SCORM 1.2 lets the content write the fields
  * and never read them, which the report does.
  */
+
+/**
+ * What the LMS counts of this attempt's interactions, read once, at launch, since an attempt the
+ * LMS starts over can only start there: fewer than the questions kept is such an attempt, which
+ * starts them again; more, interactions this page has no record of, which new questions go after.
+ * Within the session the questions kept are the record, so an LMS whose count does not follow what
+ * is written, or that counts none, does not put every new question on one index (#130).
+ */
+const launchCount = Math.max(0, Number(get('cmi.interactions._count')) || 0)
+if (questions.length > launchCount) questions = questions.slice(0, launchCount)
 
 /**
  * The question's index and the id it was written under: those it has, else the next index and
@@ -318,16 +328,13 @@ player.addEventListener('userdata', (event) => {
  */
 function interactionFor(statement) {
   const key = questionKey(statement)
-  const count = Math.max(0, Number(get('cmi.interactions._count')) || 0)
-  // The LMS counts fewer than the state names: a new attempt, which starts them again.
-  if (questions.length > count) questions = questions.slice(0, count)
   const known = questions.findIndex((entry) => entry?.[0] === key)
   if (known !== -1) return { index: known, id: /** @type {[string, string]} */ (questions[known])[1] }
   const base = interactionId(questionText(statement, language), key)
   const taken = new Set(questions.map((entry) => entry?.[1]))
   let id = base
   for (let n = 2; taken.has(id); n++) id = `${base.slice(0, IDENTIFIER_LIMIT - 1 - String(n).length)}-${n}`
-  const index = Math.max(questions.length, count)
+  const index = Math.max(questions.length, launchCount)
   questions[index] = [key, id]
   return { index, id }
 }

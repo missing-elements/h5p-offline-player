@@ -2463,7 +2463,11 @@ one row each; an LMS added here gets a row there.
   questions kept with the state (`questions` in `suspend_data`, a `[key, id]` per index, so that
   the second of two questions with the same words keeps its `-2` in a later session), after
   `cmi.interactions._count`, which 1.2 lets a SCO read and Moodle reloads from the attempt's
-  tracks; an attempt the LMS started over counts none, and they start again. The state is written
+  tracks; an attempt the LMS started over counts none, and they start again. The count is read
+  once, at launch, where an attempt starts over (#130): read on every answer, an LMS whose count
+  does not follow what is written in the session would have had every new question written over
+  the one before. Moodle counts as it is written, and kept one attempt's answers from two sessions
+  on indexes 0 and 1 (checked 2026-11-04). The state is written
   and committed with each answer as well as with each of the content's saves, since content that
   keeps no state of its own sends no `userdata`, and its questions would otherwise take a new
   index in every session; where the state cannot be written, the answer is still committed (both
@@ -2689,8 +2693,8 @@ frames the launch page, as Moodle's player does. It covers:
 - the quiz's four answers as interactions, and, through dispatched `xapi` events, the id from
   the words and from the key, the second id for the same words, kept in a later session, the
   type map, the 255 cut, the result from `success` and from the score, the questions written and
-  committed with each answer, one index per question across a retry and a second session, and an
-  attempt started over;
+  committed with each answer, one index per question across a retry and a second session, an
+  attempt started over at a launch, and an LMS whose count stays at what it loaded at launch;
 - a state that fits only compressed, one that does not fit at all and the notice said once,
   both notices' live regions on the page from the start, a write the LMS refuses, and a launch
   page without the compressor, which writes the state plain;
