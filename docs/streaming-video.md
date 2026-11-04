@@ -30,3 +30,7 @@ npx @missing-elements/h5p-normalize@latest https://…/course.h5p --dry-run  # i
 It rewrites the container and leaves the content alone: media stored, mp4 index moved to the
 front, libraries ordered before media, stored text deflated. The package grows by about 1% and
 any H5P host still accepts it; the video then starts after its first megabyte and seeks at once.
+
+It also cuts the bandwidth a video costs, on a host that honours `Range`. A deflated video is
+downloaded whole as soon as the browser asks for any of it, however little the learner watches; a
+stored one only as far as the browser buffers ahead of the learner.
