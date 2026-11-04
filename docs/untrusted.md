@@ -115,7 +115,7 @@ With or without `untrusted`:
   allows images, media and frames from anywhere, as content types need. Content cannot fetch data
   from anywhere but your origin; `connect-src` holds it there.
 - **Your origin.** `untrusted` keeps a package's code off your origin, but its content still plays
-  there. For a site with signed-in users, [Embed](https://github.com/missing-elements/h5p-offline-player#embed)
+  there. For a site with signed-in users, [Embed](setup.md#embed)
   puts the player on a separate domain as well.
 - **Correctness.** The check is about safety. Whether a package works at all is what
   [`h5p-verify`](verify.md) answers; `h5p-verify --untrusted` plays it the way your site will, and

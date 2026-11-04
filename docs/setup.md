@@ -1,8 +1,14 @@
 # Setting up the player
 
 The README's [Which setup](../README.md#which-setup) chooses between installing the element on
-your site and embedding the player page from a separate domain. This page has each path in full:
-the library pack from your own site, loading from jsDelivr, caching and upgrades.
+your site and embedding the player page from a separate domain. Installed, you get the whole API,
+and a package played as it is runs as your site. Embedded, a package never sees your site's
+cookies, storage or page, and you get its results as relayed xAPI. `untrusted` plays a package as
+data, none of its own code running and its content checked, as an H5P plugin checks an author's
+upload: [Packages you did not make](untrusted.md).
+
+This page has each path in full: the library pack from your own site, loading from jsDelivr,
+caching and upgrades.
 
 ## Requirements
 

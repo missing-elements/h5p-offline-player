@@ -392,7 +392,10 @@ README.md                 what npm shows; ACCESSIBILITY.md, SECURITY.md, CONTRIB
 docs/                     the README's longer sections, one file each: the element's API (api.md, the
                           tables Compatibility holds a version to, out of the README since 2026-10-28,
                           when it went from 325 lines to 225), setting up the player (setup.md, each
-                          install path in full, the same day), streaming video, libraries, the
+                          install path in full, the same day, and since 2026-11-04 what Install and
+                          Embed each give, when the README became a quick start, the Which setup
+                          table, a feature list and links: the owner's choice of a short README
+                          that routes to these files), streaming video, libraries, the
                           frame's CSP, packages you did not make (`untrusted` and the content check), the
                           revision on statements, resume, the verifier, cmi5, development,
                           troubleshooting, single-worker hosts and upgrades, compatibility (what a
