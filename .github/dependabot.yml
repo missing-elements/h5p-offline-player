@@ -8,4 +8,8 @@ updates:
     groups:
       development-dependencies:
         dependency-type: development
-
+    ignore:
+      # The VS Code extension's types stay at the oldest VS Code it runs on, its engines.vscode:
+      # vsce refuses to package an extension whose @types/vscode is newer, as the compiler would
+      # then accept calls an older VS Code lacks. They move with engines.vscode, by hand (#128).
+      - dependency-name: "@types/vscode"

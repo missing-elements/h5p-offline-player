@@ -2317,6 +2317,12 @@ and committed, as are the app's install screenshots (`pnpm demo:screenshots`), w
   machine. `vsce package --no-dependencies` ships `dist/` and `assets/` and no node_modules: 13.8 MB
   in 141 files on 2026-10-26. `--baseContentUrl` and `--baseImagesUrl` point the README's relative
   links at `packages/vscode/`, where vsce's default would point them at the repository's root.
+- **Its VS Code types stay at the oldest VS Code it runs on.** `engines.vscode` is `^1.90.0` and
+  `@types/vscode` is 1.90.0: vsce refuses to package an extension whose types are newer than its
+  `engines.vscode`, since the compiler would then accept calls an older VS Code lacks. Dependabot's
+  weekly group raised them to 1.144.0 in #125, and the extension's job failed on that check;
+  `.github/dependabot.yml` has ignored `@types/vscode` since #128, so the types move with
+  `engines.vscode`, by hand, when the floor does.
 - **The listing's screenshot is rendered, not taken by hand** (2026-10-27). `scripts/screenshot.mjs`
   starts the VS Code the suite downloads through Playwright's Electron driver, which takes the window
   from inside, so it needs neither the screen nor macOS's recording permission: a fresh profile, the
