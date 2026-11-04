@@ -22,7 +22,8 @@ Which libraries a package plays with: the check that it has them, the sources in
   top-level library — so the element asks the `libraries` sources for it, and that package plays
   with the pack. The element asks for it with `deep` on `index`: at once for a picked file or a
   downloaded archive, and on a host with `Range` only after the warm, reading each `library.json`
-  from the cache, since before it each would be two ranged requests. `needs-dependency.h5p` is
+  from the cache, since before it each would be a ranged request (two before the block cache, in
+  *Small reads over HTTP go through a block cache*). `needs-dependency.h5p` is
   the fixture, laid out as an export is: its library folder first, media last.
   On a host without `Range` the deep check waits for the end of the download, and the frame can
   boot before then from the forward index, so the same walk decides that too (`bootsEarly` in

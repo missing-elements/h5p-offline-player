@@ -22,6 +22,7 @@ packages/player/          @missing-elements/h5p-offline-player — the published
       constants.ts          sizes, timeouts, cache names, the version stamp
       protocol.ts           every message shape and the PackageRecord written to IndexedDB
       source.ts             probe + the three source adapters; imports no zip.js, so the element stays small
+      block-cache.ts        64 kB blocks under the range adapter's small reads, so an index costs a request or two, not one per piece
       source-reader.ts      the zip.js reader bridge — the one module besides package-reader that imports zip.js
       span-stream.ts        how a span is pulled: one request, or several at once over HTTP; shared by the bridge and the Jobs worker
       resilient-stream.ts   a ranged read that opens itself again from the byte it reached when the link goes quiet or drops

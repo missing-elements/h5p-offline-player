@@ -1,5 +1,5 @@
 import { ZipReader, type Entry, type FileEntry } from '@zip.js/zip.js'
-import { INLINE_MAX_SIZE, MEDIA_INLINE_MAX_SIZE, WARM_ENTRY_MAX_SIZE, WARM_GAP, WARM_MAX_BYTES } from '../shared/constants.js'
+import { BLOCK_CACHE_MAX_READ, INLINE_MAX_SIZE, MEDIA_INLINE_MAX_SIZE, WARM_ENTRY_MAX_SIZE, WARM_GAP, WARM_MAX_BYTES } from '../shared/constants.js'
 import { indexEntryNames, normalizeEntryName } from '../shared/entry-names.js'
 import { extensionOf, isMediaEntry, isTextEntry } from '../shared/mime.js'
 import { DEFLATE, LOCAL_HEADER_FIXED_SIZE, STORED, readDataStart } from '../shared/local-header.js'
@@ -825,19 +825,21 @@ export class PackageReader {
 
   /**
    * Inflates an entry into a stream. The stream is handed straight to `cache.put()` or to a
-   * `Response`, so the entry never sits in memory as a whole.
+   * `Response`, so the entry never sits in memory as a whole — beyond the block cache's copy of a
+   * small one's compressed bytes over HTTP (`blocksFor`).
    *
    * An entry from the central directory goes through zip.js. A forward entry has no zip.js object
    * behind it and is inflated directly: its compressed span is known from its local header, and
    * `DecompressionStream` does the rest — the same codec zip.js would have used.
    */
   inflate(entry: IndexedEntry): ReadableStream<Uint8Array> {
-    if (!entry.zip) return this.inflateDirect(entry)
+    const zip = entry.zip
+    if (!zip) return this.inflateDirect(entry)
 
-    if (entry.zip.encrypted) {
+    if (zip.encrypted) {
       throw new PlayerError('bad-archive', `${entry.name} is encrypted`)
     }
-    const getData = entry.zip.getData
+    const getData = zip.getData
     if (!getData) {
       throw new PlayerError('bad-archive', `${entry.name} has no readable data`)
     }
@@ -847,7 +849,7 @@ export class PackageReader {
     // zip.js pipes into that writable and aborts it itself when the inflate fails, which errors
     // the readable the consumer holds — this abort is only the fallback for a rejection that
     // never reached the stream, and it is refused while zip.js still holds the writer.
-    void getData.call(entry.zip, transform.writable).catch((error: unknown) => {
+    void this.blocksFor(entry, zip).then(() => getData.call(zip, transform.writable)).catch((error: unknown) => {
       // A locked writable means zip.js still holds the writer and has already errored the stream
       // on its way out; aborting it again is refused, in Chromium by throwing.
       if (transform.writable.locked) return
@@ -859,6 +861,29 @@ export class PackageReader {
     })
 
     return transform.readable
+  }
+
+  /**
+   * Pulls a small entry's local header and data into the block cache in one request, before zip.js
+   * reads them in pieces: the header, to learn where the data starts, its extra field when it has
+   * one, then the data. Most small entries fit in the block their header is in anyway; this is for
+   * the one that runs into the next. Over HTTP only, up to `BLOCK_CACHE_MAX_READ`, and never in the
+   * way: a failure is left for zip.js's own reads to meet.
+   */
+  private blocksFor(entry: IndexedEntry, zip: FileEntry): Promise<void> {
+    if (this.handle.descriptor.type !== 'range-http') return Promise.resolve()
+    const start = zip.offset
+    // The central directory's name and extra lengths are the local header's in practice; a longer
+    // local extra field only costs zip.js's data read a block of its own.
+    const end = Math.min(
+      this.handle.size - 1,
+      start + LOCAL_HEADER_FIXED_SIZE + zip.rawFilename.length + zip.rawExtraField.length + entry.compressedSize - 1
+    )
+    if (end - start + 1 > BLOCK_CACHE_MAX_READ) return Promise.resolve()
+    return this.handle.read({ start, end }).then(
+      () => undefined,
+      () => undefined
+    )
   }
 
   /**

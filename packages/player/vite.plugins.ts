@@ -270,22 +270,63 @@ function compressingHostHandler(dirs: readonly string[]): Connect.NextHandleFunc
         res.setHeader('vary', 'Accept-Encoding')
         if (gzip) res.setHeader('content-encoding', 'gzip')
 
-        const range = parseRangeHeader(req.headers.range, body.length)
-        if (range === null) {
-          res.setHeader('content-length', String(body.length))
-          res.statusCode = 200
-          return res.end(body)
-        }
-        if (range === 'unsatisfiable') {
-          res.setHeader('content-range', `bytes */${body.length}`)
-          res.statusCode = 416
-          return res.end()
-        }
-        const piece = body.subarray(range.start, range.end + 1)
-        res.setHeader('content-length', String(piece.length))
-        res.setHeader('content-range', `bytes ${range.start}-${range.end}/${body.length}`)
-        res.statusCode = 206
-        res.end(piece)
+        answerRange(req.headers.range, res, body)
+      },
+      () => noSuchFixture(res)
+    )
+  }
+}
+
+/** Answers `rangeHeader` from `body` as a host that honours `Range` does: 200, 206 or 416. */
+function answerRange(rangeHeader: string | undefined, res: ServerResponse, body: Buffer): void {
+  const range = parseRangeHeader(rangeHeader, body.length)
+  if (range === null) {
+    res.setHeader('content-length', String(body.length))
+    res.statusCode = 200
+    return void res.end(body)
+  }
+  if (range === 'unsatisfiable') {
+    res.setHeader('content-range', `bytes */${body.length}`)
+    res.statusCode = 416
+    return void res.end()
+  }
+  const piece = body.subarray(range.start, range.end + 1)
+  res.setHeader('content-length', String(piece.length))
+  res.setHeader('content-range', `bytes ${range.start}-${range.end}/${body.length}`)
+  res.statusCode = 206
+  res.end(piece)
+}
+
+/**
+ * A host that honours `Range` and writes down what it is asked, so a test can count what a load
+ * costs: `/counted/<fixture>?log=<id>` serves the archive, and `/counted/__log?log=<id>` answers
+ * the `Range` header of every request it took for that id, in the order they came. The id keeps
+ * test cases apart, and makes each load a package of its own, with nothing cached from another.
+ */
+function countingHostHandler(dirs: readonly string[]): Connect.NextHandleFunction {
+  const prefix = '/counted/'
+  const logs = new Map<string, string[]>()
+
+  return (req, res, next) => {
+    const url = new URL(req.url ?? '/', 'http://localhost')
+    const id = url.searchParams.get('log') ?? ''
+    if (url.pathname === `${prefix}__log`) {
+      res.setHeader('content-type', 'application/json')
+      res.setHeader('cache-control', 'no-store')
+      return void res.end(JSON.stringify(logs.get(id) ?? []))
+    }
+    const name = fixtureName(url.pathname, prefix)
+    if (!name) return next()
+
+    const log = logs.get(id) ?? []
+    logs.set(id, log)
+    log.push(req.headers.range ?? '')
+    archivePath(dirs, name).then((path) => readFile(path)).then(
+      (body) => {
+        res.setHeader('content-type', 'application/octet-stream')
+        res.setHeader('cache-control', 'no-store')
+        res.setHeader('accept-ranges', 'bytes')
+        answerRange(req.headers.range, res, body)
       },
       () => noSuchFixture(res)
     )
@@ -406,6 +447,7 @@ export function noRangeFixturesPlugin(dirs: readonly string[] = [PLAYER_FIXTURES
     server.middlewares.use(noRangeHandler(dirs))
     server.middlewares.use(compressingHostHandler(dirs))
     server.middlewares.use(stallingHostHandler(dirs))
+    server.middlewares.use(countingHostHandler(dirs))
   }
 }
 

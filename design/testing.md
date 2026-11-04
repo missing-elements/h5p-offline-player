@@ -96,6 +96,11 @@ same-origin, so every header is readable and the probe never needs its size fall
 browser test pins the two lengths the same archive answers with, and the unit test covers the
 fallback against headers filtered the way CORS filters them.
 
+`/counted/<fixture>?log=<id>` is a host that honours `Range` and writes down the `Range` header of
+every request it takes; `/counted/__log?log=<id>` answers them in order. `range-requests.test.ts`
+counts what a load costs with it, so the requests an index read takes cannot creep back up (#133):
+the id makes each load a package of its own and keeps cases apart.
+
 `/stalling/<fixture>?rate=<bytes per second>` is a host with an outage switch: `Range` honoured, the
 body paced, and `/stalling/__outage?ms=<n>&mode=silent|reset` takes it away for a while — every
 response in flight goes quiet and new requests wait, or every response in flight is destroyed and
