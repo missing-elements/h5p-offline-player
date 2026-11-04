@@ -132,7 +132,7 @@
     "@missing-elements/h5p-offline-player": "workspace:^",
     "@missing-elements/h5p-runtime": "workspace:^",
     "@types/node": "^26.6.6",
-    "@types/vscode": "1.144.0",
+    "@types/vscode": "1.90.0",
     "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^4.1.0",
     "esbuild": "^0.28.2",
