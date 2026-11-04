@@ -146,8 +146,8 @@ None needs a provider API key or an H5P server.
 
 A pnpm workspace: see [CONTRIBUTING.md](https://github.com/missing-elements/h5p-offline-player/blob/main/CONTRIBUTING.md),
 [docs/development.md](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/development.md)
-and [AGENTS.md](https://github.com/missing-elements/h5p-offline-player/blob/main/AGENTS.md), which holds the design
-and the reasons behind it. Report vulnerabilities privately, as
+and [AGENTS.md](https://github.com/missing-elements/h5p-offline-player/blob/main/AGENTS.md) with [design/](https://github.com/missing-elements/h5p-offline-player/tree/main/design), which hold
+the design and the reasons behind it. Report vulnerabilities privately, as
 [SECURITY.md](https://github.com/missing-elements/h5p-offline-player/blob/main/SECURITY.md) describes.
 
 ## Licence

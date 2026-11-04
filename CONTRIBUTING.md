@@ -13,7 +13,7 @@ package.
 
 The player handles untrusted archives across a page, Service Worker, and
 dedicated worker. For architectural constraints and security boundaries, read
-[AGENTS.md](./AGENTS.md).
+[AGENTS.md](./AGENTS.md) and the files in [design/](./design/) it points to.
 
 ## Prerequisites
 
