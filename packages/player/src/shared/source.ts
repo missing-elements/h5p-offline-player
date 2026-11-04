@@ -188,13 +188,19 @@ async function sizeFromOpenRange(url: string, signal?: AbortSignal): Promise<num
 /**
  * The small reads of every archive this worker reads over HTTP, shared by all its handles: the
  * reader the Service Worker builds again once libraries are attached gets a new handle, and finds
- * the blocks the first one fetched. See `BlockCache`.
+ * the blocks the first one fetched. See `BlockCache`. Made on first use rather than with the
+ * module, so that the element — which imports this module for the probe and never opens a
+ * handle — does not carry the cache in its bundle.
  */
-const blocks = new BlockCache(BLOCK_SIZE, BLOCK_CACHE_MAX_BYTES)
+let blocks: BlockCache | null = null
+
+function blockCache(): BlockCache {
+  return (blocks ??= new BlockCache(BLOCK_SIZE, BLOCK_CACHE_MAX_BYTES))
+}
 
 /** Forgets every block this worker holds. For tests, whose cases share one module. */
 export function forgetBlocks(): void {
-  blocks.clear()
+  blocks?.clear()
 }
 
 class RangeHttpHandle implements SourceHandle {
@@ -262,7 +268,7 @@ class RangeHttpHandle implements SourceHandle {
    */
   async read(range: ByteRange): Promise<Uint8Array> {
     if (range.end - range.start + 1 > BLOCK_CACHE_MAX_READ) return this.fetchBytes(range)
-    return blocks.read(this.blockKey, this.size, range, (missing) => this.fetchBytes(missing))
+    return blockCache().read(this.blockKey, this.size, range, (missing) => this.fetchBytes(missing))
   }
 
   /**
@@ -273,7 +279,7 @@ class RangeHttpHandle implements SourceHandle {
    */
   async stream(range: ByteRange): Promise<ReadableStream<Uint8Array>> {
     const length = range.end - range.start + 1
-    if (length <= BLOCK_SIZE || (length <= BLOCK_CACHE_MAX_READ && blocks.holds(this.blockKey, range))) {
+    if (length <= BLOCK_SIZE || (length <= BLOCK_CACHE_MAX_READ && blockCache().holds(this.blockKey, range))) {
       const bytes = await this.read(range)
       return new ReadableStream<Uint8Array>({
         start(controller) {

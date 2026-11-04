@@ -54,7 +54,8 @@ How a package's bytes reach the H5P runtime: the Service Worker's virtual file s
   whole, since zip.js streams an entry's data right after reading its header; anything else
   streams from the network as before, so media never passes through the cache. And
   `PackageReader.inflate` pulls a small entry's header and data in one read before zip.js reads
-  them as two (`blocksFor`). The cache is module-level, keyed by the archive's URL, validator and
+  them in pieces (`blocksFor`). The cache is one per worker, made on first use so the element's
+  bundle does not carry it, keyed by the archive's URL, validator and
   size — the package id's ingredients — so the new handle a rebuilt reader opens finds the blocks
   the first one fetched; it dies with the worker, and it is never authority. The quiz now costs
   four: the probe, the tail, the head and the warm. Two things left out on purpose, by the owner's
