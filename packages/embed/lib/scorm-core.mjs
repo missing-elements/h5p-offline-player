@@ -55,12 +55,77 @@ function languageTag(value) {
 }
 
 /**
- * The manifest, SCORM 1.2's: one organisation with one item, played by one SCO, the launch page.
- * Every file is listed, which Moodle does not need and some LMSs do.
- * @param {{ identifier: string, title: string, files: string[] }} manifest
+ * What a zip is written as: the SCORM version, 1.2 unless 2004 4th Edition is asked for; a pass
+ * mark out of 100, or `null` for the content's own result; and whether content that finishes
+ * without a score counts as 100. Each is off unless asked for, and a zip written with none is
+ * the one written before any existed.
+ * @typedef {{ scormVersion: '1.2' | '2004', passMark: number | null, completionScore: boolean }} ScormOptions
  */
-function manifestXml({ identifier, title, files }) {
+
+/**
+ * The options as given, checked: an unknown version or a pass mark outside 0 to 100 is refused,
+ * and the pass mark is kept to the hundredth, as the score is.
+ * @param {{ scormVersion?: unknown, passMark?: unknown, completionScore?: unknown }} [given]
+ * @returns {ScormOptions}
+ */
+export function scormOptions({ scormVersion, passMark, completionScore } = {}) {
+  const version = scormVersion ?? '1.2'
+  if (version !== '1.2' && version !== '2004') throw new EmbedError(`The SCORM version is 1.2 or 2004, not ${typeof version === 'string' ? JSON.stringify(version) : String(version)}.`)
+  const mark = passMark ?? null
+  if (mark !== null && (typeof mark !== 'number' || !Number.isFinite(mark) || mark < 0 || mark > 100)) {
+    throw new EmbedError(`The pass mark is a number from 0 to 100, not ${typeof mark === 'string' ? JSON.stringify(mark) : String(mark)}.`)
+  }
+  return { scormVersion: version, passMark: mark === null ? null : Math.round(mark * 100) / 100, completionScore: completionScore === true }
+}
+
+/**
+ * The manifest: one organisation with one item, played by one SCO, the launch page. Every file is
+ * listed, which Moodle does not need and some LMSs do. SCORM 1.2's, the pass mark as the item's
+ * mastery score; or SCORM 2004 4th Edition's, the pass mark as its primary objective's least
+ * measure, satisfied by the score, from which the LMS sets `cmi.scaled_passing_score`.
+ * @param {{ identifier: string, title: string, files: string[], options: ScormOptions }} manifest
+ */
+function manifestXml({ identifier, title, files, options: { scormVersion, passMark } }) {
   const name = escapeXml(title)
+  const listed = files.map((file) => `      <file href="${escapeXml(file)}"/>`).join('\n')
+  if (scormVersion === '2004') {
+    const objective =
+      passMark === null
+        ? ''
+        : `
+        <imsss:sequencing>
+          <imsss:objectives>
+            <imsss:primaryObjective objectiveID="primary" satisfiedByMeasure="true">
+              <imsss:minNormalizedMeasure>${Math.round(passMark * 100) / 10000}</imsss:minNormalizedMeasure>
+            </imsss:primaryObjective>
+          </imsss:objectives>
+        </imsss:sequencing>`
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<manifest identifier="${identifier}" version="1"
+  xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"
+  xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_v1p3"
+  xmlns:imsss="http://www.imsglobal.org/xsd/imsss">
+  <metadata>
+    <schema>ADL SCORM</schema>
+    <schemaversion>2004 4th Edition</schemaversion>
+  </metadata>
+  <organizations default="organization">
+    <organization identifier="organization">
+      <title>${name}</title>
+      <item identifier="item" identifierref="sco" isvisible="true">
+        <title>${name}</title>${objective}
+      </item>
+    </organization>
+  </organizations>
+  <resources>
+    <resource identifier="sco" type="webcontent" adlcp:scormType="sco" href="index.html">
+${listed}
+    </resource>
+  </resources>
+</manifest>
+`
+  }
+  const mastery = passMark === null ? '' : `\n        <adlcp:masteryscore>${passMark}</adlcp:masteryscore>`
   return `<?xml version="1.0" encoding="UTF-8"?>
 <manifest identifier="${identifier}" version="1.0"
   xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2"
@@ -73,22 +138,39 @@ function manifestXml({ identifier, title, files }) {
     <organization identifier="organization">
       <title>${name}</title>
       <item identifier="item" identifierref="sco" isvisible="true">
-        <title>${name}</title>
+        <title>${name}</title>${mastery}
       </item>
     </organization>
   </organizations>
   <resources>
     <resource identifier="sco" type="webcontent" adlcp:scormtype="sco" href="index.html">
-${files.map((file) => `      <file href="${escapeXml(file)}"/>`).join('\n')}
+${listed}
     </resource>
   </resources>
 </manifest>
 `
 }
 
-/** @param {{ version: string, source: string, pack: string | null, lz: boolean }} zip `pack`, the library pack's version when the zip carries parts of it; `lz`, whether it carries the compressor */
-function notice({ version, source, pack, lz }) {
-  return `This is a SCORM 1.2 package written by @missing-elements/h5p-embed. It plays ${source} in an
+/**
+ * What the launch page's bridge is told of the options, as `<meta>` elements after the build's:
+ * nothing for a zip written with none, so that its page is the one written before any existed.
+ * @param {ScormOptions} options
+ */
+function optionsMeta({ scormVersion, passMark, completionScore }) {
+  /** @type {Array<[string, string]>} */
+  const told = []
+  if (scormVersion === '2004') told.push(['h5p-scorm-version', '2004'])
+  if (passMark !== null) told.push(['h5p-scorm-pass-mark', String(passMark)])
+  if (completionScore) told.push(['h5p-scorm-completion-score', '100'])
+  return told.map(([name, content]) => `\n    <meta name="${name}" content="${content}" />`).join('')
+}
+
+/** What the notice and the page call the version. @param {ScormOptions['scormVersion']} version */
+export const scormName = (version) => (version === '2004' ? 'SCORM 2004 4th Edition' : 'SCORM 1.2')
+
+/** @param {{ version: string, source: string, pack: string | null, lz: boolean, scorm: string }} zip `pack`, the library pack's version when the zip carries parts of it; `lz`, whether it carries the compressor; `scorm`, the version's name */
+function notice({ version, source, pack, lz, scorm }) {
+  return `This is a ${scorm} package written by @missing-elements/h5p-embed. It plays ${source} in an
 LMS and reports its score, its result, each question's answer and the time spent, and keeps the
 learner's place.
 
@@ -158,15 +240,34 @@ export async function buildStamp(packageSha256, parts) {
 }
 
 /**
- * The package's title, as the LMS lists it: `h5p.json`'s, with the control characters XML refuses
- * read as spaces, since a title pasted in can carry one; or the file's name.
+ * The package's title, as the LMS lists it: the one chosen for the zip, by `--title` or on the
+ * page, else `h5p.json`'s, else the file's name; with the control characters XML refuses read as
+ * spaces, since a title pasted in can carry one. A chosen title that is empty, or only spaces,
+ * leaves the default.
  * @param {unknown} manifest `h5p.json`, parsed
- * @param {string} fallback
+ * @param {string} fallback the file's name without its extension
+ * @param {unknown} [chosen] the title chosen for the zip
  */
-export function scormTitle(manifest, fallback) {
-  const title = /** @type {{ title?: unknown } | null} */ (manifest)?.title
-  const named = typeof title === 'string' ? title.replace(/[\x00-\x1f\x7f]+/g, ' ').trim() : ''
-  return named || fallback
+export function scormTitle(manifest, fallback, chosen) {
+  /** @param {unknown} value */
+  const text = (value) => (typeof value === 'string' ? value.replace(/[\x00-\x1f\x7f]+/g, ' ').trim() : '')
+  return text(chosen) || text(/** @type {{ title?: unknown } | null} */ (manifest)?.title) || fallback
+}
+
+/**
+ * The package's main library, as `h5p.json` names it, with the version its
+ * `preloadedDependencies` give it; `null` when it names none, and no version when the
+ * dependencies do not list it.
+ * @param {unknown} manifest `h5p.json`, parsed
+ * @returns {{ machineName: string, majorVersion?: number, minorVersion?: number } | null}
+ */
+export function mainLibraryOf(manifest) {
+  const machineName = /** @type {{ mainLibrary?: unknown } | null} */ (manifest)?.mainLibrary
+  if (typeof machineName !== 'string' || !machineName) return null
+  const listed = dependenciesIn(manifest).find((dependency) => dependency.machineName === machineName)
+  const majorVersion = Number(listed?.majorVersion)
+  const minorVersion = Number(listed?.minorVersion)
+  return listed && Number.isInteger(majorVersion) && Number.isInteger(minorVersion) ? { machineName, majorVersion, minorVersion } : { machineName }
 }
 
 /**
@@ -289,15 +390,24 @@ export async function readPackage(blob, name, pack, { useWebWorkers = false } = 
  * @param {string | null} input.packVersion the library pack's version; read when the zip carries parts of it
  * @param {PackPart[]} input.parts the parts carried, sorted by folder
  * @param {ScormFiles} input.files
+ * @param {ScormOptions} [input.options] the version and the grading options, checked by
+ *   `scormOptions`; none by default
  * @returns {{ entries: ScormEntry[], xml: string }}
  */
-export function scormEntries({ manifest, source, title, build, version, packVersion, parts, files }) {
+export function scormEntries({ manifest, source, title, build, version, packVersion, parts, files, options = scormOptions() }) {
   const pack = parts.length > 0 ? packVersion ?? 'unknown' : null
+  const told = optionsMeta(options)
+  // A template from before the options, as a page that bundles the launch files may give, has no
+  // place for them, and its bridge would play a 2004 zip as 1.2: refused, rather than written so.
+  if (told && !files.launch.includes('%SCORM%')) {
+    throw new EmbedError("The launch page's template is older than the SCORM options and cannot carry them; give the one this version of h5p-embed ships, scorm/index.html.")
+  }
   const page = files.launch
     .replace('%LANG%', languageTag(manifest.defaultLanguage))
     // A function, so that a title's `$&` or `$'` is written as it is rather than read as a pattern.
     .replace('%TITLE%', () => escapeHtml(title))
     .replace('%BUILD%', build)
+    .replace('%SCORM%', () => told)
     // The element plans from the zip's index what the writer planned, and plays the package's own
     // libraries as they are.
     .replace('%LIBRARIES%', pack ? ` libraries="pack" pack-base="./${LIBRARIES}/" refresh-libraries="off"` : '')
@@ -326,9 +436,22 @@ export function scormEntries({ manifest, source, title, build, version, packVers
     if (!files.librariesText) throw new EmbedError("The pack's libraries.txt was not given.")
     entries.push({ name: 'libraries.txt', blob: files.librariesText })
   }
-  entries.push({ name: 'NOTICE.txt', text: notice({ version, source, pack, lz: files.lz !== null }) })
-  const xml = manifestXml({ identifier: `h5p-${build}`, title, files: ['imsmanifest.xml', ...entries.map((entry) => entry.name)] })
+  entries.push({ name: 'NOTICE.txt', text: notice({ version, source, pack, lz: files.lz !== null, scorm: scormName(options.scormVersion) }) })
+  const xml = manifestXml({ identifier: `h5p-${build}`, title, files: ['imsmanifest.xml', ...entries.map((entry) => entry.name)], options })
   return { entries, xml }
+}
+
+/**
+ * Adds a file that is compressed already as a stored entry. Written into a stream, an entry gets a
+ * data descriptor, and a Java ZipInputStream refuses a stored entry that has one: SCORM Cloud
+ * refused exactly those (#92). Passed through with its size and CRC, it gets a complete local
+ * header instead, and is still streamed, not held.
+ * @param {import('@zip.js/zip.js').ZipWriter<unknown>} zip
+ * @param {string} name
+ * @param {Blob} blob
+ */
+export async function addStored(zip, name, blob) {
+  await zip.add(name, new BlobReader(blob), { passThrough: true, compressionMethod: 0, uncompressedSize: blob.size, crc32: await crcOf(blob) })
 }
 
 /**
@@ -346,13 +469,7 @@ export async function addScormEntries(zip, { entries, xml }) {
     }
     const { name, blob } = entry
     // The package, the pack's parts and the fonts are compressed already, so they are stored.
-    // Written into a stream, an entry gets a data descriptor, and a Java ZipInputStream refuses
-    // a stored entry that has one: SCORM Cloud refused exactly those (#92). Passed through with
-    // its size and CRC, it gets a complete local header instead, and is still streamed, not held.
-    if (name.endsWith('.h5p') || name.endsWith('.woff2')) {
-      await zip.add(name, new BlobReader(blob), { passThrough: true, compressionMethod: 0, uncompressedSize: blob.size, crc32: await crcOf(blob) })
-    } else {
-      await zip.add(name, new BlobReader(blob), { level: 6 })
-    }
+    if (name.endsWith('.h5p') || name.endsWith('.woff2')) await addStored(zip, name, blob)
+    else await zip.add(name, new BlobReader(blob), { level: 6 })
   }
 }

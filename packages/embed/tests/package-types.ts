@@ -6,7 +6,7 @@
 import { EmbedError, buildSite, type BuiltSite } from '@missing-elements/h5p-embed'
 import { startEmbed } from '@missing-elements/h5p-embed/embed.js'
 import { buildScorm, type BuiltScorm } from '@missing-elements/h5p-embed/scorm'
-import { buildScormInPage, type PageScorm } from '@missing-elements/h5p-embed/scorm/browser'
+import { buildScormInPage, planScormInPage, type PageScorm, type PlannedScorm } from '@missing-elements/h5p-embed/scorm/browser'
 import { startScormPage } from '@missing-elements/h5p-embed/scorm-page.js'
 import { pack } from '@missing-elements/h5p-libraries'
 import { runtime } from '@missing-elements/h5p-runtime'
@@ -24,7 +24,10 @@ export async function asACallerWould(): Promise<string> {
   await buildSite({ folder: 'public/player' })
 
   // One package as a SCORM zip, for an LMS.
-  const zip: BuiltScorm = await buildScorm({ h5p: 'course.h5p', out: 'course.scorm.zip', force: true })
+  const zip: BuiltScorm = await buildScorm({ h5p: 'course.h5p', out: 'course.scorm.zip', force: true, title: 'Week 3', scormVersion: '2004', passMark: 80, completionScore: true })
+  const scorm: '1.2' | '2004' = zip.scormVersion
+  // @ts-expect-error the version is 1.2 or 2004
+  await buildScorm({ h5p: 'course.h5p', out: 'course.scorm.zip', scormVersion: '1.3' })
   const build: string = zip.build
   const fromPack: string[] = zip.libraries
   // @ts-expect-error the package is named `h5p`
@@ -33,10 +36,16 @@ export async function asACallerWould(): Promise<string> {
   // The same zip built in a page, from a picked file, with the pack as its package exports it.
   const inPage: PageScorm = await buildScormInPage({ file: new Blob([]), name: 'course.h5p', base: 'https://player.example/', pack, version: '1.4.0', onProgress: ({ step }) => step })
   const blob: Blob = inPage.blob
+  // Read first, so that a page can say what the zip will hold, and written after, under a title.
+  const plan: PlannedScorm = await planScormInPage({ file: new Blob([]), name: 'course.h5p', pack })
+  const main: string | undefined = plan.mainLibrary?.machineName
+  const retitled: PageScorm = await plan.write({ title: 'Week 3', scormVersion: '2004', passMark: null, completionScore: false, onProgress: ({ step }) => step })
+  // @ts-expect-error a title is text
+  await plan.write({ title: 3 })
   startScormPage({ pack, version: '1.4.0', packVersion: '1.0.1' })
   // @ts-expect-error the package is a `file`, not a path
   await buildScormInPage({ h5p: 'course.h5p' })
 
-  void [hosts, build, fromPack, blob, parseOrigin, new EmbedError('refused') instanceof Error]
+  void [hosts, build, fromPack, blob, main, retitled, scorm, parseOrigin, new EmbedError('refused') instanceof Error]
   return site.csp
 }

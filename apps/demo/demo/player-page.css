@@ -642,6 +642,101 @@ progress[hidden] { display: none; }
 .message.offer:not([hidden]) { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .offer button[hidden] { display: none; }
 
+/* ---------------------------------------------------------------- the SCORM page's steps */
+
+/* A step: its number in a disc before its heading, and hidden until the page can reach it. */
+.step[hidden] { display: none; }
+.step h2 { display: flex; align-items: center; gap: 0.6rem; }
+.step-number {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 0.875rem;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+.step-hint { color: var(--muted); font-size: 0.925rem; }
+
+/* A file's row in the review: its name, size and a button to take it out; what its zip will hold,
+   or why none can be written, in a strip whose left edge takes the state's colour as the status
+   strip's does; its title in the LMS; and, with several files, its own zip. */
+.scorm-rows { display: grid; gap: 0.75rem; margin: 0; padding: 0; list-style: none; }
+.scorm-row {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.scorm-row[data-state="built"] { border-left-color: var(--ok); }
+.scorm-row[data-state="refused"],
+.scorm-row[data-state="failed"] { border-left-color: var(--danger); }
+.scorm-row[data-state="reading"],
+.scorm-row[data-state="building"] { border-left-color: var(--accent); }
+.scorm-row-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; }
+.scorm-row-name { font-weight: 600; overflow-wrap: anywhere; }
+.scorm-row-size { color: var(--muted); font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+/* A small button beside the name, where the page's own rule draws a large one. */
+button.scorm-row-remove { min-height: 2rem; margin-left: auto; padding: 0.2rem 0.75rem; font-size: 0.85rem; }
+.scorm-row-facts { margin: 0.35rem 0 0; color: var(--muted); font-size: 0.925rem; }
+.scorm-row[data-state="refused"] .scorm-row-facts,
+.scorm-row[data-state="failed"] .scorm-row-facts { color: var(--danger); }
+.scorm-row-title { display: grid; gap: 0.3rem; margin-top: 0.65rem; font-size: 0.85rem; font-weight: 600; }
+.scorm-row-title input {
+  min-width: 0;
+  min-height: 2.5rem;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: inherit;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 400;
+  transition: border-color var(--ease), box-shadow var(--ease);
+}
+.scorm-row-title input:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.scorm-row-title input:disabled { opacity: 0.6; }
+.scorm-row-download { display: inline-block; margin-top: 0.6rem; font-weight: 600; }
+.scorm-row-download[hidden] { display: none; }
+
+/* The options, one card: the version as two radios, the pass mark, and completion as 100, each
+   with a line of what it does. */
+.scorm-options {
+  display: grid;
+  gap: 1rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.scorm-options fieldset { margin: 0; padding: 0; border: 0; }
+.scorm-options legend { margin-bottom: 0.35rem; padding: 0; font-weight: 600; }
+.scorm-options fieldset label { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 0.5rem; margin: 0.3rem 0; }
+.scorm-options input[type="radio"], .scorm-options input[type="checkbox"] { accent-color: var(--accent); }
+.scorm-option { display: grid; gap: 0.35rem; justify-items: start; }
+.scorm-option label[for="pass-mark"], .scorm-check { font-weight: 600; }
+.scorm-check { display: flex; align-items: baseline; gap: 0.5rem; }
+#pass-mark {
+  width: 10rem;
+  min-height: 2.5rem;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: inherit;
+  font: inherit;
+  transition: border-color var(--ease), box-shadow var(--ease);
+}
+#pass-mark:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+#pass-mark[aria-invalid="true"] { border-color: var(--danger); }
+.scorm-options .step-hint { font-size: 0.875rem; }
+
 /* ---------------------------------------------------------------- the player's box */
 
 h5p-player {

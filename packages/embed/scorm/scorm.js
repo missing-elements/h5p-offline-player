@@ -1,9 +1,15 @@
 /**
- * The launch page's script in a SCORM 1.2 package `h5p-embed --scorm` writes: it finds the LMS's
+ * The launch page's script in a SCORM package `h5p-embed --scorm` writes: it finds the LMS's
  * API, opens the session, and plays the package beside this page. The LMS hears what the content
  * reports: its score and whether it passed when it finishes, each question's answer as it is
  * given, the time spent, and the state it saves, which comes back on the next launch so the
  * learner continues where they left off.
+ *
+ * SCORM 1.2 unless the writer said otherwise in the page (`h5p-scorm-version`, 2004 4th
+ * Edition), and graded by the content's own result unless it gave a pass mark
+ * (`h5p-scorm-pass-mark`) or counts content that finishes without a score as 100
+ * (`h5p-scorm-completion-score`). A page written with none of the three is a page from before
+ * they existed, and this script does with it what it did then.
  *
  * Outside an LMS, with no API to find, it plays the package and reports nothing.
  *
@@ -21,18 +27,53 @@
  */
 
 /**
+ * The SCORM 2004 API, `API_1484_11`, as far as this page calls it.
+ * @typedef {object} Scorm2004Api
+ * @property {(empty: string) => string} Initialize
+ * @property {(empty: string) => string} Terminate
+ * @property {(element: string) => string} GetValue
+ * @property {(element: string, value: string) => string} SetValue
+ * @property {(empty: string) => string} Commit
+ */
+
+/**
+ * Either version's API as the calls this page makes.
+ * @typedef {object} Lms
+ * @property {() => string} initialize
+ * @property {() => string} finish
+ * @property {(element: string) => string} get
+ * @property {(element: string, value: string) => string} set
+ * @property {() => string} commit
+ */
+
+/**
  * lz-string, which the page loads before this script (`lz-string.js`): the saved state goes into
  * `cmi.suspend_data` compressed, as base64, so that a long Interactive Book's fits where its JSON
  * would not. Without it, a page of its own that left the script out, the state goes plain.
  * @typedef {{ compressToBase64: (text: string) => string, decompressFromBase64: (text: string) => string | null }} LzString
  */
 
-/** What SCORM 1.2 keeps of `cmi.suspend_data`: a `CMIString4096`. */
-const SUSPEND_DATA_LIMIT = 4096
-/** What it keeps of an interaction's response and its pattern: a `CMIFeedback`, 255 characters. */
-const FEEDBACK_LIMIT = 255
+/** @param {string} name */
+const told = (name) => document.querySelector(`meta[name="${name}"]`)?.getAttribute('content') ?? ''
+/** Whether the writer made this a SCORM 2004 package; 1.2 otherwise. */
+const scorm2004 = told('h5p-scorm-version') === '2004'
+/** The pass mark the writer was given, out of 100, or `null`. */
+const writtenPassMark = told('h5p-scorm-pass-mark') === '' ? null : Number(told('h5p-scorm-pass-mark'))
+/** Whether content that finishes without a score counts as 100. */
+const completionScore = told('h5p-scorm-completion-score') !== ''
+const SCORM = scorm2004 ? 'SCORM 2004' : 'SCORM 1.2'
+
+/** What the LMS keeps of `cmi.suspend_data`: SCORM 1.2's `CMIString4096`, or 2004's 64,000. */
+const SUSPEND_DATA_LIMIT = scorm2004 ? 64000 : 4096
+/**
+ * What it keeps of an interaction's response and its pattern: SCORM 1.2's `CMIFeedback`, 255
+ * characters; in 2004 the longest the format allows, 4,000.
+ */
+const FEEDBACK_LIMIT = scorm2004 ? 4000 : 255
 /** An interaction's id, a `CMIIdentifier`: 255 characters of printable ASCII, no spaces. */
 const IDENTIFIER_LIMIT = 255
+/** What 2004 keeps of a question's words, `cmi.interactions.n.description`: 250 characters. */
+const DESCRIPTION_LIMIT = 250
 /** The verb of a question answered. */
 const ANSWERED = 'http://adlnet.gov/expapi/verbs/answered'
 /** Where the core writes a part's id on every statement about it. */
@@ -43,18 +84,21 @@ const SUB_CONTENT_ID = 'http://h5p.org/x-api/h5p-subContentId'
  * @type {Record<string, string>}
  */
 const INTERACTION_TYPES = { 'true-false': 'true-false', choice: 'choice', 'fill-in': 'fill-in', 'long-fill-in': 'fill-in', matching: 'matching', performance: 'performance', sequencing: 'sequencing', likert: 'likert', numeric: 'numeric' }
+/** SCORM 2004 has xAPI's ten, `long-fill-in` and `other` among them. */
+const INTERACTION_TYPES_2004 = { ...INTERACTION_TYPES, 'long-fill-in': 'long-fill-in', other: 'other' }
 
 /**
- * The `API` object an LMS puts in a window above the content, searched from `start` up to its top
- * window (the run-time environment's discovery, 3.3.6.1).
+ * The API object an LMS puts in a window above the content, `API` for SCORM 1.2 and `API_1484_11`
+ * for 2004, searched from `start` up to its top window (the run-time environment's discovery).
  * @param {Window | null} start
- * @returns {ScormApi | null}
+ * @param {'API' | 'API_1484_11'} name
+ * @returns {unknown}
  */
-function findApi(start) {
+function findApi(start, name) {
   let win = start
   for (let hops = 0; win && hops < 10; hops++) {
     try {
-      const api = /** @type {{ API?: ScormApi }} */ (/** @type {unknown} */ (win)).API
+      const api = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (win))[name]
       if (api) return api
     } catch {
       // A window on another origin holds nothing this page can call.
@@ -63,6 +107,23 @@ function findApi(start) {
     win = win.parent
   }
   return null
+}
+
+/**
+ * The LMS, this package's version of it: the API in a window above, or above the window that
+ * opened this one, as the calls this page makes.
+ * @returns {Lms | null}
+ */
+function connect() {
+  const name = scorm2004 ? 'API_1484_11' : 'API'
+  const found = findApi(window, name) ?? (window.opener ? findApi(window.opener, name) : null)
+  if (!found) return null
+  if (scorm2004) {
+    const api = /** @type {Scorm2004Api} */ (found)
+    return { initialize: () => api.Initialize(''), finish: () => api.Terminate(''), get: (element) => api.GetValue(element), set: (element, value) => api.SetValue(element, value), commit: () => api.Commit('') }
+  }
+  const api = /** @type {ScormApi} */ (found)
+  return { initialize: () => api.LMSInitialize(''), finish: () => api.LMSFinish(''), get: (element) => api.LMSGetValue(element), set: (element, value) => api.LMSSetValue(element, value), commit: () => api.LMSCommit('') }
 }
 
 /** @param {number} value */
@@ -81,39 +142,62 @@ function timespan(ms) {
 }
 
 /**
- * A statement's `result.duration`, an ISO 8601 duration the core writes as `PT12.34S`, as a
- * `CMITimespan`; `null` for anything else.
- * @param {unknown} duration
+ * SCORM 2004's `timeinterval`, an ISO 8601 duration with the seconds to the hundredth.
+ * @param {number} ms
  */
-function latencyOf(duration) {
-  const match = typeof duration === 'string' ? /^PT(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?$/.exec(duration) : null
-  if (!match || duration === 'PT') return null
-  return timespan((Number(match[1] ?? 0) * 3600 + Number(match[2] ?? 0) * 60 + Number(match[3] ?? 0)) * 1000)
+function duration(ms) {
+  const hundredths = Math.max(0, Math.round(ms / 10))
+  const hours = Math.floor(hundredths / 360000)
+  const minutes = Math.floor(hundredths / 6000) % 60
+  return `PT${hours ? `${hours}H` : ''}${minutes ? `${minutes}M` : ''}${(hundredths % 6000) / 100}S`
 }
 
-/** The time of day, a `CMITime`: when an interaction was answered. */
-function timeOfDay() {
+/** A span of time in this package's version's format. @param {number} ms */
+const span = (ms) => (scorm2004 ? duration(ms) : timespan(ms))
+
+/**
+ * A statement's `result.duration`, an ISO 8601 duration the core writes as `PT12.34S`, in the
+ * version's format; `null` for anything else.
+ * @param {unknown} given
+ */
+function latencyOf(given) {
+  const match = typeof given === 'string' ? /^PT(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?$/.exec(given) : null
+  if (!match || given === 'PT') return null
+  return span((Number(match[1] ?? 0) * 3600 + Number(match[2] ?? 0) * 60 + Number(match[3] ?? 0)) * 1000)
+}
+
+/**
+ * When an interaction was answered: SCORM 1.2's time of day, a `CMITime`, or 2004's date and
+ * time to the hundredth of a second, in UTC.
+ */
+function answeredAt() {
   const now = new Date()
+  if (scorm2004) return now.toISOString().replace(/(\.\d{2})\dZ$/, '$1Z')
   return `${two(now.getHours())}:${two(now.getMinutes())}:${two(now.getSeconds())}`
 }
 
 /**
- * A `finished` statement's result as SCORM 1.2 records it: the score out of 100, and the status,
- * `passed` or `failed` when the content says whether it was passed, `completed` when it does not.
+ * A `finished` statement's result as the LMS records it: the score out of 100, from `scaled`,
+ * else from `raw` over `max`, or 100 for content with no score where the writer counts it so;
+ * and whether it was passed, by the pass mark where there is one and a score to hold to it, else
+ * by the content's own `success`, `null` when it does not say.
  * @param {{ score?: { scaled?: unknown, raw?: unknown, max?: unknown }, success?: unknown } | undefined} result
+ * @param {number | null} mark
  */
-function scormResult(result) {
+function scormResult(result, mark) {
   const score = result?.score ?? {}
   const scaled =
     typeof score.scaled === 'number'
       ? score.scaled
       : typeof score.raw === 'number' && typeof score.max === 'number' && score.max > 0
         ? score.raw / score.max
-        : null
-  return {
-    raw: scaled === null ? null : String(Math.round(Math.min(Math.max(scaled, 0), 1) * 10000) / 100),
-    status: result?.success === true ? 'passed' : result?.success === false ? 'failed' : 'completed'
-  }
+        : completionScore
+          ? 1
+          : null
+  const raw = scaled === null ? null : Math.round(Math.min(Math.max(scaled, 0), 1) * 10000) / 100
+  // Held to the mark as written, as the LMS holds it: 66.67 passes a mark of 66.67.
+  const passed = mark !== null && raw !== null ? raw >= mark : result?.success === true ? true : result?.success === false ? false : null
+  return { raw: raw === null ? null : String(raw), passed }
 }
 
 /**
@@ -130,11 +214,13 @@ function scormResult(result) {
  * @param {NonNullable<AnsweredStatement['result']>} result
  */
 function outcomeOf(result) {
+  // SCORM 2004 calls a wrong answer `incorrect`.
+  const wrong = scorm2004 ? 'incorrect' : 'wrong'
   if (result.success === true) return 'correct'
-  if (result.success === false) return 'wrong'
+  if (result.success === false) return wrong
   const { raw, max } = result.score ?? {}
   if (typeof raw !== 'number' || typeof max !== 'number' || max <= 0) return 'neutral'
-  return raw >= max ? 'correct' : raw <= 0 ? 'wrong' : String(Math.round(raw * 100) / 100)
+  return raw >= max ? 'correct' : raw <= 0 ? wrong : String(Math.round(raw * 100) / 100)
 }
 
 /**
@@ -163,13 +249,19 @@ function questionText(statement, language) {
 }
 
 /**
- * An interaction's id, which is what a report shows, since SCORM 1.2 has no description: the
- * question's words as a slug in printable ASCII, else the question's key with anything else
- * taken out, else `question`.
+ * An interaction's id. In SCORM 1.2 it is what a report shows, since 1.2 has no description: the
+ * question's words as a slug in printable ASCII, else the question's key with anything else taken
+ * out, else `question`. In 2004, where the words go into the description, an identifier, as 2004
+ * asks one to be a URI: the part's id as a `urn:uuid:`, else the activity's own, else a `urn:h5p:`.
  * @param {string} text
  * @param {string} key
  */
 function interactionId(text, key) {
+  if (scorm2004) {
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(key)) return `urn:uuid:${key.toLowerCase()}`
+    if (/^[a-z][a-z0-9+.-]*:[\x21-\x7e]+$/i.test(key) && key.length <= 4000) return key
+    return `urn:h5p:${encodeURIComponent(key)}`
+  }
   const slug = text
     .normalize('NFKD')
     .replace(/[̀-ͯ]/g, '')
@@ -190,21 +282,41 @@ const notice = /** @type {HTMLElement} */ (document.getElementById('notice'))
 const saving = /** @type {HTMLElement | null} */ (document.getElementById('saving'))
 const lz = /** @type {LzString | undefined} */ (/** @type {{ LZString?: LzString }} */ (/** @type {unknown} */ (globalThis)).LZString)
 
-const api = findApi(window) ?? (window.opener ? findApi(window.opener) : null)
+const lms = connect()
 const started = Date.now()
 /** Whether the LMS accepted the session; nothing is reported to one that did not. */
-const initialized = api ? String(api.LMSInitialize('')) === 'true' : false
+const initialized = lms ? String(lms.initialize()) === 'true' : false
 
 /** @param {string} element */
-const get = (element) => (initialized && api ? String(api.LMSGetValue(element)) : '')
+const get = (element) => (initialized && lms ? String(lms.get(element)) : '')
 /** @param {string} element @param {string} value */
-const set = (element, value) => initialized && api !== null && String(api.LMSSetValue(element, value)) === 'true'
-const commit = () => initialized && api !== null && String(api.LMSCommit('')) === 'true'
+const set = (element, value) => initialized && lms !== null && String(lms.set(element, value)) === 'true'
+const commit = () => initialized && lms !== null && String(lms.commit()) === 'true'
+
+/** The data model's names for the status, the score, the time and the exit, by version. */
+const STATUS = scorm2004 ? 'cmi.completion_status' : 'cmi.core.lesson_status'
+const SCORE = scorm2004 ? 'cmi.score' : 'cmi.core.score'
+const SESSION_TIME = scorm2004 ? 'cmi.session_time' : 'cmi.core.session_time'
+const EXIT = scorm2004 ? 'cmi.exit' : 'cmi.core.exit'
 
 if (initialized) {
-  const status = get('cmi.core.lesson_status')
-  if (status === 'not attempted' || status === '') set('cmi.core.lesson_status', 'incomplete')
+  const status = get(STATUS)
+  // 2004 starts an attempt as `unknown` where no completion threshold says otherwise.
+  if (status === 'not attempted' || status === '' || (scorm2004 && status === 'unknown')) set(STATUS, 'incomplete')
 }
+
+/**
+ * The pass mark out of 100, read once, at launch, where the writer was given one: the LMS's, which
+ * it takes from the manifest (1.2's `cmi.student_data.mastery_score`, 2004's
+ * `cmi.scaled_passing_score`) and an administrator may change, else the page's own, for an LMS
+ * that reads no mark from the manifest. A zip written without one is graded by the content.
+ */
+const passMark = (() => {
+  if (writtenPassMark === null || !Number.isFinite(writtenPassMark)) return null
+  const lmsMark = get(scorm2004 ? 'cmi.scaled_passing_score' : 'cmi.student_data.mastery_score')
+  const read = lmsMark === '' ? NaN : Number(lmsMark) * (scorm2004 ? 100 : 1)
+  return Number.isFinite(read) && read >= 0 && read <= 100 ? Math.round(read * 100) / 100 : writtenPassMark
+})()
 
 /*
  * The learner's place. The content saves its state through the element (`resume="host"`), and
@@ -277,10 +389,10 @@ function unsaved(reason) {
 function saveState() {
   const json = JSON.stringify({ build, entries: [...saved.values()].map((entry) => [entry.dataType, entry.subContentId, entry.data]), questions })
   const value = lz ? lz.compressToBase64(json) : json
-  // A state larger than SCORM 1.2 keeps is not written, rather than written cut short; the last
-  // one that fitted stays.
+  // A state larger than the LMS keeps is not written, rather than written cut short; the last one
+  // that fitted stays.
   if (value.length > SUSPEND_DATA_LIMIT) {
-    unsaved(`it is ${value.length} characters, and SCORM 1.2 keeps ${SUSPEND_DATA_LIMIT}.`)
+    unsaved(`it is ${value.length} characters, and ${SCORM} keeps ${SUSPEND_DATA_LIMIT}.`)
     return false
   }
   if (!set('cmi.suspend_data', value)) {
@@ -344,20 +456,27 @@ function recordAnswer(statement) {
   const { index, id } = interactionFor(statement)
   /** @param {string} field */
   const at = (field) => `cmi.interactions.${index}.${field}`
-  // The id first: it is the field that makes the record.
+  // The id first: it is the field that makes the record; then, in 2004, the question's words, and
+  // the type, which 2004 needs before the pattern and the response it gives the form of.
   set(at('id'), id)
+  if (scorm2004) {
+    // As text: the character references a question type writes, `&rsquo;` among them, read.
+    const words = (new DOMParser().parseFromString(questionText(statement, language), 'text/html').documentElement.textContent ?? '').replace(/\s+/g, ' ').trim()
+    if (words) set(at('description'), words.slice(0, DESCRIPTION_LIMIT))
+  }
   const definition = statement.object?.definition
-  const type = typeof definition?.interactionType === 'string' ? INTERACTION_TYPES[definition.interactionType] : undefined
+  const types = /** @type {Record<string, string>} */ (scorm2004 ? INTERACTION_TYPES_2004 : INTERACTION_TYPES)
+  const type = typeof definition?.interactionType === 'string' ? types[definition.interactionType] : undefined
   if (type) set(at('type'), type)
   const pattern = Array.isArray(definition?.correctResponsesPattern) ? definition.correctResponsesPattern[0] : undefined
   if (typeof pattern === 'string') set(at('correct_responses.0.pattern'), pattern.slice(0, FEEDBACK_LIMIT))
   const result = statement.result ?? {}
-  if (typeof result.response === 'string') set(at('student_response'), result.response.slice(0, FEEDBACK_LIMIT))
+  if (typeof result.response === 'string') set(at(scorm2004 ? 'learner_response' : 'student_response'), result.response.slice(0, FEEDBACK_LIMIT))
   set(at('result'), outcomeOf(result))
   if (typeof result.score?.max === 'number') set(at('weighting'), String(result.score.max))
   const latency = latencyOf(result.duration)
   if (latency) set(at('latency'), latency)
-  set(at('time'), timeOfDay())
+  set(at(scorm2004 ? 'timestamp' : 'time'), answeredAt())
 }
 
 player.addEventListener('xapi', (event) => {
@@ -378,14 +497,22 @@ let finished = false
 
 player.addEventListener('finished', (event) => {
   if (!initialized) return
-  const { raw, status } = scormResult(/** @type {CustomEvent<{ statement?: { result?: any } }>} */ (event).detail?.statement?.result)
+  const { raw, passed } = scormResult(/** @type {CustomEvent<{ statement?: { result?: any } }>} */ (event).detail?.statement?.result, passMark)
   if (raw !== null) {
-    set('cmi.core.score.min', '0')
-    set('cmi.core.score.max', '100')
-    set('cmi.core.score.raw', raw)
+    set(`${SCORE}.min`, '0')
+    set(`${SCORE}.max`, '100')
+    set(`${SCORE}.raw`, raw)
+    if (scorm2004) set('cmi.score.scaled', String(Math.round(Number(raw) * 100) / 10000))
   }
-  set('cmi.core.lesson_status', status)
-  set('cmi.core.session_time', timespan(Date.now() - started))
+  if (scorm2004) {
+    // Completion and success are two fields in 2004; a result that says nothing of a pass leaves
+    // success unknown.
+    set('cmi.completion_status', 'completed')
+    if (passed !== null) set('cmi.success_status', passed ? 'passed' : 'failed')
+  } else {
+    set('cmi.core.lesson_status', passed === true ? 'passed' : passed === false ? 'failed' : 'completed')
+  }
+  set(SESSION_TIME, span(Date.now() - started))
   finished = true
   commit()
 })
@@ -404,8 +531,12 @@ player.addEventListener('finished', (event) => {
 let ended = false
 
 function writeEnd() {
-  set('cmi.core.session_time', timespan(Date.now() - started))
-  set('cmi.core.exit', finished ? '' : 'suspend')
+  set(SESSION_TIME, span(Date.now() - started))
+  // Finished, a 1.2 session ends with nothing; a 2004 one is suspended all the same. Ended
+  // `normal`, Moodle 4.5 handed the next launch an empty data model within the same attempt, and
+  // the `incomplete` written at launch replaced the `completed` it kept, while the content started
+  // over: suspended, the result and the place stay, and a retry counts, as on an H5P site.
+  set(EXIT, finished && !scorm2004 ? '' : 'suspend')
 }
 
 if (initialized) {
@@ -417,10 +548,10 @@ if (initialized) {
 }
 
 addEventListener('pagehide', () => {
-  if (!initialized || ended || !api) return
+  if (!initialized || ended || !lms) return
   ended = true
   writeEnd()
-  api.LMSFinish('')
+  lms.finish()
 })
 
 player.addEventListener('statechange', (event) => {

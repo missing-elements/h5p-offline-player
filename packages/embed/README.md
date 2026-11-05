@@ -39,7 +39,11 @@ a subdomain shares your site's cookies.
 | `--default-libraries <sources>` | The `libraries` value for addresses that name none: `pack` or URLs. Checked against `--packages`. Default: none, so exports without libraries are refused unless the address asks |
 | `--no-libraries` | Leave out the library pack, 13.8 MB in `libraries/`, one archive per library, of which a learner's browser fetches only those a package needs; `libraries=pack` then fetches them from jsDelivr, where allowed |
 | `--force` | Write into a non-empty folder, replacing only this tool's files |
-| `--scorm <package.h5p> [zip]` | Write a SCORM 1.2 package of one `.h5p` instead of the site; see [A SCORM package, for an LMS](#a-scorm-package-for-an-lms) |
+| `--scorm <package.h5p> [zip]` | Write a SCORM package of one `.h5p` instead of the site, 1.2 unless `--scorm-version` says 2004; see [A SCORM package, for an LMS](#a-scorm-package-for-an-lms) |
+| `--title <text>` | With `--scorm`, the title the LMS lists the package by. Default: the title in its `h5p.json` |
+| `--scorm-version 2004` | With `--scorm`, SCORM 2004 4th Edition rather than 1.2; see [Options](#options-of-the-zip) |
+| `--pass-mark <0-100>` | With `--scorm`, the score that passes, in place of the content's own pass or fail |
+| `--completion-score` | With `--scorm`, record content that finishes without a score as 100 |
 | `-h`, `--help` / `-v`, `--version` | |
 
 Origins are `https://host.example`, comma or space separated, no path or trailing slash;
@@ -134,8 +138,8 @@ Whatever `xapi=` says, the frame also posts to its parent:
 npx @missing-elements/h5p-embed@latest --scorm course.h5p     # writes ./course.scorm.zip
 ```
 
-writes one package as a SCORM 1.2 zip: the package, the player and the H5P runtime, and a launch
-page that reports to the LMS. Add it to a course as a SCORM activity, in one of the
+writes one package as a SCORM 1.2 zip, or 2004 with an [option](#options-of-the-zip): the
+package, the player and the H5P runtime, and a launch page that reports to the LMS. Add it to a course as a SCORM activity, in one of the
 [supported LMSs](#supported-lmss) or another that takes SCORM 1.2, and the LMS records:
 
 - the score out of 100, and `passed` or `failed` when the content says whether it was passed,
@@ -168,26 +172,51 @@ complete such an activity on viewing it instead. Replacing the zip with one writ
 `.h5p`, or with other libraries from the pack, starts learners over, since their saved state
 belongs to what it was saved in.
 
+### Options of the zip
+
+Three, each off unless asked for; a zip written with none is the SCORM 1.2 zip described above.
+
+- **SCORM 2004 4th Edition** (`--scorm-version 2004`), checked in Moodle 4.5 and SCORM Cloud. The
+  LMS keeps completion and the pass apart, so a failed attempt still counts as completed; the
+  score is scaled as well as out of 100; each answer carries the question's words as its
+  description; and the saved state may run to 64,000 characters. A learner who comes back to a
+  finished activity finds it as they left it, with its result kept.
+- **A pass mark** (`--pass-mark 80`): a score at or above it passes, whatever the content says,
+  and below it fails. The LMS gets it as the mastery score (1.2) or the passing score (2004), and
+  a mark the LMS holds of its own wins. Content that reports no score gets no pass or fail from
+  it.
+- **Completion as 100** (`--completion-score`): content that finishes without a score, such as a
+  presentation without questions, is recorded as 100, for a gradebook that needs a number; with a
+  pass mark, that passes. Content that never finishes still stays `incomplete`.
+
 ### In the browser
 
-The site `h5p-embed` writes carries the same converter as a page, `scorm.html`: a `.h5p` chosen
-or dropped on it becomes the same zip, built in the browser from the site's own copies of the
-player, the runtime and the library pack, and offered as a download. Nothing is uploaded and no
-`npx` is needed; the page says which LMSs the zip is checked in and what each needs. The demo
-site has it at [/demo/scorm.html](https://h5p-offline-player.vercel.app/demo/scorm.html).
+The site `h5p-embed` writes carries the same converter as a page, `scorm.html`, in four steps.
+Choose `.h5p` files, or drop them on it; review each one, which shows the main library and its
+version, the size, whether it carries its libraries or how many it takes from the pack, or why it
+cannot be built, and the title the LMS will list it by, which you can change; choose the
+[options](#options-of-the-zip) for all of them, or leave them; then build, and download each
+zip, or all of them in one. They are built in the browser from the site's own
+copies of the player, the runtime and the library pack, the same zips as the command's. Nothing
+is uploaded and no `npx` is needed; the page says which LMSs the zip is checked in and what each
+needs. The demo site has it at
+[/demo/scorm.html](https://h5p-offline-player.vercel.app/demo/scorm.html).
 
 ### Supported LMSs
 
 Checked at these versions, as a learner in Chrome. Other LMSs have not been tried yet.
 
-| LMS | Add the zip as | Change from the defaults | The package is read |
-|---|---|---|---|
-| Moodle 4.5 | a SCORM package activity | nothing; keep the maximum grade at 100 | in ranges |
-| ILIAS 11 | a SCORM learning module | turn Learning Progress on | whole |
-| OpenOLAT 21.1 | a "SCORM 1.2" course element | the pass mark; in a learning path, the completion criterion | in ranges |
-| Chamilo 3.0 | an imported learning path | publish the learning path | whole |
-| SCORM Cloud | a course | nothing | in ranges |
-| Frappe LMS, `develop` | a SCORM chapter | nothing; the content needs a pass mark | whole |
+| LMS | Add the zip as | Change from the defaults | The package is read | SCORM 2004 and the grading options |
+|---|---|---|---|---|
+| Moodle 4.5 | a SCORM package activity | nothing; keep the maximum grade at 100 | in ranges | checked |
+| ILIAS 11 | a SCORM learning module | turn Learning Progress on | whole | not yet |
+| OpenOLAT 21.1 | a "SCORM 1.2" course element | the pass mark; in a learning path, the completion criterion | in ranges | not yet |
+| Chamilo 3.0 | an imported learning path | publish the learning path | whole | not yet |
+| SCORM Cloud | a course | nothing | in ranges | checked |
+| Frappe LMS, `develop` | a SCORM chapter | nothing; the content needs a pass mark | whole | not yet |
+
+Whether a pass mark written into the zip takes the place of the pass mark OpenOLAT and Frappe LMS
+ask for has not been checked yet.
 
 All of them record the score, whether it passed, the time and the learner's place, except Frappe
 LMS, which records only a pass and the learner's place. Where the package is read whole, it is
@@ -238,9 +267,12 @@ export, which `libraries=pack` then plays from) or `packBase` (the folder of a c
 `@missing-elements/h5p-runtime` export, for a bundled element) and `askInOwnFrame` (default
 `true`; `false` plays a package from another origin as it is when a same-origin page frames it).
 `librariesPack`, the URL of a whole `libraries.h5p`, still works, as a bundle that only fills gaps.
-`buildScorm` from `@missing-elements/h5p-embed/scorm` is `--scorm`: it takes `h5p`, `out` and
-`force`, and returns the zip's path, its title, size, the `libraries` it carries from the pack,
-and `build`, the stamp saved state is kept against. Every entry ships with TypeScript declarations.
+`buildScorm` from `@missing-elements/h5p-embed/scorm` is `--scorm`: it takes `h5p`, `out`,
+`force`, `title`, and the options, `scormVersion` (`'1.2'`, the default, or `'2004'`),
+`passMark` (0 to 100, or `null`) and `completionScore` (`false` by default), and returns the zip's
+path, its title, its `scormVersion`, size, the `libraries` it carries from the pack, and `build`,
+the stamp saved state is kept against. Every entry ships with TypeScript
+declarations.
 
 `buildScormInPage` from `@missing-elements/h5p-embed/scorm/browser` is the same build in a page:
 it takes `file`, a `File` or `Blob`; `base`, the folder with the player's three files and
@@ -250,11 +282,20 @@ it takes `file`, a `File` or `Blob`; `base`, the folder with the player's three 
 beside the player as the written site does, where a page that gives the template and not the
 compressor gets the one at `base`, or a zip without it that keeps the saved state plain, as 1.4
 did;
-`version` and `packVersion`, for the zip's notice; and `onProgress`. It returns the zip as a
-`Blob`, with its `name`, `title`, `libraries`, `build` and `size`. `startScormPage` from
-`@missing-elements/h5p-embed/scorm-page.js` is the page's script, which reads the page's
-`#file`, `#status`, `#download` and `#notice` (see `site/scorm.html`); the written site loads it
-bundled, with zip.js inside, and a page that bundles imports the source.
+`version` and `packVersion`, for the zip's notice; `title` and the options, as `buildScorm`
+takes them; and `onProgress`. It returns the zip as a `Blob`, with its `name`, `title`,
+`scormVersion`, `libraries`, `build` and `size`. `planScormInPage`, from the same module, takes the same options and stops before
+anything is written: it reads the package and returns what its zip will hold, its `title`,
+`mainLibrary`, `size`, the `libraries` from the pack and their `librariesSize`, or refuses it as
+the build would, and `write({ title, scormVersion, passMark, completionScore })` then writes the
+zip, as often as asked. `startScormPage`
+from `@missing-elements/h5p-embed/scorm-page.js` is the page's script, which reads the page's
+`#file`, `#status`, `#download` and `#notice`, and works in steps where the page also holds
+`#files`, the list it puts a row in for each file, and `#build`, the button that builds them, and
+takes the options from radios named `scorm-version`, `#pass-mark` and `#completion-score` where
+the page has them (see `site/scorm.html`); a page without `#files` and `#build` builds the first
+file at once, as before. The written
+site loads it bundled, with zip.js inside, and a page that bundles imports the source.
 
 ```js
 import '@missing-elements/h5p-offline-player'

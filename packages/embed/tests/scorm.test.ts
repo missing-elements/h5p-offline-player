@@ -165,6 +165,56 @@ describe('the package', () => {
     expect(existsSync(out)).toBe(false)
   })
 
+  it('writes none of the options unless asked: SCORM 1.2, the content\'s own result, and nothing in the page', async () => {
+    const out = join(dir, 'plain-options.zip')
+    expect(await buildScorm({ h5p: quiz, out })).toMatchObject({ scormVersion: '1.2' })
+    const zip = await entriesOf(out)
+    const xml = await zip.text('imsmanifest.xml')
+    expect(xml).toContain('<schemaversion>1.2</schemaversion>')
+    expect(xml).not.toContain('masteryscore')
+    expect(await zip.text('index.html')).not.toContain('h5p-scorm')
+    expect(await zip.text('NOTICE.txt')).toMatch(/^This is a SCORM 1\.2 package/)
+    await zip.close()
+  })
+
+  it('writes a pass mark as SCORM 1.2\'s mastery score, and SCORM 2004\'s manifest with the mark as its objective', async () => {
+    const graded = join(dir, 'graded.zip')
+    await buildScorm({ h5p: quiz, out: graded, passMark: 80, completionScore: true })
+    const one = await entriesOf(graded)
+    expect(await one.text('imsmanifest.xml')).toContain('<title>Do you know what just happened?</title>\n        <adlcp:masteryscore>80</adlcp:masteryscore>\n      </item>')
+    const page = await one.text('index.html')
+    expect(page).toContain('<meta name="h5p-scorm-pass-mark" content="80" />')
+    expect(page).toContain('<meta name="h5p-scorm-completion-score" content="100" />')
+    expect(page).not.toContain('h5p-scorm-version')
+    await one.close()
+
+    const out = join(dir, 'quiz-2004.zip')
+    // A mark kept to the hundredth, as the score is, and to the ten-thousandth as a measure.
+    expect(await buildScorm({ h5p: quiz, out, scormVersion: '2004', passMark: 66.666 })).toMatchObject({ scormVersion: '2004' })
+    const zip = await entriesOf(out)
+    const xml = await zip.text('imsmanifest.xml')
+    expect(xml).toContain('xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"')
+    expect(xml).toContain('xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_v1p3"')
+    expect(xml).toContain('<schemaversion>2004 4th Edition</schemaversion>')
+    expect(xml).toContain('<imsss:primaryObjective objectiveID="primary" satisfiedByMeasure="true">')
+    expect(xml).toContain('<imsss:minNormalizedMeasure>0.6667</imsss:minNormalizedMeasure>')
+    expect(xml).toContain('adlcp:scormType="sco"')
+    const listed = [...xml.matchAll(/<file href="([^"]+)"\/>/g)].map((match) => match[1])
+    expect(listed.sort()).toEqual([...zip.names].sort())
+    expect(await zip.text('index.html')).toContain('<meta name="h5p-scorm-version" content="2004" />\n    <meta name="h5p-scorm-pass-mark" content="66.67" />')
+    expect(await zip.text('NOTICE.txt')).toMatch(/^This is a SCORM 2004 4th Edition package/)
+    await zip.close()
+  })
+
+  it('refuses an option it does not know, before writing anything', async () => {
+    const out = join(dir, 'unknown-option.zip')
+    await expect(buildScorm({ h5p: quiz, out, scormVersion: '1.3' as never })).rejects.toThrow(/The SCORM version is 1\.2 or 2004, not "1\.3"\./)
+    for (const passMark of [101, -1, Number.NaN, '80' as never]) {
+      await expect(buildScorm({ h5p: quiz, out, passMark })).rejects.toThrow(/The pass mark is a number from 0 to 100/)
+    }
+    expect(existsSync(out)).toBe(false)
+  })
+
   it('refuses what is not a package, and a zip already there unless forced', async () => {
     const notZip = join(dir, 'not.h5p')
     await writeFile(notZip, 'not a zip')
@@ -194,6 +244,49 @@ describe('the command', () => {
     expect(stdout).toContain('Wrote quiz.scorm.zip')
     expect(stdout).toContain('"Do you know what just happened?" as a SCORM 1.2 package')
     expect(existsSync(join(cwd, 'quiz.scorm.zip'))).toBe(true)
+  })
+
+  it('titles the zip as --title says, in the manifest and the page', async () => {
+    const cwd = join(dir, 'cli-title')
+    await mkdir(cwd)
+    const { stdout } = await run(process.execPath, [bin, '--scorm', quiz, '--title', 'Week 3 & the <quiz>'], { cwd })
+    expect(stdout).toContain('"Week 3 & the <quiz>" as a SCORM 1.2 package')
+    const zip = await entriesOf(join(cwd, 'quiz.scorm.zip'))
+    expect((await zip.text('imsmanifest.xml')).match(/<title>Week 3 &amp; the &lt;quiz&gt;<\/title>/g)).toHaveLength(2)
+    expect(await zip.text('index.html')).toContain('<title>Week 3 &amp; the &lt;quiz&gt;</title>')
+    await zip.close()
+  })
+
+  it('refuses --title without --scorm, which names nothing to title', async () => {
+    const failure = await run(process.execPath, [bin, join(dir, 'titled-site'), '--title', 'A site'], { cwd: dir }).catch((error) => error)
+    expect(failure.code).toBe(2)
+    expect(failure.stderr).toContain('--title only with --scorm')
+    expect(existsSync(join(dir, 'titled-site'))).toBe(false)
+  })
+
+  it('writes SCORM 2004 with a pass mark and completion as 100 as the flags say, and refuses what is not one', async () => {
+    const cwd = join(dir, 'cli-options')
+    await mkdir(cwd)
+    const { stdout } = await run(process.execPath, [bin, '--scorm', quiz, '--scorm-version', '2004', '--pass-mark', '80', '--completion-score'], { cwd })
+    expect(stdout).toContain('"Do you know what just happened?" as a SCORM 2004 4th Edition package (pass mark 80, completion counts as 100)')
+    const zip = await entriesOf(join(cwd, 'quiz.scorm.zip'))
+    expect(await zip.text('imsmanifest.xml')).toContain('<imsss:minNormalizedMeasure>0.8</imsss:minNormalizedMeasure>')
+    await zip.close()
+
+    for (const [flags, said] of [
+      [['--pass-mark', 'eighty'], 'The pass mark is a number from 0 to 100, not "eighty".'],
+      [['--pass-mark', ''], 'The pass mark is a number from 0 to 100, not "".'],
+      [['--pass-mark', '120'], 'The pass mark is a number from 0 to 100, not 120.'],
+      [['--scorm-version', '1.3'], 'The SCORM version is 1.2 or 2004, not "1.3".']
+    ] as const) {
+      const failure = await run(process.execPath, [bin, '--scorm', quiz, 'refused.zip', ...flags], { cwd }).catch((error) => error)
+      expect(failure.code, flags.join(' ')).toBe(1)
+      expect(failure.stderr).toContain(said)
+    }
+    expect(existsSync(join(cwd, 'refused.zip'))).toBe(false)
+    const site = await run(process.execPath, [bin, 'site', '--pass-mark', '80', '--completion-score'], { cwd }).catch((error) => error)
+    expect(site.code).toBe(2)
+    expect(site.stderr).toContain('--pass-mark, --completion-score only with --scorm')
   })
 
   it('refuses the site\'s options beside --scorm', async () => {
@@ -288,6 +381,51 @@ const LMS_PAGE = `<!doctype html>
 </script>
 </body></html>`
 
+/*
+ * A SCORM 2004 LMS, as the same stand-in: `API_1484_11` in its window and nothing else, the values
+ * kept between launches, and a launch after a suspended session a resumed one.
+ */
+const LMS_2004_PAGE = `<!doctype html>
+<html><body>
+<script>
+  window.calls = []
+  window.values = { 'cmi.completion_status': 'unknown', 'cmi.success_status': 'unknown', 'cmi.entry': 'ab-initio', 'cmi.suspend_data': '' }
+  const record = (name, answer) => (...args) => {
+    window.calls.push([name, ...args])
+    return answer(...args)
+  }
+  window.API_1484_11 = {
+    Initialize: record('Initialize', () => 'true'),
+    Terminate: record('Terminate', () => 'true'),
+    GetValue: record('GetValue', (element) => (element === 'cmi.interactions._count' ? String(interactionCount()) : window.values[element] ?? '')),
+    SetValue: record('SetValue', (element, value) => {
+      window.values[element] = value
+      return 'true'
+    }),
+    Commit: record('Commit', () => 'true'),
+    GetLastError: () => '0',
+    GetErrorString: () => '',
+    GetDiagnostic: () => ''
+  }
+  function interactionCount() {
+    const indexes = Object.keys(window.values).map((key) => /^cmi\\.interactions\\.(\\d+)\\.id$/.exec(key)).filter(Boolean).map((match) => Number(match[1]))
+    return indexes.length ? Math.max(...indexes) + 1 : 0
+  }
+  window.launch = (path) => {
+    window.values['cmi.entry'] = window.values['cmi.exit'] === 'suspend' ? 'resume' : 'ab-initio'
+    document.getElementById('sco')?.remove()
+    const frame = document.createElement('iframe')
+    frame.id = 'sco'
+    frame.src = path
+    frame.style.cssText = 'width: 100%; height: 700px; border: 0'
+    document.body.append(frame)
+  }
+  window.leave = () => {
+    document.getElementById('sco').src = 'about:blank'
+  }
+</script>
+</body></html>`
+
 describe('in an LMS', () => {
   let browser: Browser
   let server: Server
@@ -301,9 +439,18 @@ describe('in an LMS', () => {
     const root = join(dir, 'unpacked')
     // The quiz at the host's root, and the export without its libraries in a folder of its own,
     // as an LMS gives each package a path of its own.
-    for (const [h5p, folder] of [[quiz, root], [formulas, join(root, 'formulas')]]) {
-      const out = join(dir, `${basename(h5p, '.h5p')}.served.zip`)
-      const built = await buildScorm({ h5p, out })
+    // And the quiz with the options, each in a folder of its own: 1.2 with a pass mark and
+    // completion as 100, 2004 with completion as 100, and 2004 with a pass mark.
+    const zips: Array<[string, string, Parameters<typeof buildScorm>[0] | null]> = [
+      [quiz, root, null],
+      [formulas, join(root, 'formulas'), null],
+      [quiz, join(root, 'graded'), { h5p: quiz, out: '', passMark: 80, completionScore: true }],
+      [quiz, join(root, 's2004'), { h5p: quiz, out: '', scormVersion: '2004', completionScore: true }],
+      [quiz, join(root, 's2004-graded'), { h5p: quiz, out: '', scormVersion: '2004', passMark: 80 }]
+    ]
+    for (const [h5p, folder, options] of zips) {
+      const out = join(dir, `${basename(folder)}.served.zip`)
+      const built = await buildScorm({ ...options, h5p, out })
       if (h5p === formulas) supplied = built.libraries
       const zip = await entriesOf(out)
       for (const name of zip.names) {
@@ -321,8 +468,8 @@ describe('in an LMS', () => {
     server = createServer(async (request, response) => {
       const path = decodeURIComponent(new URL(request.url ?? '/', 'http://x').pathname)
       served.push(path)
-      if (path === '/lms.html') {
-        response.writeHead(200, { 'Content-Type': MIME['.html'] }).end(LMS_PAGE)
+      if (path === '/lms.html' || path === '/lms2004.html') {
+        response.writeHead(200, { 'Content-Type': MIME['.html'] }).end(path === '/lms.html' ? LMS_PAGE : LMS_2004_PAGE)
         return
       }
       const file = join(root, normalize(path).replace(/^(\.\.[/\\])+/, ''))
@@ -367,12 +514,40 @@ describe('in an LMS', () => {
   const values = (page: Page) => page.evaluate(() => (window as unknown as { values: Record<string, string> }).values)
   const calls = (page: Page) => page.evaluate(() => (window as unknown as { calls: string[][] }).calls)
 
-  async function lmsPage(): Promise<{ context: BrowserContext; page: Page }> {
+  async function lmsPage(lms = '/lms.html'): Promise<{ context: BrowserContext; page: Page }> {
     const context = await browser.newContext()
     const page = await context.newPage()
-    await page.goto(`${origin}/lms.html`)
+    await page.goto(`${origin}${lms}`)
     return { context, page }
   }
+
+  /** Six of the quiz's nine points, as the first test scores them, which the quiz's own mark of half passes. */
+  async function sixOfNine(h5p: Frame) {
+    await h5p.getByRole('button', { name: 'Start' }).click()
+    await h5p.getByRole('radio', { name: 'In your browser, straight out of the zip' }).click()
+    await h5p.getByRole('button', { name: /^Check/ }).click()
+    await h5p.getByRole('button', { name: /^Next/ }).click()
+    await h5p.getByRole('radio', { name: 'True' }).click()
+    await h5p.getByRole('button', { name: /^Check/ }).click()
+    await h5p.getByRole('button', { name: /^Next/ }).click()
+    const blanks = h5p.locator('input.h5p-text-input:visible')
+    for (const [i, word] of ['stored', 'Range', 'deflated', 'front'].entries()) await blanks.nth(i).fill(word)
+    await h5p.getByRole('button', { name: /^Check/ }).click()
+    await h5p.getByRole('button', { name: /^Next/ }).click()
+    await h5p.getByRole('button', { name: /^Check/ }).click()
+    await h5p.getByRole('button', { name: /^Finish/ }).click()
+  }
+
+  /** The element's `finished`, as it dispatches it, with this result. */
+  const finish = (sco: Frame, result: Record<string, unknown>) =>
+    sco.evaluate((result) => {
+      const player = document.querySelector('h5p-player') as HTMLElement
+      player.dispatchEvent(new CustomEvent('finished', { detail: { statement: { result } } }))
+    }, result)
+
+  /** Sets values in the LMS before the launch, as it holds them from the manifest or a session before. */
+  const holding = (page: Page, held: Record<string, string>) =>
+    page.evaluate((held) => Object.assign((window as unknown as { values: Record<string, string> }).values, held), held)
 
   it('reports the score out of 100, the result and the time, and ends the session with the page', async () => {
     const { context, page } = await lmsPage()
@@ -754,6 +929,124 @@ describe('in an LMS', () => {
     expect(kept.said).toBe(false)
     expect(JSON.parse(kept.after).entries).toContainEqual(['state', 'large', 'kept'])
     await context.close()
+  })
+
+  it('holds the score to the pass mark in place of the content\'s pass, and takes the LMS\'s mark over the page\'s', async () => {
+    // 66.67 passes the quiz's own mark of half, and not the zip's 80, which the LMS does not hold.
+    const { context, page } = await lmsPage()
+    const { h5p } = await launch(page, '/graded/index.html')
+    await sixOfNine(h5p)
+    await page.waitForFunction(() => (window as unknown as { values: Record<string, string> }).values['cmi.core.lesson_status'] === 'failed')
+    expect(await values(page)).toMatchObject({ 'cmi.core.score.raw': '66.67', 'cmi.core.score.max': '100' })
+    expect(await calls(page)).toContainEqual(['LMSGetValue', 'cmi.student_data.mastery_score'])
+    await context.close()
+
+    // An LMS that holds a mark of its own, 60: the same score passes, as the LMS would judge it.
+    const second = await lmsPage()
+    await holding(second.page, { 'cmi.student_data.mastery_score': '60' })
+    const { sco } = await launch(second.page, '/graded/index.html')
+    await finish(sco, { score: { raw: 6, max: 9, scaled: 0.6667 }, success: false })
+    expect(await values(second.page)).toMatchObject({ 'cmi.core.lesson_status': 'passed', 'cmi.core.score.raw': '66.67' })
+    await second.context.close()
+  })
+
+  it('counts content that finishes without a score as 100, which passes the mark, and gives no score where it is off', async () => {
+    const { context, page } = await lmsPage()
+    const { sco } = await launch(page, '/graded/index.html')
+    await finish(sco, { completion: true })
+    expect(await values(page)).toMatchObject({ 'cmi.core.lesson_status': 'passed', 'cmi.core.score.raw': '100', 'cmi.core.score.min': '0', 'cmi.core.score.max': '100' })
+    // A score of 0 out of 0 is no score either.
+    await finish(sco, { score: { raw: 0, max: 0 }, completion: true })
+    expect((await values(page))['cmi.core.score.raw']).toBe('100')
+    await context.close()
+  })
+
+  it('reports to a SCORM 2004 LMS: completion and success apart, the scaled score, each answer with its words, the time as ISO 8601', async () => {
+    const { context, page } = await lmsPage('/lms2004.html')
+    const { h5p } = await launch(page, '/s2004/index.html')
+    await sixOfNine(h5p)
+    await page.waitForFunction(() => (window as unknown as { values: Record<string, string> }).values['cmi.success_status'] === 'passed')
+    const kept = await values(page)
+    expect(kept).toMatchObject({ 'cmi.completion_status': 'completed', 'cmi.score.raw': '66.67', 'cmi.score.min': '0', 'cmi.score.max': '100', 'cmi.score.scaled': '0.6667' })
+    expect(kept['cmi.session_time']).toMatch(/^PT(\d+H)?(\d+M)?\d+(\.\d{1,2})?S$/)
+    // The answers: the part's id as a URN, the words as the description, 2004's names for the
+    // response and the time, and `incorrect` where 1.2 says `wrong`.
+    expect(Object.keys(kept).filter((key) => /^cmi\.interactions\.\d+\.id$/.test(key))).toHaveLength(4)
+    expect(kept['cmi.interactions.0.id']).toMatch(/^urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
+    expect(kept['cmi.interactions.0.description']).toMatch(/^Where was this quiz unpacked/)
+    // The words as text: the drag question's `&rsquo;` read as the character it stands for.
+    expect(kept['cmi.interactions.3.description']).toContain('runtime\u2019s requests')
+    expect(kept).toMatchObject({ 'cmi.interactions.0.type': 'choice', 'cmi.interactions.0.result': 'correct', 'cmi.interactions.1.type': 'true-false', 'cmi.interactions.2.type': 'fill-in', 'cmi.interactions.3.result': 'incorrect' })
+    expect(kept['cmi.interactions.0.learner_response']).toBe(kept['cmi.interactions.0.correct_responses.0.pattern'])
+    expect(kept['cmi.interactions.0.student_response']).toBeUndefined()
+    expect(kept['cmi.interactions.0.latency']).toMatch(/^PT(\d+H)?(\d+M)?\d+(\.\d{1,2})?S$/)
+    expect(kept['cmi.interactions.0.timestamp']).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,2})?Z$/)
+    expect(Object.keys(kept).some((key) => key.startsWith('cmi.core.'))).toBe(false)
+    const made = await calls(page)
+    expect(made[0]).toEqual(['Initialize', ''])
+    expect(made).toContainEqual(['SetValue', 'cmi.completion_status', 'incomplete'])
+
+    // Finished, the session is suspended all the same, and ends with the page; the next launch
+    // resumes it, with the result kept and nothing written over it.
+    await page.evaluate(() => (window as unknown as { leave: () => void }).leave())
+    await page.waitForFunction(() => (window as unknown as { calls: string[][] }).calls.some((call) => call[0] === 'Terminate'))
+    expect((await values(page))['cmi.exit']).toBe('suspend')
+    expect((await calls(page)).filter((call) => call[0] === 'Terminate')).toHaveLength(1)
+    const before = (await calls(page)).length
+    await launch(page, '/s2004/index.html')
+    expect(await values(page)).toMatchObject({ 'cmi.entry': 'resume', 'cmi.completion_status': 'completed', 'cmi.success_status': 'passed', 'cmi.score.raw': '66.67' })
+    expect((await calls(page)).slice(before).filter((call) => call[0] === 'SetValue' && /status$/.test(call[1]))).toEqual([])
+    await context.close()
+  })
+
+  it('resumes a suspended SCORM 2004 session, and keeps a state 1.2 would not', async () => {
+    const { context, page } = await lmsPage('/lms2004.html')
+    const first = await launch(page, '/s2004/index.html')
+    await first.h5p.getByRole('button', { name: 'Start' }).click()
+    await first.h5p.getByRole('radio', { name: 'In your browser, straight out of the zip' }).click()
+    await first.h5p.getByRole('button', { name: /^Check/ }).click()
+    await first.h5p.getByRole('button', { name: /^Next/ }).click()
+    // The content's own state, which H5P saves three seconds after the answer, as in 1.2.
+    await first.sco.waitForFunction(() => {
+      const text = (parent as unknown as { values: Record<string, string> }).values['cmi.suspend_data']
+      const json = text && (window as unknown as { LZString: { decompressFromBase64: (s: string) => string | null } }).LZString.decompressFromBase64(text)
+      return Boolean(json && JSON.parse(json).entries.length > 0)
+    }, null, { timeout: 30_000 })
+    await page.evaluate(() => (window as unknown as { leave: () => void }).leave())
+    await page.waitForFunction(() => (window as unknown as { calls: string[][] }).calls.some((call) => call[0] === 'Terminate'))
+    expect((await values(page))['cmi.exit']).toBe('suspend')
+
+    const second = await launch(page, '/s2004/index.html')
+    expect((await values(page))['cmi.entry']).toBe('resume')
+    await second.h5p.getByRole('radio', { name: 'True' }).waitFor({ state: 'visible', timeout: 10_000 })
+
+    // Random text, compressed past what 1.2 keeps and short of 2004's 64,000: written, and nothing said.
+    const random = randomBytes(6000).toString('base64')
+    const kept = await save(second.sco, random)
+    expect(kept.after.length).toBeGreaterThan(4096)
+    expect(kept.said).toBe(false)
+    expect((await decoded(second.sco, kept.after)).entries).toContainEqual(['state', 'large', random])
+    await context.close()
+  })
+
+  it('holds a SCORM 2004 score to the LMS\'s passing score, and counts no score as 100 only where the zip says', async () => {
+    const { context, page } = await lmsPage('/lms2004.html')
+    // The LMS's passing score, from the manifest's objective: the content's pass is a fail below it.
+    await holding(page, { 'cmi.scaled_passing_score': '0.8' })
+    const { sco } = await launch(page, '/s2004-graded/index.html')
+    await finish(sco, { score: { raw: 6, max: 9, scaled: 0.6667 }, success: true })
+    expect(await values(page)).toMatchObject({ 'cmi.completion_status': 'completed', 'cmi.success_status': 'failed', 'cmi.score.scaled': '0.6667' })
+    // This zip does not count no score as 100: no score, so no verdict from the mark.
+    await finish(sco, { completion: true })
+    expect(await values(page)).toMatchObject({ 'cmi.completion_status': 'completed', 'cmi.score.scaled': '0.6667' })
+    await context.close()
+
+    // The zip that does, with no pass mark: completed, 100, and success left as it was.
+    const other = await lmsPage('/lms2004.html')
+    const launched = await launch(other.page, '/s2004/index.html')
+    await finish(launched.sco, { completion: true })
+    expect(await values(other.page)).toMatchObject({ 'cmi.completion_status': 'completed', 'cmi.success_status': 'unknown', 'cmi.score.raw': '100', 'cmi.score.scaled': '1' })
+    await other.context.close()
   })
 
   it('plays with no LMS around it, and reports nothing', async () => {
