@@ -78,7 +78,8 @@ async function filesUnder(dir) {
  * What `buildScorm` wrote, for a summary.
  * @typedef {object} BuiltScorm
  * @property {string} out the zip, as an absolute path
- * @property {string} title the package's title, as the LMS lists it: `h5p.json`'s, or the file's name
+ * @property {string} title the title the LMS lists the zip by: the one chosen, else `h5p.json`'s, else
+ *   the file's name
  * @property {string} version the player's version, as its `dist/VERSION` says
  * @property {string[]} libraries the folders of the libraries the zip carries from the library
  *   pack, for a package that does not carry them itself; none for one that does
@@ -97,9 +98,11 @@ async function filesUnder(dir) {
  * @param {string} options.h5p the package to wrap
  * @param {string} options.out the zip to write
  * @param {boolean} [options.force] replace a file already at `out`
+ * @param {string} [options.title] the title the LMS lists the zip by, in place of `h5p.json`'s;
+ *   an empty one leaves that
  * @returns {Promise<BuiltScorm>}
  */
-export async function buildScorm({ h5p, out, force = false }) {
+export async function buildScorm({ h5p, out, force = false, title: chosen }) {
   if (!h5p) throw new EmbedError('No package given.')
   if (!out) throw new EmbedError('No output file given.')
   const source = resolve(h5p)
@@ -116,7 +119,7 @@ export async function buildScorm({ h5p, out, force = false }) {
 
   // What the package declares and carries, and what the pack adds, read before anything is written.
   const { manifest, parts } = await readPackage(await openAsBlob(source), basename(h5p), pack)
-  const title = scormTitle(manifest, basename(h5p, extname(h5p)))
+  const title = scormTitle(manifest, basename(h5p, extname(h5p)), chosen)
   // The learner's saved place is kept against the libraries too, as the player keeps it against
   // the revision: a zip written with others starts learners over, as a refreshed package does.
   const build = await buildStamp(await sha256(source), parts)

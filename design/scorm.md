@@ -270,13 +270,15 @@ one row each; an LMS added here gets a row there.
   compressor, as one bundled for 1.4 does, gets the one at `base` or a zip without it, whose page
   names none and whose bridge writes the state plain, rather than an export that fails for a file
   it never had to serve), each part checked against the index's SHA-256 since it came
-  over the network, and the zip a `Blob`. The runtime's files are named by a list,
+  over the network, and the zip a `Blob`, in two steps since #137: `planScormInPage` reads and
+  plans, and the plan's `write` fetches and writes (below). The runtime's files are named by a list,
   `RUNTIME_FILES`, plus the fonts from its `MANIFEST.json`, since a folder on a server cannot be
   listed; `scorm-browser.test.ts` runs the builder in Node, which has `fetch`, `File` and
   `crypto.subtle`, against a written site and holds its zip to the command's entry for entry, so a
   file the runtime adds shows up there. `site/scorm-page.js` is the page's script,
-  `startScormPage()`, which reads `#file`, `#status`, `#download` and `#notice`, and a `#state`
-  badge where the page has one; the written site loads it as `scripts/build.mjs` bundles it with
+  `startScormPage()`, which reads `#file`, `#status`, `#download` and `#notice`, a `#state`
+  badge where the page has one, and `#files` and `#build` where it works in steps (below); the
+  written site loads it as `scripts/build.mjs` bundles it with
   zip.js and the player's `./plan` (`dist/scorm-page.js`, zip.js's licence in its header, since the
   site has no bundler), from `scorm.html`, with the launch page and the bridge copied beside it as
   `scorm-launch.html`, `scorm.js` and `lz-string.js` and the player's and the pack's versions in
@@ -293,8 +295,50 @@ one row each; an LMS added here gets a row there.
   Decided with the owner that day: SCORM 1.2 only, H5P's result rule kept,
   the tested LMSs the supported ones. Canvas, the audience's LMS, runs its SCORM on Rustici's
   SCORM Cloud by all accounts and cannot be tested here, since Canvas Free-for-Teacher has no SCORM
-  upload. `scorm-page.test.ts` drives the page in Chromium: a chosen file, the download, which is
-  the command's zip and plays unpacked, a refusal, and the next file after it.
+  upload.
+- **The page works in steps, and the title is the teacher's** (#137, 2026-11-05). The University
+  of Tennessee's in-browser converter (Nick Pook, MIT, h5p-standalone inside) reviews each package
+  before it builds, lets the title be changed and takes several files; the owner asked for the
+  same here, the build staying ours: their zips, measured on 2026-11-05 under a stand-in for an
+  LMS and in SCORM Cloud, sent no score, no answers and no time, and never resumed. So a page
+  shows what a zip will hold before anything is written, from the plan the build then uses:
+  `planScormInPage` reads
+  the package and plans its parts, and returns the facts, the main library with the version its
+  `preloadedDependencies` give it (`mainLibraryOf`), the title, the size, the parts and their size
+  from the pack's index, with `write`, which fetches the files and writes the zip, as often as
+  asked; `buildScormInPage` is the two at once. A refusal comes at planning, by name, before
+  anything but the pack's index is fetched. **The title** is `title` on both builders and
+  `--title` on the command, cleaned by `scormTitle` as `h5p.json`'s is, an empty one leaving the
+  package's; it goes into the manifest's organisation and item, which the LMS lists, and the
+  launch page's `<title>`, and not into the build stamp, so a zip written again under another
+  title keeps learners' places, nor into the package, which goes in as exported. **The page**
+  works in steps where it holds `#files`, a list, and `#build`, a button, as both pages here do:
+  ① choose, ② review, ③ download, each step the closest `[data-step]` around them, shown once it
+  can be reached. A file chosen or dropped gets a row (the same file twice, by name, size and date,
+  is one), whose facts sit in a live region (`role="status"`) from the moment the row appears, so
+  that what the reading found is announced. Every row is drawn again on any change, a key typed
+  in a title among them, so the page writes a region's text, and `#status`'s, only when it
+  changes: written again as it was, a region may be read out again, and a test types a title key
+  by key and counts no change to either. `#build` writes the rows one after another, a failure
+  shown in its row while the others go on; `#download` is then the zip, or, for several, one zip
+  holding them all, each stored as it is with its sizes and CRC in its local header (`addStored`,
+  the package's way since #92), while each row links its own; a title changed after a build takes
+  that zip back. A page with only the four elements of before builds the first file at once and
+  shows a refusal in `#notice`, as up to 1.5, since `startScormPage` and its page are covered by
+  docs/compatibility.md and a host's own page has to keep working. Not taken from their page: a
+  contents list, a SCORM Cloud link, an export of the settings, switches for playing offline and
+  for resume, since every zip here carries all it plays and always resumes, and an accessibility
+  check, which would need knowledge of each content type. The SCORM version and the grading
+  options are #138's.
+
+  `scorm-page.test.ts` drives the written site's page in Chromium: a chosen file read into its row
+  and built on Build, the download, which is the command's zip and plays unpacked; three files at
+  once, a refusal in its row beside two that build, a title given, each row's zip and the zip of
+  all, a row taken out, a title changed after the build; files dropped, the same one only once;
+  and a page with only the four elements, which builds at once and refuses in `#notice`.
+  `scorm-browser.test.ts` holds the plan's facts to the command's zip, two writes of one plan
+  under two titles to the same zip but for the manifest and the page, and a title given to the
+  page's builder to the command's `--title`, entry for entry.
 
 `tests/scorm.test.ts` checks the zip, the parts it carries, its stored entries' local headers and
 its refusals in Node. In Chromium it plays the unpacked zip under a page that holds the API and

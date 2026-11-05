@@ -1,4 +1,4 @@
-/* The SCORM page: a column of text with one file input, as plain as the embed page. It comes
+/* The SCORM page: a column of text in three numbered steps, as plain as the embed page. It comes
    after embed.css, which has the notice's look and no background of its own. */
 body {
   padding: 1.5rem 1rem 3rem;
@@ -36,6 +36,142 @@ label[for="file"] {
 
 input[type="file"] {
   font: inherit;
+}
+
+button {
+  padding: 0.45rem 1rem;
+  border: 1px solid #b8c0cc;
+  border-radius: 6px;
+  background: #f6f8fa;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: #eef1f5;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* A step: its number in a disc before its heading. A step the page cannot reach yet is hidden. */
+.step[hidden] {
+  display: none;
+}
+
+.step h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.step-number {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: #2f6df6;
+  color: #fff;
+  font-size: 0.85rem;
+}
+
+.step-hint {
+  color: #5b6370;
+}
+
+/* A file's row in the review: its name, size and a button to take it out; what its zip will hold,
+   or why none can be written; its title in the LMS; and, with several, its own zip. */
+.scorm-rows {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scorm-row {
+  padding: 0.7rem 0.85rem;
+  border: 1px solid #e2e6ec;
+  border-left: 3px solid #c9d0d9;
+  border-radius: 6px;
+}
+
+.scorm-row[data-state="built"] {
+  border-left-color: #1d7a42;
+}
+
+.scorm-row[data-state="refused"],
+.scorm-row[data-state="failed"] {
+  border-left-color: #b4232a;
+}
+
+.scorm-row[data-state="reading"],
+.scorm-row[data-state="building"] {
+  border-left-color: #2f6df6;
+}
+
+.scorm-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+}
+
+.scorm-row-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.scorm-row-size {
+  color: #5b6370;
+  font-size: 0.9em;
+}
+
+.scorm-row-remove {
+  margin-left: auto;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.9em;
+}
+
+.scorm-row-facts {
+  margin: 0.3rem 0 0;
+  color: #5b6370;
+}
+
+.scorm-row[data-state="refused"] .scorm-row-facts,
+.scorm-row[data-state="failed"] .scorm-row-facts {
+  color: #b4232a;
+}
+
+.scorm-row-title {
+  display: grid;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+  font-size: 0.9em;
+  font-weight: 600;
+}
+
+.scorm-row-title input {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #b8c0cc;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 400;
+}
+
+.scorm-row-download {
+  display: inline-block;
+  margin-top: 0.5rem;
+  font-weight: 600;
+}
+
+.scorm-row-download[hidden] {
+  display: none;
 }
 
 /* The line that says where the build is, then what it made, with the link to it. */

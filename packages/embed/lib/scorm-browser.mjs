@@ -1,6 +1,6 @@
 import { BlobWriter, ZipWriter } from '@zip.js/zip.js'
 import { packLibrariesIn } from '@missing-elements/h5p-offline-player/plan'
-import { addScormEntries, buildStamp, readPackage, runtimeFiles, scormEntries, scormTitle, sha256Hex } from './scorm-core.mjs'
+import { addScormEntries, buildStamp, mainLibraryOf, readPackage, runtimeFiles, scormEntries, scormTitle, sha256Hex } from './scorm-core.mjs'
 import { EmbedError, PLAYER_FILES } from './shared.mjs'
 
 /**
@@ -10,6 +10,10 @@ import { EmbedError, PLAYER_FILES } from './shared.mjs'
  * the library pack come from the site the page is on, and the zip comes back as a `Blob` for a
  * download link. Nothing is uploaded anywhere. It needs a secure context, https or localhost, for
  * `crypto.subtle`.
+ *
+ * In two steps, so that a page can show what a zip will hold before it is written:
+ * `planScormInPage` reads the package and plans the parts of the pack it needs, and the plan's
+ * `write` fetches the files and writes the zip. `buildScormInPage` is both at once.
  */
 
 /**
@@ -26,6 +30,8 @@ import { EmbedError, PLAYER_FILES } from './shared.mjs'
  * @property {Blob} file the package, as picked or dropped
  * @property {string} [name] its file name, for the zip's name, the title's fallback and the
  *   messages; a `File`'s own by default
+ * @property {string} [title] the title the LMS lists the zip by, in place of `h5p.json`'s; an
+ *   empty one leaves that
  * @property {string | URL} [base] the folder that holds the player's three files and
  *   `frame-assets/`, and, unless `assets` gives them, `scorm-launch.html`, `scorm.js`,
  *   `lz-string.js`, `embed.css` and `libraries.txt`: this page's own folder by default
@@ -51,11 +57,30 @@ import { EmbedError, PLAYER_FILES } from './shared.mjs'
  * @typedef {object} PageScorm
  * @property {Blob} blob the zip
  * @property {string} name what to call it: the package's name with `.scorm.zip` in place of its extension
- * @property {string} title the package's title, as the LMS lists it
+ * @property {string} title the title the LMS lists it by: the one chosen, else the package's
  * @property {string} version the player's version, as given
  * @property {string[]} libraries the folders of the libraries the zip carries from the pack
  * @property {string} build the build stamp, as `buildScorm` returns it
  * @property {number} size the zip's size in bytes
+ */
+
+/**
+ * What `planScormInPage` read of a package: what its zip will hold, known before anything else is
+ * fetched and anything is written.
+ * @typedef {object} PlannedScorm
+ * @property {string} name the package's file name
+ * @property {number} size the package's size in bytes
+ * @property {string} title the title the zip takes unless `write` is given another: `h5p.json`'s,
+ *   or the file's name
+ * @property {{ machineName: string, majorVersion?: number, minorVersion?: number } | null} mainLibrary
+ *   the package's main library, as `h5p.json` names it, with the version its dependencies give
+ *   it; `null` when it names none
+ * @property {string[]} libraries the folders of the libraries the zip will carry from the pack;
+ *   none for a package that carries its own
+ * @property {number} librariesSize their archives' size in bytes, as the pack's index gives it
+ * @property {(options?: { title?: string, onProgress?: (progress: ScormProgress) => void }) => Promise<PageScorm>} write
+ *   fetches the parts, the player and the runtime, and writes the zip, under `title` when one is
+ *   given; `onProgress` defaults to the plan's. It can be called again, for another title
  */
 
 /**
@@ -81,14 +106,15 @@ async function fetched(fetchImpl, url, what) {
 const asBlob = (value) => (value instanceof Blob ? value : new Blob([value]))
 
 /**
- * Builds the SCORM 1.2 zip of a package in a page, and returns it as a `Blob`. Refuses what
- * `buildScorm` refuses, with the same messages, and a part of the pack whose bytes do not match
- * the index, since they came over the network.
+ * Reads a package in a page and plans its SCORM zip: `h5p.json`, and the parts of the pack the
+ * zip will carry, by the player's own plan. Refuses what `buildScorm` refuses before it writes,
+ * with the same messages: a package that needs a library neither it nor the pack has, and a file
+ * that is not a package.
  * @param {PageScormOptions} options
- * @returns {Promise<PageScorm>}
+ * @returns {Promise<PlannedScorm>}
  */
-export async function buildScormInPage(options) {
-  const { file, pack = null, packBase = null, assets = {}, version = 'unknown', packVersion = null, onProgress = () => {}, fetch: fetchImpl = globalThis.fetch } = options ?? {}
+export async function planScormInPage(options) {
+  const { file, pack = null, packBase = null, onProgress = () => {}, fetch: fetchImpl = globalThis.fetch } = options ?? {}
   if (!(file instanceof Blob)) throw new TypeError('Give the package as a File or a Blob')
   if (!globalThis.crypto?.subtle) {
     throw new EmbedError('A page builds SCORM packages in a secure context only, https or localhost: it needs crypto.subtle, which a page has nowhere else.')
@@ -97,13 +123,9 @@ export async function buildScormInPage(options) {
   if (typeof name !== 'string' || !name) throw new TypeError("Give the package's name: a Blob has none")
   const base = new URL(options.base ?? './', globalThis.location?.href)
   if (!base.href.endsWith('/')) base.pathname += '/'
-  /** @param {string} path */
-  const at = (path) => new URL(path, base).href
 
   // The pack as the page can reach it, held to its shape by the player's own rule; a part's
   // record, what the zip's index repeats, is the entry without its address.
-  /** @type {import('./scorm-core.mjs').PackPart[]} */
-  let parts = []
   /** @type {unknown[]} */
   let index = []
   if (pack) {
@@ -122,7 +144,10 @@ export async function buildScormInPage(options) {
   })
 
   onProgress({ step: 'reading' })
+  /** @type {any} */
   let manifest
+  /** @type {import('./scorm-core.mjs').PackPart[]} */
+  let parts
   try {
     ;({ manifest, parts } = await readPackage(file, name, library))
   } catch (error) {
@@ -132,52 +157,82 @@ export async function buildScormInPage(options) {
     }
     throw error
   }
-  const title = scormTitle(manifest, name.replace(/\.[^.]+$/, ''))
+  const stem = name.replace(/\.[^.]+$/, '')
+  const planned = scormTitle(manifest, stem)
 
-  onProgress({ step: 'libraries', libraries: parts.length })
-  /** @param {string} url @param {string} what */
-  const blob = async (url, what) => (await fetched(fetchImpl, url, what)).blob()
-  // The compressor came in 1.5, after pages that bundle the launch files were written: such a page
-  // that does not give it plays on without it, its state plain, rather than fail for a file it
-  // never had to serve.
-  const compressor = async () => {
-    try {
-      return await blob(at('lz-string.js'), "The launch page's compressor")
-    } catch (error) {
-      if (assets.launch !== undefined && error instanceof EmbedError) return null
-      throw error
+  /** @type {PlannedScorm['write']} */
+  const write = async ({ title: chosen, onProgress: report = onProgress } = {}) => {
+    const title = scormTitle(manifest, stem, chosen)
+    const { assets = {}, version = 'unknown', packVersion = null } = options
+    /** @param {string} path */
+    const at = (path) => new URL(path, base).href
+
+    report({ step: 'libraries', libraries: parts.length })
+    /** @param {string} url @param {string} what */
+    const blob = async (url, what) => (await fetched(fetchImpl, url, what)).blob()
+    // The compressor came in 1.5, after pages that bundle the launch files were written: such a
+    // page that does not give it plays on without it, its state plain, rather than fail for a file
+    // it never had to serve.
+    const compressor = async () => {
+      try {
+        return await blob(at('lz-string.js'), "The launch page's compressor")
+      } catch (error) {
+        if (assets.launch !== undefined && error instanceof EmbedError) return null
+        throw error
+      }
     }
-  }
-  /** @param {string[]} names @param {(name: string) => string} url @param {string} what */
-  const blobs = async (names, url, what) => new Map(await Promise.all(names.map(async (item) => /** @type {[string, Blob]} */ ([item, await blob(url(item), `${what} ${item}`)]))))
-  const partBlobs = await blobs(parts.map((part) => part.folder), (folder) => /** @type {import('./scorm-core.mjs').PackPart} */ (parts.find((part) => part.folder === folder)).url, 'The library part')
-  // Checked as the player checks a part before it uses one: these bytes came over the network.
-  for (const part of parts) {
-    const bytes = await /** @type {Blob} */ (partBlobs.get(part.folder)).arrayBuffer()
-    if ((await sha256Hex(bytes)) !== part.sha256) {
-      throw new EmbedError(`The library part ${part.folder} from ${part.url} does not match the pack's index, so the zip was not written.`)
+    /** @param {string[]} names @param {(name: string) => string} url @param {string} what */
+    const blobs = async (names, url, what) => new Map(await Promise.all(names.map(async (item) => /** @type {[string, Blob]} */ ([item, await blob(url(item), `${what} ${item}`)]))))
+    const partBlobs = await blobs(parts.map((part) => part.folder), (folder) => /** @type {import('./scorm-core.mjs').PackPart} */ (parts.find((part) => part.folder === folder)).url, 'The library part')
+    // Checked as the player checks a part before it uses one: these bytes came over the network.
+    for (const part of parts) {
+      const bytes = await /** @type {Blob} */ (partBlobs.get(part.folder)).arrayBuffer()
+      if ((await sha256Hex(bytes)) !== part.sha256) {
+        throw new EmbedError(`The library part ${part.folder} from ${part.url} does not match the pack's index, so the zip was not written.`)
+      }
     }
-  }
-  const runtimeManifest = await (await fetched(fetchImpl, at('frame-assets/MANIFEST.json'), "The runtime's manifest")).json()
-  const files = {
-    launch: assets.launch ?? (await (await fetched(fetchImpl, at('scorm-launch.html'), "The launch page's template")).text()),
-    bridge: assets.bridge !== undefined ? asBlob(assets.bridge) : await blob(at('scorm.js'), 'The launch page\'s script'),
-    lz: assets.lz !== undefined ? asBlob(assets.lz) : await compressor(),
-    css: assets.css !== undefined ? asBlob(assets.css) : await blob(at('embed.css'), 'The stylesheet'),
-    player: await blobs(PLAYER_FILES, at, "The player's file"),
-    runtime: await blobs(runtimeFiles(runtimeManifest), (path) => at(`frame-assets/${path}`), "The runtime's file"),
-    pkg: file,
-    parts: partBlobs,
-    librariesText: parts.length === 0 ? null : assets.libraries !== undefined ? asBlob(assets.libraries) : await blob(at('libraries.txt'), "The pack's licence list")
+    const runtimeManifest = await (await fetched(fetchImpl, at('frame-assets/MANIFEST.json'), "The runtime's manifest")).json()
+    const files = {
+      launch: assets.launch ?? (await (await fetched(fetchImpl, at('scorm-launch.html'), "The launch page's template")).text()),
+      bridge: assets.bridge !== undefined ? asBlob(assets.bridge) : await blob(at('scorm.js'), 'The launch page\'s script'),
+      lz: assets.lz !== undefined ? asBlob(assets.lz) : await compressor(),
+      css: assets.css !== undefined ? asBlob(assets.css) : await blob(at('embed.css'), 'The stylesheet'),
+      player: await blobs(PLAYER_FILES, at, "The player's file"),
+      runtime: await blobs(runtimeFiles(runtimeManifest), (path) => at(`frame-assets/${path}`), "The runtime's file"),
+      pkg: file,
+      parts: partBlobs,
+      librariesText: parts.length === 0 ? null : assets.libraries !== undefined ? asBlob(assets.libraries) : await blob(at('libraries.txt'), "The pack's licence list")
+    }
+
+    // The whole package in memory once, for its hash: `crypto.subtle` takes no stream.
+    const build = await buildStamp(await sha256Hex(await file.arrayBuffer()), parts)
+    const { entries, xml } = scormEntries({ manifest, source: name, title, build, version, packVersion, parts, files })
+
+    report({ step: 'writing' })
+    const zip = new ZipWriter(new BlobWriter('application/zip'), { useWebWorkers: false })
+    await addScormEntries(zip, { entries, xml })
+    const out = await zip.close()
+    return { blob: out, name: `${stem}.scorm.zip`, title, version, libraries: parts.map((part) => part.folder), build, size: out.size }
   }
 
-  // The whole package in memory once, for its hash: `crypto.subtle` takes no stream.
-  const build = await buildStamp(await sha256Hex(await file.arrayBuffer()), parts)
-  const { entries, xml } = scormEntries({ manifest, source: name, title, build, version, packVersion, parts, files })
+  return {
+    name,
+    size: file.size,
+    title: planned,
+    mainLibrary: mainLibraryOf(manifest),
+    libraries: parts.map((part) => part.folder),
+    librariesSize: parts.reduce((sum, part) => sum + part.size, 0),
+    write
+  }
+}
 
-  onProgress({ step: 'writing' })
-  const zip = new ZipWriter(new BlobWriter('application/zip'), { useWebWorkers: false })
-  await addScormEntries(zip, { entries, xml })
-  const out = await zip.close()
-  return { blob: out, name: `${name.replace(/\.[^.]+$/, '')}.scorm.zip`, title, version, libraries: parts.map((part) => part.folder), build, size: out.size }
+/**
+ * Builds the SCORM 1.2 zip of a package in a page, and returns it as a `Blob`: `planScormInPage`
+ * and the plan's `write` at once. Refuses what `buildScorm` refuses, with the same messages, and a
+ * part of the pack whose bytes do not match the index, since they came over the network.
+ * @param {PageScormOptions} options
+ * @returns {Promise<PageScorm>}
+ */
+export async function buildScormInPage(options) {
+  return (await planScormInPage(options)).write({ title: options?.title })
 }

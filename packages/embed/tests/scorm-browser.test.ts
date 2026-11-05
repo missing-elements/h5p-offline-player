@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { buildSite } from '../lib/build.mjs'
-import { buildScormInPage, type ScormProgress } from '../lib/scorm-browser.mjs'
+import { buildScormInPage, planScormInPage, type ScormProgress } from '../lib/scorm-browser.mjs'
 import { buildScorm } from '../lib/scorm.mjs'
 import { EmbedError } from '../lib/shared.mjs'
 import { host, type Host } from './helpers/host.js'
@@ -89,6 +89,55 @@ describe('built in a page', () => {
     expect(built).toMatchObject({ name: 'formulas.scorm.zip', title: command.title, build: command.build })
     await expectSameZip(out, command.out)
     expect(steps).toEqual([{ step: 'reading' }, { step: 'libraries', libraries: command.libraries.length }, { step: 'writing' }])
+  })
+
+  it('says what a zip will hold before it is written, and writes it under any title as often as asked', async () => {
+    const steps: ScormProgress[] = []
+    const plan = await planScormInPage({ file: await picked(formulas, 'formulas.h5p'), ...onSite(site), onProgress: (progress) => steps.push(progress) })
+    const command = await buildScorm({ h5p: formulas, out: join(dir, 'formulas.plan.zip') })
+    const index = JSON.parse(await readFile(join(dir, 'site', 'libraries', 'index.json'), 'utf8')) as { libraries: Array<{ folder: string; size: number }> }
+    const sizes = new Map(index.libraries.map((entry) => [entry.folder, entry.size]))
+    expect(plan).toMatchObject({ name: 'formulas.h5p', size: (await readFile(formulas)).length, title: command.title, libraries: command.libraries })
+    expect(plan.mainLibrary).toEqual({ machineName: 'H5P.QuestionSet', majorVersion: 1, minorVersion: expect.any(Number) })
+    expect(plan.librariesSize).toBe(command.libraries.reduce((sum, folder) => sum + (sizes.get(folder) ?? Number.NaN), 0))
+    // Read, and nothing fetched or written yet.
+    expect(steps).toEqual([{ step: 'reading' }])
+
+    const carries = await planScormInPage({ file: await picked(quiz, 'quiz.h5p'), ...onSite(site) })
+    expect(carries).toMatchObject({ libraries: [], librariesSize: 0, mainLibrary: { machineName: 'H5P.QuestionSet' } })
+
+    // Written twice, under two titles: the same zip but for the title, kept against the same build.
+    const first = await plan.write()
+    const second = await plan.write({ title: '  A title\nof its own  ' })
+    expect(first).toMatchObject({ title: command.title, build: command.build, libraries: command.libraries })
+    expect(second).toMatchObject({ title: 'A title of its own', build: command.build })
+    expect(steps).toEqual([{ step: 'reading' }, ...Array(2).fill([{ step: 'libraries', libraries: command.libraries.length }, { step: 'writing' }]).flat()])
+    const firstOut = join(dir, 'formulas.first.zip')
+    const secondOut = join(dir, 'formulas.second.zip')
+    await writeFile(firstOut, new Uint8Array(await first.blob.arrayBuffer()))
+    await writeFile(secondOut, new Uint8Array(await second.blob.arrayBuffer()))
+    const a = await entriesOf(firstOut)
+    const b = await entriesOf(secondOut)
+    expect(b.names).toEqual(a.names)
+    for (const name of a.names) {
+      const same = Buffer.from(await a.bytes(name)).equals(Buffer.from(await b.bytes(name)))
+      expect(same, name).toBe(name !== 'imsmanifest.xml' && name !== 'index.html')
+    }
+    expect((await b.text('imsmanifest.xml')).match(/<title>A title of its own<\/title>/g)).toHaveLength(2)
+    expect(await b.text('index.html')).toContain('<title>A title of its own</title>')
+    await a.close()
+    await b.close()
+  })
+
+  it("writes the command's zip under the command's title, and keeps the package's for a title of spaces", async () => {
+    const titled = await buildScormInPage({ file: await picked(quiz, 'quiz.h5p'), ...onSite(site), title: 'Week 3: the quiz' })
+    const out = join(dir, 'quiz.titled.page.zip')
+    await writeFile(out, new Uint8Array(await titled.blob.arrayBuffer()))
+    const command = await buildScorm({ h5p: quiz, out: join(dir, 'quiz.titled.cli.zip'), title: 'Week 3: the quiz' })
+    expect(titled).toMatchObject({ title: 'Week 3: the quiz', build: command.build })
+    expect(command.title).toBe('Week 3: the quiz')
+    await expectSameZip(out, command.out)
+    await expect(buildScormInPage({ file: await picked(quiz, 'quiz.h5p'), ...onSite(site), title: ' \t ' })).resolves.toMatchObject({ title: 'Do you know what just happened?' })
   })
 
   it("takes the pack as its package exports it, with the same result", async () => {

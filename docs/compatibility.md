@@ -97,9 +97,9 @@ What is covered of the pack itself: the `pack` export, `parts/` with its `index.
   question's `cmi.interactions.n`), and what it keeps in `cmi.suspend_data`, which a zip written
   by a later version reads back unless the libraries it carries from the pack have changed: 1.5
   writes it compressed and still reads what 1.4 wrote plain.
-- **The SCORM page**, `scorm.html` on a written site, and **`buildScormInPage()`** and
-  **`startScormPage()`**, with their options and types: the same zip as `buildScorm()`'s, built in
-  the browser.
+- **The SCORM page**, `scorm.html` on a written site, and **`planScormInPage()`**,
+  **`buildScormInPage()`** and **`startScormPage()`**, with their options and types: the same zip
+  as `buildScorm()`'s, built in the browser.
 
 A written site is a folder of copies and changes only when it is written again: upgrading is
 running the new version of the command and deploying the folder. A SCORM zip likewise, replaced in

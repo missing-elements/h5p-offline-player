@@ -4,14 +4,14 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Convert H5P to SCORM in your browser — h5p-offline-player</title>
-    <meta name="description" content="Drop a .h5p file and download it as a SCORM 1.2 package for Moodle, ILIAS, OpenOLAT, Chamilo or SCORM Cloud. Built in your browser with nothing uploaded; the LMS records the score, the result, each answer, the time and the learner's place." />
+    <meta name="description" content="Drop .h5p files, check each one, and download them as SCORM 1.2 packages for Moodle, ILIAS, OpenOLAT, Chamilo or SCORM Cloud. Built in your browser with nothing uploaded; the LMS records the score, the result, each answer, the time and the learner's place." />
     <link rel="canonical" href="%SITE_URL%/demo/scorm.html" />
     <meta name="theme-color" content="#2f6df6" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="h5p-offline-player by Missing Elements" />
     <meta property="og:locale" content="en_US" />
     <meta property="og:title" content="Convert H5P to SCORM in your browser — h5p-offline-player" />
-    <meta property="og:description" content="Drop a .h5p file and download it as a SCORM 1.2 package for Moodle, ILIAS, OpenOLAT, Chamilo or SCORM Cloud. Built in your browser with nothing uploaded; the LMS records the score, the result, each answer, the time and the learner's place." />
+    <meta property="og:description" content="Drop .h5p files, check each one, and download them as SCORM 1.2 packages for Moodle, ILIAS, OpenOLAT, Chamilo or SCORM Cloud. Built in your browser with nothing uploaded; the LMS records the score, the result, each answer, the time and the learner's place." />
     <meta property="og:url" content="%SITE_URL%/demo/scorm.html" />
     <meta property="og:image" content="%SITE_URL%/demo/og-image.png" />
     <meta property="og:image:width" content="1200" />
@@ -19,7 +19,7 @@
     <meta property="og:image:alt" content="h5p-offline-player: self-hosted H5P, with no H5P server" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Convert H5P to SCORM in your browser — h5p-offline-player" />
-    <meta name="twitter:description" content="Drop a .h5p file and download it as a SCORM 1.2 package for Moodle, ILIAS, OpenOLAT, Chamilo or SCORM Cloud. Built in your browser with nothing uploaded; the LMS records the score, the result, each answer, the time and the learner's place." />
+    <meta name="twitter:description" content="Drop .h5p files, check each one, and download them as SCORM 1.2 packages for Moodle, ILIAS, OpenOLAT, Chamilo or SCORM Cloud. Built in your browser with nothing uploaded; the LMS records the score, the result, each answer, the time and the learner's place." />
     <meta name="twitter:image" content="%SITE_URL%/demo/og-image.png" />
     <!-- partial: head -->
     <script type="module" src="/demo/scorm-page.js"></script>
@@ -32,29 +32,49 @@
       <p class="eyebrow">SCORM</p>
       <h1>H5P to SCORM</h1>
       <p class="lede">
-        Drop a <code>.h5p</code> file here, or choose one, and download it as a SCORM 1.2 package
-        for your LMS. It is built in your browser with the player this site serves, and nothing is
-        uploaded: the package never leaves your computer.
+        Drop <code>.h5p</code> files here, or choose them, check what each zip will hold, and
+        download them as SCORM 1.2 packages for your LMS. They are built in your browser with the
+        player this site serves, and nothing is uploaded: the packages never leave your computer.
       </p>
 
-      <form class="controls">
-        <label class="file">
-          Choose a .h5p file
-          <input type="file" id="file" accept=".h5p,application/zip" />
-        </label>
-      </form>
+      <section class="step" data-step="choose">
+        <h2><span class="step-number">1</span> Choose</h2>
+        <form class="controls">
+          <label class="file">
+            Choose .h5p files
+            <input type="file" id="file" accept=".h5p,application/zip" multiple />
+          </label>
+          <span class="step-hint">or drop them anywhere on this page; each becomes a zip of its own</span>
+        </form>
+      </section>
 
-      <div class="status" data-state="idle">
-        <span class="badge" id="state" data-state="idle">idle</span>
-        <span id="status"></span>
-        <a id="download" hidden>Download</a>
-      </div>
+      <section class="step" data-step="review" hidden>
+        <h2><span class="step-number">2</span> Review</h2>
+        <p>
+          What each zip will hold, read from the package before anything is built. The title is
+          what the LMS lists the package by; change it here if you like.
+        </p>
+        <ul class="scorm-rows" id="files"></ul>
+      </section>
 
-      <!-- The live region is on the page from the start, as on the player page, so that a refusal
-           put into it is announced. -->
-      <div role="status" aria-live="polite">
-        <p class="message error" id="notice" hidden></p>
-      </div>
+      <section class="step" data-step="download" hidden>
+        <h2><span class="step-number">3</span> Download</h2>
+        <form class="controls">
+          <button type="button" class="primary" id="build">Build the SCORM package</button>
+        </form>
+
+        <div class="status" data-state="idle">
+          <span class="badge" id="state" data-state="idle">idle</span>
+          <span id="status" aria-live="polite"></span>
+          <a id="download" hidden>Download</a>
+        </div>
+
+        <!-- The live region is on the page from the start, as on the player page, so that a refusal
+             put into it is announced. -->
+        <div role="status" aria-live="polite">
+          <p class="message error" id="notice" hidden></p>
+        </div>
+      </section>
 
       <h2>In the LMS</h2>
       <p>

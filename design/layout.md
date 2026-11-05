@@ -233,8 +233,9 @@ packages/embed/           @missing-elements/h5p-embed — the embed page as a st
   lib/scorm-core.mjs        what the SCORM zip is wherever it is written, and no Node import: the
                             package read and its parts planned, the entries laid out, the zip written
                             into a zip.js writer; lib/scorm-browser.mjs, `./scorm/browser`,
-                            buildScormInPage(): the same zip in a page, from a File, the files
-                            fetched from the site and the zip a Blob; lib/shared.mjs, EmbedError and
+                            planScormInPage() and buildScormInPage(): the same zip in a page, from a
+                            File, read and planned first (#137), the files fetched from the site and
+                            the zip a Blob; lib/shared.mjs, EmbedError and
                             the player's file names, for the modules that import no Node (#122)
   scorm/                    the SCORM package's launch page (index.html, its title, language and
                             build filled in by the writer), scorm.js, its bridge to the LMS's API,

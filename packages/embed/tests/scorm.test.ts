@@ -196,6 +196,24 @@ describe('the command', () => {
     expect(existsSync(join(cwd, 'quiz.scorm.zip'))).toBe(true)
   })
 
+  it('titles the zip as --title says, in the manifest and the page', async () => {
+    const cwd = join(dir, 'cli-title')
+    await mkdir(cwd)
+    const { stdout } = await run(process.execPath, [bin, '--scorm', quiz, '--title', 'Week 3 & the <quiz>'], { cwd })
+    expect(stdout).toContain('"Week 3 & the <quiz>" as a SCORM 1.2 package')
+    const zip = await entriesOf(join(cwd, 'quiz.scorm.zip'))
+    expect((await zip.text('imsmanifest.xml')).match(/<title>Week 3 &amp; the &lt;quiz&gt;<\/title>/g)).toHaveLength(2)
+    expect(await zip.text('index.html')).toContain('<title>Week 3 &amp; the &lt;quiz&gt;</title>')
+    await zip.close()
+  })
+
+  it('refuses --title without --scorm, which names nothing to title', async () => {
+    const failure = await run(process.execPath, [bin, join(dir, 'titled-site'), '--title', 'A site'], { cwd: dir }).catch((error) => error)
+    expect(failure.code).toBe(2)
+    expect(failure.stderr).toContain('--title only with --scorm')
+    expect(existsSync(join(dir, 'titled-site'))).toBe(false)
+  })
+
   it('refuses the site\'s options beside --scorm', async () => {
     const failure = await run(process.execPath, [bin, '--scorm', quiz, '--packages', 'https://cdn.example.org'], { cwd: dir }).catch((error) => error)
     expect(failure.code).toBe(2)

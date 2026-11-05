@@ -40,6 +40,7 @@ a subdomain shares your site's cookies.
 | `--no-libraries` | Leave out the library pack, 13.8 MB in `libraries/`, one archive per library, of which a learner's browser fetches only those a package needs; `libraries=pack` then fetches them from jsDelivr, where allowed |
 | `--force` | Write into a non-empty folder, replacing only this tool's files |
 | `--scorm <package.h5p> [zip]` | Write a SCORM 1.2 package of one `.h5p` instead of the site; see [A SCORM package, for an LMS](#a-scorm-package-for-an-lms) |
+| `--title <text>` | With `--scorm`, the title the LMS lists the package by. Default: the title in its `h5p.json` |
 | `-h`, `--help` / `-v`, `--version` | |
 
 Origins are `https://host.example`, comma or space separated, no path or trailing slash;
@@ -170,11 +171,15 @@ belongs to what it was saved in.
 
 ### In the browser
 
-The site `h5p-embed` writes carries the same converter as a page, `scorm.html`: a `.h5p` chosen
-or dropped on it becomes the same zip, built in the browser from the site's own copies of the
-player, the runtime and the library pack, and offered as a download. Nothing is uploaded and no
-`npx` is needed; the page says which LMSs the zip is checked in and what each needs. The demo
-site has it at [/demo/scorm.html](https://h5p-offline-player.vercel.app/demo/scorm.html).
+The site `h5p-embed` writes carries the same converter as a page, `scorm.html`, in three steps.
+Choose `.h5p` files, or drop them on it; review each one, which shows the main library and its
+version, the size, whether it carries its libraries or how many it takes from the pack, or why it
+cannot be built, and the title the LMS will list it by, which you can change; then build, and
+download each zip, or all of them in one. They are built in the browser from the site's own
+copies of the player, the runtime and the library pack, the same zips as the command's. Nothing
+is uploaded and no `npx` is needed; the page says which LMSs the zip is checked in and what each
+needs. The demo site has it at
+[/demo/scorm.html](https://h5p-offline-player.vercel.app/demo/scorm.html).
 
 ### Supported LMSs
 
@@ -238,9 +243,10 @@ export, which `libraries=pack` then plays from) or `packBase` (the folder of a c
 `@missing-elements/h5p-runtime` export, for a bundled element) and `askInOwnFrame` (default
 `true`; `false` plays a package from another origin as it is when a same-origin page frames it).
 `librariesPack`, the URL of a whole `libraries.h5p`, still works, as a bundle that only fills gaps.
-`buildScorm` from `@missing-elements/h5p-embed/scorm` is `--scorm`: it takes `h5p`, `out` and
-`force`, and returns the zip's path, its title, size, the `libraries` it carries from the pack,
-and `build`, the stamp saved state is kept against. Every entry ships with TypeScript declarations.
+`buildScorm` from `@missing-elements/h5p-embed/scorm` is `--scorm`: it takes `h5p`, `out`,
+`force` and `title`, and returns the zip's path, its title, size, the `libraries` it carries from
+the pack, and `build`, the stamp saved state is kept against. Every entry ships with TypeScript
+declarations.
 
 `buildScormInPage` from `@missing-elements/h5p-embed/scorm/browser` is the same build in a page:
 it takes `file`, a `File` or `Blob`; `base`, the folder with the player's three files and
@@ -250,11 +256,17 @@ it takes `file`, a `File` or `Blob`; `base`, the folder with the player's three 
 beside the player as the written site does, where a page that gives the template and not the
 compressor gets the one at `base`, or a zip without it that keeps the saved state plain, as 1.4
 did;
-`version` and `packVersion`, for the zip's notice; and `onProgress`. It returns the zip as a
-`Blob`, with its `name`, `title`, `libraries`, `build` and `size`. `startScormPage` from
-`@missing-elements/h5p-embed/scorm-page.js` is the page's script, which reads the page's
-`#file`, `#status`, `#download` and `#notice` (see `site/scorm.html`); the written site loads it
-bundled, with zip.js inside, and a page that bundles imports the source.
+`version` and `packVersion`, for the zip's notice; `title`, as `buildScorm` takes it; and
+`onProgress`. It returns the zip as a `Blob`, with its `name`, `title`, `libraries`, `build` and
+`size`. `planScormInPage`, from the same module, takes the same options and stops before
+anything is written: it reads the package and returns what its zip will hold, its `title`,
+`mainLibrary`, `size`, the `libraries` from the pack and their `librariesSize`, or refuses it as
+the build would, and `write({ title })` then writes the zip, as often as asked. `startScormPage`
+from `@missing-elements/h5p-embed/scorm-page.js` is the page's script, which reads the page's
+`#file`, `#status`, `#download` and `#notice`, and works in steps where the page also holds
+`#files`, the list it puts a row in for each file, and `#build`, the button that builds them (see
+`site/scorm.html`); a page without the two builds the first file at once, as before. The written
+site loads it bundled, with zip.js inside, and a page that bundles imports the source.
 
 ```js
 import '@missing-elements/h5p-offline-player'

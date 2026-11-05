@@ -158,15 +158,34 @@ export async function buildStamp(packageSha256, parts) {
 }
 
 /**
- * The package's title, as the LMS lists it: `h5p.json`'s, with the control characters XML refuses
- * read as spaces, since a title pasted in can carry one; or the file's name.
+ * The package's title, as the LMS lists it: the one chosen for the zip, by `--title` or on the
+ * page, else `h5p.json`'s, else the file's name; with the control characters XML refuses read as
+ * spaces, since a title pasted in can carry one. A chosen title that is empty, or only spaces,
+ * leaves the default.
  * @param {unknown} manifest `h5p.json`, parsed
- * @param {string} fallback
+ * @param {string} fallback the file's name without its extension
+ * @param {unknown} [chosen] the title chosen for the zip
  */
-export function scormTitle(manifest, fallback) {
-  const title = /** @type {{ title?: unknown } | null} */ (manifest)?.title
-  const named = typeof title === 'string' ? title.replace(/[\x00-\x1f\x7f]+/g, ' ').trim() : ''
-  return named || fallback
+export function scormTitle(manifest, fallback, chosen) {
+  /** @param {unknown} value */
+  const text = (value) => (typeof value === 'string' ? value.replace(/[\x00-\x1f\x7f]+/g, ' ').trim() : '')
+  return text(chosen) || text(/** @type {{ title?: unknown } | null} */ (manifest)?.title) || fallback
+}
+
+/**
+ * The package's main library, as `h5p.json` names it, with the version its
+ * `preloadedDependencies` give it; `null` when it names none, and no version when the
+ * dependencies do not list it.
+ * @param {unknown} manifest `h5p.json`, parsed
+ * @returns {{ machineName: string, majorVersion?: number, minorVersion?: number } | null}
+ */
+export function mainLibraryOf(manifest) {
+  const machineName = /** @type {{ mainLibrary?: unknown } | null} */ (manifest)?.mainLibrary
+  if (typeof machineName !== 'string' || !machineName) return null
+  const listed = dependenciesIn(manifest).find((dependency) => dependency.machineName === machineName)
+  const majorVersion = Number(listed?.majorVersion)
+  const minorVersion = Number(listed?.minorVersion)
+  return listed && Number.isInteger(majorVersion) && Number.isInteger(minorVersion) ? { machineName, majorVersion, minorVersion } : { machineName }
 }
 
 /**
@@ -332,6 +351,19 @@ export function scormEntries({ manifest, source, title, build, version, packVers
 }
 
 /**
+ * Adds a file that is compressed already as a stored entry. Written into a stream, an entry gets a
+ * data descriptor, and a Java ZipInputStream refuses a stored entry that has one: SCORM Cloud
+ * refused exactly those (#92). Passed through with its size and CRC, it gets a complete local
+ * header instead, and is still streamed, not held.
+ * @param {import('@zip.js/zip.js').ZipWriter<unknown>} zip
+ * @param {string} name
+ * @param {Blob} blob
+ */
+export async function addStored(zip, name, blob) {
+  await zip.add(name, new BlobReader(blob), { passThrough: true, compressionMethod: 0, uncompressedSize: blob.size, crc32: await crcOf(blob) })
+}
+
+/**
  * Writes the manifest and the entries into a zip.js writer, which the caller opens on a file or a
  * `Blob` and closes.
  * @param {import('@zip.js/zip.js').ZipWriter<unknown>} zip
@@ -346,13 +378,7 @@ export async function addScormEntries(zip, { entries, xml }) {
     }
     const { name, blob } = entry
     // The package, the pack's parts and the fonts are compressed already, so they are stored.
-    // Written into a stream, an entry gets a data descriptor, and a Java ZipInputStream refuses
-    // a stored entry that has one: SCORM Cloud refused exactly those (#92). Passed through with
-    // its size and CRC, it gets a complete local header instead, and is still streamed, not held.
-    if (name.endsWith('.h5p') || name.endsWith('.woff2')) {
-      await zip.add(name, new BlobReader(blob), { passThrough: true, compressionMethod: 0, uncompressedSize: blob.size, crc32: await crcOf(blob) })
-    } else {
-      await zip.add(name, new BlobReader(blob), { level: 6 })
-    }
+    if (name.endsWith('.h5p') || name.endsWith('.woff2')) await addStored(zip, name, blob)
+    else await zip.add(name, new BlobReader(blob), { level: 6 })
   }
 }

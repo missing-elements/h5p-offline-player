@@ -6,7 +6,7 @@ import { EmbedError, buildSite } from '../lib/build.mjs'
 import { buildScorm } from '../lib/scorm.mjs'
 
 const USAGE = `Usage: h5p-embed [folder] [options]
-       h5p-embed --scorm <package.h5p> [zip] [--force]
+       h5p-embed --scorm <package.h5p> [zip] [--title <text>] [--force]
 
 Writes the H5P embed page as a static site, ready to deploy to a player domain of your own.
 The folder defaults to ./h5p-player.
@@ -17,6 +17,8 @@ zip defaults to ./<package>.scorm.zip.
 
 Options:
   --scorm <package.h5p>  write a SCORM package of this .h5p rather than the site
+  --title <text>         with --scorm, the title the LMS lists the package by. Default: the
+                         title in its h5p.json
   --packages <origins>   play packages, and fetch library bundles, only from these origins
                          (comma or space separated; this site's own is always allowed). Add
                          any host a package URL redirects to, and https://cdn.jsdelivr.net for
@@ -39,6 +41,7 @@ try {
     allowPositionals: true,
     options: {
       scorm: { type: 'string' },
+      title: { type: 'string' },
       packages: { type: 'string', multiple: true },
       ancestors: { type: 'string', multiple: true },
       'default-libraries': { type: 'string' },
@@ -75,6 +78,11 @@ const shown = (path) => {
   return below === '' ? '.' : below.startsWith('..') ? path : below
 }
 
+if (values.title !== undefined && values.scorm === undefined) {
+  console.error(`h5p-embed: --title only with --scorm, which names the package it titles\n\n${USAGE}`)
+  process.exit(2)
+}
+
 // `--scorm=` with no package still means a SCORM package, refused for naming none.
 if (values.scorm !== undefined) {
   // The site's options shape a site; a SCORM package has no hosts, framers or library sources.
@@ -87,7 +95,8 @@ if (values.scorm !== undefined) {
     const zip = await buildScorm({
       h5p: values.scorm,
       out: positionals[0] ?? `${basename(values.scorm, extname(values.scorm))}.scorm.zip`,
-      force: values.force ?? false
+      force: values.force ?? false,
+      title: values.title
     })
     const count = zip.libraries.length
     const supplied = count > 0 ? `, the H5P runtime and ${count} ${count === 1 ? 'library' : 'libraries'} from the library pack, which it does not carry` : ' and the H5P runtime'
