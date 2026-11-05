@@ -119,7 +119,8 @@ if (values.scorm !== undefined) {
     })
     const count = zip.libraries.length
     const supplied = count > 0 ? `, the H5P runtime and ${count} ${count === 1 ? 'library' : 'libraries'} from the library pack, which it does not carry` : ' and the H5P runtime'
-    const graded = [values['pass-mark'] !== undefined ? `pass mark ${Number(values['pass-mark'])}` : null, values['completion-score'] ? 'completion counts as 100' : null].filter(Boolean)
+    // The options as written into the zip, the mark kept to the hundredth, not as typed.
+    const graded = [zip.passMark !== null ? `pass mark ${zip.passMark}` : null, zip.completionScore ? 'completion counts as 100' : null].filter(Boolean)
     console.log(`Wrote ${shown(zip.out)} (${megabytes(zip.size)}): "${zip.title}" as a SCORM ${zip.scormVersion === '2004' ? '2004 4th Edition' : '1.2'} package${graded.length ? ` (${graded.join(', ')})` : ''},
 with the player ${zip.version}${supplied}.
 

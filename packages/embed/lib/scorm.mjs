@@ -84,6 +84,9 @@ async function filesUnder(dir) {
  * @property {string[]} libraries the folders of the libraries the zip carries from the library
  *   pack, for a package that does not carry them itself; none for one that does
  * @property {'1.2' | '2004'} scormVersion the SCORM version it was written for
+ * @property {number | null} passMark the pass mark it holds a score to, out of 100 and kept to the
+ *   hundredth; `null` for the content's own result
+ * @property {boolean} completionScore whether content that finishes without a score counts as 100
  * @property {string} build the first 16 hex digits of the package's SHA-256, or, with libraries
  *   from the pack, of one over its and theirs: a learner's saved place is kept against it, and
  *   handed back only to the same package playing with the same libraries
@@ -172,5 +175,5 @@ export async function buildScorm({ h5p, out, force = false, title: chosen, scorm
     throw error
   }
 
-  return { out: target, title, version, libraries: parts.map((part) => part.folder), scormVersion: options.scormVersion, build, size: (await stat(target)).size }
+  return { out: target, title, version, libraries: parts.map((part) => part.folder), ...options, build, size: (await stat(target)).size }
 }

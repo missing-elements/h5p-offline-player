@@ -268,6 +268,36 @@ describe('the SCORM page', () => {
     await context.close()
   })
 
+  it('takes a file dropped while it builds, and leaves it for the next Build', async () => {
+    const context = await browser.newContext()
+    const page = await context.newPage()
+    await page.goto(`${site.origin}/scorm.html`)
+    await page.setInputFiles('#file', quiz)
+    await read(page, 1)
+    // Fetched before the build, so that the drop lands while the zip is written.
+    await page.evaluate(async () => {
+      ;(window as unknown as { later: File }).later = new File([await (await fetch('/packages/formulas.h5p')).blob()], 'formulas.h5p', { lastModified: 1 })
+    })
+    await page.locator('#build').click()
+    const during = await page.evaluate(() => {
+      const building = document.querySelector('#files > li[data-state="building"]') !== null
+      const transfer = new DataTransfer()
+      transfer.items.add((window as unknown as { later: File }).later)
+      document.body.dispatchEvent(new DragEvent('drop', { dataTransfer: transfer, bubbles: true, cancelable: true }))
+      return { building, rows: document.querySelectorAll('#files > li').length, choosable: !(document.querySelector('#file') as HTMLInputElement).disabled }
+    })
+    expect(during).toEqual({ building: true, rows: 2, choosable: true })
+
+    // The build goes on with what it was given; the file dropped is read, and waits.
+    await page.waitForFunction(() => document.querySelector('#files > li[data-state="built"]') && !document.querySelector('#files > li[data-state="reading"], #files > li[data-state="building"]'), null, { timeout: 120_000 })
+    expect(await rowOf(page, 'quiz.h5p').getAttribute('data-state')).toBe('built')
+    expect(await rowOf(page, 'formulas.h5p').getAttribute('data-state')).toBe('planned')
+    expect(await page.locator('#status').textContent()).toBe('One SCORM 1.2 package, with its link above; 1 more to build.')
+    expect(await page.locator('#build').textContent()).toBe('Build 1 SCORM package')
+    expect(await page.locator('#build').isDisabled()).toBe(false)
+    await context.close()
+  })
+
   it("builds at once on a page with only the elements of embed 1.5's, and shows a refusal in #notice", async () => {
     const context = await browser.newContext()
     const page = await context.newPage()

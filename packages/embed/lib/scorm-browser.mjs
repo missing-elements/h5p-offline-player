@@ -66,6 +66,8 @@ import { EmbedError, PLAYER_FILES } from './shared.mjs'
  * @property {string} version the player's version, as given
  * @property {string[]} libraries the folders of the libraries the zip carries from the pack
  * @property {'1.2' | '2004'} scormVersion the SCORM version it was written for
+ * @property {number | null} passMark the pass mark it holds a score to, as `buildScorm` returns it
+ * @property {boolean} completionScore whether content that finishes without a score counts as 100
  * @property {string} build the build stamp, as `buildScorm` returns it
  * @property {number} size the zip's size in bytes
  */
@@ -76,8 +78,8 @@ import { EmbedError, PLAYER_FILES } from './shared.mjs'
  * @typedef {object} PlannedScorm
  * @property {string} name the package's file name
  * @property {number} size the package's size in bytes
- * @property {string} title the title the zip takes unless `write` is given another: `h5p.json`'s,
- *   or the file's name
+ * @property {string} title the title the zip takes unless `write` is given another: the one given
+ *   to the plan, else `h5p.json`'s, else the file's name
  * @property {{ machineName: string, majorVersion?: number, minorVersion?: number } | null} mainLibrary
  *   the package's main library, as `h5p.json` names it, with the version its dependencies give
  *   it; `null` when it names none
@@ -85,9 +87,10 @@ import { EmbedError, PLAYER_FILES } from './shared.mjs'
  *   none for a package that carries its own
  * @property {number} librariesSize their archives' size in bytes, as the pack's index gives it
  * @property {(options?: { title?: string, scormVersion?: '1.2' | '2004', passMark?: number | null, completionScore?: boolean, onProgress?: (progress: ScormProgress) => void }) => Promise<PageScorm>} write
- *   fetches the parts, the player and the runtime, and writes the zip, under `title` when one is
- *   given, and with the version and the grading options given, each defaulting to the plan's, as
- *   `onProgress` does. It can be called again, for another title or other options
+ *   fetches the parts, the player and the runtime, and writes the zip, under the title and with
+ *   the version and the grading options given, each defaulting to the plan's, as `onProgress`
+ *   does. It can be called again, for another title or other options; the package is hashed for
+ *   the build stamp on the first call only
  */
 
 /**
@@ -167,10 +170,13 @@ export async function planScormInPage(options) {
     throw error
   }
   const stem = name.replace(/\.[^.]+$/, '')
-  const defaultTitle = scormTitle(manifest, stem)
+  // A title given to the plan is the plan's, and its writes' unless they give another.
+  const plannedTitle = scormTitle(manifest, stem, options.title)
+  /** @type {string | null} the build stamp, from the first write on */
+  let stamp = null
 
   /** @type {PlannedScorm['write']} */
-  const write = async ({ title: chosen, onProgress: report = onProgress, ...given } = {}) => {
+  const write = async ({ title: chosen = options.title, onProgress: report = onProgress, ...given } = {}) => {
     const title = scormTitle(manifest, stem, chosen)
     const scorm = scormOptions({ ...planned, ...Object.fromEntries(Object.entries(given).filter(([, value]) => value !== undefined)) })
     const { assets = {}, version = 'unknown', packVersion = null } = options
@@ -214,21 +220,22 @@ export async function planScormInPage(options) {
       librariesText: parts.length === 0 ? null : assets.libraries !== undefined ? asBlob(assets.libraries) : await blob(at('libraries.txt'), "The pack's licence list")
     }
 
-    // The whole package in memory once, for its hash: `crypto.subtle` takes no stream.
-    const build = await buildStamp(await sha256Hex(await file.arrayBuffer()), parts)
+    // The whole package in memory once, for its hash: `crypto.subtle` takes no stream. Once per
+    // plan, too: the package and its parts are the same for every write.
+    const build = (stamp ??= await buildStamp(await sha256Hex(await file.arrayBuffer()), parts))
     const { entries, xml } = scormEntries({ manifest, source: name, title, build, version, packVersion, parts, files, options: scorm })
 
     report({ step: 'writing' })
     const zip = new ZipWriter(new BlobWriter('application/zip'), { useWebWorkers: false })
     await addScormEntries(zip, { entries, xml })
     const out = await zip.close()
-    return { blob: out, name: `${stem}.scorm.zip`, title, version, libraries: parts.map((part) => part.folder), scormVersion: scorm.scormVersion, build, size: out.size }
+    return { blob: out, name: `${stem}.scorm.zip`, title, version, libraries: parts.map((part) => part.folder), ...scorm, build, size: out.size }
   }
 
   return {
     name,
     size: file.size,
-    title: defaultTitle,
+    title: plannedTitle,
     mainLibrary: mainLibraryOf(manifest),
     libraries: parts.map((part) => part.folder),
     librariesSize: parts.reduce((sum, part) => sum + part.size, 0),
@@ -244,5 +251,5 @@ export async function planScormInPage(options) {
  * @returns {Promise<PageScorm>}
  */
 export async function buildScormInPage(options) {
-  return (await planScormInPage(options)).write({ title: options?.title })
+  return (await planScormInPage(options)).write()
 }

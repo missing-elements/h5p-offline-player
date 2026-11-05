@@ -15,7 +15,8 @@
  * A page that also holds `#files`, a list, and `#build`, a button, as both pages here do, works in
  * steps. Each file chosen gets a row in the list, which says what its zip will hold, or why none
  * can be written, and takes the title the LMS lists it by; nothing is written until `#build` is
- * pressed, which writes the rows one after another; `#download` is then the zip, or, for several,
+ * pressed, which writes the rows one after another, and a file chosen or dropped meanwhile gets its
+ * row and waits for the next press; `#download` is then the zip, or, for several,
  * one zip that holds them all, while each row links its own. Where the page also holds the
  * options, radios named `scorm-version` (`1.2` or `2004`), `#pass-mark` and `#completion-score`,
  * every zip is written with them, and changing one takes back the zips written before. The
@@ -316,7 +317,6 @@ function inSteps(options, list, button) {
     const options = chosen()
     button.textContent = several ? `Build ${count} SCORM ${count === 1 ? 'package' : 'packages'}` : 'Build the SCORM package'
     button.disabled = busy || pending.length === 0 || options === null || rows.some((entry) => !entry.plan && !entry.error)
-    input.disabled = busy
     for (const field of [...versions, passMarkField, completionField]) if (field) field.disabled = busy
     if (passMarkField) passMarkField.setAttribute('aria-invalid', String(options === null))
     if (!busy && options === null) {
@@ -398,9 +398,12 @@ function inSteps(options, list, button) {
     if (rows.includes(entry)) void refresh()
   }
 
-  /** @param {File[]} files */
+  /**
+   * Files chosen or dropped, each a row; while a build runs too, since a drop lands anywhere on the
+   * page: read at once, and left for the next Build.
+   * @param {File[]} files
+   */
   const add = (files) => {
-    if (busy) return
     notice.hidden = true
     for (const file of files) {
       // The same file twice is one row.

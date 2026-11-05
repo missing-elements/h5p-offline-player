@@ -167,7 +167,7 @@ describe('the package', () => {
 
   it('writes none of the options unless asked: SCORM 1.2, the content\'s own result, and nothing in the page', async () => {
     const out = join(dir, 'plain-options.zip')
-    expect(await buildScorm({ h5p: quiz, out })).toMatchObject({ scormVersion: '1.2' })
+    expect(await buildScorm({ h5p: quiz, out })).toMatchObject({ scormVersion: '1.2', passMark: null, completionScore: false })
     const zip = await entriesOf(out)
     const xml = await zip.text('imsmanifest.xml')
     expect(xml).toContain('<schemaversion>1.2</schemaversion>')
@@ -190,7 +190,7 @@ describe('the package', () => {
 
     const out = join(dir, 'quiz-2004.zip')
     // A mark kept to the hundredth, as the score is, and to the ten-thousandth as a measure.
-    expect(await buildScorm({ h5p: quiz, out, scormVersion: '2004', passMark: 66.666 })).toMatchObject({ scormVersion: '2004' })
+    expect(await buildScorm({ h5p: quiz, out, scormVersion: '2004', passMark: 66.666 })).toMatchObject({ scormVersion: '2004', passMark: 66.67, completionScore: false })
     const zip = await entriesOf(out)
     const xml = await zip.text('imsmanifest.xml')
     expect(xml).toContain('xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"')
@@ -267,10 +267,11 @@ describe('the command', () => {
   it('writes SCORM 2004 with a pass mark and completion as 100 as the flags say, and refuses what is not one', async () => {
     const cwd = join(dir, 'cli-options')
     await mkdir(cwd)
-    const { stdout } = await run(process.execPath, [bin, '--scorm', quiz, '--scorm-version', '2004', '--pass-mark', '80', '--completion-score'], { cwd })
-    expect(stdout).toContain('"Do you know what just happened?" as a SCORM 2004 4th Edition package (pass mark 80, completion counts as 100)')
+    const { stdout } = await run(process.execPath, [bin, '--scorm', quiz, '--scorm-version', '2004', '--pass-mark', '66.666', '--completion-score'], { cwd })
+    // The mark as the zip holds it, to the hundredth.
+    expect(stdout).toContain('"Do you know what just happened?" as a SCORM 2004 4th Edition package (pass mark 66.67, completion counts as 100)')
     const zip = await entriesOf(join(cwd, 'quiz.scorm.zip'))
-    expect(await zip.text('imsmanifest.xml')).toContain('<imsss:minNormalizedMeasure>0.8</imsss:minNormalizedMeasure>')
+    expect(await zip.text('imsmanifest.xml')).toContain('<imsss:minNormalizedMeasure>0.6667</imsss:minNormalizedMeasure>')
     await zip.close()
 
     for (const [flags, said] of [
@@ -1047,6 +1048,27 @@ describe('in an LMS', () => {
     await finish(launched.sco, { completion: true })
     expect(await values(other.page)).toMatchObject({ 'cmi.completion_status': 'completed', 'cmi.success_status': 'unknown', 'cmi.score.raw': '100', 'cmi.score.scaled': '1' })
     await other.context.close()
+  })
+
+  it('writes a SCORM 2004 answer\'s pattern and response after its type, and neither for an answer that names no type', async () => {
+    const { context, page } = await lmsPage('/lms2004.html')
+    const { sco } = await launch(page, '/s2004/index.html')
+    await answer(sco, 'typed', 'Which rivers cross Germany?')
+    // 2004 refuses either before the type that gives its form (408).
+    const written = (await calls(page)).filter((call) => call[0] === 'SetValue' && call[1].startsWith('cmi.interactions.0.')).map((call) => call[1])
+    const typedAt = written.indexOf('cmi.interactions.0.type')
+    expect(typedAt).toBeGreaterThan(-1)
+    expect(typedAt).toBeLessThan(written.indexOf('cmi.interactions.0.correct_responses.0.pattern'))
+    expect(typedAt).toBeLessThan(written.indexOf('cmi.interactions.0.learner_response'))
+
+    // An answer whose statement names no type is kept, without the two.
+    await answer(sco, 'untyped', 'Which rivers cross France?', { interactionType: undefined })
+    const kept = await values(page)
+    expect(kept).toMatchObject({ 'cmi.interactions.1.id': 'urn:h5p:untyped', 'cmi.interactions.1.description': 'Which rivers cross France?', 'cmi.interactions.1.result': 'incorrect', 'cmi.interactions.1.weighting': '2' })
+    expect(kept['cmi.interactions.1.type']).toBeUndefined()
+    expect(kept['cmi.interactions.1.correct_responses.0.pattern']).toBeUndefined()
+    expect(kept['cmi.interactions.1.learner_response']).toBeUndefined()
+    await context.close()
   })
 
   it('plays with no LMS around it, and reports nothing', async () => {
