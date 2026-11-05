@@ -49,6 +49,10 @@ site. [Setting up the player](https://github.com/missing-elements/h5p-offline-pl
 a bundler and the Embed setup; [the element's API](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/api.md)
 lists every attribute, property and event.
 
+On Lovable, one prompt is enough:
+`Embed an H5P file using https://github.com/missing-elements/h5p-offline-player`, with the `.h5p`
+file uploaded in the chat. [This example](https://embed-h5p-file.lovable.app/) was built that way.
+
 ## Which setup
 
 An H5P package is JavaScript, and the player runs it on the origin that serves the frame.

@@ -138,6 +138,13 @@ document.querySelector('h5p-player').runtime = runtime</pre>
         (<code>compilerOptions.isCustomElement</code>, <code>CUSTOM_ELEMENTS_SCHEMA</code>).
       </p>
       <p>
+        On an AI site builder, one prompt can make this install. Lovable did, from
+        <code>Embed an H5P file using https://github.com/missing-elements/h5p-offline-player</code>
+        and the <code>.h5p</code> file uploaded in the chat:
+        <a href="https://embed-h5p-file.lovable.app/" rel="noopener">the example it built</a>.
+        Other builders have not been tried yet.
+      </p>
+      <p>
         A bundler that does not follow that pattern, esbuild among them, leaves the files behind.
         Then serve both packages' <code>dist/</code> folders from static paths and say where they are:
       </p>
