@@ -468,10 +468,13 @@ function recordAnswer(statement) {
   const types = /** @type {Record<string, string>} */ (scorm2004 ? INTERACTION_TYPES_2004 : INTERACTION_TYPES)
   const type = typeof definition?.interactionType === 'string' ? types[definition.interactionType] : undefined
   if (type) set(at('type'), type)
+  // 2004 takes a pattern and a response only after the type that gives their form, and refuses
+  // them without one (408); 1.2 takes them as they come.
+  const typed = Boolean(type) || !scorm2004
   const pattern = Array.isArray(definition?.correctResponsesPattern) ? definition.correctResponsesPattern[0] : undefined
-  if (typeof pattern === 'string') set(at('correct_responses.0.pattern'), pattern.slice(0, FEEDBACK_LIMIT))
+  if (typed && typeof pattern === 'string') set(at('correct_responses.0.pattern'), pattern.slice(0, FEEDBACK_LIMIT))
   const result = statement.result ?? {}
-  if (typeof result.response === 'string') set(at(scorm2004 ? 'learner_response' : 'student_response'), result.response.slice(0, FEEDBACK_LIMIT))
+  if (typed && typeof result.response === 'string') set(at(scorm2004 ? 'learner_response' : 'student_response'), result.response.slice(0, FEEDBACK_LIMIT))
   set(at('result'), outcomeOf(result))
   if (typeof result.score?.max === 'number') set(at('weighting'), String(result.score.max))
   const latency = latencyOf(result.duration)

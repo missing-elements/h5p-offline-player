@@ -270,9 +270,9 @@ export, which `libraries=pack` then plays from) or `packBase` (the folder of a c
 `buildScorm` from `@missing-elements/h5p-embed/scorm` is `--scorm`: it takes `h5p`, `out`,
 `force`, `title`, and the options, `scormVersion` (`'1.2'`, the default, or `'2004'`),
 `passMark` (0 to 100, or `null`) and `completionScore` (`false` by default), and returns the zip's
-path, its title, its `scormVersion`, size, the `libraries` it carries from the pack, and `build`,
-the stamp saved state is kept against. Every entry ships with TypeScript
-declarations.
+path, its title, the options as written into it (`scormVersion`, `passMark` kept to the
+hundredth, `completionScore`), size, the `libraries` it carries from the pack, and `build`, the
+stamp saved state is kept against. Every entry ships with TypeScript declarations.
 
 `buildScormInPage` from `@missing-elements/h5p-embed/scorm/browser` is the same build in a page:
 it takes `file`, a `File` or `Blob`; `base`, the folder with the player's three files and
@@ -283,12 +283,13 @@ beside the player as the written site does, where a page that gives the template
 compressor gets the one at `base`, or a zip without it that keeps the saved state plain, as 1.4
 did;
 `version` and `packVersion`, for the zip's notice; `title` and the options, as `buildScorm`
-takes them; and `onProgress`. It returns the zip as a `Blob`, with its `name`, `title`,
-`scormVersion`, `libraries`, `build` and `size`. `planScormInPage`, from the same module, takes the same options and stops before
-anything is written: it reads the package and returns what its zip will hold, its `title`,
+takes them; and `onProgress`. It returns the zip as a `Blob`, with its `name`, `title`, the
+options as `buildScorm` returns them, `libraries`, `build` and `size`. `planScormInPage`, from
+the same module, takes the same options and stops before anything is written: it reads the
+package and returns what its zip will hold, its `title` (the one given, else the package's),
 `mainLibrary`, `size`, the `libraries` from the pack and their `librariesSize`, or refuses it as
 the build would, and `write({ title, scormVersion, passMark, completionScore })` then writes the
-zip, as often as asked. `startScormPage`
+zip, as often as asked, each of the four defaulting to the plan's. `startScormPage`
 from `@missing-elements/h5p-embed/scorm-page.js` is the page's script, which reads the page's
 `#file`, `#status`, `#download` and `#notice`, and works in steps where the page also holds
 `#files`, the list it puts a row in for each file, and `#build`, the button that builds them, and

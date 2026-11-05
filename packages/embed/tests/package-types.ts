@@ -26,6 +26,8 @@ export async function asACallerWould(): Promise<string> {
   // One package as a SCORM zip, for an LMS.
   const zip: BuiltScorm = await buildScorm({ h5p: 'course.h5p', out: 'course.scorm.zip', force: true, title: 'Week 3', scormVersion: '2004', passMark: 80, completionScore: true })
   const scorm: '1.2' | '2004' = zip.scormVersion
+  const mark: number | null = zip.passMark
+  const counted: boolean = zip.completionScore
   // @ts-expect-error the version is 1.2 or 2004
   await buildScorm({ h5p: 'course.h5p', out: 'course.scorm.zip', scormVersion: '1.3' })
   const build: string = zip.build
@@ -40,12 +42,13 @@ export async function asACallerWould(): Promise<string> {
   const plan: PlannedScorm = await planScormInPage({ file: new Blob([]), name: 'course.h5p', pack })
   const main: string | undefined = plan.mainLibrary?.machineName
   const retitled: PageScorm = await plan.write({ title: 'Week 3', scormVersion: '2004', passMark: null, completionScore: false, onProgress: ({ step }) => step })
+  const pageMark: number | null = retitled.passMark
   // @ts-expect-error a title is text
   await plan.write({ title: 3 })
   startScormPage({ pack, version: '1.4.0', packVersion: '1.0.1' })
   // @ts-expect-error the package is a `file`, not a path
   await buildScormInPage({ h5p: 'course.h5p' })
 
-  void [hosts, build, fromPack, blob, main, retitled, scorm, parseOrigin, new EmbedError('refused') instanceof Error]
+  void [hosts, build, fromPack, blob, main, retitled, scorm, mark, counted, pageMark, parseOrigin, new EmbedError('refused') instanceof Error]
   return site.csp
 }

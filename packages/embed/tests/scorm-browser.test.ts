@@ -2,7 +2,7 @@ import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { buildSite } from '../lib/build.mjs'
 import { buildScormInPage, planScormInPage, type ScormProgress } from '../lib/scorm-browser.mjs'
 import { buildScorm } from '../lib/scorm.mjs'
@@ -140,13 +140,30 @@ describe('built in a page', () => {
     await expect(buildScormInPage({ file: await picked(quiz, 'quiz.h5p'), ...onSite(site), title: ' \t ' })).resolves.toMatchObject({ title: 'Do you know what just happened?' })
   })
 
+  it('takes a title given to the plan for its writes, and hashes the package once however often it is written', async () => {
+    const size = (await readFile(quiz)).length
+    const digest = vi.spyOn(crypto.subtle, 'digest')
+    try {
+      const plan = await planScormInPage({ file: await picked(quiz, 'quiz.h5p'), ...onSite(site), title: 'Week 3: the quiz' })
+      expect(plan.title).toBe('Week 3: the quiz')
+      const first = await plan.write()
+      const second = await plan.write({ title: 'Week 4' })
+      expect(first.title).toBe('Week 3: the quiz')
+      expect(second).toMatchObject({ title: 'Week 4', build: first.build })
+      // The whole package, hashed for the build stamp: on the first write only.
+      expect(digest.mock.calls.filter(([, data]) => data.byteLength === size)).toHaveLength(1)
+    } finally {
+      digest.mockRestore()
+    }
+  })
+
   it("writes the command's zip with the command's options, and refuses them with a launch page from before them", async () => {
     const options = { scormVersion: '2004' as const, passMark: 80, completionScore: true }
     const built = await buildScormInPage({ file: await picked(formulas, 'formulas.h5p'), ...onSite(site), ...options })
     const out = join(dir, 'formulas.2004.page.zip')
     await writeFile(out, new Uint8Array(await built.blob.arrayBuffer()))
     const command = await buildScorm({ h5p: formulas, out: join(dir, 'formulas.2004.cli.zip'), ...options })
-    expect(built).toMatchObject({ scormVersion: '2004', build: command.build })
+    expect(built).toMatchObject({ scormVersion: '2004', passMark: 80, completionScore: true, build: command.build })
     await expectSameZip(out, command.out)
 
     // A plan written under other options, as the page's options step changes them.

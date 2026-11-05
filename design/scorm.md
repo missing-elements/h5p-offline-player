@@ -308,7 +308,9 @@ one row each; an LMS added here gets a row there.
   the package and plans its parts, and returns the facts, the main library with the version its
   `preloadedDependencies` give it (`mainLibraryOf`), the title, the size, the parts and their size
   from the pack's index, with `write`, which fetches the files and writes the zip, as often as
-  asked; `buildScormInPage` is the two at once. A refusal comes at planning, by name, before
+  asked, hashing the package for the build stamp on the first write only, since the package and
+  its parts are the same for every write (#142); `buildScormInPage` is the two at once, and a
+  `title` given to the plan is the plan's and its writes' default. A refusal comes at planning, by name, before
   anything but the pack's index is fetched. **The title** is `title` on both builders and
   `--title` on the command, cleaned by `scormTitle` as `h5p.json`'s is, an empty one leaving the
   package's; it goes into the manifest's organisation and item, which the LMS lists, and the
@@ -317,7 +319,9 @@ one row each; an LMS added here gets a row there.
   works in steps where it holds `#files`, a list, and `#build`, a button, as both pages here do:
   ① choose, ② review, ③ download, each step the closest `[data-step]` around them, shown once it
   can be reached. A file chosen or dropped gets a row (the same file twice, by name, size and date,
-  is one), whose facts sit in a live region (`role="status"`) from the moment the row appears, so
+  is one), during a build too, since a drop lands anywhere on the page: it is read at once and
+  waits for the next Build, where it was dropped without a word until #142. Its facts sit in a
+  live region (`role="status"`) from the moment the row appears, so
   that what the reading found is announced. Every row is drawn again on any change, a key typed
   in a title among them, so the page writes a region's text, and `#status`'s, only when it
   changes: written again as it was, a region may be read out again, and a test types a title key
@@ -352,7 +356,9 @@ one row each; an LMS added here gets a row there.
     and each answer's latency as ISO 8601 durations to the hundredth; each answer with its
     words in `description` (250 characters, as text, the character references a question writes
     read: `&rsquo;` came through as itself in Moodle until then), an id that is a URI as 2004 asks,
-    `urn:uuid:` and the part's id, `learner_response`, `incorrect` where 1.2 says `wrong`,
+    `urn:uuid:` and the part's id, the type before the pattern and `learner_response`, which 2004
+    refuses without one (408), so an answer whose statement names no type has neither (#142),
+    `incorrect` where 1.2 says `wrong`,
     `timestamp` in UTC, and `long-fill-in` and `other` kept as themselves; `suspend_data` up to
     64,000 characters, compressed as in 1.2. **A 2004 session always ends `suspend`**, finished
     or not, where 1.2 ends a finished one with nothing. Measured in Moodle 4.5 with `normal`
@@ -380,24 +386,28 @@ one row each; an LMS added here gets a row there.
     its second question, finished completed and passed at 66.67 (scaled 0.6667), the gradebook
     66.67, the total time the two sessions' sum, the four answers with their ids and words; a
     launch after the finish resumed with the result kept. With a mark of 80, the same 66.67
-    failed in 2004 and in 1.2, the gradebook still 66.67; with completion as 100, a finish with
-    no score recorded 100 and passed in both, the gradebook 100. In SCORM Cloud, through its v2
-    API: both 2004 zips imported as `SCORM20044THEDITION` with no parser warnings; the same two
-    sessions resumed on the second question, the registration completed and passed at 66.67, and
-    a launch after the finish kept it; a mark of 80 failed at 66.67 with completion still
-    completed, where 1.2 shows a failed attempt as incomplete; a finish with no score, completed,
-    passed and 100; and 1.2 with a mark of 80 failed at 66.67, the registration incomplete as for
-    any failed 1.2 attempt there. The finishes with no score were the element's `finished`
-    dispatched in the SCO's frame, as the tests do, since no package here finishes without one.
+    failed in 2004 and in 1.2, the gradebook still 66.67; with completion as 100 in a zip that
+    also held the mark of 80, a finish with no score recorded 100 and passed in both, the
+    gradebook 100. In SCORM Cloud, through its v2 API: both 2004 zips imported as
+    `SCORM20044THEDITION` with no parser warnings; the same two sessions resumed on the second
+    question, the registration completed and passed at 66.67, and a launch after the finish kept
+    it; a mark of 80 failed at 66.67 with completion still completed, where 1.2 shows a failed
+    attempt as incomplete; a finish with no score, in the zip with the mark of 80 and completion
+    as 100, completed, passed and 100; and 1.2 with a mark of 80 failed at 66.67, the
+    registration incomplete as for any failed 1.2 attempt there. The finishes with no score were
+    the element's `finished` dispatched in the SCO's frame, as the tests do, since no package here
+    finishes without one. Completion as 100 without a mark ran in no LMS: it gives `completed`
+    and 100, and in 2004 leaves success `unknown`, which a test holds (#142).
 
   `scorm-page.test.ts` drives the written site's page in Chromium: a chosen file read into its row
   and built on Build, the download, which is the command's zip and plays unpacked; three files at
   once, a refusal in its row beside two that build, a title given, each row's zip and the zip of
-  all, a row taken out, a title changed after the build; files dropped, the same one only once;
-  and a page with only the four elements, which builds at once and refuses in `#notice`.
-  `scorm-browser.test.ts` holds the plan's facts to the command's zip, two writes of one plan
-  under two titles to the same zip but for the manifest and the page, and a title given to the
-  page's builder to the command's `--title`, entry for entry.
+  all, a row taken out, a title changed after the build; files dropped, the same one only once,
+  and one dropped during a build, which waits for the next; and a page with only the four
+  elements, which builds at once and refuses in `#notice`. `scorm-browser.test.ts` holds the
+  plan's facts to the command's zip, two writes of one plan under two titles to the same zip but
+  for the manifest and the page, a title given to the page's builder to the command's `--title`,
+  entry for entry, and a title given to the plan to its writes, which hash the package once.
 
 `tests/scorm.test.ts` checks the zip, the parts it carries, its stored entries' local headers and
 its refusals in Node. In Chromium it plays the unpacked zip under a page that holds the API and
@@ -424,7 +434,8 @@ frames the launch page, as Moodle's player does. It covers:
   content's pass, and an LMS's own mark that wins over the zip's; completion as 100, passing a
   mark; and, under a page that holds `API_1484_11`, the quiz played to the end in 2004 with its
   answers, the session suspended and resumed with the result kept, a state past 4,096
-  characters kept, and a score held to the LMS's passing score;
+  characters kept, a score held to the LMS's passing score, and an answer's type written before
+  its pattern and response, and neither for an answer that names no type;
 - playing with no LMS.
 
 Not covered:
