@@ -96,7 +96,10 @@ What is covered of the pack itself: the `pack` export, `parts/` with its `index.
   `cmi.core.lesson_status`, `cmi.core.session_time`, `cmi.core.exit`, and since 1.5 each
   question's `cmi.interactions.n`), and what it keeps in `cmi.suspend_data`, which a zip written
   by a later version reads back unless the libraries it carries from the pack have changed: 1.5
-  writes it compressed and still reads what 1.4 wrote plain.
+  writes it compressed and still reads what 1.4 wrote plain. Since 1.6, the options: SCORM 2004
+  4th Edition with the same elements under 2004's names (`cmi.completion_status` and
+  `cmi.success_status` apart, `cmi.score.scaled` besides), a pass mark, and completion as 100;
+  a zip written with none is the 1.2 zip above.
 - **The SCORM page**, `scorm.html` on a written site, and **`planScormInPage()`**,
   **`buildScormInPage()`** and **`startScormPage()`**, with their options and types: the same zip
   as `buildScorm()`'s, built in the browser.

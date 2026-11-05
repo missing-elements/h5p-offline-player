@@ -6,19 +6,26 @@ import { EmbedError, buildSite } from '../lib/build.mjs'
 import { buildScorm } from '../lib/scorm.mjs'
 
 const USAGE = `Usage: h5p-embed [folder] [options]
-       h5p-embed --scorm <package.h5p> [zip] [--title <text>] [--force]
+       h5p-embed --scorm <package.h5p> [zip] [--title <text>] [--scorm-version 2004]
+                 [--pass-mark <0-100>] [--completion-score] [--force]
 
 Writes the H5P embed page as a static site, ready to deploy to a player domain of your own.
 The folder defaults to ./h5p-player.
 
-With --scorm, writes a SCORM 1.2 package of one .h5p instead, for an LMS to play and grade: the
+With --scorm, writes a SCORM package of one .h5p instead, for an LMS to play and grade: the
 player, the package and the libraries it does not carry, from the library pack, in one zip. The
-zip defaults to ./<package>.scorm.zip.
+zip defaults to ./<package>.scorm.zip; SCORM 1.2, graded by the content's own result, unless the
+options below say otherwise.
 
 Options:
   --scorm <package.h5p>  write a SCORM package of this .h5p rather than the site
   --title <text>         with --scorm, the title the LMS lists the package by. Default: the
                          title in its h5p.json
+  --scorm-version <v>    with --scorm, 1.2 (the default) or 2004, for SCORM 2004 4th Edition
+  --pass-mark <0-100>    with --scorm, the score out of 100 that passes, in place of the
+                         content's own pass or fail; the LMS gets it as the mastery score
+  --completion-score     with --scorm, count content that finishes without a score, such as a
+                         presentation with no questions, as 100
   --packages <origins>   play packages, and fetch library bundles, only from these origins
                          (comma or space separated; this site's own is always allowed). Add
                          any host a package URL redirects to, and https://cdn.jsdelivr.net for
@@ -42,6 +49,9 @@ try {
     options: {
       scorm: { type: 'string' },
       title: { type: 'string' },
+      'scorm-version': { type: 'string' },
+      'pass-mark': { type: 'string' },
+      'completion-score': { type: 'boolean' },
       packages: { type: 'string', multiple: true },
       ancestors: { type: 'string', multiple: true },
       'default-libraries': { type: 'string' },
@@ -78,10 +88,16 @@ const shown = (path) => {
   return below === '' ? '.' : below.startsWith('..') ? path : below
 }
 
-if (values.title !== undefined && values.scorm === undefined) {
-  console.error(`h5p-embed: --title only with --scorm, which names the package it titles\n\n${USAGE}`)
+// The zip's own options shape a SCORM package, and nothing in a site.
+const scormOnly = ['title', 'scorm-version', 'pass-mark', 'completion-score'].filter((name) => values[name] !== undefined)
+if (scormOnly.length > 0 && values.scorm === undefined) {
+  console.error(`h5p-embed: ${scormOnly.map((name) => `--${name}`).join(', ')} only with --scorm, which names the package\n\n${USAGE}`)
   process.exit(2)
 }
+// A pass mark written as a number is one; anything else goes on as text, which the writer refuses
+// in its words, rather than read as no mark or as 0.
+const passMarkText = values['pass-mark']
+const passMark = passMarkText === undefined ? undefined : /^\s*\d+(?:\.\d+)?\s*$/.test(passMarkText) ? Number(passMarkText) : passMarkText
 
 // `--scorm=` with no package still means a SCORM package, refused for naming none.
 if (values.scorm !== undefined) {
@@ -96,11 +112,15 @@ if (values.scorm !== undefined) {
       h5p: values.scorm,
       out: positionals[0] ?? `${basename(values.scorm, extname(values.scorm))}.scorm.zip`,
       force: values.force ?? false,
-      title: values.title
+      title: values.title,
+      scormVersion: values['scorm-version'],
+      passMark,
+      completionScore: values['completion-score'] ?? false
     })
     const count = zip.libraries.length
     const supplied = count > 0 ? `, the H5P runtime and ${count} ${count === 1 ? 'library' : 'libraries'} from the library pack, which it does not carry` : ' and the H5P runtime'
-    console.log(`Wrote ${shown(zip.out)} (${megabytes(zip.size)}): "${zip.title}" as a SCORM 1.2 package,
+    const graded = [values['pass-mark'] !== undefined ? `pass mark ${Number(values['pass-mark'])}` : null, values['completion-score'] ? 'completion counts as 100' : null].filter(Boolean)
+    console.log(`Wrote ${shown(zip.out)} (${megabytes(zip.size)}): "${zip.title}" as a SCORM ${zip.scormVersion === '2004' ? '2004 4th Edition' : '1.2'} package${graded.length ? ` (${graded.join(', ')})` : ''},
 with the player ${zip.version}${supplied}.
 
 Add it to a course as a SCORM package. The LMS gets the content's score and whether it passed,

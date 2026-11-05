@@ -140,6 +140,29 @@ describe('built in a page', () => {
     await expect(buildScormInPage({ file: await picked(quiz, 'quiz.h5p'), ...onSite(site), title: ' \t ' })).resolves.toMatchObject({ title: 'Do you know what just happened?' })
   })
 
+  it("writes the command's zip with the command's options, and refuses them with a launch page from before them", async () => {
+    const options = { scormVersion: '2004' as const, passMark: 80, completionScore: true }
+    const built = await buildScormInPage({ file: await picked(formulas, 'formulas.h5p'), ...onSite(site), ...options })
+    const out = join(dir, 'formulas.2004.page.zip')
+    await writeFile(out, new Uint8Array(await built.blob.arrayBuffer()))
+    const command = await buildScorm({ h5p: formulas, out: join(dir, 'formulas.2004.cli.zip'), ...options })
+    expect(built).toMatchObject({ scormVersion: '2004', build: command.build })
+    await expectSameZip(out, command.out)
+
+    // A plan written under other options, as the page's options step changes them.
+    const plan = await planScormInPage({ file: await picked(quiz, 'quiz.h5p'), ...onSite(site) })
+    expect((await plan.write()).scormVersion).toBe('1.2')
+    expect((await plan.write({ scormVersion: '2004' })).scormVersion).toBe('2004')
+    await expect(plan.write({ passMark: 120 })).rejects.toThrow(/The pass mark is a number from 0 to 100, not 120\./)
+    await expect(planScormInPage({ file: await picked(quiz, 'quiz.h5p'), ...onSite(site), scormVersion: '3' as never })).rejects.toThrow(/The SCORM version is 1\.2 or 2004/)
+
+    // A page that bundles the launch page as embed 1.5 shipped it has no place for the options.
+    const launch = (await readFile(join(import.meta.dirname, '../scorm/index.html'), 'utf8')).replace('%SCORM%', '')
+    const older = { ...onSite(site), assets: { launch } }
+    await expect(buildScormInPage({ file: await picked(quiz, 'quiz.h5p'), ...older, scormVersion: '2004' })).rejects.toThrow(/The launch page's template is older than the SCORM options/)
+    await expect(buildScormInPage({ file: await picked(quiz, 'quiz.h5p'), ...older })).resolves.toMatchObject({ scormVersion: '1.2' })
+  })
+
   it("takes the pack as its package exports it, with the same result", async () => {
     const index = JSON.parse(await readFile(join(dir, 'site', 'libraries', 'index.json'), 'utf8')) as { libraries: Array<{ folder: string }> }
     const pack = { libraries: index.libraries.map((entry) => ({ ...entry, url: `${site.origin}/libraries/${entry.folder}.h5p` })) }

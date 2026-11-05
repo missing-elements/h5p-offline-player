@@ -210,6 +210,47 @@ describe('the SCORM page', () => {
     await context.close()
   })
 
+  it('writes every zip with the options chosen, takes the zips back when one changes, and refuses a pass mark that is not one', async () => {
+    const context = await browser.newContext()
+    const page = await context.newPage()
+    await page.goto(`${site.origin}/scorm.html`)
+    expect(await page.locator('[data-step="options"]').isHidden()).toBe(true)
+    await page.setInputFiles('#file', [quiz, formulas])
+    await read(page, 2)
+    expect(await page.locator('[data-step="options"]').isVisible()).toBe(true)
+    // As they come: SCORM 1.2, no mark, no score for content without one.
+    expect(await page.locator('input[name="scorm-version"][value="1.2"]').isChecked()).toBe(true)
+    expect(await page.locator('#pass-mark').inputValue()).toBe('')
+    expect(await page.locator('#completion-score').isChecked()).toBe(false)
+
+    await page.locator('input[name="scorm-version"][value="2004"]').check()
+    await page.locator('#pass-mark').fill('120')
+    expect(await page.locator('#build').isDisabled()).toBe(true)
+    expect(await page.locator('#pass-mark').getAttribute('aria-invalid')).toBe('true')
+    expect(await page.locator('#status').textContent()).toMatch(/^The pass mark is a number from 0 to 100/)
+    await page.locator('#pass-mark').fill('80')
+    await page.locator('#completion-score').check()
+    expect(await page.locator('#build').isDisabled()).toBe(false)
+    await page.locator('#build').click()
+    await page.locator('#download').waitFor({ state: 'visible', timeout: 120_000 })
+    expect(await page.locator('#status').textContent()).toBe('2 SCORM 2004 packages, each with its link above.')
+
+    const own = await saved(page, rowOf(page, 'quiz.h5p').locator('.scorm-row-download'), 'quiz.options.zip')
+    const zip = await entriesOf(own.path)
+    expect(await zip.text('imsmanifest.xml')).toContain('<imsss:minNormalizedMeasure>0.8</imsss:minNormalizedMeasure>')
+    const launchPage = await zip.text('index.html')
+    expect(launchPage).toContain('<meta name="h5p-scorm-version" content="2004" />')
+    expect(launchPage).toContain('<meta name="h5p-scorm-completion-score" content="100" />')
+    await zip.close()
+
+    // Back to 1.2: every zip written before is taken back, to be built again.
+    await page.locator('input[name="scorm-version"][value="1.2"]').check()
+    expect(await page.locator('#download').isHidden()).toBe(true)
+    expect(await page.locator('#files > li[data-state="built"]').count()).toBe(0)
+    expect(await page.locator('#build').textContent()).toBe('Build 2 SCORM packages')
+    await context.close()
+  })
+
   it('takes files dropped on the page, and the same file only once', async () => {
     const context = await browser.newContext()
     const page = await context.newPage()

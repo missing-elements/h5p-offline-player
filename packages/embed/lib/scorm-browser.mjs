@@ -1,6 +1,6 @@
 import { BlobWriter, ZipWriter } from '@zip.js/zip.js'
 import { packLibrariesIn } from '@missing-elements/h5p-offline-player/plan'
-import { addScormEntries, buildStamp, mainLibraryOf, readPackage, runtimeFiles, scormEntries, scormTitle, sha256Hex } from './scorm-core.mjs'
+import { addScormEntries, buildStamp, mainLibraryOf, readPackage, runtimeFiles, scormEntries, scormOptions, scormTitle, sha256Hex } from './scorm-core.mjs'
 import { EmbedError, PLAYER_FILES } from './shared.mjs'
 
 /**
@@ -32,6 +32,11 @@ import { EmbedError, PLAYER_FILES } from './shared.mjs'
  *   messages; a `File`'s own by default
  * @property {string} [title] the title the LMS lists the zip by, in place of `h5p.json`'s; an
  *   empty one leaves that
+ * @property {'1.2' | '2004'} [scormVersion] SCORM 1.2, the default, or 2004 4th Edition
+ * @property {number | null} [passMark] a pass mark from 0 to 100, which a score is held to in
+ *   place of the content's own pass or fail; none by default
+ * @property {boolean} [completionScore] count content that finishes without a score as 100; off
+ *   by default
  * @property {string | URL} [base] the folder that holds the player's three files and
  *   `frame-assets/`, and, unless `assets` gives them, `scorm-launch.html`, `scorm.js`,
  *   `lz-string.js`, `embed.css` and `libraries.txt`: this page's own folder by default
@@ -60,6 +65,7 @@ import { EmbedError, PLAYER_FILES } from './shared.mjs'
  * @property {string} title the title the LMS lists it by: the one chosen, else the package's
  * @property {string} version the player's version, as given
  * @property {string[]} libraries the folders of the libraries the zip carries from the pack
+ * @property {'1.2' | '2004'} scormVersion the SCORM version it was written for
  * @property {string} build the build stamp, as `buildScorm` returns it
  * @property {number} size the zip's size in bytes
  */
@@ -78,9 +84,10 @@ import { EmbedError, PLAYER_FILES } from './shared.mjs'
  * @property {string[]} libraries the folders of the libraries the zip will carry from the pack;
  *   none for a package that carries its own
  * @property {number} librariesSize their archives' size in bytes, as the pack's index gives it
- * @property {(options?: { title?: string, onProgress?: (progress: ScormProgress) => void }) => Promise<PageScorm>} write
+ * @property {(options?: { title?: string, scormVersion?: '1.2' | '2004', passMark?: number | null, completionScore?: boolean, onProgress?: (progress: ScormProgress) => void }) => Promise<PageScorm>} write
  *   fetches the parts, the player and the runtime, and writes the zip, under `title` when one is
- *   given; `onProgress` defaults to the plan's. It can be called again, for another title
+ *   given, and with the version and the grading options given, each defaulting to the plan's, as
+ *   `onProgress` does. It can be called again, for another title or other options
  */
 
 /**
@@ -116,6 +123,8 @@ const asBlob = (value) => (value instanceof Blob ? value : new Blob([value]))
 export async function planScormInPage(options) {
   const { file, pack = null, packBase = null, onProgress = () => {}, fetch: fetchImpl = globalThis.fetch } = options ?? {}
   if (!(file instanceof Blob)) throw new TypeError('Give the package as a File or a Blob')
+  // Checked before the package is read, so that a page hears of a wrong option at once.
+  const planned = scormOptions(options)
   if (!globalThis.crypto?.subtle) {
     throw new EmbedError('A page builds SCORM packages in a secure context only, https or localhost: it needs crypto.subtle, which a page has nowhere else.')
   }
@@ -158,11 +167,12 @@ export async function planScormInPage(options) {
     throw error
   }
   const stem = name.replace(/\.[^.]+$/, '')
-  const planned = scormTitle(manifest, stem)
+  const defaultTitle = scormTitle(manifest, stem)
 
   /** @type {PlannedScorm['write']} */
-  const write = async ({ title: chosen, onProgress: report = onProgress } = {}) => {
+  const write = async ({ title: chosen, onProgress: report = onProgress, ...given } = {}) => {
     const title = scormTitle(manifest, stem, chosen)
+    const scorm = scormOptions({ ...planned, ...Object.fromEntries(Object.entries(given).filter(([, value]) => value !== undefined)) })
     const { assets = {}, version = 'unknown', packVersion = null } = options
     /** @param {string} path */
     const at = (path) => new URL(path, base).href
@@ -206,19 +216,19 @@ export async function planScormInPage(options) {
 
     // The whole package in memory once, for its hash: `crypto.subtle` takes no stream.
     const build = await buildStamp(await sha256Hex(await file.arrayBuffer()), parts)
-    const { entries, xml } = scormEntries({ manifest, source: name, title, build, version, packVersion, parts, files })
+    const { entries, xml } = scormEntries({ manifest, source: name, title, build, version, packVersion, parts, files, options: scorm })
 
     report({ step: 'writing' })
     const zip = new ZipWriter(new BlobWriter('application/zip'), { useWebWorkers: false })
     await addScormEntries(zip, { entries, xml })
     const out = await zip.close()
-    return { blob: out, name: `${stem}.scorm.zip`, title, version, libraries: parts.map((part) => part.folder), build, size: out.size }
+    return { blob: out, name: `${stem}.scorm.zip`, title, version, libraries: parts.map((part) => part.folder), scormVersion: scorm.scormVersion, build, size: out.size }
   }
 
   return {
     name,
     size: file.size,
-    title: planned,
+    title: defaultTitle,
     mainLibrary: mainLibraryOf(manifest),
     libraries: parts.map((part) => part.folder),
     librariesSize: parts.reduce((sum, part) => sum + part.size, 0),

@@ -6,11 +6,11 @@ import { Writable } from 'node:stream'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { ZipWriter } from '@zip.js/zip.js'
 import { installed } from './build.mjs'
-import { addScormEntries, buildStamp, readPackage, scormEntries, scormTitle } from './scorm-core.mjs'
+import { addScormEntries, buildStamp, readPackage, scormEntries, scormOptions, scormTitle } from './scorm-core.mjs'
 import { EmbedError, PLAYER_FILES } from './shared.mjs'
 
 /**
- * Writes a SCORM 1.2 package that plays one `.h5p` in an LMS and reports its result there: the
+ * Writes a SCORM package that plays one `.h5p` in an LMS and reports its result there: the
  * launch page and its bridge to the LMS's API, the player, the H5P runtime and the package, in
  * one zip a teacher uploads as a SCORM activity. The LMS serves the files from its own origin,
  * under a path of the package's own, so the player's Service Worker registers there, scoped to
@@ -83,6 +83,7 @@ async function filesUnder(dir) {
  * @property {string} version the player's version, as its `dist/VERSION` says
  * @property {string[]} libraries the folders of the libraries the zip carries from the library
  *   pack, for a package that does not carry them itself; none for one that does
+ * @property {'1.2' | '2004'} scormVersion the SCORM version it was written for
  * @property {string} build the first 16 hex digits of the package's SHA-256, or, with libraries
  *   from the pack, of one over its and theirs: a learner's saved place is kept against it, and
  *   handed back only to the same package playing with the same libraries
@@ -90,9 +91,10 @@ async function filesUnder(dir) {
  */
 
 /**
- * Writes a SCORM 1.2 zip that plays `h5p` in an LMS, with the parts of the library pack it needs
- * and does not carry. Refuses a package that needs a library neither it nor the pack has, and a
- * file already at `out` unless `force`.
+ * Writes a SCORM zip that plays `h5p` in an LMS, with the parts of the library pack it needs and
+ * does not carry: SCORM 1.2, graded by the content's own result, unless the options say
+ * otherwise. Refuses a package that needs a library neither it nor the pack has, an option it does
+ * not know, and a file already at `out` unless `force`.
  *
  * @param {object} options
  * @param {string} options.h5p the package to wrap
@@ -100,11 +102,17 @@ async function filesUnder(dir) {
  * @param {boolean} [options.force] replace a file already at `out`
  * @param {string} [options.title] the title the LMS lists the zip by, in place of `h5p.json`'s;
  *   an empty one leaves that
+ * @param {'1.2' | '2004'} [options.scormVersion] SCORM 1.2, the default, or 2004 4th Edition
+ * @param {number | null} [options.passMark] a pass mark from 0 to 100, which a score is held to in
+ *   place of the content's own pass or fail; none by default
+ * @param {boolean} [options.completionScore] count content that finishes without a score as 100;
+ *   off by default
  * @returns {Promise<BuiltScorm>}
  */
-export async function buildScorm({ h5p, out, force = false, title: chosen }) {
+export async function buildScorm({ h5p, out, force = false, title: chosen, scormVersion, passMark, completionScore }) {
   if (!h5p) throw new EmbedError('No package given.')
   if (!out) throw new EmbedError('No output file given.')
+  const options = scormOptions({ scormVersion, passMark, completionScore })
   const source = resolve(h5p)
   const target = resolve(out)
   if (source === target) throw new EmbedError(`${out} is the package itself. Name another file to write.`)
@@ -138,6 +146,7 @@ export async function buildScorm({ h5p, out, force = false, title: chosen }) {
     version,
     packVersion,
     parts,
+    options,
     files: {
       launch: await readFile(join(SCORM, 'index.html'), 'utf8'),
       bridge: await openAsBlob(join(SCORM, 'scorm.js')),
@@ -163,5 +172,5 @@ export async function buildScorm({ h5p, out, force = false, title: chosen }) {
     throw error
   }
 
-  return { out: target, title, version, libraries: parts.map((part) => part.folder), build, size: (await stat(target)).size }
+  return { out: target, title, version, libraries: parts.map((part) => part.folder), scormVersion: options.scormVersion, build, size: (await stat(target)).size }
 }

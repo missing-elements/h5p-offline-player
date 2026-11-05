@@ -1,6 +1,6 @@
 /*! @missing-elements/h5p-embed. MIT. */
 /**
- * The SCORM page: `.h5p` files picked or dropped become SCORM 1.2 zips, built in the browser by
+ * The SCORM page: `.h5p` files picked or dropped become SCORM zips, built in the browser by
  * `planScormInPage` and its `write` from this site's own copies of the player, the runtime and
  * the library pack, with nothing uploaded anywhere. `startScormPage()` runs it; the site's
  * `scorm-main.js` calls it with what `h5p-embed` wrote into `config.js`, and the demo's
@@ -16,9 +16,11 @@
  * steps. Each file chosen gets a row in the list, which says what its zip will hold, or why none
  * can be written, and takes the title the LMS lists it by; nothing is written until `#build` is
  * pressed, which writes the rows one after another; `#download` is then the zip, or, for several,
- * one zip that holds them all, while each row links its own. The closest `[data-step]` around
- * each of the two is shown once it can be reached. A page with neither builds the first file it
- * is given at once, as the page did up to embed 1.5.
+ * one zip that holds them all, while each row links its own. Where the page also holds the
+ * options, radios named `scorm-version` (`1.2` or `2004`), `#pass-mark` and `#completion-score`,
+ * every zip is written with them, and changing one takes back the zips written before. The
+ * closest `[data-step]` around each is shown once it can be reached. A page with neither `#files`
+ * nor `#build` builds the first file it is given at once, as the page did up to embed 1.5.
  */
 import { BlobWriter, ZipWriter } from '@zip.js/zip.js'
 import { addStored } from '../lib/scorm-core.mjs'
@@ -28,7 +30,7 @@ import { EmbedError } from '../lib/shared.mjs'
 /**
  * What `buildScormInPage` is given beside the file: where the player's files and the pack are,
  * and the versions for the zip's notice.
- * @typedef {Omit<import('../lib/scorm-browser.mjs').PageScormOptions, 'file' | 'name' | 'title' | 'onProgress'>} ScormPageOptions
+ * @typedef {Omit<import('../lib/scorm-browser.mjs').PageScormOptions, 'file' | 'name' | 'title' | 'onProgress' | 'scormVersion' | 'passMark' | 'completionScore'>} ScormPageOptions
  */
 
 /** What a page in steps calls the zip that holds the others. */
@@ -55,7 +57,7 @@ const reason = (error) => (error instanceof EmbedError ? error.message : `The zi
  */
 const made = (zip) => {
   const carried = zip.libraries.length ? `, with ${libraries(zip.libraries.length)} from the pack` : ''
-  return `“${zip.title}” as a SCORM 1.2 package${carried}. Build ${zip.build}.`
+  return `“${zip.title}” as a SCORM ${zip.scormVersion} package${carried}. Build ${zip.build}.`
 }
 
 /**
@@ -186,6 +188,24 @@ function inSteps(options, list, button) {
   const { input, link, notice, say, mark } = common()
   const reviewStep = /** @type {HTMLElement | null} */ (list.closest('[data-step]'))
   const downloadStep = /** @type {HTMLElement | null} */ (button.closest('[data-step]'))
+  const versions = /** @type {HTMLInputElement[]} */ ([...document.querySelectorAll('input[name="scorm-version"]')])
+  const passMarkField = /** @type {HTMLInputElement | null} */ (document.querySelector('#pass-mark'))
+  const completionField = /** @type {HTMLInputElement | null} */ (document.querySelector('#completion-score'))
+  const optionsStep = /** @type {HTMLElement | null} */ ((passMarkField ?? completionField ?? versions[0])?.closest('[data-step]') ?? null)
+
+  /**
+   * The options as the page holds them, page-wide; `null` while the pass mark is not one, which
+   * the field's own limits, 0 to 100, decide.
+   */
+  const chosen = () => {
+    if (passMarkField && !passMarkField.checkValidity()) return null
+    const mark = passMarkField?.value.trim() ?? ''
+    return {
+      scormVersion: /** @type {'1.2' | '2004'} */ (versions.find((radio) => radio.checked)?.value === '2004' ? '2004' : '1.2'),
+      passMark: mark === '' ? null : Number(mark),
+      completionScore: completionField?.checked ?? false
+    }
+  }
   /**
    * A file chosen on a page in steps, and what became of it.
    * @typedef {object} Row
@@ -290,12 +310,19 @@ function inSteps(options, list, button) {
     const several = buildable.length > 1
     for (const entry of rows) render(entry, several)
     if (reviewStep) reviewStep.hidden = rows.length === 0
+    if (optionsStep) optionsStep.hidden = buildable.length === 0
     if (downloadStep) downloadStep.hidden = buildable.length === 0
     const count = pending.length || buildable.length
+    const options = chosen()
     button.textContent = several ? `Build ${count} SCORM ${count === 1 ? 'package' : 'packages'}` : 'Build the SCORM package'
-    button.disabled = busy || pending.length === 0 || rows.some((entry) => !entry.plan && !entry.error)
+    button.disabled = busy || pending.length === 0 || options === null || rows.some((entry) => !entry.plan && !entry.error)
     input.disabled = busy
-    if (!busy) {
+    for (const field of [...versions, passMarkField, completionField]) if (field) field.disabled = busy
+    if (passMarkField) passMarkField.setAttribute('aria-invalid', String(options === null))
+    if (!busy && options === null) {
+      mark('idle')
+      say('The pass mark is a number from 0 to 100, or nothing for the content’s own result.')
+    } else if (!busy) {
       const failed = pending.filter((entry) => entry.error).length
       const waiting = pending.length - failed
       const unwritten = failed === 1 ? 'one could not be written, as its row says' : `${failed} could not be written, as their rows say`
@@ -307,7 +334,8 @@ function inSteps(options, list, button) {
         say(made(/** @type {NonNullable<Row['zip']>} */ (built[0].zip)))
       } else {
         const notes = [failed ? unwritten : '', waiting ? `${waiting} more to build` : ''].filter(Boolean)
-        const counted = built.length === 1 ? 'One SCORM 1.2 package, with its link above' : `${built.length} SCORM 1.2 packages, each with its link above`
+        const scorm = `SCORM ${/** @type {NonNullable<Row['zip']>} */ (built[0].zip).scormVersion}`
+        const counted = built.length === 1 ? `One ${scorm} package, with its link above` : `${built.length} ${scorm} packages, each with its link above`
         mark('ready')
         say(`${counted}${notes.map((note) => `; ${note}`).join('')}.`)
       }
@@ -387,7 +415,8 @@ function inSteps(options, list, button) {
 
   const build = async () => {
     const queue = rows.filter((entry) => entry.plan && !entry.zip)
-    if (busy || queue.length === 0) return
+    const options = chosen()
+    if (busy || queue.length === 0 || options === null) return
     busy = true
     notice.hidden = true
     mark('building')
@@ -399,6 +428,7 @@ function inSteps(options, list, button) {
       const step = (text) => say(queue.length > 1 ? `${entry.file.name}, ${at + 1} of ${queue.length}: ${text}` : text.charAt(0).toUpperCase() + text.slice(1))
       try {
         const zip = await /** @type {import('../lib/scorm-browser.mjs').PlannedScorm} */ (entry.plan).write({
+          ...options,
           title: entry.field?.value,
           onProgress: ({ step: where, libraries: count }) => {
             if (where === 'libraries') step(count ? `fetching ${libraries(count)} from the pack…` : 'fetching the player…')
@@ -432,6 +462,13 @@ function inSteps(options, list, button) {
     if (files.length) add(files)
   })
   button.addEventListener('click', () => void build())
+  // An option changed takes back every zip written before it: they were written without it.
+  for (const field of [...versions, passMarkField, completionField]) {
+    field?.addEventListener(field.type === 'number' ? 'input' : 'change', () => {
+      for (const entry of rows) forget(entry)
+      void refresh()
+    })
+  }
   void refresh()
 }
 

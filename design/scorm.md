@@ -1,6 +1,7 @@
 # The SCORM package
 
-`npx @missing-elements/h5p-embed --scorm course.h5p` writes `course.scorm.zip`, SCORM 1.2. It holds
+`npx @missing-elements/h5p-embed --scorm course.h5p` writes `course.scorm.zip`, SCORM 1.2 unless
+`--scorm-version 2004` asks for 2004 4th Edition (#138, below). It holds
 the package as `package.h5p`, the player's three files, the runtime as `frame-assets/`, `embed.css`
 and the launch page with its bridge, for a package that does not carry its libraries the library
 pack's parts it needs in `libraries/`, and `imsmanifest.xml` lists every file. Built on 2026-10-28
@@ -292,8 +293,9 @@ one row each; an LMS added here gets a row there.
   `pnpm build`; CI now builds the demo straight after the install, as Vercel does. Aliased to the
   player's source instead, as the element is, the plan shared its modules with the element, and
   the build split them into a chunk `h5p-player.js` imports, a file the page's zip carries alone.
-  Decided with the owner that day: SCORM 1.2 only, H5P's result rule kept,
-  the tested LMSs the supported ones. Canvas, the audience's LMS, runs its SCORM on Rustici's
+  Decided with the owner that day, and amended on 2026-11-05 by #137 and #138, which made 2004, a
+  pass mark and completion as 100 options and kept the defaults: SCORM 1.2 only, H5P's result
+  rule kept, the tested LMSs the supported ones. Canvas, the audience's LMS, runs its SCORM on Rustici's
   SCORM Cloud by all accounts and cannot be tested here, since Canvas Free-for-Teacher has no SCORM
   upload.
 - **The page works in steps, and the title is the teacher's** (#137, 2026-11-05). The University
@@ -329,7 +331,64 @@ one row each; an LMS added here gets a row there.
   contents list, a SCORM Cloud link, an export of the settings, switches for playing offline and
   for resume, since every zip here carries all it plays and always resumes, and an accessibility
   check, which would need knowledge of each content type. The SCORM version and the grading
-  options are #138's.
+  options are #138's, below.
+- **SCORM 2004, a pass mark and completion as 100, each an option** (#138, 2026-11-05). The
+  owner's call, after the same converter offered all three: options, page-wide on the page and a
+  flag each on the command (`--scorm-version 2004`, `--pass-mark`, `--completion-score`), the
+  defaults as they were, and each offered for the LMSs it was checked in. A zip written with none
+  is the one written before them: its manifest, its launch page and its notice are byte for byte
+  what main wrote, and only the bridge is new code, which plays a page that names no option as it
+  did. The bridge learns the options from the launch page: a `<meta>` after the build's for each
+  one set (`h5p-scorm-version`, `h5p-scorm-pass-mark`, `h5p-scorm-completion-score`), none
+  otherwise. A template that has no place for them (`%SCORM%`), as a page that bundled 1.5's
+  launch files has, is refused with an option set, since its bridge would play a 2004 zip as 1.2.
+  `scormOptions` checks them once for both writers: 1.2 or 2004, a mark from 0 to 100 kept to the
+  hundredth.
+  - **SCORM 2004 4th Edition.** The manifest in the 2004 namespaces (`imscp_v1p1`, `adlcp_v1p3`,
+    `imsss`), `schemaversion` `2004 4th Edition`, `adlcp:scormType`. The bridge finds
+    `API_1484_11` where it finds 1.2's `API`, and speaks the same steps through one set of calls:
+    `cmi.completion_status` and `cmi.success_status` apart, a result that says nothing of a pass
+    leaving success `unknown`; `cmi.score.scaled` beside `raw`, `min` and `max`; the session time
+    and each answer's latency as ISO 8601 durations to the hundredth; each answer with its
+    words in `description` (250 characters, as text, the character references a question writes
+    read: `&rsquo;` came through as itself in Moodle until then), an id that is a URI as 2004 asks,
+    `urn:uuid:` and the part's id, `learner_response`, `incorrect` where 1.2 says `wrong`,
+    `timestamp` in UTC, and `long-fill-in` and `other` kept as themselves; `suspend_data` up to
+    64,000 characters, compressed as in 1.2. **A 2004 session always ends `suspend`**, finished
+    or not, where 1.2 ends a finished one with nothing. Measured in Moodle 4.5 with `normal`
+    after a finish: the next launch got an empty data model within the same attempt (`entry`
+    `ab-initio`, completion `unknown`, no state), so the `incomplete` the bridge writes at
+    launch replaced the `completed` Moodle kept, and the content started over. Suspended, the
+    relaunch resumed: completed and passed kept, the content back on its result, and a retry
+    counted, as on an H5P site.
+  - **A pass mark.** In 1.2 the item's `adlcp:masteryscore`; in 2004 its primary objective
+    (`objectiveID="primary"`, `satisfiedByMeasure`, `minNormalizedMeasure` the mark over 100 to
+    the ten-thousandth), from which the LMS sets `cmi.scaled_passing_score`. The bridge reads the
+    LMS's mark at launch, `cmi.student_data.mastery_score` or `cmi.scaled_passing_score`, which an
+    administrator may change, else the page's, for an LMS that reads none from the manifest, and
+    holds the score as written to it, so 66.67 passes a mark of 66.67 as the LMS judges it. A
+    result with no score gets no verdict from the mark, and keeps the content's own. A zip
+    written without a mark reads none, so an LMS's own mastery score never changes a default
+    zip's status.
+  - **Completion as 100.** A result with no score, neither `scaled` nor `raw` over a `max` above
+    0, as content without questions finishes, is reported as 100 (`scaled` 1) beside completed,
+    and passes a mark. H5P invents no score, so this is off unless asked; content that never
+    finishes, an Accordion or a Virtual Tour, stays incomplete.
+  - **Checked on 2026-11-05.** In Moodle 4.5.15 (Docker, `notes/scorm-spike`, the 2004 runs by
+    `drive-options.mjs`): Moodle took the 2004 zips as `SCORM_1.3`, kept the objective (0.8,
+    satisfied by measure) and the 1.2 mastery score (80). The quiz over two sessions resumed on
+    its second question, finished completed and passed at 66.67 (scaled 0.6667), the gradebook
+    66.67, the total time the two sessions' sum, the four answers with their ids and words; a
+    launch after the finish resumed with the result kept. With a mark of 80, the same 66.67
+    failed in 2004 and in 1.2, the gradebook still 66.67; with completion as 100, a finish with
+    no score recorded 100 and passed in both, the gradebook 100. In SCORM Cloud, through its v2
+    API: both 2004 zips imported as `SCORM20044THEDITION` with no parser warnings; the same two
+    sessions resumed on the second question, the registration completed and passed at 66.67, and
+    a launch after the finish kept it; a mark of 80 failed at 66.67 with completion still
+    completed, where 1.2 shows a failed attempt as incomplete; a finish with no score, completed,
+    passed and 100; and 1.2 with a mark of 80 failed at 66.67, the registration incomplete as for
+    any failed 1.2 attempt there. The finishes with no score were the element's `finished`
+    dispatched in the SCO's frame, as the tests do, since no package here finishes without one.
 
   `scorm-page.test.ts` drives the written site's page in Chromium: a chosen file read into its row
   and built on Build, the download, which is the command's zip and plays unpacked; three files at
@@ -360,12 +419,19 @@ frames the launch page, as Moodle's player does. It covers:
   dispatched as it dispatches them, since no package here reaches either headless;
 - the formulas export played from the zip's parts: the parts the element fetched are compared
   with those the writer planned, and the test waits for the LaTeX to be typeset;
+- the options (#138): none written unless asked; a pass mark as 1.2's mastery score and as 2004's
+  objective; an option refused, by the function and by the command; a mark that fails the
+  content's pass, and an LMS's own mark that wins over the zip's; completion as 100, passing a
+  mark; and, under a page that holds `API_1484_11`, the quiz played to the end in 2004 with its
+  answers, the session suspended and resumed with the result kept, a state past 4,096
+  characters kept, and a score held to the LMS's passing score;
 - playing with no LMS.
 
 Not covered:
 
 - any LMS but Moodle 4.5, Frappe LMS, SCORM Cloud, ILIAS 11, OpenOLAT 21.1 and Chamilo 3.0, and
-  SCORM 2004;
+  SCORM 2004 and the grading options in any but Moodle 4.5 and SCORM Cloud;
+- content that finishes without a score, in an LMS: the finish was dispatched;
 - SCORM Cloud's launch in a frame of its player page, where it launched in its pop-up;
 - Firefox and Safari;
 - Moodle with `slasharguments` off, its popup window and its mobile app;

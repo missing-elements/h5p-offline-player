@@ -705,6 +705,38 @@ button.scorm-row-remove { min-height: 2rem; margin-left: auto; padding: 0.2rem 0
 .scorm-row-download { display: inline-block; margin-top: 0.6rem; font-weight: 600; }
 .scorm-row-download[hidden] { display: none; }
 
+/* The options, one card: the version as two radios, the pass mark, and completion as 100, each
+   with a line of what it does. */
+.scorm-options {
+  display: grid;
+  gap: 1rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.scorm-options fieldset { margin: 0; padding: 0; border: 0; }
+.scorm-options legend { margin-bottom: 0.35rem; padding: 0; font-weight: 600; }
+.scorm-options fieldset label { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 0.5rem; margin: 0.3rem 0; }
+.scorm-options input[type="radio"], .scorm-options input[type="checkbox"] { accent-color: var(--accent); }
+.scorm-option { display: grid; gap: 0.35rem; justify-items: start; }
+.scorm-option label[for="pass-mark"], .scorm-check { font-weight: 600; }
+.scorm-check { display: flex; align-items: baseline; gap: 0.5rem; }
+#pass-mark {
+  width: 10rem;
+  min-height: 2.5rem;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: inherit;
+  font: inherit;
+  transition: border-color var(--ease), box-shadow var(--ease);
+}
+#pass-mark:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+#pass-mark[aria-invalid="true"] { border-color: var(--danger); }
+.scorm-options .step-hint { font-size: 0.875rem; }
+
 /* ---------------------------------------------------------------- the player's box */
 
 h5p-player {

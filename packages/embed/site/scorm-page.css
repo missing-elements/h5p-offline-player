@@ -174,6 +174,52 @@ button:disabled {
   display: none;
 }
 
+/* The options: the version as two radios, the pass mark, and completion as 100, each with a line
+   of what it does. */
+.scorm-options {
+  margin: 0.6rem 0;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid #e2e6ec;
+  border-radius: 6px;
+}
+
+.scorm-options legend,
+label[for="pass-mark"] {
+  font-weight: 600;
+}
+
+.scorm-options label {
+  display: block;
+  margin: 0.25rem 0;
+}
+
+label[for="pass-mark"] {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+#pass-mark {
+  width: 9rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #b8c0cc;
+  border-radius: 6px;
+  font: inherit;
+}
+
+#pass-mark[aria-invalid="true"] {
+  border-color: #b4232a;
+}
+
+.scorm-check {
+  font-weight: 600;
+}
+
+.step-hint {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.92em;
+}
+
 /* The line that says where the build is, then what it made, with the link to it. */
 .status {
   display: flex;
