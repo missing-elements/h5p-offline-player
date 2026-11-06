@@ -133,6 +133,61 @@ describe('normalizeArchive', () => {
     expect(report.warnings).toEqual([])
   })
 
+  it('writes the library folders named in `last` after everything else, the media included, and changes nothing but the order (#148)', async () => {
+    // A package as h5p-author writes one with an editor library: carried for an H5P site's upload
+    // check, and read by nothing as the package plays.
+    const writer = new ZipWriter(new BlobWriter('application/zip'))
+    await writer.add('h5p.json', text({ mainLibrary: 'H5P.Foo' }))
+    await writer.add('H5P.Foo-1.0/library.json', text(libraryJson))
+    await writer.add('H5PEditor.Foo-1.0/library.json', text({ ...libraryJson, machineName: 'H5PEditor.Foo', runnable: 0 }))
+    await writer.add('H5PEditor.Foo-1.0/editor.js', new TextReader(script))
+    await writer.add('H5PEditor.Foo-1.0/icon.png', new Uint8ArrayReader(icon), { level: 0 })
+    await writer.add('content/content.json', text({}))
+    await writer.add('content/images/x.png', new Uint8ArrayReader(png), { level: 0 })
+    const carried = join(dir, 'carried.h5p')
+    await writeFile(carried, new Uint8Array(await (await writer.close()).arrayBuffer()))
+
+    // Without `last`, as before: every library folder ahead of the content.
+    const plain = await normalizeArchive({ input: carried, output: join(dir, 'carried.plain.h5p') })
+    expect(plain.entries.map((entry) => entry.name)).toEqual([
+      'h5p.json',
+      'H5P.Foo-1.0/library.json',
+      'H5PEditor.Foo-1.0/library.json',
+      'H5PEditor.Foo-1.0/editor.js',
+      'H5PEditor.Foo-1.0/icon.png',
+      'content/content.json',
+      'content/images/x.png'
+    ])
+
+    const output = join(dir, 'carried.last.h5p')
+    const report = await normalizeArchive({ input: carried, output, last: ['H5PEditor.Foo-1.0'] })
+    const { entries, data } = await entriesOf(output)
+    const order = [
+      'h5p.json',
+      'H5P.Foo-1.0/library.json',
+      'content/content.json',
+      'content/images/x.png',
+      'H5PEditor.Foo-1.0/library.json',
+      'H5PEditor.Foo-1.0/editor.js',
+      'H5PEditor.Foo-1.0/icon.png'
+    ]
+    expect(entries.map((entry) => entry.filename)).toEqual(order)
+    expect(report.entries.map((entry) => entry.name)).toEqual(order)
+    // The folder stays whole, its png beside its scripts, and every entry is what it was without `last`.
+    const forms = ({ entries }: typeof plain) => Object.fromEntries(entries.map((entry) => [entry.name, [entry.target, entry.action]]))
+    expect(forms(report)).toEqual(forms(plain))
+    expect(data.get('H5PEditor.Foo-1.0/icon.png')).toEqual(icon)
+    expect(new TextDecoder().decode(data.get('H5PEditor.Foo-1.0/editor.js'))).toBe(script)
+    expect(entries.every((entry) => entry.bitFlag?.dataDescriptor === false)).toBe(true)
+    expect(report.bytesOut).toBe((await stat(output)).size)
+
+    // `content` is never moved, and a name the archive has no folder for is ignored.
+    const odd = await normalizeArchive({ input: carried, last: ['content', 'H5P.Missing-1.0'] })
+    expect(odd.entries.map((entry) => entry.name)).toEqual(plain.entries.map((entry) => entry.name))
+    // One name is not a list: a string would be read as a folder per letter.
+    await expect(normalizeArchive({ input: carried, last: 'H5PEditor.Foo-1.0' as unknown as string[] })).rejects.toThrow(/list of folder names/)
+  })
+
   it('reports the same plan on a dry run and writes nothing', async () => {
     const report = await normalizeArchive({ input })
     expect(report.bytesOut).toBeNull()
@@ -267,6 +322,31 @@ describe('orderEntries', () => {
       'content/content.json',
       'content/images/a.png',
       'content/video.mp4'
+    ])
+  })
+
+  it('puts the folders in `last` after the media, each whole, in the order the source had them (#148)', () => {
+    const ordered = orderEntries(
+      named(
+        'H5PEditor.B-1.0/b.js',
+        'content/video.mp4',
+        'content/content.json',
+        'H5P.A-1.0/a.js',
+        'H5PEditor.A-1.0/a.js',
+        'H5PEditor.B-1.0/img/logo.png',
+        'h5p.json'
+      ),
+      // `content` stays where it is, and a folder the entries lack is ignored.
+      ['H5PEditor.A-1.0', 'H5PEditor.B-1.0', 'content', 'H5P.Missing-1.0']
+    ).map((entry) => entry.name)
+    expect(ordered).toEqual([
+      'h5p.json',
+      'H5P.A-1.0/a.js',
+      'content/content.json',
+      'content/video.mp4',
+      'H5PEditor.B-1.0/b.js',
+      'H5PEditor.B-1.0/img/logo.png',
+      'H5PEditor.A-1.0/a.js'
     ])
   })
 })

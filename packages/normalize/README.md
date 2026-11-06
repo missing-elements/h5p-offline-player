@@ -42,9 +42,17 @@ import { normalizeArchive, formatBytes } from '@missing-elements/h5p-normalize'
 const report = await normalizeArchive({
   input: 'course.h5p',
   output: 'course.normalized.h5p', // omit for a dry run
+  last: ['H5PEditor.Wizard-1.2'], // library folders to write after everything else, the media too
   onEntry: (result) => console.log(result.name, result.action)
 })
 ```
+
+`last` names library folders a package carries and nothing reads as it plays, such as the editor
+libraries an H5P site's upload check asks for. They are written after the media, each whole, so a
+host that ignores `Range` does not wait for them before the frame boots; without `last`, every
+library folder comes before `content/`, as it always did. `content` is never moved, a name the
+archive has no folder for is ignored, and the command has no flag for it: only the package's author
+knows which folders those are.
 
 TypeScript declarations ship with the package: `Report` and `EntryResult` describe what it returns.
 

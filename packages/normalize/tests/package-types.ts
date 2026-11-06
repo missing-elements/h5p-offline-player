@@ -19,10 +19,15 @@ export async function asACallerWould(): Promise<string> {
   // @ts-expect-error the source is named `input`
   await normalizeArchive({ file: 'in.h5p' })
 
+  // Library folders to write after everything else, the media included (#148).
+  const trailing: Report = await normalizeArchive({ input: 'in.h5p', output: 'out.h5p', last: ['H5PEditor.Wizard-1.2'] })
+  // @ts-expect-error a list of folder names, not one name
+  await normalizeArchive({ input: 'in.h5p', last: 'H5PEditor.Wizard-1.2' })
+
   const checked: number = crc32(new Uint8Array(4), crc32(new Uint8Array(4)))
   // @ts-expect-error bytes, not text
   crc32('h5p.json')
 
-  void [moved, saved, orderEntries, checked]
+  void [moved, saved, orderEntries, checked, trailing]
   return `${report.revision} ${revision}`
 }
