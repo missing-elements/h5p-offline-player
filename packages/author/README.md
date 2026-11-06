@@ -31,8 +31,8 @@ H5P.Blanks 1.14: interface texts from its translation language/de.json.
 Not verified: run npx @missing-elements/h5p-verify@latest on it and look at its screenshot before handing it over.
 ```
 
-The package plays in the player and carries, after the content, the editor libraries an H5P site's
-upload check asks for, which the player never reads: a Moodle 4.5 with no library installed accepts
+The package plays in the player and carries the editor libraries an H5P site's upload check asks
+for, which the player never reads: a Moodle 4.5 with no library installed accepts
 every type's example (Moodle was the one site tried; WordPress and Drupal run the same check). A
 Question Set gains 120 kB by them; a Course Presentation or a Branching Scenario several MB, as
 the same package exported from Moodle has, because their editors bring every type they can hold.

@@ -320,4 +320,7 @@ Which libraries a package plays with: the check that it has them, the sources in
   with the rest, as it pulls a platform export's editor libraries, one request either way
   (`range-requests.test.ts` on `installable.h5p`: the probe, the tail, the head and the warm, and
   the deep index then reads the run's `library.json` files from the cache); on a host without
-  `Range` the frame boots before the run arrives, since the author writes it after the content.
+  `Range` the frame boots before the run arrives for a package without media, which keeps the
+  author's layout, the run after the content. A package with media goes through the normalizer,
+  whose `orderEntries` sorts every library folder before `content/`, and boots after the run: the
+  demo's video has 4.1 MB before its content, where it had 1.5.

@@ -216,8 +216,10 @@ to 3,000. Eleven things the code does not say by itself:
   a fresh Moodle refuses is broken, and a platform's export is as big. `lib/install.mjs` walks from
   the selected parts over the pack's index at exact versions, through what each added library
   names in turn (`installClosure`), and `writePackage` copies them after the content, where nothing
-  reads them as the package plays and the frame boots before they arrive on a host without
-  `Range`; `h5p.json` lists what plays, as the platforms' exports write it. Measured on the 35
+  reads them as the package plays; `h5p.json` lists what plays, as the platforms' exports write it.
+  A package with media then goes through the normalizer, which sorts every library folder before
+  `content/` (`orderEntries`), so there the run precedes `content.json` and a host without `Range`
+  boots after it; one without media keeps the layout and boots before the run arrives. Measured on the 35
   packages of the Moodle check, with real files: a Question Set gains 123 kB, most types under
   50 kB, and the three containers much more, because their editors preload every type they can
   hold: Interactive Video 2.4 → 5.1 MB, Course Presentation 1.2 → 4.8 MB (64 libraries, as

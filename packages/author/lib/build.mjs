@@ -225,8 +225,9 @@ export async function composePackage(source, pack, media) {
  * What a package holds but its media, in the order a package streams in: its manifest, the
  * libraries it plays with, each part's own files copied as they are, the content, then the
  * libraries an H5P site's upload check wants, which nothing reads as the package plays, so the
- * frame boots before they arrive on a host without `Range`. The caller adds the media after it,
- * last.
+ * frame boots before they arrive on a host without `Range`, unless the normalizer, which a package
+ * with media goes through, sorts library folders before the content. The caller adds the media
+ * after it, last.
  * @param {import('@zip.js/zip.js').ZipWriter<unknown>} writer
  * @param {{ manifest: Record<string, unknown>, content: Record<string, unknown>, selected: Map<string, import('./pack.mjs').PartLibrary>, install: Map<string, import('./pack.mjs').PartLibrary> }} built
  * @param {import('./pack.mjs').Pack} pack
