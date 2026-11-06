@@ -10,7 +10,7 @@ backend, no third-party service between your learners and your content.
 **[Live player demo](https://h5p-offline-player.vercel.app/)** ·
 [Offline PWA app](https://h5p-offline-player.vercel.app/app/) ·
 [H5P to SCORM](https://h5p-offline-player.vercel.app/demo/scorm.html) ·
-[Emded H5P Lovable demo]((https://embed-h5p-file.lovable.app/)) ·
+[Emded H5P Lovable demo](https://embed-h5p-file.lovable.app/) ·
 [VS Code extension](https://marketplace.visualstudio.com/items?itemName=MissingElements.h5p-preview) ·
 
 THe library pack follows the H5P hub, and the Moodle's translations, **updates every week**.
