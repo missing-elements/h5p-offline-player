@@ -20,8 +20,10 @@ and the player never serves.
   `new URL` for each archive, so a bundler emits them as assets of your site.
 - `install.js`: the `pack` export with the `installOnly` libraries too, for a page that writes
   packages with `@missing-elements/h5p-author/browser`. A bundler emits every archive a module
-  names, 1.8 MB more here, so a page that only plays imports `index.js`.
+  names, 1.9 MB more here, so a page that only plays imports `index.js`.
 - `libraries.h5p`: the whole pack as one archive, for a `libraries` URL that takes it as any bundle.
+  Since 1.1.0 it holds the `installOnly` libraries too, 15.5 MB where it was 13.7, which a player
+  never reads.
 - `libraries.txt`: each library's version, licence and authors.
 
 ## Use

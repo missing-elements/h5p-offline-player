@@ -62,7 +62,8 @@ The demo's `/embed`, the site `@missing-elements/h5p-embed` writes for a player 
   2026-10-09, the day the public site stopped being the production path: until then a host that wanted
   its own player domain had to build the demo app. `npx @missing-elements/h5p-embed <folder>`
   copies the page, the player's `dist/`, the runtime as `frame-assets/` and the library pack's
-  parts as `libraries/` (since 2026-10-18; `config.js` then gives the page `packBase`, which it
+  parts the player serves, with an index of those, as `libraries/` (since 2026-10-18; the pack's
+  `installOnly` parts, 1.9 MB for H5P sites' upload check, stay out, #146; `config.js` then gives the page `packBase`, which it
   hands the element as `pack-base`, and `&refresh-libraries=off` passes through) from
   the installed packages (so the versions are the ones published together, and nothing is
   fetched), and writes the policy six ways from one list of rules: a `<meta>` in the page for

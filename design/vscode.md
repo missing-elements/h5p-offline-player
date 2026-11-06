@@ -77,7 +77,7 @@ and committed, as are the app's install screenshots (`pnpm demo:screenshots`), w
   `preview.html` beside the bundle, for Open in Browser.
 - **The extension carries everything it serves.** `assets/` is copied at build from the installed
   packages, as the embed builder takes them: the player's three files, the runtime, the library
-  pack's parts the player serves with an index of those (the pack's `installOnly` parts, 1.8 MB
+  pack's parts the player serves with an index of those (the pack's `installOnly` parts, 1.9 MB
   for H5P sites' upload check, stay out: a preview never reads one, #146) and `libraries.txt`.
   Content-only exports play offline and nothing leaves the machine. `vsce package --no-dependencies` ships `dist/` and `assets/` and no node_modules: 13.8 MB
   in 141 files on 2026-10-26. `--baseContentUrl` and `--baseImagesUrl` point the README's relative

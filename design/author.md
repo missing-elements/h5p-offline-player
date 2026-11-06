@@ -15,7 +15,7 @@ already holds text to the content check's rules, from the pack an untrusted chec
 `apps/skills` plays every example untrusted too. Measured on a five-question quiz, at four
 characters a token: `content.json` was about 3,470 tokens to write by hand, after reading 3,900 to
 9,500 of a type's semantics; the source is 1,000 to 1,800 tokens, written from a type file of 200
-to 3,000. Ten things the code does not say by itself:
+to 3,000. Eleven things the code does not say by itself:
 
 - **One generator, three ways to run it.** The third, `saved`, checks content as H5P stores it
   (*Saved content is checked as the build checks what it writes*, below). `ContentGenerator` was the sweep's

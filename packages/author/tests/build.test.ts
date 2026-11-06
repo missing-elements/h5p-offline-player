@@ -574,7 +574,8 @@ describe('installing on an H5P site (#146)', () => {
     const { files, entries, manifest, libraries, install } = await build(example)
     expect(libraries).toContain('H5P.QuestionSet-1.21')
     expect(install.length).toBeGreaterThan(0)
-    expect(install.every(folder => folder.startsWith('H5PEditor.'))).toBe(true)
+    // The editor libraries at least; an older minor a library names may join them as the hub moves.
+    expect(install.some(folder => folder.startsWith('H5PEditor.'))).toBe(true)
     // Nothing a carried library names, preloaded, dynamic or editor, is missing at its exact version.
     expect(missingForInstall(carried(files))).toEqual([])
     // Not in the manifest, as the platforms' own exports write it.

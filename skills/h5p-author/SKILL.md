@@ -106,8 +106,8 @@ computer, hand over the file and the command.
 
 Deliver the `.h5p`, the source, the report, screenshot and full `revision`, the preview
 command, and any notes. A pass means it starts and draws, not that it is accurate, accessible
-or right for every LMS. The package uploads to Moodle, WordPress and Drupal as it is: it carries
-the editor libraries their upload check asks for. It carries H5P's libraries, each under its own licence, most
+or right for every LMS. The package carries the editor libraries an H5P site's upload check asks
+for, so a Moodle with no library installed accepts it (the one site tried). It carries H5P's libraries, each under its own licence, most
 MIT, listed in the pack's [`libraries.txt`](https://github.com/missing-elements/h5p-offline-player/blob/main/packages/libraries/libraries.txt):
 tell the user, so they check those terms before they distribute it. The H5P Preview extension (`MissingElements.h5p-preview`) plays it in
 VS Code, Cursor or VSCodium; `h5p-player-setup` puts it on a website.

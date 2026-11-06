@@ -298,7 +298,8 @@ Which libraries a package plays with: the check that it has them, the sources in
   the task had run; the harness is in notes/moodle-upload. The owner's call: always carry them.
   So `build-libraries.mjs` keeps, with the newest minor of each major, the closure the upload rule
   wants of them, 37 `H5PEditor.*` libraries and four older minors (`H5P.Audio` 1.2, `H5P.DragNBar`
-  1.4, `H5P.Question` 1.4, `H5P.ImageHotspots` 1.10), 41 parts and 1.8 MB more, each at the exact
+  1.4, `H5P.Question` 1.4, `H5P.ImageHotspots` 1.10), 41 parts and 1.9 MB more (`libraries.h5p`,
+  which a host may attach whole, grows 13.7 to 15.5 MB), each at the exact
   version named, and stops when a bundle lacks one; every one declares MIT or has it in its
   repository (`UNDECLARED`). `splitPack` marks them `installOnly` by a rule read off the pack
   alone, an editor library or an older minor of a major the pack has a newer minor of, and writes

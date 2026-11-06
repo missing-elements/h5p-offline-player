@@ -92,7 +92,8 @@ The pack is found in one of three places:
 Serve `libraries.txt` beside it: the list of each library's licence and authors, which those
 licences ask to travel with the code. The package also carries the whole pack as one file,
 `libraries.h5p`, which a `.h5p` URL in `libraries` takes like any bundle, downloaded whole, with
-no refresh.
+no refresh. Since 1.1.0 it is 15.5 MB, 1.8 MB of them libraries an H5P site's upload check wants,
+which a player never reads; the archives above leave those out.
 
 ## Several sources
 

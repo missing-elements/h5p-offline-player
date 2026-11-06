@@ -75,7 +75,7 @@ await mkdir(join(root, 'assets', 'player'), { recursive: true })
 for (const name of PLAYER_FILES) await cp(join(player, name), join(root, 'assets', 'player', name))
 await cp(runtime, join(root, 'assets', 'runtime'), { recursive: true })
 // The parts the player serves, with an index of those: the pack also carries the libraries an
-// H5P site's upload check wants (`installOnly`), which a preview never reads, 1.8 MB.
+// H5P site's upload check wants (`installOnly`), which a preview never reads, 1.9 MB.
 /** @type {{ libraries: Array<{ folder: string, installOnly?: true }> }} */
 const index = JSON.parse(await readFile(join(pack, 'index.json'), 'utf8'))
 const served = index.libraries.filter((entry) => !entry.installOnly)
