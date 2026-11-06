@@ -417,7 +417,14 @@ export async function buildSite({ out, libraries = true, packages = null, ancest
   await rm(join(target, 'libraries.h5p'), { force: true })
   await rm(join(target, 'libraries'), { recursive: true, force: true })
   if (pack) {
-    await cp(pack, join(target, 'libraries'), { recursive: true })
+    // The parts the player serves, with an index of those: the pack also carries the libraries an
+    // H5P site's upload check wants (`installOnly`), 1.9 MB a site that plays packages never reads (#146).
+    /** @type {{ libraries: Array<{ folder: string, installOnly?: true }> }} */
+    const index = JSON.parse(await readFile(join(pack, 'index.json'), 'utf8'))
+    const served = index.libraries.filter((entry) => !entry.installOnly)
+    await mkdir(join(target, 'libraries'), { recursive: true })
+    for (const { folder } of served) await cp(join(pack, `${folder}.h5p`), join(target, 'libraries', `${folder}.h5p`))
+    await writeFile(join(target, 'libraries', 'index.json'), `{"libraries": [\n${served.map((entry) => `  ${JSON.stringify(entry)}`).join(',\n')}\n]}\n`)
     await cp(join(dirname(pack), 'libraries.txt'), join(target, 'libraries.txt'))
   } else {
     await rm(join(target, 'libraries.txt'), { force: true })

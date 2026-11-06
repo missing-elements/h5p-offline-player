@@ -17,9 +17,13 @@ import { HUB, download as cachedDownload, hubBundle as cachedBundle } from './li
  * Every content type below is fetched from the hub (cached under the OS temp directory, shared
  * with `build-demo-content.mjs`; `--refresh` fetches again), and so is every addon in `ADDONS`
  * from where H5P Group publishes it, and every library folder in the
- * bundles is kept except the editor's, at the newest minor of each major: H5P keeps a minor
+ * bundles is kept at the newest minor of each major: H5P keeps a minor
  * compatible with the ones before it, and the player resolves a request for 1.26 to 1.27. A
- * package that needs a newer minor than the pack has is refused, naming the library.
+ * package that needs a newer minor than the pack has is refused, naming the library. With them,
+ * since pack 1.1.0, what an H5P site's upload check wants of those libraries (#146): the editor
+ * libraries, and the older minor a library names exactly, at the exact versions. `splitPack`
+ * marks those `installOnly` in the index; the player never serves one, and h5p-author carries
+ * them into a package.
  *
  * The outputs are committed, like the demo content: a deploy should not depend on the hub.
  * Refresh them before a release. A library whose `library.json` declares no licence has to be
@@ -85,6 +89,29 @@ const UNDECLARED = {
   'H5P.Nil': 'MIT (README of github.com/h5p/h5p-nil)',
   'H5P.Table': 'MIT (README of github.com/h5p/h5p-table)',
   'H5P.Text': 'MIT (README of github.com/h5p/h5p-text)',
+  'H5PEditor.ARMarkerGenerator': 'MIT (LICENSE of github.com/otacke/h5p-editor-ar-marker-generator)',
+  'H5PEditor.BranchingQuestion': 'MIT (README of github.com/h5p/h5p-editor-branching-question)',
+  'H5PEditor.ColorSelector': 'MIT (README of github.com/h5p/h5p-editor-color-selector)',
+  'H5PEditor.CoursePresentation': 'MIT (README of github.com/h5p/h5p-editor-course-presentation)',
+  'H5PEditor.DateTime': 'MIT (LICENSE of github.com/otacke/h5p-editor-datetime)',
+  'H5PEditor.DragQuestion': 'MIT (README of github.com/h5p/h5p-editor-drag-question)',
+  'H5PEditor.Duration': 'MIT (README of github.com/h5p/h5p-editor-duration)',
+  'H5PEditor.GameMap': 'MIT (LICENSE of github.com/otacke/h5p-editor-game-map)',
+  'H5PEditor.ImageCoordinateSelector': 'MIT (README of github.com/h5p/h5p-editor-image-coordinate-selector)',
+  'H5PEditor.ImageHotspotQuestion': 'MIT (README of github.com/h5p/h5p-editor-image-hotspot-question)',
+  'H5PEditor.ImageMultipleHotspotQuestion': 'MIT (README of github.com/lukemuller/h5p-editor-image-multiple-hotspot-question)',
+  'H5PEditor.ImportantDescription': 'MIT (LICENSE of github.com/otacke/h5p-editor-important-description)',
+  'H5PEditor.InfoWall': 'MIT (LICENSE of github.com/otacke/h5p-editor-info-wall)',
+  'H5PEditor.InfoWallPassiveList': 'MIT (LICENSE of github.com/otacke/h5p-editor-info-wall-passive-list)',
+  'H5PEditor.InputRow': 'MIT (LICENSE of github.com/otacke/h5p-editor-input-row)',
+  'H5PEditor.KewArCode': 'MIT (LICENSE of github.com/otacke/h5p-editor-kewar-code)',
+  'H5PEditor.RadioGroup': 'MIT (README of github.com/h5p/h5p-editor-radio-group)',
+  'H5PEditor.RadioSelector': 'MIT (README of github.com/h5p/h5p-editor-radio-selector)',
+  'H5PEditor.Shape': 'MIT (README of github.com/h5p/h5p-editor-shape)',
+  'H5PEditor.ThreeDModelLoader': 'MIT (LICENSE of github.com/otacke/h5p-editor-3d-model-loader)',
+  'H5PEditor.Timecode': 'MIT (README of github.com/h5p/h5p-editor-timecode)',
+  'H5PEditor.UrlField': 'MIT (README of github.com/h5p/h5p-editor-url-field)',
+  'H5PEditor.Wizard': 'MIT (README of github.com/h5p/h5p-editor-wizard)',
   flowplayer: 'GPL-3.0 (header of scripts/flowplayer-3.2.12.min.js)'
 }
 
@@ -104,8 +131,8 @@ const hubBundle = (machineName) => cachedBundle(machineName, { refresh, optional
  */
 const download = (url, name, optional = false) => cachedDownload(url, name, { refresh, optional, log: LOG })
 
-/** folder -> { library, files: Map<name, Uint8Array> }, keeping the newest minor per major. */
-const kept = new Map()
+/** `<machineName>-<major>.<minor>` -> { folder, library, files: Map<name, Uint8Array> }: every version the bundles carry, at its newest patch. */
+const seen = new Map()
 const skipped = []
 
 for (const machineName of CONTENT_TYPES) {
@@ -118,7 +145,7 @@ for (const machineName of CONTENT_TYPES) {
 }
 for (const url of ADDONS) await keepLibraries(await download(url, url.slice(url.lastIndexOf('/') + 1)))
 
-/** Keeps every library folder in a bundle that is newer than the one kept so far. */
+/** Keeps every library folder in a bundle, each version at the newest patch seen so far. */
 async function keepLibraries(path) {
   const reader = new ZipReader(new BlobReader(await openAsBlob(path)))
   const entries = (await reader.getEntries({ filenameValidation: 'tolerant' })).filter((entry) => !entry.directory)
@@ -128,7 +155,7 @@ async function keepLibraries(path) {
     const slash = entry.filename.indexOf('/')
     if (slash < 0) continue
     const folder = entry.filename.slice(0, slash)
-    if (folder === 'content' || folder.startsWith('H5PEditor.')) continue
+    if (folder === 'content') continue
     if (!folders.has(folder)) folders.set(folder, [])
     folders.get(folder).push(entry)
   }
@@ -137,18 +164,46 @@ async function keepLibraries(path) {
     const libraryEntry = files.find((entry) => entry.filename === `${folder}/library.json`)
     if (!libraryEntry) continue
     const library = JSON.parse(new TextDecoder().decode(await libraryEntry.getData(new Uint8ArrayWriter())))
-    const key = `${library.machineName}-${library.majorVersion}`
-    const current = kept.get(key)
+    const current = seen.get(versionOf(library))
     if (current && !newer(library, current.library)) continue
 
     const contents = new Map()
     for (const entry of files) contents.set(entry.filename, await entry.getData(new Uint8ArrayWriter()))
-    kept.set(key, { folder, library, files: contents })
+    seen.set(versionOf(library), { folder, library, files: contents })
   }
   await reader.close()
 }
 
-const libraries = [...kept.values()].sort((a, b) => a.folder.localeCompare(b.folder))
+// What the player serves: the newest minor of each major, the editor's libraries left out.
+const played = new Map()
+for (const version of seen.values()) {
+  if (version.library.machineName.startsWith('H5PEditor.')) continue
+  const key = `${version.library.machineName}-${version.library.majorVersion}`
+  const current = played.get(key)
+  if (!current || newer(version.library, current.library)) played.set(key, version)
+}
+
+// With them, what an H5P site's upload check wants (#146): every library a carried one names,
+// preloaded, dynamic or editor, at the exact major.minor, and what those name in turn. A bundle
+// carries its content type's whole closure, so each is in `seen`; one that is not stops the build.
+const carried = new Map([...played.values()].map((version) => [versionOf(version.library), version]))
+const queue = [...carried.values()]
+while (queue.length > 0) {
+  const { folder, library } = queue.shift()
+  for (const dependency of [...(library.preloadedDependencies ?? []), ...(library.dynamicDependencies ?? []), ...(library.editorDependencies ?? [])]) {
+    const wanted = versionOf(dependency)
+    if (carried.has(wanted)) continue
+    const found = seen.get(wanted)
+    if (!found) {
+      console.error(`${LOG} ${folder} needs ${wanted}, which no bundle carries`)
+      process.exit(1)
+    }
+    carried.set(wanted, found)
+    queue.push(found)
+  }
+}
+
+const libraries = [...carried.values()].sort((a, b) => a.folder.localeCompare(b.folder))
 
 const unknown = libraries.filter(({ library }) => !library.license && !UNDECLARED[library.machineName])
 if (unknown.length > 0) {
@@ -169,7 +224,9 @@ await writePackModule(parts, outDir)
 
 const lines = [
   'Library pack of H5P Offline Player by Missing Elements: the H5P hub runtime libraries the installable app carries,',
-  'so that a package exported without its own libraries plays offline. Each library is used here',
+  'so that a package exported without its own libraries plays offline, and with them the editor',
+  "libraries and older minors an H5P site's upload check wants of them, which h5p-author carries",
+  'into a package and the player never serves (installOnly in parts/index.json). Each library is used here',
   'under the licence below; its source is the library folder itself, as shipped by the hub',
   `(${HUB}<content type>), or for an addon as H5P Group publishes it (${ADDONS.join(', ')}).`,
   'Built by apps/demo/scripts/build-libraries.mjs.',
@@ -185,11 +242,16 @@ const lines = [
 await writeFile(join(outDir, 'libraries.txt'), lines.join('\n'))
 
 console.log(
-  `[libraries] ${libraries.length} libraries from ${CONTENT_TYPES.length - skipped.length} content types -> packages/libraries/libraries.h5p ${formatBytes(pack.length)}, and ${parts.length} parts` +
+  `[libraries] ${played.size} libraries the player serves and ${libraries.length - played.size} for H5P sites' upload check, from ${CONTENT_TYPES.length - skipped.length} content types -> packages/libraries/libraries.h5p ${formatBytes(pack.length)}, and ${parts.length} parts` +
     (skipped.length ? ` (not on the hub: ${skipped.join(', ')})` : '')
 )
 
 /** Whether `a` is a newer release than `b` of the same major. */
 function newer(a, b) {
   return a.minorVersion !== b.minorVersion ? a.minorVersion > b.minorVersion : (a.patchVersion ?? 0) > (b.patchVersion ?? 0)
+}
+
+/** `<machineName>-<major>.<minor>`, of a `library.json` or a dependency it names. */
+function versionOf(library) {
+  return `${library.machineName}-${library.majorVersion}.${library.minorVersion}`
 }

@@ -1,4 +1,4 @@
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { chromium, type Browser, type Download, type Page } from 'playwright'
@@ -88,7 +88,9 @@ describe('the SCORM page', () => {
     await read(page, 1)
     const row = rowOf(page, 'quiz.h5p')
     expect(await row.getAttribute('data-state')).toBe('planned')
-    expect(await row.locator('.scorm-row-size').textContent()).toBe('1.5 MB')
+    // The page's own rule for a file of a megabyte or more, from the file as it is: the demo's quiz
+    // changes size whenever `pnpm demo:content` is run (#146 added the libraries an H5P site wants).
+    expect(await row.locator('.scorm-row-size').textContent()).toBe(`${((await stat(quiz)).size / 1_000_000).toFixed(1)} MB`)
     expect(await row.locator('.scorm-row-facts').textContent()).toMatch(/^H5P\.QuestionSet 1\.\d+ · carries its libraries$/)
     expect(await row.locator('.scorm-row-title input').inputValue()).toBe('Do you know what just happened?')
     // Nothing is written before Build.

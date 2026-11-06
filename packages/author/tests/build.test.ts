@@ -8,7 +8,7 @@ import { promisify } from 'node:util'
 import { BlobReader, TextWriter, Uint8ArrayWriter, ZipReader } from '@zip.js/zip.js'
 import { pack } from '@missing-elements/h5p-libraries'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { buildPackage, librariesIn, SourceError } from '../lib/author.mjs'
+import { buildPackage, librariesIn, missingForInstall, SourceError } from '../lib/author.mjs'
 import { readSource } from '../lib/build.mjs'
 import { MediaStore } from '../lib/media.mjs'
 import { nodeMedia } from '../lib/node.mjs'
@@ -126,9 +126,10 @@ describe('the quiz format', () => {
   })
 
   it('builds a self-contained Question Set using pack versions, semantics defaults, and the full dependency closure', async () => {
-    const { files, content, manifest, translations, libraries } = await build(example)
+    const { files, content, manifest, translations, libraries, install } = await build(example)
     expect([...files.keys()][0]).toBe('h5p.json')
-    expect([...files.keys()].at(-1)).toBe('content/content.json')
+    // The content comes after the libraries that play; only what an H5P site's upload check wants follows it (#146).
+    expect([...files.keys()].filter(name => !install.includes(name.slice(0, name.indexOf('/')))).at(-1)).toBe('content/content.json')
     expect(manifest.mainLibrary).toBe('H5P.QuestionSet')
     expect(manifest.defaultLanguage).toBe(example.language)
     expect(manifest.authors).toEqual(example.authors)
@@ -160,7 +161,8 @@ describe('the quiz format', () => {
       expect(files.has(`${dependency.machineName}-${dependency.majorVersion}.${dependency.minorVersion}/library.json`)).toBe(true)
     }
     for (const [name, json] of files) {
-      if (!name.endsWith('/library.json')) continue
+      // The libraries that play; what an H5P site's upload check wants follows the content (#146).
+      if (!name.endsWith('/library.json') || install.includes(name.slice(0, name.indexOf('/')))) continue
       const library = JSON.parse(json)
       expect(library.machineName).not.toMatch(/H5PEditor/)
       for (const dependency of [...(library.preloadedDependencies ?? []), ...(library.dynamicDependencies ?? [])]) {
@@ -547,7 +549,7 @@ describe('the build', () => {
     const project = await mkdtemp(join(dir, 'project-'))
     await writeFile(join(project, 'german.json'), JSON.stringify({ ...example, language: 'de' }))
     const german = await exec(process.execPath, [bin, 'build', 'german.json', 'german.h5p'], { cwd: project })
-    expect(german.stdout).toMatch(/^Built .*german\.h5p: H5P\.QuestionSet, \d+ libraries from the library pack \d+\.\d+\.\d+\./)
+    expect(german.stdout).toMatch(/^Built .*german\.h5p: H5P\.QuestionSet, \d+ libraries from the library pack \d+\.\d+\.\d+, \d+ more for installing on an H5P site\./)
     expect(german.stdout).toMatch(/H5P\.MultiChoice 1\.\d+: interface texts from its translation language\/de\.json\./)
     expect(german.stdout + german.stderr).toMatch(/H5P\.QuestionSet 1\.\d+: interface texts from its translation language\/de\.json/)
     expect(german.stdout).toContain('Not verified')
@@ -562,4 +564,52 @@ describe('the build', () => {
     expect(schema).toContain('- `correct` one of "true" | "false" = "true"')
     await expect(exec(process.execPath, [bin, 'schema', 'H5P.Nope'])).rejects.toMatchObject({ stderr: expect.stringContaining('H5P.Blanks (Fill in the Blanks)') })
   }, 120_000)
+})
+
+describe('installing on an H5P site (#146)', () => {
+  /** Every `library.json` an archive carries. */
+  const carried = (files: Map<string, string>) => [...files].filter(([name]) => /^[^/]+\/library\.json$/.test(name)).map(([, text]) => JSON.parse(text))
+
+  it('carries what H5P core\'s upload check wants of its libraries, after the content, and lists only what plays in h5p.json', async () => {
+    const { files, entries, manifest, libraries, install } = await build(example)
+    expect(libraries).toContain('H5P.QuestionSet-1.21')
+    expect(install.length).toBeGreaterThan(0)
+    // The editor libraries at least; an older minor a library names may join them as the hub moves.
+    expect(install.some(folder => folder.startsWith('H5PEditor.'))).toBe(true)
+    // Nothing a carried library names, preloaded, dynamic or editor, is missing at its exact version.
+    expect(missingForInstall(carried(files))).toEqual([])
+    // Not in the manifest, as the platforms' own exports write it.
+    const named = new Set(manifest.preloadedDependencies.map((each: { machineName: string }) => each.machineName))
+    for (const folder of install) expect(named.has(folder.slice(0, folder.lastIndexOf('-')))).toBe(false)
+    // After the content, where nothing reads them as the package plays; the media come last.
+    const names = entries.map(entry => entry.filename)
+    const content = names.indexOf('content/content.json')
+    for (const folder of install) for (const name of names.filter(each => each.startsWith(`${folder}/`))) expect(names.indexOf(name)).toBeGreaterThan(content)
+    for (const folder of libraries) for (const name of names.filter(each => each.startsWith(`${folder}/`))) expect(names.indexOf(name)).toBeLessThan(content)
+  })
+
+  it('carries the older minor a library names exactly, beside the newer one that plays', async () => {
+    const base = await mkdtemp(join(dir, 'sequence-'))
+    for (const name of ['a.png', 'b.png', 'c.png']) await writeFile(join(base, name), png(40, 20))
+    // Image Sequencing 1.1 names H5P.Audio 1.2; the pack plays 1.5, which the package carries for it.
+    const { libraries, install, files } = await build({
+      ...META,
+      type: 'H5P.ImageSequencing',
+      params: { sequenceImages: ['a', 'b', 'c'].map(name => ({ image: { path: `${name}.png` }, imageDescription: name.toUpperCase() })) }
+    }, { base })
+    expect(libraries).toContain('H5P.Audio-1.5')
+    expect(install).toContain('H5P.Audio-1.2')
+    expect(missingForInstall(carried(files))).toEqual([])
+  })
+
+  it('refuses to build from a pack that lacks them, naming the first and where the pack with them is', async () => {
+    const lean = join(dir, 'lean-parts')
+    await cp(parts, lean, { recursive: true })
+    const index = JSON.parse(await readFile(join(lean, 'index.json'), 'utf8'))
+    await writeFile(join(lean, 'index.json'), JSON.stringify({ libraries: index.libraries.filter((entry: { installOnly?: true }) => !entry.installOnly) }))
+    await expect(buildPackage(example, join(dir, 'lean.h5p'), { libraries: lean })).rejects.toThrow(
+      /^The library pack cannot supply H5PEditor\.\S+ \d+\.\d+, which H5P\.\S+ \d+\.\d+ needs to install on an H5P site: a page imports the pack from '@missing-elements\/h5p-libraries\/install'/
+    )
+    expect(await readdir(dir)).not.toContain('lean.h5p')
+  })
 })

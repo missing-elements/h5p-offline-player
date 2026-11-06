@@ -124,8 +124,12 @@ packages/runtime/         @missing-elements/h5p-runtime — the H5P core runtime
 packages/libraries/       @missing-elements/h5p-libraries — the hub's runtime libraries for every content type
                           it serves: parts/, one archive per library folder, and parts/index.json, each
                           library's version, dependencies and addon patterns and its archive's size and
-                          SHA-256; index.js, the `pack` export a bundler reads, a static `new URL` per part,
-                          and index.d.ts; libraries.h5p, the whole pack as one archive; libraries.txt, the
+                          SHA-256, and `installOnly` on the libraries carried for an H5P site's upload
+                          check, the editor's and an older minor another names, which the player never
+                          serves (#146); index.js, the `pack` export a bundler reads, a static `new URL` per
+                          part the player serves, and index.d.ts; install.js, the same with the
+                          `installOnly` parts, for a page that writes packages; libraries.h5p, the whole
+                          pack as one archive; libraries.txt, the
                           licences. All committed, built by apps/demo/scripts/build-libraries.mjs (`pnpm
                           libraries`), the pack written by scripts/parts.mjs (`writePack`, which keeps an
                           unchanged library's entries from the pack before, #116) and split into parts by
@@ -170,6 +174,9 @@ packages/author/          @missing-elements/h5p-author — a playable .h5p of an
   lib/node.mjs              what only Node does, and the one module that imports `node:`: the pack read
                             from disk, a source's files beside it, downloads in a temporary folder,
                             the package written to a path and normalized (#108)
+  lib/install.mjs           what an H5P site's upload check wants with the libraries that play, at the
+                            exact versions (`installClosure`), written after the content; the check
+                            itself, `missingForInstall`, for apps/skills and a tool beside the build (#146)
   lib/check.mjs             `checkContent`: content in the form H5P saves it checked, the layouts' `after`
                             run, for a tool that edits a saved package and for the build, which runs it
                             last on what it writes (#107); no Node import of its own

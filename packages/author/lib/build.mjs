@@ -2,6 +2,7 @@ import { TextReader } from '@zip.js/zip.js'
 import { librariesNamedIn, planPack } from '@missing-elements/h5p-offline-player/plan'
 import { checkContent, layoutContext, valueAt } from './check.mjs'
 import { ContentGenerator, libraryString } from './generator.mjs'
+import { installClosure } from './install.mjs'
 import { loadLibraries } from './libraries.mjs'
 import { CC_VERSIONS, LICENSES, ROLES } from './metadata.mjs'
 import { quizProblems, quizSource } from './quiz.mjs'
@@ -134,7 +135,8 @@ async function closure(pack, main, content) {
  * @param {Source} source as `readSource` returned it
  * @param {import('./pack.mjs').Pack} pack
  * @param {import('./media.mjs').MediaStore<F>} media
- * @returns {Promise<{ manifest: Record<string, unknown>, content: Record<string, unknown>, selected: Map<string, import('./pack.mjs').PartLibrary>, translations: TranslationReport[], notes: Problem[] }>}
+ * @returns {Promise<{ manifest: Record<string, unknown>, content: Record<string, unknown>, selected: Map<string, import('./pack.mjs').PartLibrary>, install: Map<string, import('./pack.mjs').PartLibrary>, translations: TranslationReport[], notes: Problem[] }>}
+ *   `selected`, the libraries the package plays with; `install`, those an H5P site's upload check wants with them
  * @internal
  */
 export async function composePackage(source, pack, media) {
@@ -195,6 +197,9 @@ export async function composePackage(source, pack, media) {
 
   const { selected, addons } = await closure(pack, mainLibrary.library, content)
   if (addons.length) notes.push({ path: 'params', message: `its text matches ${addons.join(', ')}, which the package carries, as a site with it installed would add it` })
+  // What an H5P site's upload check wants with them, at the exact versions (#146); not in
+  // `h5p.json`, which lists what plays, as the platforms' own exports write it.
+  const install = await installClosure(pack, selected)
 
   // As H5P's exports write it, unescaped: the platforms check it when they load content.
   const manifest = {
@@ -213,24 +218,28 @@ export async function composePackage(source, pack, media) {
       machineName: part.library.machineName, majorVersion: String(part.library.majorVersion), minorVersion: String(part.library.minorVersion)
     }))
   }
-  return { manifest, content, selected, translations, notes }
+  return { manifest, content, selected, install, translations, notes }
 }
 
 /**
  * What a package holds but its media, in the order a package streams in: its manifest, the
- * libraries, each part's own files copied as they are, then the content. The caller adds the media
+ * libraries it plays with, each part's own files copied as they are, the content, then the
+ * libraries an H5P site's upload check wants, which nothing reads as the package plays, so the
+ * frame boots before they arrive on a host without `Range`, unless the normalizer, which a package
+ * with media goes through, sorts library folders before the content. The caller adds the media
  * after it, last.
  * @param {import('@zip.js/zip.js').ZipWriter<unknown>} writer
- * @param {{ manifest: Record<string, unknown>, content: Record<string, unknown>, selected: Map<string, import('./pack.mjs').PartLibrary> }} built
+ * @param {{ manifest: Record<string, unknown>, content: Record<string, unknown>, selected: Map<string, import('./pack.mjs').PartLibrary>, install: Map<string, import('./pack.mjs').PartLibrary> }} built
  * @param {import('./pack.mjs').Pack} pack
  * @internal
  */
-export async function writePackage(writer, { manifest, content, selected }, pack) {
+export async function writePackage(writer, { manifest, content, selected, install }, pack) {
+  /** @param {import('./pack.mjs').PartLibrary} part */
+  const copy = (part) => writer.appendZip(pack.archiveOf(part), { filter: (entry) => !entry.directory && entry.filename.startsWith(`${part.folder}/`) })
   await writer.add('h5p.json', new TextReader(JSON.stringify(manifest)))
-  for (const part of selected.values()) {
-    await writer.appendZip(pack.archiveOf(part), { filter: (entry) => !entry.directory && entry.filename.startsWith(`${part.folder}/`) })
-  }
+  for (const part of selected.values()) await copy(part)
   await writer.add('content/content.json', new TextReader(JSON.stringify(content)))
+  for (const part of install.values()) await copy(part)
 }
 
 /**

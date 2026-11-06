@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
@@ -10,6 +11,7 @@ import { EmbedError, buildSite, contentSecurityPolicy, parseDefaultLibraries, pa
 /** What the command writes, and what it refuses, without a browser. */
 
 const bin = resolve(import.meta.dirname, '../bin/h5p-embed.mjs')
+const require = createRequire(import.meta.url)
 let dir: string
 
 beforeAll(async () => {
@@ -104,6 +106,12 @@ describe('the site', () => {
     expect(index.libraries.length).toBeGreaterThan(50)
     for (const { folder } of index.libraries) expect(existsSync(join(out, 'libraries', `${folder}.h5p`)), folder).toBe(true)
     expect(existsSync(join(out, 'libraries.h5p'))).toBe(false)
+    // Only what the player serves: the pack also carries the libraries an H5P site's upload check
+    // wants (`installOnly`), which a site that plays packages never reads (#146).
+    const carried = JSON.parse(await readFile(require.resolve('@missing-elements/h5p-libraries/parts/index.json'), 'utf8'))
+    expect(carried.libraries.some((entry: { installOnly?: true }) => entry.installOnly)).toBe(true)
+    expect(index.libraries).toEqual(carried.libraries.filter((entry: { installOnly?: true }) => !entry.installOnly))
+    expect((await readdir(join(out, 'libraries'))).sort()).toEqual(['index.json', ...index.libraries.map(({ folder }: { folder: string }) => `${folder}.h5p`)].sort())
 
     const html = await readFile(join(out, 'index.html'), 'utf8')
     expect(html).toContain(`content="${contentSecurityPolicy({ packages: ['https://cdn.example.org'], meta: true })}"`)

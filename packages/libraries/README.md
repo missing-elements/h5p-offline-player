@@ -3,16 +3,27 @@
 The H5P hub's runtime libraries for every content type it serves, each at the newest minor of its
 major, for [`<h5p-player>`](https://www.npmjs.com/package/@missing-elements/h5p-offline-player)'s
 `libraries="pack"`. With it, an export that carries only `content/` (common from h5p.com and
-h5p.org) plays, and an older export plays the newer versions of its libraries.
+h5p.org) plays, and an older export plays the newer versions of its libraries. With them, the
+libraries an H5P site asks for when a package is uploaded, the editor's among them, which
+[h5p-author](https://www.npmjs.com/package/@missing-elements/h5p-author) copies into a package
+and the player never serves.
 
 ## What is in it
 
 - `parts/`: one `.h5p` per library folder, and `index.json`, which gives each library's version,
   dependencies and addon patterns, and its archive's size and SHA-256. The player downloads only
-  the archives a package needs and checks each against its hash.
-- `index.js`: the `pack` export, the index with a static `new URL` for each archive, so a bundler
-  emits them as assets of your site.
+  the archives a package needs and checks each against its hash. A library marked `installOnly`
+  is carried for an H5P site's upload check, which wants every library a package carries to have
+  its dependencies with it at the exact version, editor dependencies included: the editor
+  libraries, and an older minor of a library that another names exactly.
+- `index.js`: the `pack` export, the index of the libraries the player serves, with a static
+  `new URL` for each archive, so a bundler emits them as assets of your site.
+- `install.js`: the `pack` export with the `installOnly` libraries too, for a page that writes
+  packages with `@missing-elements/h5p-author/browser`. A bundler emits every archive a module
+  names, 1.9 MB more here, so a page that only plays imports `index.js`.
 - `libraries.h5p`: the whole pack as one archive, for a `libraries` URL that takes it as any bundle.
+  Since 1.1.0 it holds the `installOnly` libraries too, 15.5 MB where it was 13.7, which a player
+  never reads.
 - `libraries.txt`: each library's version, licence and authors.
 
 ## Use

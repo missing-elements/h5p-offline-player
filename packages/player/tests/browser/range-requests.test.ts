@@ -24,6 +24,16 @@ describe('the requests a load costs', () => {
     expect(ranges[0]).toBe('bytes=0-0')
   })
 
+  it('asks for nothing of its own for a run after the content that the boot never reads (#146)', async () => {
+    // h5p-author's layout: after the content, the libraries an H5P site's upload check wants,
+    // 200 kB here past the index's first block. The probe, the tail, the head, and the warm, which
+    // pulls the run with the rest in its one request; the deep index then reads its library.json
+    // files from the cache, where each would otherwise be a request.
+    const ranges = await rangesOf('installable.h5p')
+    expect(ranges).toHaveLength(4)
+    expect(new Set(ranges).size).toBe(ranges.length)
+  })
+
   it('asks for nothing again once a bundle is attached and the reader is built anew', async () => {
     const ranges = await rangesOf('needs-dependency.h5p', { libraries: FIXTURES.libraries })
     // The probe, the tail, the head, and the warm: the reader built again with the bundle

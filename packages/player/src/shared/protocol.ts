@@ -63,8 +63,17 @@ export interface PackLibrary {
   patchVersion: number
   /** The dependencies its `library.json` declares. */
   preloadedDependencies?: PackDependency[]
+  dynamicDependencies?: PackDependency[]
+  editorDependencies?: PackDependency[]
   /** For an addon, the content the platforms add it to (`addTo` in its `library.json`). */
   addTo?: unknown
+  /**
+   * Carried for an H5P site's upload check only, which wants every library a package carries to
+   * have its dependencies with it at the exact major.minor, editor dependencies included (#146):
+   * an editor library, or an older minor the pack has a newer one of. The plan never takes one;
+   * h5p-author copies them into a package.
+   */
+  installOnly?: true
   /** The part's size in bytes. */
   size: number
   /** The part's SHA-256, lower-case hex. */

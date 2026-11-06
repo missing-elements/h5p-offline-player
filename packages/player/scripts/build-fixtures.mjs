@@ -83,6 +83,37 @@ built.push([
   })
 ])
 
+// 1a. As h5p-author writes a package (#146): after the content, the libraries an H5P site's upload
+//     check wants and nothing reads as the package plays, here the content type's editor and what
+//     it needs, two of them, each with a script of 100 kB that does not compress, so the run lies
+//     past the index's first block and before its last. The content type names its editor.
+built.push([
+  'installable.h5p',
+  await writeArchive('installable.h5p', async (writer) => {
+    await addBaseFiles(writer, { skip: ['H5P.OfflineTest-1.0/library.json'] })
+    const library = JSON.parse(await readFile(resolve(sourceDir, 'H5P.OfflineTest-1.0', 'library.json'), 'utf8'))
+    await writer.add(
+      'H5P.OfflineTest-1.0/library.json',
+      new TextReader(JSON.stringify({ ...library, editorDependencies: [{ machineName: 'H5PEditor.OfflineTest', majorVersion: 1, minorVersion: 0 }] }))
+    )
+    const editor = (machineName, needs) => ({
+      title: machineName,
+      machineName,
+      majorVersion: 1,
+      minorVersion: 0,
+      patchVersion: 0,
+      runnable: 0,
+      license: 'MIT',
+      preloadedJs: [{ path: 'editor.js' }],
+      ...(needs ? { preloadedDependencies: [{ machineName: needs, majorVersion: 1, minorVersion: 0 }] } : {})
+    })
+    for (const [machineName, needs] of [['H5PEditor.OfflineTest', 'H5PEditor.OfflineTestWidget'], ['H5PEditor.OfflineTestWidget', null]]) {
+      await writer.add(`${machineName}-1.0/library.json`, new TextReader(JSON.stringify(editor(machineName, needs))))
+      await writer.add(`${machineName}-1.0/editor.js`, new Uint8ArrayReader(randomBytes(100 * 1024)))
+    }
+  })
+])
+
 // 1b. A result and its parts: the content type with its Answer button, which reports `answered`
 //     as a single question does, a child of itself run as sub-content, whose Complete reports
 //     `completed` with the parent named, and another run without a parent, as Interactive Book

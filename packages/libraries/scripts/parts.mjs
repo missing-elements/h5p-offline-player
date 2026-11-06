@@ -12,7 +12,9 @@ import { BlobWriter, TextReader, Uint8ArrayReader, Uint8ArrayWriter, ZipReader, 
  * of a library a package carries; a part is checked against its hash once downloaded.
  *
  * Also writes `index.js` and `index.d.ts`, the `pack` export a bundler resolves: the index with a
- * static `new URL` for every part, the one shape Vite, Rollup and webpack 5 emit as an asset.
+ * static `new URL` for every part, the one shape Vite, Rollup and webpack 5 emit as an asset; and
+ * `install.js`, the same with the libraries carried for an H5P site's upload check only
+ * (`installOnly` below), which the player never serves.
  *
  * Each part copies its entries from the pack as they are, compressed bytes and dates included,
  * so the parts change exactly when the pack does, and the pack keeps a library's entries from the
@@ -120,7 +122,9 @@ export async function splitPack(pack, outDir) {
   await rm(outDir, { recursive: true, force: true })
   await mkdir(outDir, { recursive: true })
 
-  const index = []
+  // Every folder's `library.json` first: whether a library is carried for an H5P site's upload
+  // check only is decided against the pack as a whole (`installOnly`).
+  const read = []
   for (const [folder, entries] of [...folders].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
     if (!/^[A-Za-z0-9._-]+-\d+\.\d+$/.test(folder)) throw new Error(`${folder} is not a versioned library folder`)
     const libraryEntry = entries.find((entry) => entry.filename === `${folder}/library.json`)
@@ -129,7 +133,16 @@ export async function splitPack(pack, outDir) {
     if (folder !== `${library.machineName}-${library.majorVersion}.${library.minorVersion}`) {
       throw new Error(`${folder}/library.json names ${library.machineName} ${library.majorVersion}.${library.minorVersion}`)
     }
+    read.push({ folder, entries, library })
+  }
+  const newestMinor = new Map()
+  for (const { library } of read) {
+    const key = `${library.machineName}-${library.majorVersion}`
+    newestMinor.set(key, Math.max(newestMinor.get(key) ?? -1, Number(library.minorVersion)))
+  }
 
+  const index = []
+  for (const { folder, entries, library } of read) {
     const write = async (comment) => {
       const writer = new ZipWriter(new BlobWriter('application/zip'), { lastModDate: FIXED_DATE, extendedTimestamp: false })
       await writer.add('h5p.json', new TextReader(PART_MANIFEST))
@@ -143,19 +156,20 @@ export async function splitPack(pack, outDir) {
     if (bytes.length < MIN_PART_SIZE) bytes = await write(padding(MIN_PART_SIZE - bytes.length))
     await writeFile(join(outDir, `${folder}.h5p`), bytes)
 
-    const dependencies = (library.preloadedDependencies ?? []).map(({ machineName, majorVersion, minorVersion }) => ({
-      machineName,
-      majorVersion: Number(majorVersion),
-      minorVersion: Number(minorVersion)
-    }))
+    const preloaded = dependenciesOf(library.preloadedDependencies)
+    const dynamic = dependenciesOf(library.dynamicDependencies)
+    const editor = dependenciesOf(library.editorDependencies)
     index.push({
       folder,
       machineName: library.machineName,
       majorVersion: Number(library.majorVersion),
       minorVersion: Number(library.minorVersion),
       patchVersion: Number(library.patchVersion ?? 0),
-      ...(dependencies.length ? { preloadedDependencies: dependencies } : {}),
+      ...(preloaded.length ? { preloadedDependencies: preloaded } : {}),
+      ...(dynamic.length ? { dynamicDependencies: dynamic } : {}),
+      ...(editor.length ? { editorDependencies: editor } : {}),
       ...(library.addTo ? { addTo: library.addTo } : {}),
+      ...(installOnly(library, newestMinor.get(`${library.machineName}-${library.majorVersion}`)) ? { installOnly: true } : {}),
       size: bytes.length,
       sha256: createHash('sha256').update(bytes).digest('hex')
     })
@@ -166,6 +180,29 @@ export async function splitPack(pack, outDir) {
   // One library a line, so a refresh's diff reads as the libraries it changed.
   await writeFile(join(outDir, 'index.json'), `{"libraries": [\n${index.map((entry) => `  ${JSON.stringify(entry)}`).join(',\n')}\n]}\n`)
   return index
+}
+
+/**
+ * Whether a library of the pack is carried for an H5P site's upload check only, and never served
+ * by the player: an editor library, or an older minor of a major the pack has a newer minor of,
+ * which the player plays in its place. H5P core's validator, which Moodle, WordPress and Drupal
+ * run on an upload, wants every library a package carries to have its dependencies with it at the
+ * exact major.minor, editor dependencies included (#146), so h5p-author carries these too; the
+ * `pack` export of `index.js` leaves them out, and `install.js` has them.
+ * @param {{ machineName: string, minorVersion: number | string }} library its `library.json`
+ * @param {number} newestMinor the pack's newest minor of the library's major
+ */
+export function installOnly(library, newestMinor) {
+  return library.machineName.startsWith('H5PEditor.') || Number(library.minorVersion) < newestMinor
+}
+
+/** A `library.json` dependency list, each entry's version as numbers. */
+function dependenciesOf(list) {
+  return (Array.isArray(list) ? list : []).map(({ machineName, majorVersion, minorVersion }) => ({
+    machineName,
+    majorVersion: Number(majorVersion),
+    minorVersion: Number(minorVersion)
+  }))
 }
 
 /** An archive comment of `length` bytes, ASCII, saying what it is for. */
@@ -186,15 +223,19 @@ async function checkParts(outDir, index) {
 }
 
 /**
- * Writes `index.js` and `index.d.ts` into `dir`: the index as data, each part named by a static
- * `new URL` relative to the module.
+ * Writes the modules a bundler resolves into `dir`, the index as data with each part named by a
+ * static `new URL` relative to the module: `index.js`, the `pack` export, the libraries the player
+ * serves; and `install.js`, the same with the libraries carried for an H5P site's upload check
+ * only (`installOnly`), for a page that writes packages. A bundler emits every part a module
+ * names, so a page that only plays imports the first. With their `.d.ts` files.
  * @param {Array<object>} index
  * @param {string} dir the package directory
  * @param {string} name the package's name, for the pre-bundling fix below
  */
 export async function writePackModule(index, dir = packageDir, name = '@missing-elements/h5p-libraries') {
   const url = (folder) => `unbundled(new URL(${JSON.stringify(`./parts/${folder}.h5p`)}, import.meta.url).href)`
-  const module = `// Written by scripts/parts.mjs. Do not edit; run \`pnpm parts\` in packages/libraries.
+  const list = (entries) => entries.map((entry) => `    { ...${JSON.stringify(entry)}, url: ${url(entry.folder)} }`).join(',\n')
+  const header = `// Written by scripts/parts.mjs. Do not edit; run \`pnpm parts\` in packages/libraries.
 
 // Vite's dev server pre-bundles dependencies into \`node_modules/.vite/deps/\`, which rewrites
 // these URLs to files that were never put there. The package's own copy is still served at its
@@ -211,15 +252,36 @@ function unbundled(href) {
   url.search = ''
   return url.href
 }
-
+`
+  const played = index.filter((entry) => !entry.installOnly)
+  const carried = index.filter((entry) => entry.installOnly)
+  const module = `${header}
 /**
  * The library pack, for \`<h5p-player>\`'s \`pack\` property: what \`parts/index.json\` says of each
- * library, and where its part is. Each URL is a static \`new URL\`, so a bundler emits the part and
- * rewrites the address; a learner's browser fetches only the parts a package needs.
+ * library the player serves, and where its part is. Each URL is a static \`new URL\`, so a bundler
+ * emits the part and rewrites the address; a learner's browser fetches only the parts a package
+ * needs. The libraries carried for an H5P site's upload check only are in \`install.js\`.
  */
 export const pack = {
   libraries: [
-${index.map((entry) => `    { ...${JSON.stringify(entry)}, url: ${url(entry.folder)} }`).join(',\n')}
+${list(played)}
+  ]
+}
+`
+  const install = `${header}
+import { pack as played } from './index.js'
+
+/**
+ * The whole pack, for a page that writes packages with \`@missing-elements/h5p-author/browser\`:
+ * the libraries the player serves, then the ones an H5P site's upload check wants with them
+ * (\`installOnly\`): the editor libraries, and an older minor of a library that another names
+ * exactly. A bundler emits every part named here, about ${Math.round(carried.reduce((sum, { size }) => sum + size, 0) / 1e5) / 10} MB more than \`index.js\`'s,
+ * so a page that only plays imports that one.
+ */
+export const pack = {
+  libraries: [
+    ...played.libraries,
+${list(carried)}
   ]
 }
 `
@@ -241,8 +303,17 @@ export interface PackLibrary {
   patchVersion: number
   /** The dependencies its \`library.json\` declares. */
   preloadedDependencies?: PackDependency[]
+  dynamicDependencies?: PackDependency[]
+  editorDependencies?: PackDependency[]
   /** For an addon, the content it is added to, as its \`library.json\` says. */
   addTo?: unknown
+  /**
+   * Carried for an H5P site's upload check only, which wants every library a package carries to
+   * have its dependencies with it at the exact major.minor, editor dependencies included: an
+   * editor library, or an older minor the player plays the newer one for. Never served by the
+   * player; \`install.js\` has these, \`index.js\` does not.
+   */
+  installOnly?: true
   /** The part's size in bytes. */
   size: number
   /** The part's SHA-256, in hex. */
@@ -253,8 +324,17 @@ export interface PackLibrary {
 /** For \`<h5p-player>\`'s \`pack\` property. */
 export declare const pack: { libraries: PackLibrary[] }
 `
+  const installTypes = `// Written by scripts/parts.mjs. Do not edit; run \`pnpm parts\` in packages/libraries.
+
+import type { PackLibrary } from './index.js'
+
+/** The whole pack, \`installOnly\` libraries included, for a page that writes packages. */
+export declare const pack: { libraries: PackLibrary[] }
+`
   await writeFile(join(dir, 'index.js'), module)
   await writeFile(join(dir, 'index.d.ts'), types)
+  await writeFile(join(dir, 'install.js'), install)
+  await writeFile(join(dir, 'install.d.ts'), installTypes)
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

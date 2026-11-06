@@ -292,9 +292,10 @@ SPA-fallback trap described above cannot happen there.
   player works, and Dialog Cards for its vocabulary. They are built by
   `scripts/build-demo-content.mjs` from `demo/content/src/<name>/` — our `content.json` and a
   `manifest.json` naming the content type — with the libraries taken from the H5P hub's bundle
-  for that type (which `libraries="hub"` fetched at runtime until 0.6). The script keeps only the
+  for that type (which `libraries="hub"` fetched at runtime until 0.6). The script keeps the
   dependency closure the content needs (walked from `library.json`, plus every sub-content
-  library the params name), drops the editor libraries the hub ships, and runs the result through
+  library the params name) and, after it, what an H5P site's upload check wants of those
+  libraries (below), and runs the result through
   the normalizer, so each package is also an example of what the normalizer produces. A fifth,
   `formulas.h5p` (2026-10-13), is a Question Set with LaTeX in it written with `"stripped": true`
   in its manifest — `h5p.json` naming the main library alone, `content/`, no library folders, as
@@ -313,8 +314,23 @@ SPA-fallback trap described above cannot happen there.
   `how-it-works.h5p` twice since the same day, the second `frame copyright`, since one package
   under two settings is what the per-load fix is for; it was `lang="de"` too until #55, when an
   English package's strings became English whatever the element's language. The outputs
-  are committed, 5.5 MB for the four, because a deploy should need neither the hub nor the video
-  host; `pnpm demo:content` regenerates them. Provenance: the libraries are MIT, the text is
+  are committed, 8.3 MB for the four, because a deploy should need neither the hub nor the video
+  host; `pnpm demo:content` regenerates them. Since 2026-11-06 (#146) a package that carries
+  libraries also carries what an H5P site's upload check wants of them: every dependency a carried
+  library names, editor ones included, at its exact major.minor, as a platform's export does, with
+  `h5p.json` naming only what plays. A Moodle with no library installed refused the quiz, the
+  video and the glossary for their editor libraries, and accepts them now (checked on 4.5.15 with
+  the hub's content types not yet installed; `how-it-works.h5p` and `markup.h5p` needed nothing,
+  and `formulas.h5p` carries no library on purpose, so a site without Question Set refuses it, as it
+  does an h5p.com export). The quiz grew 123 kB, the glossary 8 kB and the video from 2.5 to
+  5.2 MB, an Interactive Video's editor preloading every type it can hold. The normalizer sorts
+  library folders before `content/`, so the added ones precede `content.json`: on a host without
+  `Range`, `/no-range/video.h5p` boots after 4.1 MB where it needed 1.5. The same rebuild moved the
+  quiz's Question Set, Blanks, Drag the Words, Video and Components to the hub's newer patches,
+  which the plan had been refreshing from the pack (the quiz now refreshes only Components, 97 to
+  101). A bundle has older patches than the pack for some libraries, so the video's refresh also
+  fetches SingleChoiceSet 1.11 (88 to 89) from the site's pack, as it would for a platform's
+  export: 180 kB of a library nothing plays, which the plan cannot tell from one that does. Provenance: the libraries are MIT, the text is
   ours under CC0, and the clip is Big Buck Bunny, © Blender Foundation, CC BY 3.0, credited in the
   package metadata and on the player page. The `/no-range/` route serves this content on the site,
   and this content or a fixture locally, which is what the browser tests need.

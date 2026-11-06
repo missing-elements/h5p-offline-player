@@ -81,7 +81,10 @@ plays at the newer one once a pack has it. A pack that drops a content type or a
 one before carried comes only with a player major.
 
 What is covered of the pack itself: the `pack` export, `parts/` with its `index.json` and one
-`<folder>.h5p` per library, and `libraries.h5p`, the whole pack as one file.
+`<folder>.h5p` per library, and `libraries.h5p`, the whole pack as one file. Since 1.1.0 the
+index marks the libraries carried for an H5P site's upload check `installOnly`, and gives each
+library's `editorDependencies` and `dynamicDependencies` beside its `preloadedDependencies`; the
+`pack` export leaves the marked ones out, and the `./install` export has them.
 
 ### The embed site, `@missing-elements/h5p-embed`
 

@@ -15,7 +15,7 @@ already holds text to the content check's rules, from the pack an untrusted chec
 `apps/skills` plays every example untrusted too. Measured on a five-question quiz, at four
 characters a token: `content.json` was about 3,470 tokens to write by hand, after reading 3,900 to
 9,500 of a type's semantics; the source is 1,000 to 1,800 tokens, written from a type file of 200
-to 3,000. Ten things the code does not say by itself:
+to 3,000. Eleven things the code does not say by itself:
 
 - **One generator, three ways to run it.** The third, `saved`, checks content as H5P stores it
   (*Saved content is checked as the build checks what it writes*, below). `ContentGenerator` was the sweep's
@@ -206,6 +206,30 @@ to 3,000. Ten things the code does not say by itself:
   Question's own `nextContentId`, which it deletes, and a Game Map stage's `type`, which it keeps
   out of the content. Both fields are still written, being hidden and required, and the runtime
   ignores the first and works the second out again.
+
+- **A package installs on an H5P site** (2026-11-06, #146). H5P core's upload check wants every
+  library a package carries to have its preloaded, dynamic and editor dependencies with it at the
+  exact major.minor, or installed on the site; the hub's bundles and the platforms' exports carry
+  the editor libraries for that, and the pack did not, so a Moodle with no library installed
+  refused 28 of the 32 type files' examples (*The pack carries what an H5P site's upload check
+  wants* in libraries.md has the measurement). The owner's call: always carry them, since a `.h5p`
+  a fresh Moodle refuses is broken, and a platform's export is as big. `lib/install.mjs` walks from
+  the selected parts over the pack's index at exact versions, through what each added library
+  names in turn (`installClosure`), and `writePackage` copies them after the content, where nothing
+  reads them as the package plays; `h5p.json` lists what plays, as the platforms' exports write it.
+  A package with media then goes through the normalizer, which sorts every library folder before
+  `content/` (`orderEntries`), so there the run precedes `content.json` and a host without `Range`
+  boots after it; one without media keeps the layout and boots before the run arrives. Measured on the 35
+  packages of the Moodle check, with real files: a Question Set gains 123 kB, most types under
+  50 kB, and the three containers much more, because their editors preload every type they can
+  hold: Interactive Video 2.4 → 5.1 MB, Course Presentation 1.2 → 4.8 MB (64 libraries, as
+  LMSable's and a Moodle export's), Branching Scenario 2.2 → 7.3 MB. All 35 then pass a fresh
+  Moodle as an admin and still play. `missingForInstall` is the rule as a check, for `apps/skills`
+  over every example and for a tool beside the build. In Node the pack is read from
+  `parts/index.json`, which names the `installOnly` parts the `pack` export leaves out; a page
+  gives `@missing-elements/h5p-libraries/install`'s, and a build from a pack without them is
+  refused naming the first library and where the pack with them is, rather than writing a package
+  a site refuses.
 
 Not built: editing an existing package, which a tool beside it does with `checkContent` as its
 check; layout for Drag and Drop and Crossword; and any judgement of whether content is right, which
