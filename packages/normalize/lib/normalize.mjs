@@ -9,7 +9,9 @@
  *   then nothing decodes before the last byte lands.
  * - Entries are ordered `h5p.json`, then the library folders, then `content/`, with content
  *   media last. On a host that ignores `Range` the player boots from the local headers as they
- *   arrive, and this order gets the libraries in before the media.
+ *   arrive, and this order gets the libraries in before the media. A caller can name library
+ *   folders that a package carries and nothing reads as it plays (`last`): those go after the
+ *   media, so that such a host does not wait for them.
  * - Text the runtime parses — scripts, styles, JSON — is deflated where an exporter had stored
  *   it. Everything else is copied byte for byte.
  *
@@ -132,15 +134,25 @@ export function plainRelativeName(raw) {
  * media last. Library folders are kept intact rather than having their images pulled to the
  * end: the player treats a folder as complete once a later folder has begun, and a straggler
  * would then be reported missing.
+ *
+ * A folder in `last` goes after all of that, the media too, whole and in the order the source
+ * introduced them (#148): a library the package carries and nothing reads as it plays, such as
+ * the editor libraries an H5P site's upload check asks for. `content` is never moved, and a name
+ * the archive has no folder for is ignored.
  * @internal
  *
  * @template {{ name: string, target: TargetForm }} T
  * @param {T[]} entries in source order
+ * @param {Iterable<string>} [last] top-level folders to write after everything else
  * @returns {T[]}
  */
-export function orderEntries(entries) {
+export function orderEntries(entries, last = []) {
+  const trailing = new Set(last)
+  trailing.delete('content')
   /** @type {Map<string, number>} */
   const folderRank = new Map()
+  /** @type {Map<string, number>} */
+  const trailingRank = new Map()
   const keyed = entries.map((entry, index) => {
     const { name, target } = entry
     const slash = name.indexOf('/')
@@ -150,7 +162,10 @@ export function orderEntries(entries) {
       key = [0, name === 'h5p.json' ? 0 : 1, index]
     } else {
       const folder = name.slice(0, slash)
-      if (folder !== 'content') {
+      if (trailing.has(folder)) {
+        if (!trailingRank.has(folder)) trailingRank.set(folder, trailingRank.size)
+        key = [4, /** @type {number} */ (trailingRank.get(folder)), index]
+      } else if (folder !== 'content') {
         if (!folderRank.has(folder)) folderRank.set(folder, folderRank.size)
         key = [1, /** @type {number} */ (folderRank.get(folder)), index]
       } else if (target === 'store') {
@@ -174,9 +189,14 @@ export function orderEntries(entries) {
  * @param {string} options.input path of the source archive
  * @param {string} [options.output] path to write; omitted for a dry run
  * @param {(result: EntryResult) => void} [options.onEntry] called as each entry is finished
+ * @param {readonly string[] | ReadonlySet<string>} [options.last] library folders, by name, to write
+ *   after everything else, the media included: what the package carries and nothing reads as it
+ *   plays. The rest of the order is as above; a name the archive has no folder for is ignored
  * @returns {Promise<Report>}
  */
-export async function normalizeArchive({ input, output, onEntry }) {
+export async function normalizeArchive({ input, output, onEntry, last }) {
+  // A string is iterable, and would be read as one folder per letter.
+  if (typeof last === 'string') throw new TypeError('`last` takes a list of folder names, not one name')
   const source = await open(input, 'r')
   /** @type {string | null} */
   let tempDir = null
@@ -229,7 +249,7 @@ export async function normalizeArchive({ input, output, onEntry }) {
     /** @type {EntryResult[]} */
     const results = []
     let index = 0
-    for (const item of orderEntries(planned)) {
+    for (const item of orderEntries(planned, last)) {
       let result
       try {
         result = await processEntry(item, { source, tempDir, writer, index: index++ })
