@@ -220,3 +220,31 @@ describe('addons', () => {
     expect(plan({ own, roots: dependencies([['H5P.Accordion', 1, 0]]), params })).toBeNull()
   })
 })
+
+describe("what the pack carries for an H5P site's upload check (#146)", () => {
+  // The editor libraries, and an older minor of a major the pack has a newer minor of, marked
+  // `installOnly`: h5p-author copies them into a package, and the plan never takes one.
+  const pack = [
+    ...PACK,
+    inPack('H5PEditor.QuestionSetTextualEditor', 1, 3, 1, [], { installOnly: true }),
+    inPack('H5P.Question', 1, 4, 9, [['H5P.JoubelUI', 1, 3]], { installOnly: true }),
+    inPack('H5P.MathDisplayEditor', 1, 0, 1, [], { installOnly: true, addTo: { content: { types: [{ text: { regex: '/./' } }] } } })
+  ]
+
+  it('fills what the content names from the newest minor the player serves, never the older one', () => {
+    const result = plan({ pack, roots: dependencies([['H5P.Question', 1, 4]]) })
+    expect(folders(result)).toEqual(['H5P.JoubelUI-1.3', 'H5P.Question-1.5'])
+  })
+
+  it('refreshes the older minor a package carries to the newest one, as before', () => {
+    const result = plan({ pack, own: [carried('H5P.Question', 1, 4, 9, [['H5P.JoubelUI', 1, 3]]), carried('H5P.JoubelUI', 1, 3, 20)] })
+    expect(result?.superseded).toEqual(['H5P.Question-1.4'])
+    expect(folders(result)).toEqual(['H5P.Question-1.5'])
+  })
+
+  it('never plans an editor library a package names or carries, nor an addon marked so', () => {
+    const own = [carried('H5P.QuestionSet', 1, 21, 2, [['H5P.Question', 1, 5], ['H5P.JoubelUI', 1, 3], ['H5PEditor.QuestionSetTextualEditor', 1, 3]])]
+    expect(plan({ pack, own, roots: dependencies([['H5PEditor.QuestionSetTextualEditor', 1, 3]]), params: { text: 'anything' } })).toBeNull()
+    expect(plan({ pack, roots: dependencies([['H5P.Accordion', 1, 0]]), params: { text: 'anything' } })?.parts.map(({ folder }) => folder)).toEqual(['H5P.Accordion-1.0'])
+  })
+})

@@ -33,6 +33,8 @@ describe('the pack the element names', () => {
   it("carries the checkout's index, which the worker plans from and checks each part against", async () => {
     const index = JSON.parse(await readFile(resolve(import.meta.dirname, '../../../libraries/parts/index.json'), 'utf8'))
     // Written by scripts/sync-h5p-assets.mjs too: a part refused for its hash is this out of step.
-    expect(PACK_INDEX).toEqual(index.libraries)
+    // Without what the pack carries for an H5P site's upload check only, which the plan never takes (#146).
+    expect(PACK_INDEX).toEqual(index.libraries.filter((entry: { installOnly?: true }) => !entry.installOnly))
+    expect(index.libraries.some((entry: { installOnly?: true }) => entry.installOnly)).toBe(true)
   })
 })

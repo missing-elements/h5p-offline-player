@@ -202,6 +202,7 @@ Read it before changing which libraries a package plays with: the library check,
 - The pack is split, a package downloads the parts it needs, and the pack's newer versions play in place of a package's older ones.
 - `libraries` is a list, tried in order.
 - Content written for a newer minor than any source has plays at the newest older one.
+- The pack carries what an H5P site's upload check wants, and the player never serves it.
 
 ### The frame and the runtime: [`design/frame.md`](design/frame.md)
 

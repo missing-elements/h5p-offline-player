@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { crc32, deflateSync } from 'node:zlib'
 import { BlobReader, TextWriter, Uint8ArrayWriter, ZipReader, type FileEntry } from '@zip.js/zip.js'
-import { buildPackage, checkContent, loadLibraries, packageLibraries, schemaOf } from '@missing-elements/h5p-author'
+import { buildPackage, checkContent, loadLibraries, missingForInstall, packageLibraries, schemaOf } from '@missing-elements/h5p-author'
 import { verifyPackage } from '@missing-elements/h5p-verify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -122,6 +122,10 @@ async function checksAsSaved(file: string) {
     const checked = checkContent(await loadLibraries(await packageLibraries(files), content), content)
     expect([checked.problems, checked.notes]).toEqual([[], []])
     expect(checked.params).toEqual(params)
+    // What H5P core's upload check wants, which a Moodle with no library installed refused of 28
+    // of these 32 before (#146): every library a carried one names, at the exact version, carried.
+    const libraries = await Promise.all([...entries.keys()].filter((name) => /^[^/]+\/library\.json$/.test(name)).map(async (name) => JSON.parse(await files.read(name))))
+    expect(missingForInstall(libraries)).toEqual([])
   } finally {
     await reader.close()
   }

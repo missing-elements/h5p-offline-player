@@ -1,7 +1,7 @@
 {
   "name": "@missing-elements/h5p-libraries",
-  "version": "1.0.1",
-  "description": "The H5P hub's runtime libraries for every content type it serves, for <h5p-player>'s `libraries` attribute: one archive per library, which the player fetches as a package needs them, and the whole pack as one .h5p.",
+  "version": "1.1.0",
+  "description": "The H5P hub's runtime libraries for every content type it serves, for <h5p-player>'s `libraries` attribute: one archive per library, which the player fetches as a package needs them, and the whole pack as one .h5p. With them, the editor libraries an H5P site's upload check wants, for h5p-author.",
   "license": "SEE LICENSE IN libraries.txt",
   "repository": {
     "type": "git",
@@ -23,6 +23,10 @@
       "types": "./index.d.ts",
       "default": "./index.js"
     },
+    "./install": {
+      "types": "./install.d.ts",
+      "default": "./install.js"
+    },
     "./parts/*": "./parts/*",
     "./libraries.h5p": "./libraries.h5p",
     "./libraries.txt": "./libraries.txt",
@@ -32,6 +36,8 @@
     "parts",
     "index.js",
     "index.d.ts",
+    "install.js",
+    "install.d.ts",
     "libraries.h5p",
     "libraries.txt"
   ],
@@ -44,7 +50,7 @@
   "scripts": {
     "build": "node ../../apps/demo/scripts/build-libraries.mjs",
     "parts": "node scripts/parts.mjs",
-    "test": "node -e \"const { statSync } = require('node:fs'); for (const file of ['libraries.h5p', 'parts/index.json', 'index.js']) if (statSync(file).size < 1e3) throw new Error(file + ' is missing or empty')\""
+    "test": "node -e \"const { statSync } = require('node:fs'); for (const file of ['libraries.h5p', 'parts/index.json', 'index.js', 'install.js']) if (statSync(file).size < 1e3) throw new Error(file + ' is missing or empty')\""
   },
   "devDependencies": {
     "@zip.js/zip.js": "^2.24.0"

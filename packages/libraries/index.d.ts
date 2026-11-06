@@ -16,8 +16,17 @@ export interface PackLibrary {
   patchVersion: number
   /** The dependencies its `library.json` declares. */
   preloadedDependencies?: PackDependency[]
+  dynamicDependencies?: PackDependency[]
+  editorDependencies?: PackDependency[]
   /** For an addon, the content it is added to, as its `library.json` says. */
   addTo?: unknown
+  /**
+   * Carried for an H5P site's upload check only, which wants every library a package carries to
+   * have its dependencies with it at the exact major.minor, editor dependencies included: an
+   * editor library, or an older minor the player plays the newer one for. Never served by the
+   * player; `install.js` has these, `index.js` does not.
+   */
+  installOnly?: true
   /** The part's size in bytes. */
   size: number
   /** The part's SHA-256, in hex. */

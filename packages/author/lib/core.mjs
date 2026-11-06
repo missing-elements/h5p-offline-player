@@ -8,6 +8,7 @@
 
 export { checkContent } from './check.mjs'
 export { ContentGenerator, librariesIn, libraryString } from './generator.mjs'
+export { missingForInstall } from './install.mjs'
 export { loadLibraries, packageLibraries } from './libraries.mjs'
 export { GENERATED_END, GENERATED_START } from './schema.mjs'
 export { SourceError } from './source-error.mjs'

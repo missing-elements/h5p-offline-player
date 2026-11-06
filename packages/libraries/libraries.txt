@@ -1,5 +1,7 @@
 Library pack of H5P Offline Player by Missing Elements: the H5P hub runtime libraries the installable app carries,
-so that a package exported without its own libraries plays offline. Each library is used here
+so that a package exported without its own libraries plays offline, and with them the editor
+libraries and older minors an H5P site's upload check wants of them, which h5p-author carries
+into a package and the player never serves (installOnly in parts/index.json). Each library is used here
 under the licence below; its source is the library folder itself, as shipped by the hub
 (https://hub-api.h5p.org/v1/content-types/<content type>), or for an addon as H5P Group publishes it (https://h5p.org/sites/default/files/h5p-math-display-1-0-50.h5p).
 Built by apps/demo/scripts/build-libraries.mjs.
@@ -16,6 +18,7 @@ H5P.AFrameOrbitControls-1.3  1.3.0  MIT (library.json)  — Kevin Ngo &lt;me@ngo
 H5P.Agamotto-1.6  1.6.8  MIT (library.json)  — Oliver Tacke
 H5P.ArithmeticQuiz-1.1  1.1.25  MIT (library.json)  — Joubel, fabforge
 H5P.ARScavenger-1.4  1.4.1  MIT (library.json)  — Oliver Tacke
+H5P.Audio-1.2  1.2.14  MIT (README of github.com/h5p/h5p-audio)  — Joubel
 H5P.Audio-1.5  1.5.29  MIT (README of github.com/h5p/h5p-audio)  — Joubel
 H5P.AudioRecorder-1.0  1.0.54  MIT (library.json)  — Joubel
 H5P.Blanks-1.14  1.14.37  MIT (library.json)  — Joubel
@@ -34,6 +37,7 @@ H5P.Dialogcards-1.9  1.9.40  MIT (library.json)  — Joubel
 H5P.Dictation-1.3  1.3.3  MIT (library.json)  — Oliver Tacke
 H5P.DocumentationTool-1.8  1.8.42  MIT (library.json)  — Joubel
 H5P.DocumentExportPage-1.5  1.5.40  MIT (library.json)  — Joubel
+H5P.DragNBar-1.4  1.4.8  MIT (README of github.com/h5p/h5p-drag-n-bar)  — Joubel
 H5P.DragNBar-1.5  1.5.26  MIT (README of github.com/h5p/h5p-drag-n-bar)  — Joubel
 H5P.DragNDrop-1.1  1.1.5  MIT (README of github.com/h5p/h5p-drag-n-drop)  — Frode Petterson
 H5P.DragNResize-1.2  1.2.6  MIT (README of github.com/h5p/h5p-drag-n-resize)  — Frode Petterson
@@ -55,6 +59,7 @@ H5P.GuidedTour-1.0  1.0.6  MIT (library.json)  — Joubel
 H5P.IFrameEmbed-1.0  1.0.29  MIT (library.json)  — Joubel
 H5P.Image-1.1  1.1.33  MIT (README of github.com/h5p/h5p-image)  — Joubel
 H5P.ImageHotspotQuestion-1.8  1.8.34  MIT (library.json)  — Joubel
+H5P.ImageHotspots-1.10  1.10.31  MIT (library.json)  — Joubel
 H5P.ImageHotspots-1.11  1.11.6  MIT (library.json)  — Joubel
 H5P.ImageJuxtaposition-1.5  1.5.4  MPL (library.json)  — Oliver Tacke
 H5P.ImageMultipleHotspotQuestion-1.0  1.0.1  MIT (README of github.com/h5p/h5p-image-multiple-hotspot-question)  — Luke Muller
@@ -78,6 +83,7 @@ H5P.MultiMediaChoice-0.3  0.3.77  MIT (library.json)  — H5P Group AS
 H5P.Nil-1.0  1.0.14  MIT (README of github.com/h5p/h5p-nil)  — Frode Petterson
 H5P.OpenEndedQuestion-1.0  1.0.28  MIT (library.json)  — Joubel
 H5P.PersonalityQuiz-1.0  1.0.8  MIT (library.json)  — Lumenia AS
+H5P.Question-1.4  1.4.10  MIT (library.json)  — Joubel
 H5P.Question-1.5  1.5.53  MIT (library.json)  — Joubel
 H5P.Questionnaire-1.3  1.3.11  MIT (library.json)  — Joubel
 H5P.QuestionSet-1.21  1.21.14  MIT (library.json)  — Joubel
@@ -106,6 +112,43 @@ H5P.Transition-1.0  1.0.4  MIT (library.json)  — Joubel
 H5P.TrueFalse-1.8  1.8.21  MIT (library.json)  — Joubel
 H5P.TwitterUserFeed-1.0  1.0.21  MIT (library.json)  — Joubel
 H5P.Video-1.6  1.6.79  MIT (library.json)  — Joubel
+H5PEditor.ARMarkerGenerator-1.0  1.0.3  MIT (LICENSE of github.com/otacke/h5p-editor-ar-marker-generator)  — Oliver Tacke
+H5PEditor.AudioRecorder-1.0  1.0.11  MIT (library.json)  — Joubel
+H5PEditor.BranchingQuestion-1.0  1.0.5  MIT (README of github.com/h5p/h5p-editor-branching-question)  — thomasmars
+H5PEditor.BranchingScenario-1.5  1.5.13  MIT (library.json)  — Joubel
+H5PEditor.Collage-0.3  0.3.22  MIT (library.json)  — Joubel
+H5PEditor.ColorSelector-1.0  1.0.3  MIT (README of github.com/h5p/h5p-editor-color-selector)  — Joubel AS
+H5PEditor.ColorSelector-1.3  1.3.1  MIT (README of github.com/h5p/h5p-editor-color-selector)  — Joubel
+H5PEditor.CoursePresentation-1.26  1.26.6  MIT (README of github.com/h5p/h5p-editor-course-presentation)  — Joubel
+H5PEditor.DateTime-1.0  1.0.9  MIT (LICENSE of github.com/otacke/h5p-editor-datetime)  — Oliver Tacke
+H5PEditor.DragQuestion-1.10  1.10.27  MIT (README of github.com/h5p/h5p-editor-drag-question)  — Joubel
+H5PEditor.Duration-1.1  1.1.14  MIT (README of github.com/h5p/h5p-editor-duration)  — Frode Petterson
+H5PEditor.GameMap-1.2  1.2.4  MIT (LICENSE of github.com/otacke/h5p-editor-game-map)  — Oliver Tacke
+H5PEditor.ImageCoordinateSelector-1.2  1.2.7  MIT (README of github.com/h5p/h5p-editor-image-coordinate-selector)  — Joubel
+H5PEditor.ImageHotspotQuestion-1.8  1.8.12  MIT (README of github.com/h5p/h5p-editor-image-hotspot-question)  — Joubel
+H5PEditor.ImageMultipleHotspotQuestion-1.0  1.0.0  MIT (README of github.com/lukemuller/h5p-editor-image-multiple-hotspot-question)  — Luke Muller
+H5PEditor.ImportantDescription-0.1  0.1.4  MIT (LICENSE of github.com/otacke/h5p-editor-important-description)  — Oliver Tacke
+H5PEditor.InfoWall-0.2  0.2.4  MIT (LICENSE of github.com/otacke/h5p-editor-info-wall)  — Oliver Tacke
+H5PEditor.InfoWallPassiveList-0.1  0.1.5  MIT (LICENSE of github.com/otacke/h5p-editor-info-wall-passive-list)  — Oliver Tacke
+H5PEditor.InputRow-1.0  1.0.1  MIT (LICENSE of github.com/otacke/h5p-editor-input-row)  — Oliver Tacke
+H5PEditor.InteractiveVideo-1.26  1.26.3  MIT (library.json)  — Joubel
+H5PEditor.KewArCode-1.0  1.0.0  MIT (LICENSE of github.com/otacke/h5p-editor-kewar-code)  — Oliver Tacke
+H5PEditor.QuestionSetTextualEditor-1.3  1.3.18  MIT (library.json)  — Joubel
+H5PEditor.RadioGroup-1.1  1.1.4  MIT (README of github.com/h5p/h5p-editor-radio-group)  — Joubel
+H5PEditor.RadioSelector-1.2  1.2.2  MIT (README of github.com/h5p/h5p-editor-radio-selector)  — Joubel
+H5PEditor.RangeList-1.0  1.0.13  MIT (library.json)  — Joubel
+H5PEditor.SelectToggleFields-1.1  1.1.1  MIT (library.json)  — fnoks
+H5PEditor.Shape-1.0  1.0.0  MIT (README of github.com/h5p/h5p-editor-shape)  — Joubel
+H5PEditor.ShowWhen-1.0  1.0.9  MIT (library.json)  — fnoks
+H5PEditor.SingleChoiceSetTextualEditor-1.0  1.0.10  MIT (library.json)  — Joubel
+H5PEditor.SummaryTextualEditor-1.1  1.1.12  MIT (library.json)  — Joubel
+H5PEditor.TableList-1.0  1.0.4  MIT (library.json)  — Joubel
+H5PEditor.ThreeDModelLoader-1.0  1.0.4  MIT (LICENSE of github.com/otacke/h5p-editor-3d-model-loader)  — Oliver Tacke
+H5PEditor.ThreeImage-0.5  0.5.2  MIT (library.json)  — Joubel
+H5PEditor.Timecode-1.2  1.2.14  MIT (README of github.com/h5p/h5p-editor-timecode)  — Joubel
+H5PEditor.UrlField-1.2  1.2.2  MIT (README of github.com/h5p/h5p-editor-url-field)  — Joubel
+H5PEditor.VerticalTabs-1.3  1.3.14  MIT (library.json)  — Joubel
+H5PEditor.Wizard-1.2  1.2.17  MIT (README of github.com/h5p/h5p-editor-wizard)  — Frode Petterson
 jQuery.ui-1.10  1.10.22  MIT (library.json)  — Jupiter
 Shepherd-1.0  1.0.7  MIT (library.json)  — Hubspot. Wrapped as H5P by Joubel (fnoks)
 TimelineJS-1.1  1.1.1  MPL2 (library.json)  — KnightLab

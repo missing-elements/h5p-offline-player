@@ -11,11 +11,12 @@ import { TextWriter, Uint8ArrayReader, ZipReader } from '@zip.js/zip.js'
  */
 
 /**
+ * @typedef {{ machineName: string, majorVersion: number, minorVersion: number }} IndexDependency
  * @typedef {{
  *   folder: string, machineName: string, majorVersion: number, minorVersion: number, patchVersion: number,
- *   preloadedDependencies?: { machineName: string, majorVersion: number, minorVersion: number }[],
- *   addTo?: any, size: number, sha256: string, url: string
- * }} IndexEntry
+ *   preloadedDependencies?: IndexDependency[], dynamicDependencies?: IndexDependency[], editorDependencies?: IndexDependency[],
+ *   addTo?: any, installOnly?: true, size: number, sha256: string, url: string
+ * }} IndexEntry `installOnly`: carried for an H5P site's upload check, never served by the player
  */
 
 /**

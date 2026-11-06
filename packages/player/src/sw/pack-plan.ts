@@ -124,7 +124,10 @@ interface Request {
 }
 
 export function planPack(input: PlanInput): PackPlan | null {
-  const byLibrary = new Map(input.pack.map((library) => [libraryKey(library.machineName, library.majorVersion), library]))
+  // What the pack carries for an H5P site's upload check only, the editor libraries and the older
+  // minors (#146), is never planned: the player serves the newest of each major, as before.
+  const served = input.pack.filter((library) => !library.installOnly)
+  const byLibrary = new Map(served.map((library) => [libraryKey(library.machineName, library.majorVersion), library]))
   const providedFolders = new Set(input.provided.map(({ folder }) => folder))
   const planned = new Map<string, PackLibrary & { url: string }>()
   const superseded: string[] = []
@@ -214,7 +217,7 @@ export function planPack(input: PlanInput): PackPlan | null {
   resolve()
 
   if (input.refresh || planned.size > 0) {
-    for (const addon of input.pack) {
+    for (const addon of served) {
       if (addon.addTo === undefined) continue
       const present = (machineName: string) => machineName === addon.machineName
       if (own.some((library) => present(library.machineName)) || input.provided.some((library) => present(library.machineName))) continue

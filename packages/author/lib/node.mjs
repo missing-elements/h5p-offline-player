@@ -21,37 +21,32 @@ import { Pack } from './pack.mjs'
  * @typedef {import('./translate.mjs').TranslationReport} TranslationReport
  * @typedef {{
  *   output: string, manifest: Record<string, unknown>, content: Record<string, unknown>,
- *   libraries: string[], translations: TranslationReport[], notes: Problem[], media: string[]
- * }} BuildResult what was written, and what is worth telling about it
+ *   libraries: string[], install: string[], translations: TranslationReport[], notes: Problem[], media: string[]
+ * }} BuildResult what was written, and what is worth telling about it: `libraries`, the folders the
+ *   package plays with; `install`, those carried for an H5P site's upload check
  * @typedef {{ libraries?: string, base?: string, fetch?: typeof fetch }} BuildOptions
  *   `libraries`, a library pack's parts folder in place of the pinned pack; `base`, the folder a
  *   source's file paths are read from; `fetch`, for media named by web address
  */
 
 /**
- * The pack a build reads: the one this package pins, or the `parts/` folder of another copy.
+ * The pack a build reads: the one this package pins, or the `parts/` folder of another copy. Read
+ * from its `index.json`, which names the libraries carried for an H5P site's upload check too,
+ * where the `pack` export of `index.js` leaves them out.
  * @param {string} [folder] a folder holding `index.json` and the parts it names
  */
 export async function openPack(folder) {
-  /** @type {import('./pack.mjs').IndexEntry[]} */
-  let libraries
-  let origin
-  if (folder) {
-    const directory = resolve(folder)
-    let index
-    try {
-      index = JSON.parse(await readFile(join(directory, 'index.json'), 'utf8'))
-    } catch (error) {
-      throw new Error(`${directory} is not a library pack's parts folder: it has no readable index.json`, { cause: error })
-    }
-    if (!Array.isArray(index?.libraries)) throw new Error(`${join(directory, 'index.json')} lists no libraries`)
-    libraries = index.libraries.map((/** @type {import('./pack.mjs').IndexEntry} */ entry) => ({ ...entry, url: pathToFileURL(join(directory, `${entry.folder}.h5p`)).href }))
-    origin = directory
-  } else {
-    const { pack } = await import('@missing-elements/h5p-libraries')
-    libraries = /** @type {import('./pack.mjs').IndexEntry[]} */ (pack.libraries)
-    origin = '@missing-elements/h5p-libraries'
+  const directory = folder ? resolve(folder) : dirname(fileURLToPath(import.meta.resolve('@missing-elements/h5p-libraries/parts/index.json')))
+  const origin = folder ? directory : '@missing-elements/h5p-libraries'
+  let index
+  try {
+    index = JSON.parse(await readFile(join(directory, 'index.json'), 'utf8'))
+  } catch (error) {
+    throw new Error(`${directory} is not a library pack's parts folder: it has no readable index.json`, { cause: error })
   }
+  if (!Array.isArray(index?.libraries)) throw new Error(`${join(directory, 'index.json')} lists no libraries`)
+  /** @type {import('./pack.mjs').IndexEntry[]} */
+  const libraries = index.libraries.map((/** @type {import('./pack.mjs').IndexEntry} */ entry) => ({ ...entry, url: pathToFileURL(join(directory, `${entry.folder}.h5p`)).href }))
   return new Pack(libraries, async (entry) => {
     try {
       return new Uint8Array(await readFile(fileURLToPath(entry.url)))
@@ -161,6 +156,7 @@ export async function buildPackage(input, output, options = {}) {
       manifest: built.manifest,
       content: built.content,
       libraries: [...built.selected.keys()],
+      install: [...built.install.keys()],
       translations: built.translations,
       notes: built.notes,
       media: media.files.map((item) => item.name)

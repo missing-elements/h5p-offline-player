@@ -1,4 +1,4 @@
-import { pack } from '@missing-elements/h5p-libraries'
+import { pack } from '@missing-elements/h5p-libraries/install'
 import { describe, expect, it } from 'vitest'
 import { commands } from 'vitest/browser'
 import { buildPackage, openPack } from '../../lib/browser.mjs'

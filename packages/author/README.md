@@ -26,10 +26,15 @@ npx @missing-elements/h5p-author@latest build rivers.json rivers.h5p
 ```
 
 ```
-Built /work/rivers.h5p: H5P.Blanks, 9 libraries from the library pack 1.0.0.
+Built /work/rivers.h5p: H5P.Blanks, 9 libraries from the library pack 1.1.0, 3 more for installing on an H5P site.
 H5P.Blanks 1.14: interface texts from its translation language/de.json.
 Not verified: run npx @missing-elements/h5p-verify@latest on it and look at its screenshot before handing it over.
 ```
+
+The package plays in the player and installs on Moodle, WordPress and Drupal: it carries, after
+the content, the editor libraries their upload check asks for, which the player never reads. A
+Question Set gains 120 kB by them; a Course Presentation or a Branching Scenario several MB, as
+the same package exported from Moodle has, because their editors bring every type they can hold.
 
 It is written for an AI agent and its tokens: the agent writes what only an author can know, and
 code writes everything that can be derived. The
@@ -110,12 +115,15 @@ An unknown name lists the pack's content types.
 ```js
 import { buildPackage, schemaOf, SourceError } from '@missing-elements/h5p-author'
 
-const { output, manifest, content, libraries, translations, notes, media } =
+const { output, manifest, content, libraries, install, translations, notes, media } =
   await buildPackage(source, 'rivers.h5p', { base: process.cwd() })
 ```
 
 `buildPackage(source, output, { libraries, base, fetch })` refuses an existing output, and throws a
-`SourceError` whose `problems` are `{ path, message }`. `schemaOf(machineName, { markdown, all,
+`SourceError` whose `problems` are `{ path, message }`; `libraries` are the folders the package
+plays with, `install` those carried for an H5P site's upload check. `missingForInstall(libraries)`
+is that check, over a package's `library.json` files: what a site with no library installed would
+refuse it for, empty for a build. `schemaOf(machineName, { markdown, all,
 libraries })` returns the field list. `ContentGenerator` is the engine underneath, also run by the
 repository's sweep of every content type.
 
@@ -184,7 +192,7 @@ things differ. The libraries come from a pack the page can reach. A source's fil
 `Blob`s the page was given. And the package comes back as a `Blob`.
 
 ```js
-import { pack } from '@missing-elements/h5p-libraries'
+import { pack } from '@missing-elements/h5p-libraries/install'
 import { buildPackage, openPack, SourceError } from '@missing-elements/h5p-author/browser'
 
 const libraries = await openPack(pack) // once, for the page's builds
@@ -192,7 +200,9 @@ const { blob, notes } = await buildPackage(source, { libraries, files: { 'volga.
 ```
 
 - `openPack(pack)` takes either of two things:
-  - the `pack` export, its parts emitted by the page's bundler;
+  - the `pack` export of `@missing-elements/h5p-libraries/install`, its parts emitted by the
+    page's bundler: the one with the libraries an H5P site's upload check wants, which the
+    package's `pack` export leaves out, so a build from that one is refused naming the first;
   - the address of a copy of the pack's `parts/` folder, as a site serves it to `<h5p-player>`'s
     `pack-base`. Its `index.json` is read from there and held to the shape the player holds it to.
 

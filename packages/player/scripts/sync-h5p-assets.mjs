@@ -87,10 +87,11 @@ import type { PackLibrary } from './protocol.js'
 /**
  * The index of the library pack this release pins, \`LIBRARY_PACK_VERSION\`: each library's
  * version and dependencies, and its part's size and SHA-256. The Service Worker plans from it for
- * \`libraries="pack"\`, and the parts are fetched from \`LIBRARY_PACK_BASE\`.
+ * \`libraries="pack"\`, and the parts are fetched from \`LIBRARY_PACK_BASE\`. The libraries the pack
+ * carries for an H5P site's upload check only (\`installOnly\`) are left out: the plan never takes one.
  */
 export const PACK_INDEX: readonly PackLibrary[] = [
-${packIndex.libraries.map((entry) => `  ${JSON.stringify(entry)}`).join(',\n')}
+${packIndex.libraries.filter((entry) => !entry.installOnly).map((entry) => `  ${JSON.stringify(entry)}`).join(',\n')}
 ]
 `
 const currentPackIndex = (await exists(packIndexPath)) ? await readFile(packIndexPath, 'utf8') : ''

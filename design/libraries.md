@@ -284,3 +284,39 @@ Which libraries a package plays with: the check that it has them, the sources in
   written; and a sub-content library no source has at any minor of its major still fails at
   runtime, unnamed, when played trusted. `downgrade-libraries="off"` refuses as before, and now
   names a newer question's library too, where it booted without it.
+- **The pack carries what an H5P site's upload check wants, and the player never serves it**
+  (2026-11-06, #146). H5P core's validator, which Moodle, WordPress and Drupal run on an upload
+  (`H5PValidator::getMissingLibraries`), accepts a package only if every library it carries has
+  its preloaded, dynamic and editor dependencies in the package at the exact major.minor, or
+  installed on the site at that version. The hub's bundles carry the editor libraries for that,
+  and so does a platform's export (a Course Presentation from Moodle: 63 folders, 18 of them
+  `H5PEditor.*`), but the pack dropped `H5PEditor.*` and kept one minor per major, so every
+  h5p-author package lacked them: a Moodle 4.5 with no library installed, as a new site is until
+  its monthly hub task has run, refused 28 of the 32 type files' examples as an admin, naming the
+  editor libraries, and Image Sequencing for `H5P.Audio 1.2` beside the pack's 1.5. A teacher's
+  upload never reads a package's libraries, so it needs the site's, and passed everything once
+  the task had run; the harness is in notes/moodle-upload. The owner's call: always carry them.
+  So `build-libraries.mjs` keeps, with the newest minor of each major, the closure the upload rule
+  wants of them, 37 `H5PEditor.*` libraries and four older minors (`H5P.Audio` 1.2, `H5P.DragNBar`
+  1.4, `H5P.Question` 1.4, `H5P.ImageHotspots` 1.10), 41 parts and 1.8 MB more, each at the exact
+  version named, and stops when a bundle lacks one; every one declares MIT or has it in its
+  repository (`UNDECLARED`). `splitPack` marks them `installOnly` by a rule read off the pack
+  alone, an editor library or an older minor of a major the pack has a newer minor of, and writes
+  `editorDependencies` and `dynamicDependencies` into the index beside `preloadedDependencies`.
+  Three things keep the player as it was. `planPack` plans over the entries without the mark, so
+  the pack still holds one version per major for it, which *newest-per-major satisfies every
+  dependency on both sides* rests on; `packLibrariesIn` keeps the mark and the two lists, since
+  the author's page build reads a parts copy's index through it; and the pinned `PACK_INDEX` is
+  stamped without them (`sync-h5p-assets`), the worker never needing them. The `pack` export of
+  `index.js` lists what the player serves, as before, so a bundler emits only those parts, the
+  installable app precaches 105 and not 146, and the VS Code extension copies the served ones
+  with an index of them (`scripts/build.mjs`); `install.js` exports the whole pack, for a page
+  that writes packages with the author's browser build. What it costs the player: a package
+  carrying two minors of a library, Image Sequencing's `H5P.Audio` 1.2 beside 1.5, has the older
+  refreshed to the pack's 1.5 as any older minor is, one part downloaded that the package's own
+  1.5 could have answered for; accepted, one small part in a rare case, over a rule in the plan
+  and a refresh reported that fetched nothing. Over a host with `Range` the warm pulls the run
+  with the rest, as it pulls a platform export's editor libraries, one request either way
+  (`range-requests.test.ts` on `installable.h5p`: the probe, the tail, the head and the warm, and
+  the deep index then reads the run's `library.json` files from the cache); on a host without
+  `Range` the frame boots before the run arrives, since the author writes it after the content.
