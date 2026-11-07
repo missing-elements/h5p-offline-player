@@ -217,9 +217,10 @@ to 3,000. Eleven things the code does not say by itself:
   the selected parts over the pack's index at exact versions, through what each added library
   names in turn (`installClosure`), and `writePackage` copies them after the content, where nothing
   reads them as the package plays; `h5p.json` lists what plays, as the platforms' exports write it.
-  A package with media then goes through the normalizer, which sorts every library folder before
-  `content/` (`orderEntries`), so there the run precedes `content.json` and a host without `Range`
-  boots after it; one without media keeps the layout and boots before the run arrives. Measured on the 35
+  A package with media then goes through the normalizer, told to write the run after the media
+  (`last`, #148), so with or without media a host without `Range` boots before the run arrives;
+  over one with `Range` the player's warm takes only what `h5p.json` declares, and so leaves the
+  run out too. Measured on the 35
   packages of the Moodle check, with real files: a Question Set gains 123 kB, most types under
   50 kB, and the three containers much more, because their editors preload every type they can
   hold: Interactive Video 2.4 → 5.1 MB, Course Presentation 1.2 → 4.8 MB (64 libraries, as

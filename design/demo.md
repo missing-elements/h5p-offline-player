@@ -323,14 +323,16 @@ SPA-fallback trap described above cannot happen there.
   the hub's content types not yet installed; `how-it-works.h5p` and `markup.h5p` needed nothing,
   and `formulas.h5p` carries no library on purpose, so a site without Question Set refuses it, as it
   does an h5p.com export). The quiz grew 123 kB, the glossary 8 kB and the video from 2.5 to
-  5.2 MB, an Interactive Video's editor preloading every type it can hold. The normalizer sorts
-  library folders before `content/`, so the added ones precede `content.json`: on a host without
-  `Range`, `/no-range/video.h5p` boots after 4.1 MB where it needed 1.5. The same rebuild moved the
+  5.2 MB, an Interactive Video's editor preloading every type it can hold. The script has the
+  normalizer write the added ones after the media (`last`, #148), so `content.json` stays where it
+  was: on a host without `Range`, `/no-range/video.h5p` boots after 1.5 MB, where the first
+  rebuild, with them sorted before `content/`, needed 4.1. The same rebuild moved the
   quiz's Question Set, Blanks, Drag the Words, Video and Components to the hub's newer patches,
   which the plan had been refreshing from the pack (the quiz now refreshes only Components, 97 to
   101). A bundle has older patches than the pack for some libraries, so the video's refresh also
-  fetches SingleChoiceSet 1.11 (88 to 89) from the site's pack, as it would for a platform's
-  export: 180 kB of a library nothing plays, which the plan cannot tell from one that does. Provenance: the libraries are MIT, the text is
+  fetched SingleChoiceSet 1.11 (88 to 89, 180 kB) from the site's pack, a library nothing in it
+  plays, carried for the editor; since #148 the plan reads and refreshes only what the content
+  reaches, and leaves it as it is. Provenance: the libraries are MIT, the text is
   ours under CC0, and the clip is Big Buck Bunny, © Blender Foundation, CC BY 3.0, credited in the
   package metadata and on the player page. The `/no-range/` route serves this content on the site,
   and this content or a fixture locally, which is what the browser tests need.

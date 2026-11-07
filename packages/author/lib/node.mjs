@@ -143,9 +143,11 @@ export async function buildPackage(input, output, options = {}) {
     }
     let final = staged
     if (media.files.length) {
-      // Media stored and last, an mp4's index first: the layout a package streams in.
+      // Media stored and last, an mp4's index first: the layout a package streams in. The
+      // libraries carried for an H5P site's upload check go after the media, where `writePackage`
+      // put them after the content: a host that ignores `Range` then boots before they arrive.
       final = join(temporary, 'normalized.h5p')
-      await normalizeArchive({ input: staged, output: final })
+      await normalizeArchive({ input: staged, output: final, last: [...built.install.keys()] })
     }
     // Unlike a hard link, an exclusive copy also works on FAT/exFAT destinations.
     await copyFile(final, output, constants.COPYFILE_EXCL).catch((error) => {
