@@ -152,3 +152,47 @@ describe('BlockCache', () => {
     expect(asked).toHaveLength(2)
   })
 })
+
+describe('BlockCache, kept beyond the worker (#136)', () => {
+  it('gives the blocks of a key it holds among those asked for, and holds them again in a new cache', async () => {
+    const first = new BlockCache(BLOCK, 1024)
+    const { fetchRange } = source()
+    await first.read('a', SIZE, { start: 90, end: 99 }, fetchRange)
+    await first.read('a', SIZE, { start: 0, end: 3 }, fetchRange)
+    // Block 6 holds 96 to 99 only: the archive ends there.
+    const kept = first.blocksOf('a', [0, 3, 5, 6])
+    expect(kept.map(({ index, bytes }) => [index, bytes.length])).toEqual([
+      [0, 16],
+      [5, 16],
+      [6, 4]
+    ])
+
+    const next = new BlockCache(BLOCK, 1024)
+    const later = source()
+    next.seed('a', SIZE, kept)
+    expect(await next.read('a', SIZE, { start: 92, end: 97 }, later.fetchRange)).toEqual(archive.slice(92, 98))
+    expect(await next.read('a', SIZE, { start: 2, end: 9 }, later.fetchRange)).toEqual(archive.slice(2, 10))
+    expect(later.asked).toEqual([])
+  })
+
+  it('leaves out a block of the wrong length for its place, and one it already holds', async () => {
+    const cache = new BlockCache(BLOCK, 1024)
+    const { asked, fetchRange } = source()
+    await cache.read('a', SIZE, { start: 0, end: 3 }, fetchRange)
+
+    cache.seed('a', SIZE, [
+      // Held already: what was fetched stands.
+      { index: 0, bytes: new Uint8Array(BLOCK).fill(255) },
+      // Short for a whole block, and past the archive's end.
+      { index: 1, bytes: archive.slice(16, 20) },
+      { index: 9, bytes: new Uint8Array(BLOCK) }
+    ])
+    expect(await cache.read('a', SIZE, { start: 0, end: 3 }, fetchRange)).toEqual(archive.slice(0, 4))
+    expect(await cache.read('a', SIZE, { start: 16, end: 19 }, fetchRange)).toEqual(archive.slice(16, 20))
+    // Block 1 was fetched after all.
+    expect(asked).toEqual([
+      { start: 0, end: 15 },
+      { start: 16, end: 31 }
+    ])
+  })
+})

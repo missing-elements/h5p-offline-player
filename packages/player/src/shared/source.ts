@@ -203,16 +203,50 @@ export function forgetBlocks(): void {
   blocks?.clear()
 }
 
+type RangeHttpDescriptor = Extract<SourceDescriptor, { type: 'range-http' }>
+
+/** What names an archive's bytes in the block cache: the package id's ingredients, and the size. */
+function blockKeyOf(descriptor: RangeHttpDescriptor, size: number): string {
+  return `${descriptor.url}\u0000${descriptor.validator ?? ''}\u0000${size}`
+}
+
+/** A block of an archive, by its place: block `index` starts at `index * BLOCK_SIZE`. */
+export interface KeptBlock {
+  index: number
+  bytes: Uint8Array
+}
+
+/**
+ * The blocks `handle`'s small reads went through, held in this worker's cache, for keeping with
+ * the package (#136): what the index and a load's reads before the boot needed. Only a handle over
+ * HTTP has any.
+ */
+export function blocksReadBy(handle: SourceHandle): KeptBlock[] {
+  return handle instanceof RangeHttpHandle ? handle.blocksRead() : []
+}
+
+/** Puts back blocks an earlier worker read of the archive at `descriptor`, `size` bytes long. */
+export function seedBlocks(descriptor: RangeHttpDescriptor, size: number, kept: Iterable<KeptBlock>): void {
+  blockCache().seed(blockKeyOf(descriptor, size), size, kept)
+}
+
 class RangeHttpHandle implements SourceHandle {
   received = 0
   /** What names these bytes in the block cache: the package id's ingredients, and the size. */
   private readonly blockKey: string
+  /** The blocks this handle's small reads went through, fetched or found held. */
+  private readonly used = new Set<number>()
 
   constructor(
-    readonly descriptor: Extract<SourceDescriptor, { type: 'range-http' }>,
+    readonly descriptor: RangeHttpDescriptor,
     readonly size: number
   ) {
-    this.blockKey = `${descriptor.url}\u0000${descriptor.validator ?? ''}\u0000${size}`
+    this.blockKey = blockKeyOf(descriptor, size)
+  }
+
+  /** The blocks this handle's small reads went through that the cache still holds, in archive order. */
+  blocksRead(): KeptBlock[] {
+    return blockCache().blocksOf(this.blockKey, [...this.used].sort((a, b) => a - b))
   }
 
   /** Counts a body's bytes as they pass, without holding any of them. */
@@ -268,6 +302,8 @@ class RangeHttpHandle implements SourceHandle {
    */
   async read(range: ByteRange): Promise<Uint8Array> {
     if (range.end - range.start + 1 > BLOCK_CACHE_MAX_READ) return this.fetchBytes(range)
+    const last = Math.floor(Math.min(range.end, this.size - 1) / BLOCK_SIZE)
+    for (let index = Math.floor(range.start / BLOCK_SIZE); index <= last; index += 1) this.used.add(index)
     return blockCache().read(this.blockKey, this.size, range, (missing) => this.fetchBytes(missing))
   }
 

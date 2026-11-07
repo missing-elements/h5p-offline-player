@@ -149,7 +149,7 @@ Read it before changing the Service Worker's file server (`src/sw/mount.ts`, `pa
 
 - `SourceReader` overrides `createReadable`.
 - A large span over HTTP is then pulled by several connections at once.
-- Small reads over HTTP go through a block cache, and a rebuilt reader finds it.
+- Small reads over HTTP go through a block cache, and a rebuilt reader finds it; with a validator, so does a worker started again.
 - Waiting on the watermark is bounded by a stall, not by a wall clock.
 - A ranged read survives the link, and a body the server gives up on ends short.
 - A body that streams holds its fetch event open.
