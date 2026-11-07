@@ -183,8 +183,11 @@ Which libraries a package plays with: the check that it has them, the sources in
   (`PackageReader.ownLibraries`, 2026-11-07, #148): a library nothing plays, an editor library or an
   older minor carried for an H5P site's upload check, keeps its name's version and is not
   refreshed. The warm leaves those folders out, so reading them would be a request each, and
-  refreshing them downloaded parts nothing played: the demo's video fetched `H5P.SingleChoiceSet`
-  1.11, 180 kB, and Image Sequencing the pack's `H5P.Audio` 1.5 for the 1.2 beside its own 1.5.
+  refreshing them downloaded parts nothing played, before the frame booted. A platform's export
+  carries every type its editor can hold: five from the local corpus fetched 12.7 MB of parts,
+  where what they play takes 1.9 (a Course Presentation 31 parts and 3.4 MB, where 3 parts and
+  0.33 MB play). The demo's video fetched `H5P.SingleChoiceSet` 1.11, 180 kB, and Image Sequencing
+  the pack's `H5P.Audio` 1.5 for the 1.2 beside its own 1.5.
   A refreshed folder is withheld from the package's own
   index whole (`superseded`, as `untrusted` withholds), so requests for it resolve to the part's
   folder by the compatible-version rule `get()` already applies — exact for a patch, the newer
