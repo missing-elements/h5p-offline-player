@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { BLOCK_CACHE_MAX_READ, BLOCK_SIZE } from '../../src/shared/constants'
-import { forgetBlocks, openSource } from '../../src/shared/source'
+import { blocksReadBy, forgetBlocks, openSource, seedBlocks } from '../../src/shared/source'
 import { PackageReader } from '../../src/sw/package-reader'
 import { collect, manifest, zipOf } from './helpers/archives'
 
@@ -166,5 +166,31 @@ describe('an index read over HTTP', () => {
     const again = await PackageReader.open('pkg', await openSource('pkg', archiveDescriptor))
     await collect(again.inflate(again.get('content/content.json')!.entry))
     expect(asked).toHaveLength(2)
+  })
+
+  it('costs nothing in a worker started again that put back the blocks the first one read (#136)', async () => {
+    const bytes = await quiz()
+    const asked = rangeHost(bytes)
+    const archiveDescriptor = { type: 'range-http', url: 'https://host.example/quiz.h5p', size: bytes.length, validator: '"v1"' } as const
+
+    const first = await PackageReader.open('pkg', await openSource('pkg', archiveDescriptor))
+    await collect(first.inflate(first.get('content/content.json')!.entry))
+    const kept = blocksReadBy(first.handle)
+    expect(asked).toHaveLength(2)
+
+    // A worker started again, its cache empty: the index costs the tail and the head again.
+    forgetBlocks()
+    const cold = await PackageReader.open('pkg', await openSource('pkg', archiveDescriptor))
+    await collect(cold.inflate(cold.get('content/content.json')!.entry))
+    expect(asked).toHaveLength(4)
+
+    // The same, with the first worker's blocks put back: nothing.
+    forgetBlocks()
+    seedBlocks(archiveDescriptor, bytes.length, kept)
+    const warm = await PackageReader.open('pkg', await openSource('pkg', archiveDescriptor))
+    await collect(warm.inflate(warm.get('content/content.json')!.entry))
+    expect(asked).toHaveLength(4)
+    // What was kept is what the index and the content read: the head's block and the tail's.
+    expect(kept.map(({ index }) => index)).toEqual(blocksReadBy(warm.handle).map(({ index }) => index))
   })
 })

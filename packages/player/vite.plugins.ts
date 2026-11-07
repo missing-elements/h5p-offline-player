@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { readFile, stat } from 'node:fs/promises'
 import type { ServerResponse } from 'node:http'
@@ -302,6 +303,7 @@ function answerRange(rangeHeader: string | undefined, res: ServerResponse, body:
  * costs: `/counted/<fixture>?log=<id>` serves the archive, and `/counted/__log?log=<id>` answers
  * the `Range` header of every request it took for that id, in the order they came. The id keeps
  * test cases apart, and makes each load a package of its own, with nothing cached from another.
+ * `&etag=1` adds an `ETag`, the validator a host gives (#136); without it the host gives none.
  */
 function countingHostHandler(dirs: readonly string[]): Connect.NextHandleFunction {
   const prefix = '/counted/'
@@ -326,6 +328,7 @@ function countingHostHandler(dirs: readonly string[]): Connect.NextHandleFunctio
         res.setHeader('content-type', 'application/octet-stream')
         res.setHeader('cache-control', 'no-store')
         res.setHeader('accept-ranges', 'bytes')
+        if (url.searchParams.get('etag')) res.setHeader('etag', `"${createHash('sha1').update(body).digest('hex').slice(0, 16)}"`)
         answerRange(req.headers.range, res, body)
       },
       () => noSuchFixture(res)

@@ -237,6 +237,31 @@ describe('ChunkStore writes', () => {
     expect(heard).toEqual([{ size: null, available: 48, complete: false }])
   })
 
+  it('keeps the blocks an index was read from, with what they were read under, and reads them back whole (#136)', async () => {
+    const { caches } = fakeCaches(false)
+    vi.stubGlobal('caches', caches)
+    const store = new ChunkStore('pkg')
+    expect(await store.getIndexBlocks()).toBeUndefined()
+
+    const kept = {
+      validator: '"abc123"',
+      size: 200_000,
+      blocks: [
+        { index: 0, bytes: Uint8Array.from({ length: 65_536 }, (_, i) => i % 251) },
+        { index: 3, bytes: Uint8Array.from({ length: 3_392 }, (_, i) => (i * 7) % 256) }
+      ]
+    }
+    await store.setIndexBlocks(kept)
+    expect(await store.getIndexBlocks()).toEqual(kept)
+
+    // Cut short, the copy reads as none, and the index is read from the network.
+    const cache = await caches.open(cacheNameFor('pkg'))
+    const [key] = (await cache.keys()).map((request) => request.url).filter((url) => url.endsWith('/index-blocks'))
+    const whole = new Uint8Array(await (await cache.match(key))!.arrayBuffer())
+    await cache.put(key, new Response(whole.slice(0, whole.length - 1)))
+    expect(await store.getIndexBlocks()).toBeUndefined()
+  })
+
   it('gives up with a QuotaError when nothing is left to evict', async () => {
     vi.stubGlobal('caches', fakeCaches(true).caches)
     setEvictionPolicy(async () => null)

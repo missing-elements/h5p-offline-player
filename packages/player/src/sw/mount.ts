@@ -39,7 +39,7 @@ import {
   type WorkerReply
 } from '../shared/protocol.js'
 import { contentRange, parseRange, type ByteRange } from '../shared/range.js'
-import { openSource } from '../shared/source.js'
+import { blocksReadBy, openSource, seedBlocks, type SourceHandle } from '../shared/source.js'
 import * as db from '../shared/idb.js'
 import { dependenciesIn } from '../shared/content-libraries.js'
 import { libraryFolderNames } from '../shared/library-folders.js'
@@ -176,6 +176,16 @@ class VirtualServer {
    * archive without another attempt to cache them.
    */
   private storageFullUntil = 0
+  /**
+   * The blocks kept with each package, or put back from it, in this worker, by their indices: an
+   * index that read none beyond them writes nothing.
+   */
+  private readonly keptIndexBlocks = new Map<string, ReadonlySet<number>>()
+  /**
+   * Readers whose frame has booted. What one reads after that is the runtime's, not the index's:
+   * a second load in a worker still running reuses the reader, and keeps nothing more.
+   */
+  private readonly booted = new WeakSet<PackageReader>()
 
   constructor(
     private readonly worker: ServiceWorkerGlobalScope,
@@ -183,7 +193,52 @@ class VirtualServer {
   ) {
     installEvictionPolicy((pkgId) => {
       for (const key of this.readers.keys()) if (key.startsWith(pkgId)) this.readers.delete(key)
+      this.keptIndexBlocks.delete(pkgId)
     })
+  }
+
+  /**
+   * Keeps the blocks this reader's index was read from with the package (#136). The block cache
+   * dies with the worker, and Chromium stops an idle one after about thirty seconds, so a reload
+   * read the tail, `h5p.json` and `content.json` again before the first answer. Only for an
+   * archive over HTTP whose host gave a validator: without one, an archive republished at the same
+   * URL keeps its package id, and old blocks would send zip.js to the old offsets. The blocks are
+   * whatever this reader's small reads went through before its frame booted, the index and what
+   * the load read for the plan and the check; the player names no file. Written again only when a
+   * load read a block beyond those kept. A copy that cannot be written is no copy.
+   */
+  private async keepIndexBlocks(reader: PackageReader): Promise<void> {
+    const { handle } = reader
+    const { descriptor } = handle
+    if (descriptor.type !== 'range-http' || !descriptor.validator || this.booted.has(reader)) return
+    const blocks = blocksReadBy(handle)
+    const kept = this.keptIndexBlocks.get(reader.pkgId)
+    if (blocks.length === 0 || (kept && blocks.every(({ index }) => kept.has(index)))) return
+    try {
+      await new ChunkStore(reader.pkgId).setIndexBlocks({ validator: descriptor.validator, size: handle.size, blocks })
+      this.keptIndexBlocks.set(reader.pkgId, new Set(blocks.map(({ index }) => index)))
+    } catch {
+      // Read from the network next time, as before.
+    }
+  }
+
+  /**
+   * Puts back the blocks an earlier worker kept for this archive, when the validator and the size
+   * they were read under still match the ones this load was given: zip.js then reads the index
+   * from memory, as a reader built again after `attach-libraries` does. A copy that is missing or
+   * cannot be read means a read from the network, as before; it is never the authority.
+   */
+  private async seedIndexBlocks(pkgId: string, handle: SourceHandle): Promise<void> {
+    const { descriptor } = handle
+    if (descriptor.type !== 'range-http' || !descriptor.validator) return
+    try {
+      const kept = await new ChunkStore(pkgId).getIndexBlocks()
+      if (!kept || kept.validator !== descriptor.validator || kept.size !== handle.size) return
+      seedBlocks(descriptor, handle.size, kept.blocks)
+      this.keptIndexBlocks.set(pkgId, new Set(kept.blocks.map(({ index }) => index)))
+    } catch {
+      // The network answers.
+    }
   }
 
   /* ---------------------------------------------------------------- control channel */
@@ -248,6 +303,8 @@ class VirtualServer {
             mainLibrary: typeof reader.manifest.mainLibrary === 'string' ? reader.manifest.mainLibrary : undefined,
             ...(downgraded.length > 0 ? { downgraded } : {})
           })
+          // After the reply, so the load does not wait on it.
+          if (!reader.partial) await this.keepIndexBlocks(reader)
           return
         }
 
@@ -415,6 +472,7 @@ class VirtualServer {
     // `let`: a wait on a partial reader hands back the reader to go on with, which is a new one
     // once the archive is whole, as in `serveEntry`.
     let reader = await this.refresh(load, await this.reader(load))
+    this.booted.add(reader)
     const manifest = reader.hasFallbacks ? await reader.mergedManifest() : reader.manifest
     // A download that stops moving is a stall, answered with a retry as an entry's is, and not a
     // library the package lacks: a lookup that found one ends the walk's waiting.
@@ -841,6 +899,7 @@ class VirtualServer {
     }
 
     const handle = await openSource(pkgId, record.source, file)
+    await this.seedIndexBlocks(pkgId, handle)
 
     // Not held to its libraries here: an `index` does that, after any plan from the pack, and a
     // bundle or a part registered to supply libraries to something else never is.

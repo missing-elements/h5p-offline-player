@@ -80,6 +80,59 @@ function forwardIndexKey(pkgId: string): string {
   return `${CHUNK_KEY_ORIGIN}${pkgId}/chunk/${encodeEntry(ARCHIVE_ENTRY)}${FORWARD_INDEX_MARKER}`
 }
 
+/** Beside the package's entries, not among them: the blocks are pieces of the archive, not of an entry. */
+function indexBlocksKey(pkgId: string): string {
+  return `${CHUNK_KEY_ORIGIN}${pkgId}/index-blocks`
+}
+
+/**
+ * The blocks an archive's index was read from over HTTP, kept with the package (#136), and what
+ * they were read under: the host's validator and the archive's size. A worker started again puts
+ * them back in its block cache only when both still match.
+ */
+export interface IndexBlocks {
+  validator: string
+  size: number
+  blocks: Array<{ index: number; bytes: Uint8Array }>
+}
+
+/** One body: four bytes giving the length of a JSON head, the head, then each block's bytes in turn. */
+function encodeIndexBlocks({ validator, size, blocks }: IndexBlocks): Uint8Array<ArrayBuffer> {
+  const head = new TextEncoder().encode(
+    JSON.stringify({ validator, size, blocks: blocks.map(({ index, bytes }) => ({ index, length: bytes.length })) })
+  )
+  const body = new Uint8Array(4 + head.length + blocks.reduce((sum, { bytes }) => sum + bytes.length, 0))
+  new DataView(body.buffer).setUint32(0, head.length)
+  body.set(head, 4)
+  let at = 4 + head.length
+  for (const { bytes } of blocks) {
+    body.set(bytes, at)
+    at += bytes.length
+  }
+  return body
+}
+
+/** `undefined` for a body that is not what `encodeIndexBlocks` writes, whole. */
+function decodeIndexBlocks(body: Uint8Array): IndexBlocks | undefined {
+  if (body.length < 4) return undefined
+  const length = new DataView(body.buffer, body.byteOffset, body.byteLength).getUint32(0)
+  if (4 + length > body.length) return undefined
+  const head = JSON.parse(new TextDecoder().decode(body.subarray(4, 4 + length))) as {
+    validator?: unknown
+    size?: unknown
+    blocks?: Array<{ index?: unknown; length?: unknown }>
+  }
+  if (typeof head.validator !== 'string' || typeof head.size !== 'number' || !Array.isArray(head.blocks)) return undefined
+  const blocks: IndexBlocks['blocks'] = []
+  let at = 4 + length
+  for (const { index, length: bytes } of head.blocks) {
+    if (typeof index !== 'number' || typeof bytes !== 'number' || at + bytes > body.length) return undefined
+    blocks.push({ index, bytes: body.slice(at, at + bytes) })
+    at += bytes
+  }
+  return at === body.length ? { validator: head.validator, size: head.size, blocks } : undefined
+}
+
 /** A write the browser refused for lack of space, in either spelling. */
 export function isQuotaError(error: unknown): boolean {
   return (
@@ -340,6 +393,26 @@ export class ChunkStore {
       entry: FORWARD_INDEX_ENTRY,
       meta: { size: null, available: snapshot.parsedTo, complete: snapshot.done }
     })
+  }
+
+  /**
+   * The blocks the archive's index was read from over HTTP, as a worker kept them (#136):
+   * `undefined` when none were kept, or what was kept does not read back whole.
+   */
+  async getIndexBlocks(): Promise<IndexBlocks | undefined> {
+    const cache = await this.cache()
+    const response = await cache.match(indexBlocksKey(this.pkgId))
+    if (!response) return undefined
+    try {
+      return decodeIndexBlocks(new Uint8Array(await response.arrayBuffer()))
+    } catch {
+      return undefined
+    }
+  }
+
+  async setIndexBlocks(kept: IndexBlocks): Promise<void> {
+    const body = encodeIndexBlocks(kept)
+    await this.write(indexBlocksKey(this.pkgId), () => new Response(body, { headers: { 'content-type': 'application/octet-stream' } }))
   }
 
   /* ---------------------------------------------------------------- writing and eviction */

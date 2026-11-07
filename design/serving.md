@@ -36,7 +36,7 @@ How a package's bytes reach the H5P runtime: the Service Worker's virtual file s
   keeps a request's bytes as they arrive and the consumer follows it live when its turn comes,
   and the window fills only after the first byte, which costs a per-connection-capped host one
   round trip and nothing else. Same 40 MB at 4 Mbit/s now: first byte in under two seconds.
-- **Small reads over HTTP go through a block cache, and a rebuilt reader finds it.** zip.js reads
+- **Small reads over HTTP go through a block cache, and a rebuilt reader finds it; with a validator, so does a worker started again.** zip.js reads
   an index in pieces, one after another: 65,557 bytes from the end to find the end-of-central-
   directory record, then the directory — which in a package of a few hundred entries lies inside
   those same bytes — then each entry's 30-byte local header, its extra field when it has one, and
@@ -57,7 +57,8 @@ How a package's bytes reach the H5P runtime: the Service Worker's virtual file s
   them in pieces (`blocksFor`). The cache is one per worker, made on first use so the element's
   bundle does not carry it, keyed by the archive's URL, validator and
   size — the package id's ingredients — so the new handle a rebuilt reader opens finds the blocks
-  the first one fetched; it dies with the worker, and it is never authority. The quiz now costs
+  the first one fetched; it dies with the worker, but for the blocks an index was read from, and
+  it is never authority. The quiz now costs
   four: the probe, the tail, the head and the warm. Two things left out on purpose, by the owner's
   decision the same day: a whole-file download below a size, which with the cache saves one
   request and needs a threshold; and rules per content type for what to fetch first, which would
@@ -65,6 +66,25 @@ How a package's bytes reach the H5P runtime: the Service Worker's virtual file s
   `tests/unit/range-http-handle.test.ts` a real archive's index over a host that honours `Range`,
   and `tests/browser/range-requests.test.ts` counts what a load costs at `/counted/`, a host that
   writes down every request it takes.
+
+  The blocks an index was read from outlive the worker (2026-11-07, #136). Chromium stops an idle
+  worker after about thirty seconds, so the usual revisit found the cache empty and read the tail
+  and the head again, one after the other, before the worker answered anything. Measured on the
+  demo's quiz from a host paced to 1 MB/s with 100 ms on every request, the worker stopped
+  through CDP between the loads: a reload took four requests and was ready at 0.64 s. Now, at the
+  end of each `index` of a whole reader over HTTP, `keepIndexBlocks` writes the blocks that
+  reader's small reads went through (`blocksReadBy`: the index, `content.json`, whatever the load
+  read before the boot; the player names no file) into the package's cache, with the validator
+  and the size they were read under. `openReader` puts them back (`seedBlocks`) before zip.js
+  opens the archive, when both still match, and the same reload is the probe alone, ready at
+  0.21 s. Only with a validator: without one, an archive republished at the same URL keeps its
+  package id, and old blocks would send zip.js to the old offsets, so such a host reads the index
+  again. A copy that is missing, cut short or of the wrong length is read around, never trusted
+  (`BlockCache.seed` checks each block's length for its place), and it goes with the package's
+  cache when that is evicted. The bytes are kept rather than a parsed index, so zip.js stays the
+  only parser, and the price is one Cache API read in place of a round trip.
+  `tests/browser-emulated/worker-stopped.test.ts` stops the worker and counts the reload's
+  requests at `/counted/` with an `ETag` and without.
 - **Waiting on the watermark is bounded by a stall, not by a wall clock.** Inflating a few hundred
   megabytes over a network legitimately takes minutes, and a request for the *tail* of such an
   entry cannot be answered until it finishes: an mp4 whose `moov` index sits at the end — common,

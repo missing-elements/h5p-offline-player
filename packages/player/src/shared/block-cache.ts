@@ -21,7 +21,10 @@ import type { ByteRange } from './range.js'
  * bytes out from under it.
  *
  * Nothing here is authority: the key names the bytes — the archive's URL, validator and size, the
- * ingredients of its package id — and the cache dies with the worker that holds it.
+ * ingredients of its package id — and the cache dies with the worker that holds it. The blocks
+ * an index was read from are the exception: kept with the package when the archive has a
+ * validator (`blocksOf`), and put back by the next worker (`seed`), so a worker the browser
+ * stopped does not read the index again (#136).
  */
 export class BlockCache {
   /** Held blocks by `blockId`, oldest use first: a use moves a block to the end. */
@@ -92,6 +95,35 @@ export class BlockCache {
       out.set(block.subarray(from - blockStart, to - blockStart + 1), from - start)
     })
     return out
+  }
+
+  /**
+   * The blocks of `key` held among `indices`, in that order, for keeping beyond this worker
+   * (#136): a worker the browser stops takes its cache with it, and the next one read the index
+   * again. One not held is left out.
+   */
+  blocksOf(key: string, indices: Iterable<number>): Array<{ index: number; bytes: Uint8Array }> {
+    const out: Array<{ index: number; bytes: Uint8Array }> = []
+    for (const index of indices) {
+      const bytes = this.blocks.get(blockId(key, index))
+      if (bytes) out.push({ index, bytes })
+    }
+    return out
+  }
+
+  /**
+   * Holds blocks of `key`, in an archive of `size` bytes, that an earlier worker read: from then
+   * on a read finds them as if fetched. A block of the wrong length for its place is left out,
+   * and so is one already held or on its way, which is as good or newer.
+   */
+  seed(key: string, size: number, blocks: Iterable<{ index: number; bytes: Uint8Array }>): void {
+    for (const { index, bytes } of blocks) {
+      const id = blockId(key, index)
+      const expected = Math.min(this.blockSize, size - index * this.blockSize)
+      if (!Number.isInteger(index) || index < 0 || expected <= 0 || bytes.length !== expected) continue
+      if (this.blocks.has(id) || this.pending.has(id)) continue
+      this.keep(id, bytes)
+    }
   }
 
   /** Forgets every block held. Blocks on their way still arrive, and are kept. */
