@@ -359,12 +359,57 @@ export class PackageReader {
   }
 
   /**
+   * The folders of this archive that `h5p.json` declares in its `preloadedDependencies`, each the
+   * one the runtime would load for it (`reachableFolder`). A platform's export, and h5p-author's
+   * package, lists there every library the content plays, flattened, and none of those carried
+   * only for an H5P site's upload check. Empty when it declares nothing this archive carries.
+   */
+  private declaredFolders(): Set<string> {
+    const names = new Set(this.entries.keys())
+    const available = indexLibraryFolders(names)
+    const folders = new Set<string>()
+    for (const dependency of dependenciesIn(this.manifest)) {
+      const folder = reachableFolder(dependency, names, available, true)
+      if (folder) folders.add(folder)
+    }
+    return folders
+  }
+
+  /**
    * What the package carries of its libraries, for the pack's plan: the plan's `ownLibraries` over
-   * this archive's library folders, reading each folder's `library.json` through `read` when the
-   * caller can afford to — over HTTP each read is two ranged requests until the warm has cached it.
+   * this archive's library folders. With `read`, passed when the caller can afford one — over HTTP
+   * a `library.json` is a ranged request until the warm has cached it — the folders the content
+   * reaches are read: from what it asks for at its top (`contentDependencies`, the plan's roots),
+   * through each one's `preloadedDependencies`, as the runtime goes. Their versions, patch
+   * included, and their dependencies are what the plan refreshes and follows. The rest, which
+   * nothing plays — the editor libraries and older minors a package carries for an H5P site's
+   * upload check (#146) — are taken by their names, so the plan neither refreshes them nor reads
+   * them: the warm leaves them out (`warmSpans`), and each would be a request of its own.
    */
   async ownLibraries(read?: (located: LocatedEntry) => Promise<unknown>): Promise<OwnLibrary[]> {
-    return carriedLibraries(this.ownLibraryFolders(), read && ((folder) => read({ reader: this, entry: this.entries.get(`${folder}/library.json`)! })))
+    const folders = this.ownLibraryFolders()
+    if (!read) return carriedLibraries(folders)
+    const names = new Set(folders.map((folder) => `${folder}/library.json`))
+    const available = indexLibraryFolders(names)
+    const libraries = new Map<string, Promise<unknown>>()
+    const readFolder = (folder: string) => {
+      let library = libraries.get(folder)
+      if (!library) {
+        library = read({ reader: this, entry: this.entries.get(`${folder}/library.json`)! })
+        libraries.set(folder, library)
+      }
+      return library
+    }
+    const { found } = await walkDependencies(
+      await this.contentDependencies(),
+      (dependency) => reachableFolder(dependency, names, available, this.downgrades),
+      // One that does not parse has no dependencies here; the plan leaves it out, below.
+      (folder) => readFolder(folder).catch(() => null)
+    )
+    const reached = new Set(found.map(({ located }) => located))
+    // Reached first: the plan takes the first folder that satisfies a dependency, so it takes one it read.
+    const ordered = [...folders.filter((folder) => reached.has(folder)), ...folders.filter((folder) => !reached.has(folder))]
+    return carriedLibraries(ordered, readFolder, (folder) => reached.has(folder))
   }
 
   /** The library folders the attached archives provide, a part's or a bundle's. */
@@ -766,6 +811,13 @@ export class PackageReader {
    * nothing the boot reads — a cluster of images and no script, style or JSON — is left to
    * demand, and the total is capped at `WARM_MAX_BYTES`, taking spans in archive order.
    *
+   * Only the library folders `h5p.json` declares are candidates (`declaredFolders`), beside the
+   * root and `content/`: an export lists there every library its content plays, and nothing
+   * that an H5P site's upload check alone wants, the editor libraries most of all, which are
+   * often more than half of a package's library bytes (#148). A folder left out is served on
+   * demand if anything asks for it, as every file was before the warm. An `h5p.json` that
+   * declares nothing this archive carries leaves every folder in.
+   *
    * Only for an index read from the central directory: a forward entry has no offset to walk
    * from, and the archive it came from is local anyway.
    */
@@ -775,9 +827,15 @@ export class PackageReader {
     const nextOffset = new Map<number, number>()
     for (let i = 0; i + 1 < offsets.length; i += 1) nextOffset.set(offsets[i], offsets[i + 1])
 
+    const declared = this.declaredFolders()
+    const booted = (name: string) => {
+      const slash = name.indexOf('/')
+      return slash < 0 || declared.size === 0 || name.startsWith('content/') || declared.has(name.slice(0, slash))
+    }
     const candidates = located
       .filter(
         (entry) =>
+          booted(entry.name) &&
           entry.strategy.kind === 'inline' &&
           !entry.zip!.encrypted &&
           (entry.method === STORED || entry.method === DEFLATE) &&

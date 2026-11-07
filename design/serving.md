@@ -186,7 +186,7 @@ How a package's bytes reach the H5P runtime: the Service Worker's virtual file s
   applied to ranges too when the request accepts it; `tests/browser/compressing-host.test.ts`
   pins the browser behaviour the probe depends on, and `tests/unit/source-probe.test.ts` covers
   the fallback with CORS-filtered headers.
-- **On a host that honours `Range`, the libraries are pulled whole before the frame boots.** The
+- **On a host that honours `Range`, the libraries `h5p.json` declares are pulled whole before the frame boots.** The
   runtime reads them exhaustively at boot — every `library.json`, script and stylesheet — and an
   inline entry read on demand cost two ranged requests, the 30-byte local header and then the
   data (one since the block cache, or none when its block is already held). Measured against a real host (nginx in front of a store, `stream.dev.mkis.fwu.de`): a
@@ -209,6 +209,27 @@ How a package's bytes reach the H5P runtime: the Service Worker's virtual file s
   a picked file and a downloaded archive are local reads. `tests/unit/warm.test.ts` builds a real
   archive with a video between two library folders and checks the split, the walk and the marker;
   `tests/browser/warm.test.ts` checks the phase, the cache and the skip on a second load.
+
+  Only the library folders `h5p.json` declares are candidates, beside the root and `content/`
+  (`declaredFolders`, 2026-11-07, #148). An export lists there every library its content plays,
+  flattened, and none it carries only for an H5P site's upload check: the editor libraries, and an
+  older minor one of them names, which h5p-author's packages carry too since #146. Until then the
+  warm pulled them with the rest. Across the 88 real packages of the local corpus, 70 carry such
+  folders, and the warm came to 231 MB against 149 MB for what plays; a platform's Course
+  Presentation pulled 5.3 MB where its content needs 1.8. In all 88, `h5p.json` declared every
+  folder the dependency walk reaches, so nothing has to be read to decide; a folder left out is
+  served on demand if anything asks for it, as every file was before the warm, and an `h5p.json`
+  that declares nothing the archive carries keeps every folder in. Measured from a host paced to
+  1 MB/s: the demo's video ready at 1.9 s where it took 4.5 (1.9 before #146 added its editors),
+  that Course Presentation at 2.2 s where it took 5.8, an Interactive Video export at 2.5 s where it
+  took 4.4. Leaving a folder out between two that play can split a run, a request more each: the
+  Interactive Video's load went from five requests to nine, a Column export's from eight to
+  thirteen, and with 100 ms added to every request and the link at 10 MB/s the two were still
+  ready sooner, 1.4 s for 1.6 and 1.7 s for 2.5.
+  The pack's plan reads only the folders the content reaches, for the same reason: what the warm
+  leaves out would otherwise be read one request at a time (*The refresh rule* in libraries.md).
+  `tests/browser/range-requests.test.ts` checks that `installable.h5p`'s run is never asked for,
+  with the pack offered and without.
 - **Media is held to a lower inline bar than everything else.** `INLINE_MAX_SIZE` is 16 MB, and an
   inline entry is copied whole before its first byte is served; a media element wants the head
   first and the rest by ranges. So `chooseStrategy` puts media over `MEDIA_INLINE_MAX_SIZE`

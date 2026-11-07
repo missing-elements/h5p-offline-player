@@ -32,6 +32,8 @@ the fixes and the look of current H5P.
 - A library the pack does not have keeps the package's own copy, and runs against the pack's
   newer versions of the libraries it shares: H5P's rule is that a minor does not break what
   depends on it.
+- A library the package carries that its content never plays, an editor library or an older
+  minor kept for an H5P site's upload check, stays as it is, and nothing is downloaded for it.
 
 Content written for an older minor is upgraded before it starts: the player runs the steps each
 library ships in its `upgrades.js` on the content's parameters, as the H5P plugins do: a Question

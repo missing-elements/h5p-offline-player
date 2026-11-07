@@ -178,7 +178,14 @@ Which libraries a package plays with: the check that it has them, the sources in
   the bundle's version played, and the pack's was reported. The rule needs each own
   `library.json` for the patch, so on a host with `Range` it waits for the deep index after the
   warm, where they are cached (before it, names give
-  major and minor and nothing is refreshed). A refreshed folder is withheld from the package's own
+  major and minor and nothing is refreshed). Only the folders the content reaches are read, from
+  what it asks for at its top through each one's `preloadedDependencies`
+  (`PackageReader.ownLibraries`, 2026-11-07, #148): a library nothing plays, an editor library or an
+  older minor carried for an H5P site's upload check, keeps its name's version and is not
+  refreshed. The warm leaves those folders out, so reading them would be a request each, and
+  refreshing them downloaded parts nothing played: the demo's video fetched `H5P.SingleChoiceSet`
+  1.11, 180 kB, and Image Sequencing the pack's `H5P.Audio` 1.5 for the 1.2 beside its own 1.5.
+  A refreshed folder is withheld from the package's own
   index whole (`superseded`, as `untrusted` withholds), so requests for it resolve to the part's
   folder by the compatible-version rule `get()` already applies — exact for a patch, the newer
   minor otherwise — and the content upgrade sees the newer version and runs its steps, as for a
@@ -312,15 +319,15 @@ Which libraries a package plays with: the check that it has them, the sources in
   `index.js` lists what the player serves, as before, so a bundler emits only those parts, the
   installable app precaches 105 and not 146, and the VS Code extension copies the served ones
   with an index of them (`scripts/build.mjs`); `install.js` exports the whole pack, for a page
-  that writes packages with the author's browser build. What it costs the player: a package
-  carrying two minors of a library, Image Sequencing's `H5P.Audio` 1.2 beside 1.5, has the older
-  refreshed to the pack's 1.5 as any older minor is, one part downloaded that the package's own
-  1.5 could have answered for; accepted, one small part in a rare case, over a rule in the plan
-  and a refresh reported that fetched nothing. Over a host with `Range` the warm pulls the run
-  with the rest, as it pulls a platform export's editor libraries, one request either way
-  (`range-requests.test.ts` on `installable.h5p`: the probe, the tail, the head and the warm, and
-  the deep index then reads the run's `library.json` files from the cache); on a host without
-  `Range` the frame boots before the run arrives for a package without media, which keeps the
-  author's layout, the run after the content. A package with media goes through the normalizer,
-  whose `orderEntries` sorts every library folder before `content/`, and boots after the run: the
-  demo's video has 4.1 MB before its content, where it had 1.5.
+  that writes packages with the author's browser build. What it costs the player, since #148
+  nothing at boot: over a host with `Range` the warm takes only the folders `h5p.json` declares,
+  which leaves the run out as it leaves out a platform export's editor libraries (*the libraries
+  `h5p.json` declares are pulled whole* in serving.md), and the plan reads and refreshes only the
+  folders the content reaches (*The refresh rule* above), so it neither reads the run nor refreshes
+  an older minor in it. `range-requests.test.ts` checks that `installable.h5p`'s run is never
+  asked for, with the pack offered and without. Over a host without `Range` the frame boots
+  before the run arrives: the author writes it after the content, and a package with media goes
+  through the normalizer, which the author's Node build and the demo's script tell to write it
+  after the media (`last`). Before #148 the run sorted before `content.json` there, the warm
+  pulled it and the plan refreshed it: the demo's video, 5.2 MB with it, was ready at 4.5 s from
+  a host paced to 1 MB/s either way, where it is now 1.9 s with `Range` and 2.3 s without.

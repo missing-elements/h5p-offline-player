@@ -159,7 +159,7 @@ Read it before changing the Service Worker's file server (`src/sw/mount.ts`, `pa
 - Every response needs a `Content-Type`.
 - `RangeHttpHandle.read` slices a `200` body as it flows, like `stream` always did.
 - The archive's size never comes from a plain `GET`.
-- On a host that honours `Range`, the libraries are pulled whole before the frame boots.
+- On a host that honours `Range`, the libraries `h5p.json` declares are pulled whole before the frame boots.
 - Media is held to a lower inline bar than everything else.
 - An inline entry is inflated once per burst.
 - An unknown `pkgId` is a 404 on every route.
