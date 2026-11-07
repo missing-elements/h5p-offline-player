@@ -6,8 +6,8 @@
  * A fresh site has nothing, so a build carries the closure (#146): the editor libraries, and the
  * older minor a library names where the pack plays a newer one. The pack carries them as parts
  * the player never serves (`installOnly` in its index), and a build writes them after the
- * content, where nothing reads them as the package plays; the normalizer, which a package with
- * media goes through, sorts library folders before `content/`.
+ * content, where nothing reads them as the package plays, and in a package with media after the
+ * media too: the Node build names them to the normalizer as `last`.
  */
 
 /** @param {{ machineName: string, majorVersion: number | string, minorVersion: number | string }} library */

@@ -24,7 +24,8 @@ import { download, hubBundle as cachedBundle } from './lib/hub.mjs'
  * dependencies with it at the exact major.minor, so a Moodle with no library installed refused
  * the demo's quiz, video and glossary for their editor libraries. `h5p.json` lists only what
  * plays, as the platforms' exports write it, and the player never reads the rest; they follow the
- * libraries that play, and the normalizer keeps library folders in that order.
+ * libraries that play, and the normalizer writes them after the media (`last`), so a host that
+ * ignores `Range` boots before they arrive.
  *
  * The outputs are committed. This is a maintainer's tool with two network dependencies — the
  * hub, and whatever media a manifest points at — and a deploy should not have either. Hub
@@ -193,7 +194,7 @@ async function buildPackage(name) {
 
   await mkdir(outDir, { recursive: true })
   const output = join(outDir, `${name}.h5p`)
-  const report = await normalizeArchive({ input: assembled, output })
+  const report = await normalizeArchive({ input: assembled, output, last: [...install] })
 
   console.log(
     `[demo-content] ${name}.h5p ${formatBytes(report.bytesOut ?? 0)}: ${manifest.mainLibrary}, ` +

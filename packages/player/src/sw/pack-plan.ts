@@ -13,6 +13,9 @@ import { parseLibraryFolder } from '../shared/library-folders.js'
  *   upgrade. Equal or older in the pack, or only another major there: the package's own. The
  *   own folder is withheld and requests for it resolve to the part's, so a folder is always
  *   served whole from one archive, and the frame upgrades the content to the version served.
+ *   Only a library whose patch is known is refreshed, one whose `library.json` was read, and the
+ *   reader reads those the content reaches: a library nothing plays, such as an editor library
+ *   carried for an H5P site's upload check, stays as it is (#148).
  * - **Fill.** What the package needs and does not carry comes from the pack: what `h5p.json`
  *   declares, the sub-content its parameters name, and what each library's `library.json` asks
  *   for in turn. Off while a source listed before the pack is still to be tried.
@@ -63,15 +66,21 @@ export interface ProvidedLibrary {
  * left unknown, which leaves the library as it is and its dependencies to the next look; a folder
  * whose name gives no version, an unversioned one, is the library at a version unknown, which is
  * how the runtime takes it too, falling back to the bare name. A `library.json` that does not
- * parse, or a folder named for another library, is left out. `PackageReader.ownLibraries` and the
- * SCORM writer both take what a package carries through here (#109).
+ * parse, or a folder named for another library, is left out. `readable`, when given, says which
+ * folders `read` is for; the others are taken by their names, as without it.
+ * `PackageReader.ownLibraries` reads only the folders the content reaches (#148), and the SCORM
+ * writer every one (#109).
  */
-export async function ownLibraries(folders: Iterable<string>, read?: (folder: string) => Promise<unknown>): Promise<OwnLibrary[]> {
+export async function ownLibraries(
+  folders: Iterable<string>,
+  read?: (folder: string) => Promise<unknown>,
+  readable?: (folder: string) => boolean
+): Promise<OwnLibrary[]> {
   const version = (part: unknown) => (typeof part === 'number' && Number.isInteger(part) && part >= 0 ? part : typeof part === 'string' && /^\d+$/.test(part) ? Number(part) : null)
   const libraries: OwnLibrary[] = []
   for (const folder of folders) {
     const parsed = parseLibraryFolder(folder)
-    if (!read) {
+    if (!read || (readable && !readable(folder))) {
       libraries.push(
         parsed
           ? { folder, machineName: parsed.machineName, major: parsed.major, minor: parsed.minor, patch: null, dependencies: null }

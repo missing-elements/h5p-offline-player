@@ -92,10 +92,12 @@ export const WARM_ENTRY = '__warm__'
 
 /**
  * Warming: on a host that honours `Range`, the runs of the archive that hold the runtime's own
- * files — every library's scripts, styles and JSON — are pulled whole before the frame boots,
- * instead of one or two ranged requests per file while it boots. Two requests of 4 MB against
- * 156 of a few hundred bytes each, measured on one real package; on a host that answers a
- * client's requests one at a time, that was the difference between 128 s and 9 s.
+ * files — the scripts, styles and JSON of every library `h5p.json` declares — are pulled whole
+ * before the frame boots, instead of one or two ranged requests per file while it boots. Two
+ * requests of 4 MB against 156 of a few hundred bytes each, measured on one real package; on a
+ * host that answers a client's requests one at a time, that was the difference between 128 s
+ * and 9 s. What it declares is what the content plays: an editor library carried for an H5P
+ * site's upload check is left to demand (#148).
  *
  * A span is a run of inline entries separated by gaps of at most `WARM_GAP`, so a large media
  * entry between two library folders splits it and is never pulled. An entry over

@@ -50,6 +50,60 @@ describe('warmSpans', () => {
     expect(spans[1].start - spans[0].end).toBeGreaterThanOrEqual(video.length)
     expect(spans[1].end).toBeLessThanOrEqual(handle.size)
   })
+
+  it('leaves out the library folders h5p.json does not declare, which nothing plays (#148)', async () => {
+    // An editor library between two that play, large enough to split the run, and after the
+    // content another, as h5p-author writes the ones an H5P site's upload check wants.
+    const editor = new Uint8Array(WARM_GAP + 1024)
+    for (let i = 0; i < editor.length; i += 1) editor[i] = (i * 7919) & 0xff
+    const library = (machineName: string) => JSON.stringify({ machineName, majorVersion: 1, minorVersion: 0 })
+    const bytes = await zipOf(
+      {
+        'h5p.json': manifest('H5P.A', [
+          ['H5P.A', 1, 0],
+          ['H5P.B', 1, 0]
+        ]),
+        'H5P.A-1.0/library.json': library('H5P.A'),
+        'H5P.A-1.0/a.js': script,
+        'H5PEditor.A-1.0/library.json': library('H5PEditor.A'),
+        'H5PEditor.A-1.0/a.js': editor,
+        'H5P.B-1.0/library.json': library('H5P.B'),
+        'H5P.B-1.0/b.js': script,
+        'content/content.json': '{"params":{}}',
+        'H5PEditor.B-1.0/library.json': library('H5PEditor.B'),
+        'H5PEditor.B-1.0/b.js': script
+      },
+      { stored: ['H5PEditor.A-1.0/a.js'] }
+    )
+    const reader = await PackageReader.open('pkg', memoryHandle(bytes).handle, { requireLibraries: false })
+    const spans = reader.warmSpans()
+
+    expect(spans.map((span) => span.entries.map((entry) => entry.name))).toEqual([
+      ['h5p.json', 'H5P.A-1.0/library.json', 'H5P.A-1.0/a.js'],
+      ['H5P.B-1.0/library.json', 'H5P.B-1.0/b.js', 'content/content.json']
+    ])
+    // Each span stops where an editor begins: none of their bytes are pulled.
+    const offset = (name: string) => reader.entries.get(name)!.zip!.offset
+    expect(spans[0].end).toBe(offset('H5PEditor.A-1.0/library.json'))
+    expect(spans[1].end).toBe(offset('H5PEditor.B-1.0/library.json'))
+  })
+
+  it('keeps every folder when h5p.json declares nothing the archive carries', async () => {
+    const bytes = await zipOf({
+      'h5p.json': manifest('H5P.A', []),
+      'H5P.A-1.0/library.json': JSON.stringify({ machineName: 'H5P.A', majorVersion: 1, minorVersion: 0 }),
+      'H5P.A-1.0/a.js': script,
+      'content/content.json': '{"params":{}}'
+    })
+    const reader = await PackageReader.open('pkg', memoryHandle(bytes).handle, { requireLibraries: false })
+
+    expect(reader.warmSpans().flatMap((span) => span.entries.map((entry) => entry.name))).toEqual([
+      'h5p.json',
+      'H5P.A-1.0/library.json',
+      'H5P.A-1.0/a.js',
+      'content/content.json'
+    ])
+  })
 })
 
 describe('warmPackage', () => {

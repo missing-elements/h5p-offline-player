@@ -91,6 +91,63 @@ describe('PackageReader.foldersWithUpgrades', () => {
   })
 })
 
+describe('PackageReader.ownLibraries', () => {
+  const library = (machineName: string, minorVersion: number, needs: Array<[string, number, number]> = []) =>
+    JSON.stringify({
+      machineName,
+      majorVersion: 1,
+      minorVersion,
+      patchVersion: 3,
+      preloadedDependencies: needs.map(([name, majorVersion, minor]) => ({ machineName: name, majorVersion, minorVersion: minor }))
+    })
+
+  it('reads the library.json of the folders the content reaches, and takes the rest by their names (#148)', async () => {
+    // H5P.A plays and needs H5P.Dep, served by a newer minor; the content runs H5P.Sub as
+    // sub-content. The editors are carried for an H5P site's upload check, and nothing plays them.
+    const content = await zipOf({
+      'h5p.json': manifest('H5P.A', [['H5P.A', 1, 0]]),
+      'H5P.A-1.0/library.json': library('H5P.A', 0, [['H5P.Dep', 1, 0]]),
+      'H5PEditor.A-1.0/library.json': library('H5PEditor.A', 0, [['H5PEditor.W', 1, 0]]),
+      'H5P.Dep-1.2/library.json': library('H5P.Dep', 2),
+      'H5PEditor.W-1.0/library.json': library('H5PEditor.W', 0),
+      'H5P.Sub-1.0/library.json': library('H5P.Sub', 0),
+      'content/content.json': JSON.stringify({ part: { library: 'H5P.Sub 1.0', params: {} } })
+    })
+    const reader = await PackageReader.open('own', memoryHandle(content).handle)
+    const read: string[] = []
+    const own = await reader.ownLibraries(({ entry }) => {
+      read.push(entry.name)
+      return new Response(reader.inflate(entry)).json()
+    })
+
+    expect(read.sort()).toEqual(['H5P.A-1.0/library.json', 'H5P.Dep-1.2/library.json', 'H5P.Sub-1.0/library.json'])
+    // What was read first, with its patch and dependencies; the editors by their names alone,
+    // which the plan neither refreshes nor follows.
+    expect(own.map(({ folder, patch, dependencies }) => [folder, patch, dependencies?.length ?? null])).toEqual([
+      ['H5P.A-1.0', 3, 1],
+      ['H5P.Dep-1.2', 3, 0],
+      ['H5P.Sub-1.0', 3, 0],
+      ['H5PEditor.A-1.0', null, null],
+      ['H5PEditor.W-1.0', null, null]
+    ])
+  })
+
+  it('reads nothing without a read, taking every folder by its name', async () => {
+    const content = await zipOf({
+      'h5p.json': manifest('H5P.A', [['H5P.A', 1, 0]]),
+      'H5P.A-1.0/library.json': library('H5P.A', 0),
+      'H5PEditor.A-1.0/library.json': library('H5PEditor.A', 0),
+      'content/content.json': '{}'
+    })
+    const reader = await PackageReader.open('own', memoryHandle(content).handle)
+
+    expect((await reader.ownLibraries()).map(({ folder, patch }) => [folder, patch])).toEqual([
+      ['H5P.A-1.0', null],
+      ['H5PEditor.A-1.0', null]
+    ])
+  })
+})
+
 describe('PackageReader.title', () => {
   const open = async (h5pJson: string) =>
     PackageReader.open('t', memoryHandle(await zipOf({ 'h5p.json': h5pJson, 'content/content.json': '{}' })).handle, {

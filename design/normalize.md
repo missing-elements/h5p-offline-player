@@ -7,9 +7,9 @@ publishes it. It is its own package, `packages/normalize`, published as
 `lib/normalize.mjs` holds the policy, `lib/mp4-faststart.mjs` the remux and `lib/zip-writer.mjs`
 the output side; `bin/h5p-normalize.mjs` is the command. Its documented API is `normalizeArchive`,
 with `formatBytes` and `archiveFingerprint` re-exported, so the other modules stay free to change;
-the demo's content build and h5p-author's Node build are the callers in this repository. Its `prepublishOnly` runs its
-typecheck and tests, and its `prepack` copies the root LICENSE in. Five things about
-it that the code does not say by itself:
+the demo's content build and h5p-author's Node build are the callers in this repository. Its
+`prepublishOnly` runs its typecheck and tests, and its `prepack` copies the root LICENSE in. Five
+things about it that the code does not say by itself:
 
 - **It writes the zip itself.** zip.js reads the input — descriptors, zip64, inflate, all
   handled — but its `ZipWriter`, asked not to write a data descriptor, buffers the whole entry
@@ -30,14 +30,15 @@ it that the code does not say by itself:
   write after the media, `last` (2026-11-06, #148): libraries a package carries and nothing reads
   as it plays, which h5p-author and the demo's packages carry for an H5P site's upload check
   (#146) and which sorted before `content.json` like any library, so that a host that ignores
-  `Range` had them to wait for. Only the caller knows which they are, so the command has no flag
-  and the normalizer reads no `library.json`; `content` is never moved and a name the archive
-  lacks is ignored. Measured on the demo's video with them (Interactive Video, 5.2 MB, its content
-  ending at 4.1 MB in the library order and at 1.5 with `last`) from a host paced to 1 MB/s that
-  ignores `Range`: ready at 2.3 s with 2.3 MB sent, where it was 4.5 s with 4.4 MB. From a host
-  that honours `Range` the boot is the same, 4.5 s either way: the warm pulls every text run
-  before `ready`, and the trailing run is a span of its own, eight requests for seven. Writing
-  the run last does not shorten that; trimming the warm would, and is the player's.
+  `Range` had them to wait for. h5p-author's Node build and the demo's content script pass them.
+  Only the caller knows which they are, so the command has no flag and the normalizer reads no
+  `library.json`; `content` is never moved and a name the archive lacks is ignored. Measured on
+  the demo's video with them (Interactive Video, 5.2 MB, its content ending at 4.1 MB in the
+  library order and at 1.5 with `last`) from a host paced to 1 MB/s that ignores `Range`: ready
+  at 2.3 s with 2.3 MB sent, where it was 4.5 s with 4.4 MB. A host that honours `Range` gains
+  nothing from the order: the player's warm leaves out what `h5p.json` does not declare,
+  wherever it lies (*the libraries `h5p.json` declares are pulled whole* in serving.md), and the
+  same video is ready there at 1.9 s in either layout.
 - **It drops what the player would drop.** Directory entries, names that are not plain relative
   paths, duplicates after normalisation — read with `filenameValidation: 'tolerant'` for the same
   reason the player uses it. `plainRelativeName` is a copy of the player's `normalizeEntryName`,
