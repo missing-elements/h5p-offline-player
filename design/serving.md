@@ -251,7 +251,12 @@ How a package's bytes reach the H5P runtime: the Service Worker's virtual file s
   the Jobs worker publishes what it has found as a `ForwardIndexSnapshot` beside the watermark,
   announced on the same channel; the Service Worker builds a `partial` `PackageReader` from it and
   serves from that until the archive is whole, when a reader from the central directory — the
-  authority — replaces it. Three rules keep a partial index honest:
+  authority — replaces it. Each progress report goes out once its snapshot is stored
+  (`IndexPublisher`, #144): the element asks whether the frame can boot on every report, and the
+  worker answers from the stored snapshot, so a report sent first was answered from the one
+  before, and the next report was a chunk away. For a package under two chunks the first report
+  is the last before the end, and the frame waited for the whole download; CI's Firefox runner
+  lost that race now and then (#75). Three rules keep a partial index honest:
   - **An entry is in the snapshot only once its bytes have all arrived.** Recording it off its
     header alone would let the worker reach for data that is not there yet.
   - **The element boots only when `bootReady()` holds:** `h5p.json` has arrived and every

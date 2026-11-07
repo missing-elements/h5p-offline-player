@@ -21,6 +21,7 @@ import { streamSpan } from '../shared/span-stream.js'
 import { inflated } from '../shared/stream-utils.js'
 import { quotaMessage } from '../shared/storage.js'
 import { createChunkWriter } from './chunk-writer.js'
+import { IndexPublisher } from './index-publisher.js'
 import { JobQueue, type ExtractJob } from './job-queue.js'
 import { warmPackage } from './warm.js'
 
@@ -273,29 +274,9 @@ async function downloadArchive(
     )
   }
 
-  let published = -1
-  let publishing: Promise<void> = Promise.resolve()
-  let indexRefused = false
-  const publishIndex = (final: boolean) => {
-    if (final) scanner.finish()
-    const snapshot = scanner.snapshot()
-    if (!final && snapshot.entries.length === published) return publishing
-    published = snapshot.entries.length
-    // Serialised: two snapshots racing to the same record could land the older one last. A
-    // snapshot the store refuses is dropped and the chain goes on from the next one: the index
-    // is what lets the frame boot before the download is whole, and the central directory is
-    // the authority once it is, so a refused write costs an early boot and never the download.
-    // Caught on each link, because a rejected link would skip every later one and come back as
-    // an unhandled rejection on each `void` call, and fail the download at the final publish.
-    publishing = publishing
-      .then(() => store.setForwardIndex(snapshot))
-      .catch((error: unknown) => {
-        if (indexRefused) return
-        indexRefused = true
-        console.warn('[h5p-player] the forward index could not be written; the frame boots once the download is whole:', error)
-      })
-    return publishing
-  }
+  // Each progress report goes out once its snapshot is stored: the element asks whether the frame
+  // can boot on every report, and the Service Worker answers from the stored snapshot (#144).
+  const index = new IndexPublisher(scanner, (snapshot) => store.setForwardIndex(snapshot))
 
   const indexer = new TransformStream<Uint8Array, Uint8Array>({
     transform(chunk, controller) {
@@ -311,10 +292,7 @@ async function downloadArchive(
         entry: ARCHIVE_ENTRY,
         totalSize,
         startOffset,
-        onProgress: (loaded) => {
-          send({ type: 'progress', pkgId, loaded, total: totalSize })
-          void publishIndex(false)
-        }
+        onProgress: (loaded) => index.report(() => send({ type: 'progress', pkgId, loaded, total: totalSize }))
       }),
       { signal }
     )
@@ -327,7 +305,7 @@ async function downloadArchive(
         'downloads, so the whole archive has to be stored before it can play.'
     )
   }
-  await publishIndex(true)
+  await index.publish(true)
 
   // Read back, because WebKit can lose it: measured on 2026-10-13 in Playwright's WebKit, a
   // package downloaded whole, its element removed — which terminates this worker — and played
