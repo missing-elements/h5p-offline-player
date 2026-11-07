@@ -14,10 +14,11 @@ caching and upgrades.
 
 - The page on `https://`, or `localhost` while developing: the player needs a Service Worker.
 - CORS headers on the package host, so the page can read the `.h5p`. `Range` support is optional:
-  without it the archive is downloaded once and played from the cache. On another origin, add
-  `Access-Control-Expose-Headers: ETag` (or `Last-Modified`): the player can then tell an archive
-  republished at the same URL from the old one, and a reload after the browser stopped its
-  worker reads nothing of the archive but one byte.
+  without it the archive is downloaded once and played from the cache. With an `ETag` or a
+  `Last-Modified` header, the player can tell an archive republished at the same URL from the old
+  one, and a reload after the browser stopped its worker reads nothing of the archive but one
+  byte. A page reads `Last-Modified` from any origin, and an `ETag` from another origin only once
+  the host adds `Access-Control-Expose-Headers: ETag`.
 - A browser with Service Workers, the Cache API, IndexedDB, Web Locks and `DecompressionStream`;
   [Compatibility](compatibility.md) says which are tested.
 
