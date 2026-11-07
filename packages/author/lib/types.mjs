@@ -97,9 +97,10 @@ const interactiveBook = {
 /* ---------------------------------------------------------------- Course Presentation */
 
 /**
- * The slide Course Presentation draws, 16:9, and the text it draws on it at that size: 16 px on a
- * slide 640 px wide, about 8.5 px a character, 1.5 lines. Positions and sizes are percentages of
- * the slide's width (`x`, `width`) and height (`y`, `height`).
+ * The slide Course Presentation draws, 16:9, 640 by 360 px at the size its stylesheet is written
+ * for. Positions and sizes are percentages of the slide's width (`x`, `width`) and height (`y`,
+ * `height`). `font`, `char` and `line` are the text Interactive Video's layout measures with
+ * (`textLines`): 16 px, about 8.5 px a character, lines of 1.5.
  */
 const SLIDE = { width: 640, height: 360, font: 16, char: 8.5, line: 1.5 }
 const MARGIN_X = 4
@@ -107,8 +108,89 @@ const MARGIN_Y = 5
 const GAP = 2
 
 /**
+ * Text as Course Presentation 1.27 draws it on that slide, from its stylesheet and Advanced
+ * Text's (#145): an element at .75em of the slide's 16 px, 12 px; a paragraph at .9em of that,
+ * 10.8 px, in lines of 1.25em with 1em after it; `h2` at 1.667em and `h3` at 1.333em, in lines of
+ * 1.5em with .5em after; a list item at the element's size in lines of 1.25em, 1em apart. `em` is
+ * a block's size in em of the element's, `size` the same in px, `line` and `after` in em of the
+ * block's own size; `pre` takes no style, so it is never set larger. Measured at the slide's
+ * 16 px in lines of 1.5, as before, a text box came out about twice as tall as its text. These are
+ * the minor the pack carries, as the editor rules the other layouts follow are pinned.
+ */
+const SLIDE_TEXT = {
+  p: { em: 0.9, size: 10.8, line: 1.25, after: 1, sized: true },
+  h2: { em: 1.667, size: 20, line: 1.5, after: 0.5, sized: true },
+  h3: { em: 1.333, size: 16, line: 1.5, after: 0.5, sized: true },
+  li: { em: 1, size: 12, line: 1.25, after: 1, sized: true },
+  pre: { em: 1, size: 12, line: 1.25, after: 1, sized: false }
+}
+/** A list's room above and below it, in px: 1em of the element's 12 px each way. */
+const LIST_MARGIN = 24
+/** About how wide a character is, as a part of the font's size, in H5P's sans. */
+const CHARACTER = 0.53
+/** Larger text, tried largest first, on a slide with room for it (#145). */
+const TEXT_STEPS = [2, 1.75, 1.5, 1.25]
+
+/**
+ * How much of the slide's height markup takes, in percent, as Course Presentation draws it in a
+ * box `pixels` wide with every block that takes a size `step` times as large: each paragraph,
+ * heading and list item by its lines and the room after it, each list by the room around it, and
+ * a little to spare. Text in no block is measured as a paragraph.
+ * @param {string} html
+ * @param {number} pixels
+ * @param {number} [step]
+ */
+function slideTextHeight(html, pixels, step = 1) {
+  /** @type {Array<{ tag: keyof typeof SLIDE_TEXT, inner: string }>} */
+  const blocks = [...html.matchAll(/<(p|h2|h3|li|pre)\b[^>]*>([\s\S]*?)<\/\1>/gi)].map((match) => ({
+    tag: /** @type {keyof typeof SLIDE_TEXT} */ (match[1].toLowerCase()),
+    inner: match[2]
+  }))
+  if (!blocks.length && textOf(html)) blocks.push({ tag: 'p', inner: html })
+  let height = (html.match(/<(?:ul|ol)\b/gi) ?? []).length * LIST_MARGIN
+  for (const { tag, inner } of blocks) {
+    const metric = SLIDE_TEXT[tag]
+    const size = metric.size * (metric.sized ? step : 1)
+    const perLine = Math.max(8, Math.floor(pixels / (size * CHARACTER)))
+    const lines = inner.split(/<br\s*\/?>/i).reduce((sum, piece) => sum + Math.max(1, Math.ceil(textOf(piece).length / perLine)), 0)
+    height += lines * size * metric.line + size * metric.after
+  }
+  return Math.min(95, (height / SLIDE.height) * 100 + 2)
+}
+
+/**
+ * Markup with each block that takes a size set `step` times as large: a `font-size` on the block
+ * itself, in em of the element's, so the lines, which the stylesheet gives in em, grow with it. A
+ * span inside a paragraph would inherit the paragraph's line height as a length, and its lines
+ * would overlap. The content check keeps it: Advanced Text allows `font.size`, and a style may
+ * sit on a paragraph, a heading or a list item; one the block has already is kept beside it.
+ * Written as the content check writes a style it keeps, so an untrusted play changes nothing:
+ * each declaration trimmed, in the order of its patterns, joined by `;` and ended with one.
+ * @param {string} html
+ * @param {number} step
+ */
+function sizedText(html, step) {
+  const blocks = /<(?:p|h2|h3|li|pre)\b/i.test(html) ? html : `<p>${html}</p>`
+  return blocks.replace(/<(p|h2|h3|li)\b([^>]*)>/gi, (_, /** @type {string} */ tag, /** @type {string} */ attributes) => {
+    const style = /\sstyle\s*=\s*(["'])([\s\S]*?)\1/i.exec(attributes)
+    const declarations = (style?.[2] ?? '').split(';').map((each) => each.trim()).filter(Boolean)
+    declarations.push(`font-size:${round(SLIDE_TEXT[/** @type {'p' | 'h2' | 'h3' | 'li'} */ (tag.toLowerCase())].em * step)}em`)
+    const rank = (/** @type {string} */ declaration) => {
+      const at = STYLE_ORDER.indexOf(declaration.slice(0, declaration.indexOf(':')).trim().toLowerCase())
+      return at < 0 ? STYLE_ORDER.length : at
+    }
+    const value = `style="${declarations.sort((a, b) => rank(a) - rank(b)).join(';')};"`
+    return style ? `<${tag}${attributes.replace(style[0], ` ${value}`)}>` : `<${tag}${attributes} ${value}>`
+  })
+}
+
+/** The order the content check writes a kept style's declarations in, its patterns' (`stylePatterns`). */
+const STYLE_ORDER = ['text-align', 'font-size', 'font-family', 'color', 'background-color', 'letter-spacing', 'line-height']
+
+/**
  * How many lines markup takes at 16 px in a width, at about 8.5 px a character: a heading's at
- * its size, and a little between blocks.
+ * its size, and a little between blocks. Interactive Video's measure; Course Presentation's is
+ * `slideTextHeight`.
  * @param {string} html
  * @param {number} pixels
  */
@@ -134,10 +216,7 @@ function wanted(element, width) {
   const library = machineName(element?.action?.library)
   const params = element?.action?.params ?? {}
   const pixels = (width / 100) * SLIDE.width
-  if (library === 'H5P.AdvancedText') {
-    const lines = textLines(String(params.text ?? ''), pixels)
-    return { height: Math.min(95, (lines * SLIDE.font * SLIDE.line / SLIDE.height) * 100 + 3), flexible: false, min: 8 }
-  }
+  if (library === 'H5P.AdvancedText') return { height: slideTextHeight(String(params.text ?? ''), pixels), flexible: false, min: 8 }
   if (library === 'H5P.Image') {
     const file = params.file ?? {}
     const ratio = file.width && file.height ? file.height / file.width : 9 / 16
@@ -150,9 +229,37 @@ function wanted(element, width) {
 }
 
 /**
+ * On a slide with room left and no question to give it to, its text set larger, in steps, the
+ * largest that fits with every picture at its full size (#145): Course Presentation draws text
+ * small, a paragraph at 10.8 px on a slide 640 px wide, and a slide of text alone showed it in its
+ * top part. Only text nobody sized: one that sets a `font-size` anywhere keeps its own.
+ * @param {any[]} free the elements being stacked
+ * @param {Array<{ kind: string, height: number, min: number }>} kinds what each wants, in the same order
+ * @param {number} spare percent of the slide's height left over
+ * @param {number} width percent of the slide's width each takes
+ */
+function growText(free, kinds, spare, width) {
+  const texts = free.flatMap((element, i) =>
+    kinds[i].kind === 'fixed' && machineName(element?.action?.library) === 'H5P.AdvancedText' &&
+    typeof element.action.params?.text === 'string' && !/font-size/i.test(element.action.params.text) ? [i] : [])
+  if (!texts.length || spare <= 0) return
+  const pixels = (width / 100) * SLIDE.width
+  for (const step of TEXT_STEPS) {
+    const heights = texts.map((i) => slideTextHeight(free[i].action.params.text, pixels, step))
+    if (heights.reduce((sum, height, n) => sum + height - kinds[texts[n]].height, 0) > spare) continue
+    texts.forEach((i, n) => {
+      kinds[i].height = kinds[i].min = heights[n]
+      free[i].action.params.text = sizedText(free[i].action.params.text, step)
+    })
+    return
+  }
+}
+
+/**
  * Elements without a position are stacked down the slide, full width, below any placed by hand.
- * Text keeps the height its lines need; a picture or a video shrinks, keeping its shape, to leave
- * a question the room it needs; a question takes what is left.
+ * Text keeps the height its lines need, set larger where the slide has room and no question;
+ * a picture or a video shrinks, keeping its shape, to leave a question the room it needs; a
+ * question takes what is left.
  * @param {any[]} elements
  * @param {string} path
  * @param {LayoutContext} context
@@ -172,15 +279,17 @@ function stackSlide(elements, path, context) {
     return { kind: 'fixed', height: want.height, min: want.height }
   })
   const room = 100 - MARGIN_Y - top - GAP * (free.length - 1)
-  const fixed = kinds.filter((each) => each.kind === 'fixed' || each.kind === 'button').reduce((sum, each) => sum + each.height, 0)
+  const fixedHeight = () => kinds.filter((each) => each.kind === 'fixed' || each.kind === 'button').reduce((sum, each) => sum + each.height, 0)
   const flexible = kinds.filter((each) => each.kind === 'flexible')
   const pictures = kinds.filter((each) => each.kind === 'picture')
-  const needed = fixed + flexible.reduce((sum, each) => sum + each.min, 0) + pictures.reduce((sum, each) => sum + each.min, 0)
+  const needed = fixedHeight() + flexible.reduce((sum, each) => sum + each.min, 0) + pictures.reduce((sum, each) => sum + each.min, 0)
   if (needed > room + 0.5) {
     context.note(path, flexible.length
       ? 'likely holds more than fits on one slide: split it, or show the question as a button ("displayAsButton": true)'
       : 'likely holds more than fits on one slide: split it')
   }
+  if (!flexible.length) growText(free, kinds, room - fixedHeight() - pictures.reduce((sum, each) => sum + each.height, 0), width)
+  const fixed = fixedHeight()
   let rest = Math.max(0, room - fixed)
   // Pictures first get what they want, up to an equal share of what is left after the questions' minimum.
   const forPictures = Math.max(0, rest - flexible.reduce((sum, each) => sum + each.min, 0))

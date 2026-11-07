@@ -73,10 +73,11 @@ What `params` takes is what H5P's editor would let an author save in the same fo
   and the command lists what stayed English. A source may still set one by name.
 
 Some content types have a widget of their own in the editor, which sets fields the form hides.
-The build does what those widgets do: it lays out a Course Presentation slide's elements, places
-Interactive Video interactions, joins Game Map stages and sets their ids, numbers Branching
-Scenario end screens, and names untitled Question Set questions. It refuses what they would not
-let pass: a scenario path with no end, a map with no start, a hotspot question with no right area.
+The build does what those widgets do: it lays out a Course Presentation slide's elements, setting
+the text larger where a slide has room and no question, places Interactive Video interactions,
+joins Game Map stages and sets their ids, numbers Branching Scenario end screens, and names
+untitled Question Set questions. It refuses what they would not let pass: a scenario path with no
+end, a map with no start, a hotspot question with no right area.
 
 A source with problems writes nothing and lists every problem by its path at once:
 

@@ -48,6 +48,50 @@ describe('Course Presentation', () => {
     expect(second[1].y).toBeGreaterThanOrEqual(30)
   })
 
+  const text = (html: string) => ({ action: { library: 'H5P.AdvancedText', params: { text: html } } })
+  const slides = async (...elements: unknown[][]) =>
+    (await build('H5P.CoursePresentation', { presentation: { slides: elements.map((each) => ({ elements: each })) } })).presentation.slides.map(
+      (slide: { elements: Array<{ y: number, height: number, action: { params: { text?: string } } }> }) => slide.elements
+    )
+
+  it('measures text as Course Presentation draws it, so a text box is about as tall as its text (#145)', async () => {
+    // An h2 in lines of 30 px with 10 after, a paragraph in lines of 13.5 px with 10.8 after: 64 px
+    // of the slide's 360. At the slide's 16 px in lines of 1.5, as before, the box was 25.
+    const [[box]] = await slides([text('<h2>Rivers</h2><p>Water runs down to the sea.</p>'), { action: question }])
+    expect(box.height).toBeGreaterThan(17)
+    expect(box.height).toBeLessThan(21)
+    // Beside a question, the text keeps its size and the question the room.
+    expect(box.action.params.text).toBe('<h2>Rivers</h2><p>Water runs down to the sea.</p>')
+  })
+
+  it('sets text larger on a slide with room and no question, as large as fits (#145)', async () => {
+    const long = Array.from({ length: 5 }, (_, i) => `<p>Paragraph ${i}: the sun warms the sea, and some of the water rises into the air as vapour.</p>`).join('')
+    const [[short], [longer], [full]] = await slides(
+      [text('<h2>The water cycle</h2><p>How water travels between the sea, the sky and the land.</p>')],
+      [text(`<h2>Evaporation</h2>${long}`)],
+      // Eleven one-line paragraphs: 74 % of the slide as written, 93 % at the smallest step, past the 90 there is.
+      [text(Array.from({ length: 11 }, () => '<p>The sun warms the sea, and some of the water rises into the air as vapour.</p>').join(''))]
+    )
+    // Twice the size, the largest step, on the size each block has.
+    expect(short.action.params.text).toBe('<h2 style="font-size:3.33em;">The water cycle</h2><p style="font-size:1.8em;">How water travels between the sea, the sky and the land.</p>')
+    expect(short.y + short.height).toBeLessThanOrEqual(95)
+    // More text, a smaller step.
+    expect(longer.action.params.text).toMatch(/^<h2 style="font-size:(2\.92|2\.5|2\.08)em;">Evaporation<\/h2><p style="font-size:(1\.58|1\.35|1\.13)em;">/)
+    expect(longer.y + longer.height).toBeLessThanOrEqual(95)
+    // No room for even the smallest step: as written.
+    expect(full.action.params.text).not.toContain('font-size')
+  })
+
+  it('keeps a size the source set, and a block’s own style beside the one it adds (#145)', async () => {
+    const [[sized], [centred]] = await slides(
+      [text('<p><span style="font-size:1.25em;">Already sized</span></p>')],
+      [text('<p style="text-align:center;">A centred line</p>')]
+    )
+    expect(sized.action.params.text).toBe('<p><span style="font-size:1.25em;">Already sized</span></p>')
+    // As the content check writes a style it keeps: text-align first, each ended with a semicolon.
+    expect(centred.action.params.text).toBe('<p style="text-align:center;font-size:1.8em;">A centred line</p>')
+  })
+
   it('says when a slide holds more than fits', async () => {
     const long = Array.from({ length: 12 }, (_, i) => `<p>Paragraph ${i} about rivers, lakes, seas and the water cycle that joins them.</p>`).join('')
     const { notes } = await result('H5P.CoursePresentation', { presentation: { slides: [{ elements: [{ action: { library: 'H5P.AdvancedText', params: { text: long } } }, { action: question }] }] } })
