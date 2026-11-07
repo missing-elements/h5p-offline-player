@@ -49,8 +49,15 @@ to 3,000. Eleven things the code does not say by itself:
   Map and Branching Scenario are edited on a slide, a video, a map and a tree of their own, which set
   fields the form hides (`widget: "none"`). `lib/types.mjs` does each one's work on the generated
   content, wherever the type appears: a slide's unplaced elements stacked, text as tall as its lines
-  on CP's 16:9 slide at 16 px per 640, pictures shrunk in shape, a question in what is left, with a
-  note when a slide holds too much; interactions placed apart, clear of what shows at the same
+  as CP 1.27's stylesheet draws them, pictures shrunk in shape, a question in what is left, with a
+  note when a slide holds too much. Text is measured at the sizes CP draws, a paragraph at 10.8 px
+  per 640 in lines of 1.25em (`SLIDE_TEXT`), and on a slide with room and no question it is set
+  larger, in steps up to twice, as large as fits with its pictures whole (#145): measured at the
+  slide's 16 px before, a text box was twice as tall as its text, and a slide of text alone showed
+  small text in its top part. The size goes on each block, not on a span inside, since CP gives a
+  paragraph's lines in em and a span would inherit them as a length, so its lines would overlap;
+  and it is written as the content check writes a style, so an untrusted play changes nothing.
+  Text whose source sets a size keeps it. Interactions placed apart, clear of what shows at the same
   time, and named by their library; a poster sized by what it holds, in IV's em (a 16:9 video is
   40 by 22.5): a picture in its shape, as the editor's own widget does, a text as wide as keeps
   it short, a question 17 by 16. The editor starts every interaction at 10 by 10 and leaves the

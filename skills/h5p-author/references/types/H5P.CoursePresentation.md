@@ -3,9 +3,9 @@
 Slides with text, pictures, video and questions; a summary slide with the score follows when there are questions.
 
 - `presentation.slides` is the list of slides; each slide's `elements` are sub-content under `action`: `{ "action": { "library": "H5P.AdvancedText", "params": { … } } }`.
-- Leave out `x`, `y`, `width` and `height` and the build stacks a slide's elements top to bottom: text as tall as its lines, pictures in shape, a question in what is left. It notes a slide that holds too much; split it, or show its question as a button (`"displayAsButton": true`). To place an element by hand, give all four, in percent of the slide's width and height from the top left.
+- Leave out `x`, `y`, `width` and `height` and the build stacks a slide's elements top to bottom: text as tall as its lines, pictures in shape, a question in what is left. On a slide with room and no question it sets the text larger, up to twice its size; text you give a `font-size` keeps it. It notes a slide that holds too much; split it, or show its question as a button (`"displayAsButton": true`). To place an element by hand, give all four, in percent of the slide's width and height from the top left.
 - A slide's `keywords` (`[{ "main": "…" }]`) name it in the outline.
-- The slide is 16:9; at most a short heading, a paragraph and a picture, or a question, fit one slide.
+- The slide is 16:9: a heading with a few short paragraphs or a list, or with a paragraph and a picture, or with a line of text and a question, fits one slide. Keep to one idea a slide.
 
 ## Example
 
