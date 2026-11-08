@@ -53,12 +53,22 @@ one row each; an LMS added here gets a row there.
   both again and calls `LMSFinish`.
   **Each answer goes into `cmi.interactions`** (#124, 2026-11-04, asked for by two of three
   commenters on the Reddit demand check): every `answered` statement the element relays, by the
-  part's `subContentId`, with the question's words as the id, since 1.2 has no description field
-  and the id is what a report shows (a slug in printable ASCII, which 1.2's `CMIIdentifier`
-  allows and nothing else; the key for a question with no words; `-2` on a second question with
-  the same words), the xAPI type as 1.2 names it (`long-fill-in` as `fill-in`, `other` and an
-  unknown type left out), the pattern and the response cut to 255 (`CMIFeedback`; H5P's `0[,]2`
-  goes in as it is, which Moodle takes), `correct` or `wrong` from `success`, or from the score
+  part's `subContentId`, with an id a person reads, since 1.2 has no description field and the id
+  is what a report shows: the question's number, its index from 1, and its first words, 40
+  characters cut at a word, in letters, digits and `_` alone, as in
+  `Q3_which_rivers_cross_germany`; the number alone where the words have no Latin letters. That
+  is the form a commenter on the Reddit SCORM post uses (2026-11-08): 1.2 calls a
+  `CMIIdentifier` alphanumeric, and an LMS that holds it to that refuses the colon and the slash
+  that the earlier fallback for a question with no words, its activity's URL, could carry. The
+  number keeps two questions with the same words apart, where a `-2` did until then; in content
+  answered out of order, a Course Presentation or a book, it follows the order of answering, as
+  the index does. Then the xAPI type as 1.2 names it (`long-fill-in` as `fill-in`, `other` and an
+  unknown type left out), and the pattern and the response cut to 255 (`CMIFeedback`) **only
+  where they are the learner's own text or number, `fill-in` and `numeric`**: 1.2 holds a
+  choice, true-false, matching or sequencing answer to single characters, which H5P's `0[,]2`
+  and `true`, written in 2004's notation, are not. Moodle took them as they are, but a strict LMS
+  refuses them and LMSs read 1.2's form differently, the same commenter's reason to send none,
+  so since 2026-11-08 those answers carry their result alone. Then `correct` or `wrong` from `success`, or from the score
   where the content says nothing, as Fill in the Blanks does not (full marks, none, or the marks
   themselves, a number 1.2 takes there), `neutral` with neither, the marks as `weighting`,
   `result.duration` as `latency`, the time of day. **One index per question, written over on a
@@ -66,7 +76,8 @@ one row each; an LMS added here gets a row there.
   learner (`get_scorm_question_count` takes the highest index found), so an entry per attempt
   would set one learner's columns against another's. The index and the id come from the
   questions kept with the state (`questions` in `suspend_data`, a `[key, id]` per index, so that
-  the second of two questions with the same words keeps its `-2` in a later session), after
+  a question keeps its id in a later session, and one an older zip kept keeps the id that zip
+  gave it), after
   `cmi.interactions._count`, which 1.2 lets a SCO read and Moodle reloads from the attempt's
   tracks; an attempt the LMS started over counts none, and they start again. The count is read
   once, at launch, where an attempt starts over (#130): read on every answer, an LMS whose count

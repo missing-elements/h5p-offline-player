@@ -70,8 +70,10 @@ const SUSPEND_DATA_LIMIT = scorm2004 ? 64000 : 4096
  * characters; in 2004 the longest the format allows, 4,000.
  */
 const FEEDBACK_LIMIT = scorm2004 ? 4000 : 255
-/** An interaction's id, a `CMIIdentifier`: 255 characters of printable ASCII, no spaces. */
-const IDENTIFIER_LIMIT = 255
+/** How much of a question's words a SCORM 1.2 id carries after its number, cut at a word. */
+const ID_WORDS_LIMIT = 40
+/** Latin letters that no decomposition takes to ASCII, as an id spells them. */
+const FOLDED = /** @type {Record<string, string>} */ ({ ß: 'ss', æ: 'ae', œ: 'oe', ø: 'o', đ: 'd', ł: 'l', þ: 'th', ð: 'd' })
 /** What 2004 keeps of a question's words, `cmi.interactions.n.description`: 250 characters. */
 const DESCRIPTION_LIMIT = 250
 /** The verb of a question answered. */
@@ -250,27 +252,31 @@ function questionText(statement, language) {
 
 /**
  * An interaction's id. In SCORM 1.2 it is what a report shows, since 1.2 has no description: the
- * question's words as a slug in printable ASCII, else the question's key with anything else taken
- * out, else `question`. In 2004, where the words go into the description, an identifier, as 2004
- * asks one to be a URI: the part's id as a `urn:uuid:`, else the activity's own, else a `urn:h5p:`.
+ * question's number, its index from 1, and its first words, as in `Q3_which_rivers_cross_germany`,
+ * in letters, digits and `_` alone, which every LMS takes as a `CMIIdentifier`; the number alone
+ * for a question with no words in Latin letters. The number keeps two questions with the same
+ * words apart. In 2004, where the words go into the description, an identifier, as 2004 asks one
+ * to be a URI: the part's id as a `urn:uuid:`, else the activity's own, else a `urn:h5p:`.
  * @param {string} text
  * @param {string} key
+ * @param {number} index
  */
-function interactionId(text, key) {
+function interactionId(text, key, index) {
   if (scorm2004) {
     if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(key)) return `urn:uuid:${key.toLowerCase()}`
     if (/^[a-z][a-z0-9+.-]*:[\x21-\x7e]+$/i.test(key) && key.length <= 4000) return key
     return `urn:h5p:${encodeURIComponent(key)}`
   }
-  const slug = text
+  const words = text
+    .toLowerCase()
+    .replace(/[ßæœøđłþð]/g, (letter) => FOLDED[letter] ?? '')
     .normalize('NFKD')
     .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 80)
-    .replace(/-+$/, '')
-  return (slug || key.replace(/[^\x21-\x7e]/g, '')).slice(0, IDENTIFIER_LIMIT) || 'question'
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+  const cut = words.lastIndexOf('_', ID_WORDS_LIMIT)
+  const shown = words.length <= ID_WORDS_LIMIT ? words : words.slice(0, cut > 0 ? cut : ID_WORDS_LIMIT)
+  return shown ? `Q${index + 1}_${shown}` : `Q${index + 1}`
 }
 
 /** The package's build, as the writer stamped it: what saved state is kept against. */
@@ -434,7 +440,7 @@ if (questions.length > launchCount) questions = questions.slice(0, launchCount)
 
 /**
  * The question's index and the id it was written under: those it has, else the next index and
- * an id no other question has, so that two with the same words differ.
+ * the id that names it. A question kept by an older zip, in the state it wrote, keeps its old id.
  * @param {AnsweredStatement} statement
  * @returns {{ index: number, id: string }}
  */
@@ -442,11 +448,8 @@ function interactionFor(statement) {
   const key = questionKey(statement)
   const known = questions.findIndex((entry) => entry?.[0] === key)
   if (known !== -1) return { index: known, id: /** @type {[string, string]} */ (questions[known])[1] }
-  const base = interactionId(questionText(statement, language), key)
-  const taken = new Set(questions.map((entry) => entry?.[1]))
-  let id = base
-  for (let n = 2; taken.has(id); n++) id = `${base.slice(0, IDENTIFIER_LIMIT - 1 - String(n).length)}-${n}`
   const index = Math.max(questions.length, launchCount)
+  const id = interactionId(questionText(statement, language), key, index)
   questions[index] = [key, id]
   return { index, id }
 }
@@ -469,12 +472,15 @@ function recordAnswer(statement) {
   const type = typeof definition?.interactionType === 'string' ? types[definition.interactionType] : undefined
   if (type) set(at('type'), type)
   // 2004 takes a pattern and a response only after the type that gives their form, and refuses
-  // them without one (408); 1.2 takes them as they come.
-  const typed = Boolean(type) || !scorm2004
+  // them without one (408); H5P writes them in 2004's own notation, which xAPI took over. 1.2 gets
+  // them only where they are the learner's own text or number, `fill-in` and `numeric`: it holds a
+  // choice, true-false, matching or sequencing answer to single characters, which H5P's `0[,]2` and
+  // `true` are not, and LMSs part ways on those, so such an answer carries its result alone.
+  const withResponse = scorm2004 ? Boolean(type) : type === 'fill-in' || type === 'numeric'
   const pattern = Array.isArray(definition?.correctResponsesPattern) ? definition.correctResponsesPattern[0] : undefined
-  if (typed && typeof pattern === 'string') set(at('correct_responses.0.pattern'), pattern.slice(0, FEEDBACK_LIMIT))
+  if (withResponse && typeof pattern === 'string') set(at('correct_responses.0.pattern'), pattern.slice(0, FEEDBACK_LIMIT))
   const result = statement.result ?? {}
-  if (typed && typeof result.response === 'string') set(at(scorm2004 ? 'learner_response' : 'student_response'), result.response.slice(0, FEEDBACK_LIMIT))
+  if (withResponse && typeof result.response === 'string') set(at(scorm2004 ? 'learner_response' : 'student_response'), result.response.slice(0, FEEDBACK_LIMIT))
   set(at('result'), outcomeOf(result))
   if (typeof result.score?.max === 'number') set(at('weighting'), String(result.score.max))
   const latency = latencyOf(result.duration)
