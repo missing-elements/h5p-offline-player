@@ -169,8 +169,9 @@ describe('content authored from semantics', () => {
 
   it('takes a multiple of a fractional step, which the editor\'s `%` misses by a rounding error (#162)', () => {
     const semantics = [{ name: 'ratio', type: 'number', decimals: 2, step: 0.1 }]
-    for (const ratio of [0.3, 0.7, 2.3]) expect(generate(semantics, { ratio }, [], STRICT).problems, String(ratio)).toEqual([])
-    expect(generate(semantics, { ratio: 0.35 }, [], STRICT).problems).toEqual([{ path: 'params.ratio', message: 'takes steps of 0.1' }])
+    for (const ratio of [0.3, 0.7, 2.3, 1234.5, 50000000.1]) expect(generate(semantics, { ratio }, [], STRICT).problems, String(ratio)).toEqual([])
+    // Half a step off, however large: the bound is the arithmetic's error, not a share of the value.
+    for (const ratio of [0.35, 50000000.05]) expect(generate(semantics, { ratio }, [], STRICT).problems, String(ratio)).toEqual([{ path: 'params.ratio', message: 'takes steps of 0.1' }])
   })
 
   it('takes a field named as an object\'s own properties are, toString or constructor, for what it is: not a field (#162)', () => {

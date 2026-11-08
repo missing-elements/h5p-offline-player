@@ -653,7 +653,10 @@ export class ContentGenerator {
     const step = Number(field.step)
     if (field.step !== undefined && step > 0) {
       const steps = written / step
-      if (Math.abs(steps - Math.round(steps)) > 1e-9 * Math.max(1, Math.abs(steps))) this.report(path, `takes steps of ${field.step}`)
+      // The value, the step and their quotient are each rounded once, so the quotient is off by
+      // at most about 1.5 Number.EPSILON of itself; the bound is four. A share as loose as 1e-9
+      // let 50000000.05 pass in steps of 0.1, half a step off.
+      if (Math.abs(steps - Math.round(steps)) > 4 * Number.EPSILON * Math.max(1, Math.abs(steps))) this.report(path, `takes steps of ${field.step}`)
     }
     return written
   }

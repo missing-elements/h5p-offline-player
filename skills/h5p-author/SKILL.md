@@ -84,8 +84,10 @@ npx @missing-elements/h5p-author@latest build source.json course.h5p
 A source with a problem writes nothing: the build lists every problem by its path, so fix them
 all and run it again under the same name. Once a build has written its file it never writes
 over it, so a later build takes a new name (`course-2.h5p`). Copy the one you hand over to the
-name the user asked for; never delete a file to free a name. Pass the build's notes on to the
-user: texts left in English, a slide that holds too much.
+name the user asked for without writing over a file already there (`cp -n`). If that name is
+taken, ask, or where you cannot ask, take a new name and say so. Never delete or overwrite a file
+to free a name. Pass the build's notes on to the user: texts left in English, a slide that holds
+too much.
 
 ## 4. Verify
 
@@ -94,11 +96,12 @@ npx @missing-elements/h5p-verify@latest course.h5p
 ```
 
 It writes `course.verify/report.json` and `course.verify/screenshot.png` beside the package
-(`--out <folder>` puts them elsewhere). Read the report's `verdict`, `errors` and `warnings`,
-and look at the screenshot: layout mistakes raise no error. One run is enough: the build already
-writes what an H5P site's content check keeps, so `--untrusted` finds nothing more. Follow the
-`h5p-verify` skill's loop if it is installed. Fix the source, never by removing what fails.
-Without a browser, say the package is **unverified**.
+(`--out <folder>` puts them elsewhere). Read the report's `verdict`, `reasons`, `errors` and
+`warnings`: a run that fails may say why only in `reasons`, such as content that never reached
+ready or drew nothing. Look at the screenshot too: layout mistakes raise no error. One run is
+enough: the build already writes what an H5P site's content check keeps, so `--untrusted` finds
+nothing more. Follow the `h5p-verify` skill's loop if it is installed. Fix the source, never by
+removing what fails. Without a browser, say the package is **unverified**.
 
 ## 5. Review and hand over
 
@@ -116,7 +119,9 @@ do it: the person's own play is the check, and a script of your own costs more t
 
 Deliver:
 
-- the `.h5p`, the source, `report.json`, `screenshot.png` and the report's full `revision`;
+- the `.h5p` and the source;
+- `report.json`, `screenshot.png` and the report's full `revision`, from the run that passed;
+  where the verifier could not run, no report, and the package called **unverified**;
 - the preview command, and the build's notes;
 - what a pass means: it starts and draws, not that it is accurate, accessible or right for
   every LMS;
