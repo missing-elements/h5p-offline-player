@@ -380,7 +380,7 @@ one row each; an LMS added here gets a row there.
     0, as a questionnaire or a branching scenario without scoring finishes, is reported as 100
     (`scaled` 1) beside completed, and passes a mark. H5P invents no score, so this is off unless
     asked; content that never finishes, an Accordion or a Virtual Tour, stays incomplete. So does a
-    presentation or a book without questions, which the README and the command's help gave as the
+    presentation or book with no questions in it, which the README and the command's help gave as the
     example until #160 (2026-11-08): Course Presentation 1.27 and Interactive Book 1.15 send their
     `completed` from a summary page they show only when they hold tasks. Played to its last slide,
     the presentation sent `progressed` alone; the book's chapters say `completed` as sub-content,

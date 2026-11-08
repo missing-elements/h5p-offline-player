@@ -27,9 +27,9 @@ and whether the options below were checked there. Each of these has a default:
   content says. Frappe LMS marks a lesson done only on a pass, so there a quiz needs one.
 - **Content that finishes without a score.** A questionnaire, or a branching scenario without
   scoring, ends `completed` with no score; `--completion-score` records it as 100, for a
-  gradebook that needs a number, and with a pass mark it passes. A presentation or a book without
-  questions, an Accordion or a Virtual Tour never finishes at all, and stays `incomplete` with or
-  without it: the LMS should complete such an activity on viewing.
+  gradebook that needs a number, and with a pass mark it passes. An Accordion, a Virtual Tour, or a
+  presentation or book with no questions in it never finishes at all, and stays `incomplete` with
+  or without it: the LMS should complete such an activity on viewing.
 - **SCORM 2004** (`--scorm-version 2004`) only when the LMS asks for it, or a failed attempt
   should still count as completed. Otherwise 1.2, the version checked in every LMS below.
 - **The title** the LMS lists it by is the package's own, unless `--title "<text>"` gives another.
@@ -41,8 +41,11 @@ For a plain quiz, the defaults fit: ask about nothing but the LMS.
     npx @missing-elements/h5p-verify@latest course.h5p --libraries pack --no-refresh-libraries --no-downgrade-libraries
 
 These options play it as the zip will: the libraries it carries as they are, the ones it lacks
-from the pack, and none older than the content was made for. Exit 0 is a pass. Read anything
-else with the h5p-verify skill, if it is installed, and fix the package before going on. A
+from the pack, and none older than the content was made for. Exit 0 is a pass. Exit 1 means
+the package does not play, and the summary says why: read it with the h5p-verify skill, if it is
+installed, and fix the package before going on. Exit 2 means the check could not run, for want of
+a browser or of a file at that path: fix that and run it again, or, where it cannot run, write
+the zip and tell the user the package is unchecked. Never change the package for an exit 2. A
 package h5p-author has just built and checked needs no second check.
 
 ## 3. Write the zip
@@ -60,7 +63,8 @@ libraries it took from the pack. If it refuses:
 |---|---|
 | `needs libraries that neither it nor the library pack carries: …` | The package was made with a library, or a version of one, that the pack does not have. Export it with its libraries from a tool that carries them, such as Lumi or the H5P plugin of Moodle, WordPress or Drupal, and write the zip from that |
 | `… exists. Pass --force to replace it.` | Give another name, or add `--force` once the user agrees to replace the file |
-| `No such file`, `it is not an H5P package`, `could not be read as a zip archive`, `names no libraries` | Not a playable `.h5p`: ask the user for the file again |
+| `No such file: …` | The path is wrong, or the command ran in another folder: check both before asking the user for the file |
+| `it is not an H5P package`, `could not be read as a zip archive`, `names no libraries` | Not a playable `.h5p`: ask the user for the file again |
 | `The pass mark is a number from 0 to 100` | Give a number, such as `--pass-mark 80` |
 
 ## 4. Hand over

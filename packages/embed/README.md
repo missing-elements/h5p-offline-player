@@ -169,8 +169,9 @@ missing named.
 The package plays trusted: its own code runs on the LMS's origin, as every SCORM package's does.
 The LMS has to be served over https, since the player needs its Service Worker.
 
-Content that reports no result of its own, an Accordion, a Virtual Tour, or a presentation or a
-book without questions, stays `incomplete`: complete such an activity on viewing it instead.
+Content that reports no result of its own stays `incomplete`, such as an Accordion, a Virtual
+Tour, or a presentation or book with no questions in it: complete such an activity on viewing it
+instead.
 Replacing the zip with one written from another `.h5p`, or with other libraries from the pack,
 starts learners over, since their saved state belongs to what it was saved in.
 
@@ -193,8 +194,8 @@ Three, each off unless asked for; a zip written with none is the SCORM 1.2 zip d
   it.
 - **Completion as 100** (`--completion-score`): content that finishes without a score, such as a
   questionnaire or a branching scenario without scoring, is recorded as 100, for a gradebook that
-  needs a number; with a pass mark, that passes. Content that never finishes still stays
-  `incomplete`, a presentation or a book without questions among it.
+  needs a number; with a pass mark, that passes. Content that never finishes, such as a
+  presentation or book with no questions in it, still stays `incomplete`.
 
 ### In the browser
 
