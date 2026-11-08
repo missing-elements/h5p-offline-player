@@ -284,7 +284,7 @@ describe('the h5p-to-scorm skill', () => {
     const zip = args[args.indexOf('course.h5p') + 1]
     expect(zip).toMatch(/\.zip$/)
     const graded = await runIn('graded', built.quiz, embed, args)
-    expect(graded.stdout).toMatch(new RegExp(`^Wrote ${zip.replace(/\./g, '\\.')} \\([\\d.]+ MB\\): "Practice: recognizing phishing" as a SCORM 1\\.2 package \\(pass mark ${mark}\\),\\n`))
+    expect(graded.stdout).toMatch(new RegExp(`^Wrote ${zip.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\([\\d.]+ MB\\): "Practice: recognizing phishing" as a SCORM 1\\.2 package \\(pass mark ${mark}\\),\\n`))
     const manifest = await unpack(join(graded.cwd, zip), 'graded')
     expect(manifest).toContain(`<adlcp:masteryscore>${mark}</adlcp:masteryscore>`)
 
