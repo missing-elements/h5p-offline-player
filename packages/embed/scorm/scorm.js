@@ -226,6 +226,25 @@ function outcomeOf(result) {
 }
 
 /**
+ * A SCORM 1.2 answer or right answer, for the two types 1.2 takes them for, as a report shows them
+ * to a person. H5P writes both in 2004's notation, which xAPI took over and 1.2 has not: a fill-in's
+ * right answer opens with `{case_matters=false}` and the like, and both part a blank from the next
+ * with `[,]`, so 1.2 gets `stored, Range` for `{case_matters=false}stored[,]Range`; the learner's
+ * own words are kept as typed. A numeric's is a number, 1.2's `CMIDecimal`, and anything else, such
+ * as 2004's range `1[:]5`, is not written. Nothing is written for what comes out empty.
+ * @param {unknown} text
+ * @param {string} type `fill-in` or `numeric`
+ * @param {boolean} right whether it is the right answer, whose modifiers go
+ * @returns {string | null}
+ */
+function scorm12Answer(text, type, right) {
+  if (typeof text !== 'string') return null
+  if (type === 'numeric') return /^-?(\d+(\.\d*)?|\.\d+)$/.test(text.trim()) ? text.trim() : null
+  const plain = (right ? text.replace(/^(\{[^{}]*\})+/, '') : text).split('[,]').join(', ')
+  return plain === '' ? null : plain
+}
+
+/**
  * Which question a statement is about: the part's id, which the core writes on every statement
  * about a part; the content's own, for a question that is the whole package, has none.
  * @param {AnsweredStatement} statement
@@ -476,14 +495,25 @@ function recordAnswer(statement) {
   if (type) set(at('type'), type)
   // 2004 takes a pattern and a response only after the type that gives their form, and refuses
   // them without one (408); H5P writes them in 2004's own notation, which xAPI took over. 1.2 gets
-  // them only where they are the learner's own text or number, `fill-in` and `numeric`: it holds a
-  // choice, true-false, matching or sequencing answer to single characters, which H5P's `0[,]2` and
-  // `true` are not, and LMSs part ways on those, so such an answer carries its result alone.
-  const withResponse = scorm2004 ? Boolean(type) : type === 'fill-in' || type === 'numeric'
+  // them only where they are the learner's own text or number, `fill-in` and `numeric`, as text a
+  // person reads (`scorm12Answer`): it holds a choice, true-false, matching or sequencing answer to
+  // single characters, which H5P's `0[,]2` and `true` are not, and LMSs part ways on those, so such
+  // an answer carries its result alone.
   const pattern = Array.isArray(definition?.correctResponsesPattern) ? definition.correctResponsesPattern[0] : undefined
-  if (withResponse && typeof pattern === 'string') set(at('correct_responses.0.pattern'), pattern.slice(0, FEEDBACK_LIMIT))
   const result = statement.result ?? {}
-  if (withResponse && typeof result.response === 'string') set(at(scorm2004 ? 'learner_response' : 'student_response'), result.response.slice(0, FEEDBACK_LIMIT))
+  /** @type {string | null} */
+  let right = null
+  /** @type {string | null} */
+  let given = null
+  if (scorm2004 && type) {
+    if (typeof pattern === 'string') right = pattern
+    if (typeof result.response === 'string') given = result.response
+  } else if (type === 'fill-in' || type === 'numeric') {
+    right = scorm12Answer(pattern, type, true)
+    given = scorm12Answer(result.response, type, false)
+  }
+  if (right !== null) set(at('correct_responses.0.pattern'), right.slice(0, FEEDBACK_LIMIT))
+  if (given !== null) set(at(scorm2004 ? 'learner_response' : 'student_response'), given.slice(0, FEEDBACK_LIMIT))
   set(at('result'), outcomeOf(result))
   if (typeof result.score?.max === 'number') set(at('weighting'), String(result.score.max))
   const latency = latencyOf(result.duration)

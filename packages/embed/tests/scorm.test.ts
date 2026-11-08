@@ -578,10 +578,12 @@ describe('in an LMS', () => {
     expect(kept['cmi.interactions.0.id']).toMatch(/^Q1_[a-z0-9_]{1,40}$/)
     expect(kept['cmi.interactions.2.id']).toMatch(/^Q3_[a-z0-9_]{1,40}$/)
     expect(kept).toMatchObject({ 'cmi.interactions.0.type': 'choice', 'cmi.interactions.0.result': 'correct', 'cmi.interactions.1.type': 'true-false', 'cmi.interactions.1.result': 'correct', 'cmi.interactions.2.type': 'fill-in', 'cmi.interactions.2.result': 'correct' })
-    // The typed-in answer with its response and the right one; the choice and the true-false with
+    // The typed-in answer with its response and the right one, as text a person reads: the blanks
+    // listed, and H5P's `{case_matters=false}` gone. The right one is each blank's first answer; the
+    // learner's "deflated" is the second the third blank takes. The choice and the true-false with
     // their result alone, since 1.2 writes those answers in a form of its own.
-    expect(kept['cmi.interactions.2.student_response']).toBeTruthy()
-    expect(kept['cmi.interactions.2.correct_responses.0.pattern']).toBeTruthy()
+    expect(kept['cmi.interactions.2.student_response']).toBe('stored, Range, deflated, front')
+    expect(kept['cmi.interactions.2.correct_responses.0.pattern']).toBe('stored, Range, compressed, front')
     for (const index of [0, 1]) {
       expect(kept[`cmi.interactions.${index}.student_response`]).toBeUndefined()
       expect(kept[`cmi.interactions.${index}.correct_responses.0.pattern`]).toBeUndefined()
@@ -853,7 +855,7 @@ describe('in an LMS', () => {
     await context.close()
   })
 
-  it('writes a SCORM 1.2 answer\'s response and the right one where they are the learner\'s own text or number', async () => {
+  it('writes a SCORM 1.2 answer\'s response and the right one where they are the learner\'s own text or number, as text a person reads', async () => {
     const { context, page } = await lmsPage()
     const { sco } = await launch(page)
     await answer(sco, 'a', 'Name a river', { interactionType: 'fill-in', correctResponsesPattern: ['{case_matters=false}Rhine'] }, { response: 'Rhine', success: true })
@@ -861,13 +863,25 @@ describe('in an LMS', () => {
     await answer(sco, 'c', 'It flows into the North Sea', { interactionType: 'true-false', correctResponsesPattern: ['true'] }, { response: 'false' })
     await answer(sco, 'd', 'Put them in order', { interactionType: 'sequencing', correctResponsesPattern: ['0[,]1[,]2'] }, { response: '1[,]0[,]2' })
     await answer(sco, 'e', 'Match them', { interactionType: 'matching', correctResponsesPattern: ['0[.]1[,]1[.]0'] }, { response: '0[.]0[,]1[.]1' })
+    await answer(sco, 'f', 'Name two seas', { interactionType: 'fill-in', correctResponsesPattern: ['{case_matters=false}{lang=en}North Sea[,]Baltic'] }, { response: 'North Sea[,]Black Sea', success: false })
+    await answer(sco, 'g', 'Roughly how long, in km?', { interactionType: 'numeric', correctResponsesPattern: ['1200[:]1300'] }, { response: 'about 1230', success: undefined, score: undefined })
     const kept = await values(page)
+    // H5P's `{case_matters=false}` and `{lang=en}` taken off the right answer, and blanks parted by
+    // `[,]` listed, in the answer given as in the right one.
     expect(kept).toMatchObject({
       'cmi.interactions.0.student_response': 'Rhine',
-      'cmi.interactions.0.correct_responses.0.pattern': '{case_matters=false}Rhine',
+      'cmi.interactions.0.correct_responses.0.pattern': 'Rhine',
       'cmi.interactions.1.student_response': '1230',
-      'cmi.interactions.1.correct_responses.0.pattern': '1233'
+      'cmi.interactions.1.correct_responses.0.pattern': '1233',
+      'cmi.interactions.5.student_response': 'North Sea, Black Sea',
+      'cmi.interactions.5.correct_responses.0.pattern': 'North Sea, Baltic',
+      'cmi.interactions.6.type': 'numeric',
+      'cmi.interactions.6.result': 'neutral'
     })
+    // A numeric answer that is not a number, 1.2's `CMIDecimal`, is not written: neither 2004's
+    // range nor words.
+    expect(kept['cmi.interactions.6.student_response']).toBeUndefined()
+    expect(kept['cmi.interactions.6.correct_responses.0.pattern']).toBeUndefined()
     // Their type and their result, but not H5P's notation, which 1.2 does not take for them.
     for (const index of [2, 3, 4]) {
       expect(kept[`cmi.interactions.${index}.type`]).toBe(['true-false', 'sequencing', 'matching'][index - 2])
@@ -1038,6 +1052,9 @@ describe('in an LMS', () => {
     expect(kept).toMatchObject({ 'cmi.interactions.0.type': 'choice', 'cmi.interactions.0.result': 'correct', 'cmi.interactions.1.type': 'true-false', 'cmi.interactions.2.type': 'fill-in', 'cmi.interactions.3.result': 'incorrect' })
     expect(kept['cmi.interactions.0.learner_response']).toBe(kept['cmi.interactions.0.correct_responses.0.pattern'])
     expect(kept['cmi.interactions.0.student_response']).toBeUndefined()
+    // 2004 takes H5P's notation, which is its own, as written: the fill-in's too.
+    expect(kept['cmi.interactions.2.correct_responses.0.pattern']).toBe('{case_matters=false}stored[,]Range[,]compressed[,]front')
+    expect(kept['cmi.interactions.2.learner_response']).toBe('stored[,]Range[,]deflated[,]front')
     expect(kept['cmi.interactions.0.latency']).toMatch(/^PT(\d+H)?(\d+M)?\d+(\.\d{1,2})?S$/)
     expect(kept['cmi.interactions.0.timestamp']).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,2})?Z$/)
     expect(Object.keys(kept).some((key) => key.startsWith('cmi.core.'))).toBe(false)

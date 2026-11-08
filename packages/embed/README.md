@@ -147,7 +147,8 @@ package, the player and the H5P runtime, and a launch page that reports to the L
 - each question's answer, as `cmi.interactions`: an id a report reads, the question's number and
   first words, such as `Q3_which_rivers_cross_germany`; its type, `correct` or `wrong`, the marks
   it was worth and the time it took; and for an answer the learner typed, fill-in or numeric, the
-  answer given and the right one. SCORM 1.2 writes a choice, true-false, matching or sequencing
+  answer given and the right one, as plain text: `stored, Range` where H5P writes
+  `{case_matters=false}stored[,]Range`. SCORM 1.2 writes a choice, true-false, matching or sequencing
   answer in a form of its own, which LMSs read differently, so those carry their result alone.
   One interaction per question, written over when it is answered again, which is how Moodle's
   interactions report lines learners up. SCORM 1.2 lets the content write these and never read

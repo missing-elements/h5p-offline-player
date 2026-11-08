@@ -70,6 +70,12 @@ one row each; an LMS added here gets a row there.
   notation, are not. Moodle took them as they are, but a strict LMS refuses them and LMSs read
   1.2's form differently, the same commenter's reason to send none, so since 2026-11-08 those
   answers carry their result alone: a conformance fix, as `docs/compatibility.md` names one.
+  The two that keep theirs are written as a person reads them (`scorm12Answer`, the same day,
+  the owner's call when Moodle's report was found to show `{case_matters=false}stored[,]Range`):
+  the right answer without the `{case_matters=…}`, `{lang=…}` it opens with, a fill-in's blanks
+  listed with commas in place of `[,]`, every fill-in type in the pack writing them that way, so
+  `stored, Range`; and a numeric only where it is a number, 1.2's `CMIDecimal`, not 2004's range
+  `1[:]5`, though no library in the pack writes `numeric`. 2004 keeps the notation, its own.
   Then `correct` or `wrong` from `success`, or from the score
   where the content says nothing, as Fill in the Blanks does not (full marks, none, or the marks
   themselves, a number 1.2 takes there), `neutral` with neither, the marks as `weighting`,
