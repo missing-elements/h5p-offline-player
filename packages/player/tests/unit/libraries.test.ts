@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { findMissingLibraries } from '../../src/shared/library-folders'
-import { explainMissingLibraries, servedWhenUntrusted } from '../../src/sw/package-reader'
+import { describeMissingLibraries, explainMissingLibraries, servedWhenUntrusted } from '../../src/sw/package-reader'
 
 /**
  * An export that carries content but not the libraries it names is the single most common broken
@@ -64,6 +64,31 @@ describe('findMissingLibraries', () => {
 
   it('has nothing to report when a manifest declares no dependencies', () => {
     expect(findMissingLibraries(entries('h5p.json'), { title: 'x' })).toEqual([])
+  })
+})
+
+describe('describeMissingLibraries', () => {
+  // An old platform export lists a library once for each library that needs it: an h5p.org
+  // Course Presentation in the local corpus declares 98 dependencies, 51 of them different.
+  const repeated = {
+    ...manifest,
+    preloadedDependencies: [...manifest.preloadedDependencies, { machineName: 'H5P.Video', majorVersion: '1', minorVersion: '6' }]
+  }
+
+  it('names a library h5p.json lists twice once', () => {
+    expect(describeMissingLibraries(entries('H5P.InteractiveVideo-1.27/library.json'), repeated)).toEqual({
+      mainLibrary: 'H5P.InteractiveVideo',
+      folders: ['H5P.Video-1.6'],
+      all: false
+    })
+  })
+
+  it('still knows a content-only export when it lists a library twice', () => {
+    expect(describeMissingLibraries(entries('h5p.json', 'content/content.json'), repeated)).toEqual({
+      mainLibrary: 'H5P.InteractiveVideo',
+      folders: ['H5P.InteractiveVideo-1.27', 'H5P.Video-1.6'],
+      all: true
+    })
   })
 })
 

@@ -554,6 +554,11 @@ class VirtualServer {
       return json(await reader.mergedManifest())
     }
 
+    // An empty entry is answered from its size, whole, whatever range was asked for, as a server
+    // may: there is nothing to read, and the cache gives an empty response back with no body at
+    // all, which the inline path took for an entry it could not read and answered with a 500.
+    if (located.entry.size === 0) return entryResponse(located.entry, 'none', null)
+
     const rangeHeader = event.request.headers.get('range')
 
     // Extracted bytes are stored against the archive they came from, not the package being
@@ -641,9 +646,8 @@ class VirtualServer {
     const whole = range === 'none' || (range.start === 0 && range.end === entry.size - 1)
     const wanted: ByteRange = range === 'none' ? { start: 0, end: entry.size - 1 } : range
 
-    let body: BodyInit | null
-    if (entry.size === 0) body = null
-    else if (entry.method === STORED) body = await reader.sliceStream(entry, wanted)
+    let body: BodyInit
+    if (entry.method === STORED) body = await reader.sliceStream(entry, wanted)
     else if (whole) body = reader.inflate(entry)
     else body = sliceStream(reader.inflate(entry), wanted)
 
@@ -984,7 +988,6 @@ class VirtualServer {
     return reader
   }
 
-  /** An entry's JSON, from the cache when it is there, as every library's is after the warm. */
   /**
    * Whether a download still under way can boot the frame: `bootReady`, and no library the
    * declared ones need in turn absent so far, nor a sub-content library a source has the major of
@@ -998,6 +1001,7 @@ class VirtualServer {
     return (await reader.missingDependencies(reader.manifest, (located) => this.readJson(located), offered)) === null
   }
 
+  /** An entry's JSON, from the cache when it is there, as every library's is after the warm. */
   private async readJson({ reader, entry }: LocatedEntry): Promise<unknown> {
     const cached = await new ChunkStore(reader.pkgId).getWhole(entry.name)
     return (cached ?? new Response(reader.inflate(entry))).json()

@@ -1105,7 +1105,8 @@ export function describeMissingLibraries(
 
   return {
     mainLibrary: manifest.mainLibrary,
-    folders: missing.map((dependency) => libraryFolderNames(dependency)[0]),
+    // An old export lists a library once for each library that needs it, so it is named once.
+    folders: [...new Set(missing.map((dependency) => libraryFolderNames(dependency)[0]))],
     all: missing.length === dependencies.length
   }
 }

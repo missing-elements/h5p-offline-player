@@ -168,6 +168,21 @@ built.push([
   })
 ])
 
+// 1e. The ordinary case with empty files, as real exports carry them (a book in the local corpus has
+//     three empty images): the content type loads an empty script beside its own, and `content/`
+//     holds an empty file deflated, as most writers leave one, and another stored.
+built.push([
+  'empty-files.h5p',
+  await writeArchive('empty-files.h5p', async (writer) => {
+    const library = JSON.parse(await readFile(resolve(sourceDir, 'H5P.OfflineTest-1.0', 'library.json'), 'utf8'))
+    await writer.add('H5P.OfflineTest-1.0/library.json', new TextReader(JSON.stringify({ ...library, preloadedJs: [...library.preloadedJs, { path: 'empty.js' }] })))
+    await addBaseFiles(writer, { skip: ['H5P.OfflineTest-1.0/library.json'] })
+    await writer.add('H5P.OfflineTest-1.0/empty.js', new Uint8ArrayReader(new Uint8Array(0)))
+    await writer.add('content/empty.txt', new Uint8ArrayReader(new Uint8Array(0)))
+    await writer.add('content/empty-stored.txt', new Uint8ArrayReader(new Uint8Array(0)), { level: 0 })
+  })
+])
+
 // 2. A large deflated entry: the Jobs worker inflates it into chunks and the virtual server
 //    serves the prefix that exists as a shorter 206.
 built.push([

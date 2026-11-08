@@ -156,6 +156,7 @@ Read it before changing the Service Worker's file server (`src/sw/mount.ts`, `pa
 - Some video cannot be streamed at all, and `preload` is the only lever.
 - Prefetch waits for `ready`, runs one entry at a time, and is off by default.
 - The cache is never the authority on size.
+- An empty entry is answered from its size, never from the cache.
 - Every response needs a `Content-Type`.
 - `RangeHttpHandle.read` slices a `200` body as it flows, like `stream` always did.
 - The archive's size never comes from a plain `GET`.

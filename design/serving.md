@@ -183,6 +183,12 @@ How a package's bytes reach the H5P runtime: the Service Worker's virtual file s
 - **The cache is never the authority on size.** An entry's real size comes from the zip central
   directory, so the virtual server can answer with the correct total length while only a prefix
   exists. That is what lets a cold video start playing.
+- **An empty entry is answered from its size, never from the cache.** `serveLocated` answers an
+  entry of size 0 with an empty `200` before any strategy runs, whatever range was asked for, as
+  a server may. The cache gives an empty response back with `body === null` (Chromium, checked
+  2026-11-08), and the inline path read that as an entry it could not read: a 500. For a
+  library's empty script that was a failed load, and the package did not play at all
+  (`empty-files.h5p` in `virtual-server.test.ts`); in the local corpus it was three empty images.
 - **Every response needs a `Content-Type`.** A zip records none. Browsers ignore a stylesheet that
   is not `text/css`, and Safari refuses media served as `application/octet-stream`.
 - **`RangeHttpHandle.read` slices a `200` body as it flows, like `stream` always did.** A host

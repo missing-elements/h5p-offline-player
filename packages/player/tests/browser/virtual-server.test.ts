@@ -79,6 +79,25 @@ describe('the virtual file server', () => {
     }
   })
 
+  it('plays a library that loads an empty script, and serves every empty file as an empty 200', async () => {
+    // The cache gives an empty response back with no body at all, which once read as an entry
+    // that could not be read: a 500, and for a library's script a failed load.
+    const player = await play(FIXTURES.emptyFiles)
+
+    for (const name of ['H5P.OfflineTest-1.0/empty.js', 'content/empty.txt', 'content/empty-stored.txt']) {
+      for (const pass of ['first', 'again']) {
+        const response = await frameFetch(player, virtualUrl(player, name))
+        expect(response.status, `${name}, ${pass}`).toBe(200)
+        expect(response.headers.get('content-length'), name).toBe('0')
+        expect(await response.text(), name).toBe('')
+      }
+    }
+
+    // There are no bytes to cut a range from, so the whole is the answer, as a server may give.
+    const ranged = await frameFetch(player, virtualUrl(player, 'content/empty.txt'), { headers: { Range: 'bytes=0-' } })
+    expect([ranged.status, await ranged.text()]).toEqual([200, ''])
+  })
+
   it('404s a package it has never heard of, on the entry route as on the frame route', async () => {
     const player = await play(FIXTURES.basic)
     const unknown = '0'.repeat(32)
