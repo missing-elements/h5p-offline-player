@@ -371,8 +371,9 @@ apps/skills/              the skills' test project, a project of the kind a skil
                             LMS (#159): a quiz over two sessions in SCORM 1.2, which the skill's
                             pass mark fails where the quiz's own passes; a questionnaire, a
                             branching scenario without scoring and a presentation without questions
-                            in 2004 with completion as 100; and its LMS table held to the embed
-                            README's
+                            in 2004 with completion as 100; the content it names as keeping the
+                            learner's place or starting over, held to whether the pack's library
+                            has getCurrentState(); and its LMS table held to the embed README's
 
 README.md                 what npm shows; ACCESSIBILITY.md, SECURITY.md, CONTRIBUTING.md, GLOSSARY.md,
                           CODE_OF_CONDUCT.md beside it

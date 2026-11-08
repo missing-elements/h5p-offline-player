@@ -1,11 +1,11 @@
 import { execFile } from 'node:child_process'
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, extname, join, normalize, resolve } from 'node:path'
 import { promisify } from 'node:util'
-import { BlobReader, Uint8ArrayWriter, ZipReader } from '@zip.js/zip.js'
+import { BlobReader, TextWriter, Uint8ArrayWriter, ZipReader, type Entry, type FileEntry } from '@zip.js/zip.js'
 import { buildPackage } from '@missing-elements/h5p-author'
 import { chromium, type Browser, type Frame, type Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -399,6 +399,35 @@ describe('the h5p-to-scorm skill', () => {
       expect(values['cmi.score.raw']).toBeUndefined()
       await context.close()
     }
+  })
+
+  it("names the content that keeps the learner's place, and the content that starts over, as the pack's libraries are", async () => {
+    // The player saves what a content type's getCurrentState() returns, and a type without it
+    // starts over (docs/resume.md). The skill names some of each; a pack refresh that changes one
+    // makes the skill wrong, and fails here.
+    const bullet = /^- The next launch continues where the learner was[\s\S]*?(?=\n- |\n\n)/m.exec(skill)?.[0]
+    expect(bullet).toBeTruthy()
+    const [keep, over] = bullet!.split(/(?<=\.) (?=An? )/)
+    const titles = { 'Question Set': 'H5P.QuestionSet', 'Course Presentation': 'H5P.CoursePresentation', 'Interactive Book': 'H5P.InteractiveBook', 'Interactive Video': 'H5P.InteractiveVideo', 'Branching Scenario': 'H5P.BranchingScenario', Accordion: 'H5P.Accordion', 'Image Hotspots': 'H5P.ImageHotspots', Flashcards: 'H5P.Flashcards', Timeline: 'H5P.Timeline' }
+    const named = (text: string) => Object.entries(titles).filter(([title]) => text.includes(title)).map(([, library]) => library)
+    expect(named(keep)).toHaveLength(5)
+    expect(named(over ?? '')).toHaveLength(4)
+    expect(over).toMatch(/starts over/)
+    /** Whether every version of a library the pack has saves its state. */
+    async function saves(library: string) {
+      const files = (await readdir(parts)).filter((name) => name.startsWith(`${library}-`) && name.endsWith('.h5p'))
+      expect(files.length, library).toBeGreaterThan(0)
+      const found = await Promise.all(files.map(async (name) => {
+        const reader = new ZipReader(new BlobReader(new Blob([await readFile(join(parts, name))])))
+        const scripts = (await reader.getEntries()).filter((entry: Entry): entry is FileEntry => !entry.directory && entry.filename.endsWith('.js'))
+        const texts = await Promise.all(scripts.map((entry) => entry.getData(new TextWriter())))
+        await reader.close()
+        return texts.some((text) => text.includes('getCurrentState'))
+      }))
+      return found.every(Boolean) ? true : found.some(Boolean) ? 'some versions' : false
+    }
+    for (const library of named(keep)) expect(await saves(library), library).toBe(true)
+    for (const library of named(over!)) expect(await saves(library), library).toBe(false)
   })
 
   it("names the embed README's supported LMSs, each added as it says and checked as far", () => {

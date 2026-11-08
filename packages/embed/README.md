@@ -151,7 +151,9 @@ package, the player and the H5P runtime, and a launch page that reports to the L
   never read them; the LMS's reports do;
 - the time spent in each session;
 - the learner's place: the content's saved state goes into `cmi.suspend_data`, compressed, and
-  the next launch continues from it. SCORM 1.2 keeps 4,096 characters; compressed, a quiz's state
+  the next launch continues from it, for a content type that saves one, as Question Set, Course
+  Presentation, Interactive Book, Interactive Video and most single questions do. An Accordion,
+  Image Hotspots, Flashcards or a Timeline starts over, as on any H5P site. SCORM 1.2 keeps 4,096 characters; compressed, a quiz's state
   takes about 200, a twelve-chapter Interactive Book about 1,000, and none of 23 real packages
   measured passed 1,100. One that does not fit is not saved, the last that fitted stays, and
   the page says so under the content, once. Moodle keeps 64,000 when its administrator turns

@@ -425,7 +425,10 @@ one row each; an LMS added here gets a row there.
   builds, plays their zips under a stand-in LMS as a learner (a quiz over two sessions in 1.2,
   where its mark of 80 fails the 66.67 the quiz's own 50% passes; a questionnaire, a branching
   scenario without scoring and a presentation without questions in 2004 with completion as 100),
-  and holds its table to the README's, so an LMS checked later is added to both.
+  holds the content it names as keeping the learner's place or starting over to the pack's
+  libraries (the player saves what `getCurrentState()` returns, and a type without it starts
+  over, `docs/resume.md`), and holds its table to the README's, so an LMS checked later is added
+  to both.
 
 `tests/scorm.test.ts` checks the zip, the parts it carries, its stored entries' local headers and
 its refusals in Node. In Chromium it plays the unpacked zip under a page that holds the API and

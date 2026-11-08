@@ -7,11 +7,12 @@ license: MIT
 # Turn an H5P package into a SCORM zip
 
 `h5p-embed --scorm` writes one `.h5p` as a SCORM zip: the package, the player, the H5P runtime
-and a launch page that reports to the LMS. The other supported LMSs record the score out of 100, passed or
-failed, each question's answer and the time spent, and keep the learner's place. Frappe LMS records
-only a pass and the learner's place. An export from h5p.com or h5p.org, which leaves the libraries out,
-works too: the zip
-takes the ones it needs from the library pack.
+and a launch page that reports to the LMS. It sends the score out of 100, passed or failed, each
+question's answer and the time spent, and saves the learner's place for the next launch where the
+content type keeps one (see *Hand over*). Every LMS below records the score, the result, the time
+and the place, except Frappe LMS, which records only a pass and the place. An export from h5p.com
+or h5p.org, which leaves the libraries out, works too: the zip takes the ones it needs from the
+library pack.
 
 The commands need Node 22 or later. Keep `@latest` in them: without it, npm on an older Node
 quietly installs the last version that supported it.
@@ -84,8 +85,11 @@ Tell the user, too:
 - The package's own code runs on the LMS's site, as every SCORM package's does: make zips only
   of packages the user trusts as much as any other SCORM package they upload.
 - How to try it: launch it as a student, answer one question wrong and the rest right, and check
-  the score and the status in the gradebook; then leave halfway through and launch it again,
-  which continues where it was.
+  the score and the status in the gradebook; then leave halfway through and launch it again.
+- The next launch continues where the learner was only for a content type that saves its place,
+  as Question Set, Course Presentation, Interactive Book, Interactive Video, Branching Scenario
+  and most single questions do. An Accordion, Image Hotspots, Flashcards or a Timeline starts over
+  at every launch, as on any H5P site.
 - SCORM 1.2 keeps 4,096 characters of saved state, of which a quiz takes about 200 and a
   twelve-chapter Interactive Book about 1,000. A state that does not fit is not saved, and the
   page says so under the content; SCORM 2004 keeps 64,000.
