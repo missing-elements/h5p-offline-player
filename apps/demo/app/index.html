@@ -39,7 +39,8 @@
     <link rel="manifest" href="/app/manifest.webmanifest" vite-ignore />
     <!-- iOS takes the home screen icon from here, not from the manifest. -->
     <link rel="apple-touch-icon" href="/app/icons/apple-touch-icon.png" vite-ignore />
-    <!-- partial: head -->
+    <!-- head-base, not head: the app counts no page views, installed or in a tab. -->
+    <!-- partial: head-base -->
     <link rel="stylesheet" href="/app/app.css" />
     <script type="module" src="/demo/element.js"></script>
     <script type="module" src="/app/app.js"></script>

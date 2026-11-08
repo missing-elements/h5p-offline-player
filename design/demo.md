@@ -241,12 +241,17 @@ SPA-fallback trap described above cannot happen there.
   satisfies `js/xss` only, and the redirect query accepts nothing short of a fixed host, which a
   player of any host's packages cannot have. New code that sets `src` from outside takes the same
   path, rather than another dismissal.
-- **Page views are counted by Vercel Web Analytics**, through `demo/analytics.js` in every
-  page's head, including `/embed` and the app: `inject()` from `@vercel/analytics`, which loads
-  `/_vercel/insights/script.js` from the site's own origin and reports to it, so the CSP needs no
-  change and no cookie is set; in dev it logs to the console. Added on 2026-09-26, removed on
-  2026-10-07 and put back on 2026-10-13 by the owner. Demo only: the packages carry none, and
-  `docs/privacy.md` describes the packages, not this site.
+- **Page views are counted by Vercel Web Analytics on the site's pages, never in the app or
+  `/embed`**, through `demo/analytics.js`: `partials/head.html` is `head-base.html` plus that
+  script, the app's page names `head-base` itself, and `/embed` loads neither. `inject()` from
+  `@vercel/analytics` loads `/_vercel/insights/script.js` from the site's own origin and reports
+  to it, so the CSP needs no change and no cookie is set; in dev it logs to the console. Added on
+  2026-09-26, removed on 2026-10-07 and put back on 2026-10-13 by the owner, and taken off the
+  app and `/embed` on 2026-11-09, also by the owner. The installed app counted every launch made
+  with a network: its worker answers the precached shell but not Vercel's script, so the request
+  went out and failed only offline (measured that day). `/embed` plays inside other people's
+  sites. Demo only: the packages carry none, and `docs/privacy.md` describes the packages, not
+  this site.
 - **The header's Star button shows the repository's live star count**, asked for by the owner on
   2026-10-17: `demo/stars.js`, on every page with the header, reads `stargazers_count` from
   `api.github.com` in the visitor's browser — the one request to a third party the pages make,

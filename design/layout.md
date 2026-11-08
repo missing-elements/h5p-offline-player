@@ -336,11 +336,13 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             scripts share, lib/pages.mjs the one list of the site's pages, for the
                             build and the sitemap, lib/partials.mjs the Vite plugin that puts the
                             shared markup into them
-  partials/                 the markup every page shares, written once: head.html (the favicon,
-                            the two classic scripts, the stylesheet, analytics), topbar.html (the
-                            bar), topbar-nav.html and topbar-icons.html (its links, and the theme
-                            switch with the Star, which the app's own bar names around its buttons);
-                            a page writes `<!-- partial: topbar -->` on a line of its own
+  partials/                 the markup every page shares, written once: head-base.html (the
+                            favicon, the two classic scripts, the stylesheet), head.html (that and
+                            the analytics, for every page but the app's, which names head-base),
+                            topbar.html (the bar), topbar-nav.html and topbar-icons.html (its
+                            links, and the theme switch with the Star, which the app's own bar
+                            names around its buttons); a page writes `<!-- partial: topbar -->`
+                            on a line of its own
   sweep/                    <machineName>.json for the content types the sweep cannot generate
                             playable content for, and the element's attributes they need
   vite.config.ts            the dev server and the hosted demo: the pages plus dist/'s layout at the
