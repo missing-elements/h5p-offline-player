@@ -22,6 +22,8 @@ const downgradeToggle = document.querySelector('#downgrade')
 const confirmBox = document.querySelector('#confirm-src')
 const modeNote = document.querySelector('#mode-note')
 const modeTag = document.querySelector('#mode-tag')
+const reportRow = document.querySelector('#report-row')
+const reportButton = document.querySelector('#report')
 
 const write = logInto(log)
 const show = messageIn(message)
@@ -159,6 +161,7 @@ player.addEventListener('finished', (event) => {
 
 player.addEventListener('error', (event) => {
   const { code, message: detail, missingLibraries } = event.detail
+  lastError = { code, message: detail, mainLibrary: missingLibraries?.mainLibrary, late: code === 'runtime' && player.state === 'ready' }
   bar.hidden = true
   // Played untrusted, the package turned out to need its own copy of a library. From another
   // site, the visitor decides, naming the host; this site's own or a picked file was played
@@ -238,6 +241,16 @@ player.setAttribute('resize-code', `<script src="${EMBED_ORIGIN}/resizer.js"></s
 /** The link being played, for the question a refusal of its own code asks. */
 let currentLink = null
 
+/** What the load being shown played, `{ url }` or `{ file }`, and its last error: for the report. */
+let playing = null
+let lastError = null
+
+const startReport = (what) => {
+  playing = what
+  lastError = null
+  reportRow.hidden = false
+}
+
 /**
  * The element's two modes, as the switch in the form sets them: Trusted plays a package with its
  * own libraries, Untrusted as data, none of its own code running, its libraries from this site's
@@ -298,6 +311,7 @@ const loadUrl = (url) => {
   trust.dismiss()
   reload = () => loadUrl(url)
   currentLink = url
+  startReport({ url })
   write(`loading  ${url}${applyMode()}`)
   // The embed code is read with the load, like `libraries`, so it goes on before `src`.
   player.setAttribute('embed-code', embedCodeFor(url))
@@ -313,6 +327,7 @@ const loadFile = (file) => {
   trust.dismiss()
   reload = () => loadFile(file)
   currentLink = null
+  startReport({ file })
   write(`loading  ${file.name} (${(file.size / 1024).toFixed(0)} kB, from disk)${applyMode()}`)
   startClock()
   urlInput.value = ''
@@ -363,6 +378,96 @@ for (const button of document.querySelectorAll('.samples button')) {
     loadUrl(button.dataset.src)
   })
 }
+
+/**
+ * "My file does not play": this repository's bug report form on GitHub, filled in from what the
+ * page knows of the load: the package's address or file name, the switches, its content type, the
+ * player's error and the event log. The visitor reads it there and sends it, or not: nothing
+ * leaves the page on its own, and the package goes only if they attach it. Every address loses
+ * its query and fragment, in the log too, since a signed URL carries its credentials there and an
+ * issue is public. GitHub fills a form's fields from the query by their `id`; it refuses `labels`
+ * from a visitor who may not set them, and the form adds `bug` itself.
+ */
+const REPORT_FORM = 'https://github.com/missing-elements/h5p-offline-player/issues/new'
+/** GitHub answers a longer address with a 414, so the log is cut from its middle to fit. */
+const REPORT_MAX_LENGTH = 7000
+
+const withoutQuery = (text) => {
+  try {
+    const url = new URL(text, location.href)
+    url.search = ''
+    url.hash = ''
+    return url.href
+  } catch {
+    return text
+  }
+}
+const scrub = (text) => text.replace(/https?:\/\/[^\s"'<>]+/g, (address) => withoutQuery(address))
+
+/** The file's name, or the last part of the link's path. */
+const packageName = () => {
+  if (playing?.file) return playing.file.name
+  const url = new URL(playing.url, location.href)
+  const last = url.pathname.split('/').filter(Boolean).pop()
+  try {
+    return last ? decodeURIComponent(last) : url.host
+  } catch {
+    return last
+  }
+}
+
+const reportUrl = () => {
+  const name = packageName()
+  const on = (toggle) => (toggle.checked ? 'on' : 'off')
+  const link = playing.url ? withoutQuery(playing.url) : null
+  const queryLeftOut = link !== null && link !== new URL(playing.url, location.href).href
+  const what = lastError
+    ? `${lastError.late ? 'It started, then the content reported an error' : 'The player stopped with an error'}: ` +
+      `${lastError.code}: ${scrub(lastError.message ?? '').slice(0, 600)}`
+    : `The player reached "${player.state}" and reported no error.`
+
+  const description =
+    `${name} does not play on the demo's player page, ${location.origin}/.\n\n` +
+    `${what}\n` +
+    `Content type: ${player.metadata?.mainLibrary ?? lastError?.mainLibrary ?? 'not known'}\n\n` +
+    'What I expected, and what I see instead:\n'
+  const reproduction =
+    (link ? `1. Open ${location.origin}/?src=${encodeURIComponent(link)}\n` : `1. Open ${location.origin}/ and choose the file from disk.\n`) +
+    `2. It plays ${playsUntrusted() ? 'Untrusted' : 'Trusted'}, with Newest libraries ${on(refreshToggle)} and Older if needed ${on(downgradeToggle)}.\n\n` +
+    `The package: ${link ? `${link}${queryLeftOut ? ' (its query left out)' : ''}` : `${name}, ${(playing.file.size / 1024).toFixed(0)} kB, from disk`}.\n` +
+    'Attach it here only if it may be shared publicly: GitHub takes it renamed to .zip, up to 25 MB.'
+  const environment =
+    `Package version: h5p-offline-player ${__PLAYER_VERSION__}, on ${location.host}\n` +
+    `Browser and version: ${navigator.userAgent}\n` +
+    `Operating system: ${navigator.userAgentData?.platform ?? ''}`
+
+  // Oldest first, as it happened, without the statements, which say nothing about a failure.
+  const events = log.textContent
+    .split('\n')
+    .filter((line) => line && !/^\S+ {2}xapi /.test(line))
+    .reverse()
+    .map(scrub)
+  const address = (lines) =>
+    `${REPORT_FORM}?${new URLSearchParams({
+      template: 'bug_report.yml',
+      title: `[Bug]: ${name} does not play`,
+      component: 'h5p-offline-player',
+      description,
+      reproduction,
+      environment,
+      logs: `The page's event log:\n\n\`\`\`text\n${lines.join('\n')}\n\`\`\``
+    })}`
+  // The load and its first states are at the start, the failure at the end: both are kept.
+  for (let keep = events.length; ; keep = Math.floor(keep * 0.7)) {
+    const lines = keep >= events.length ? events : [...events.slice(0, Math.ceil(keep / 2)), `… ${events.length - keep} lines left out`, ...events.slice(events.length - Math.floor(keep / 2))]
+    const result = address(lines)
+    if (result.length <= REPORT_MAX_LENGTH || keep < 4) return result
+  }
+}
+
+reportButton.addEventListener('click', () => {
+  window.open(reportUrl(), '_blank', 'noopener')
+})
 
 const askBeforeOpening = trust.ask
 

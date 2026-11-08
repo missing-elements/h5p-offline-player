@@ -271,6 +271,17 @@ SPA-fallback trap described above cannot happen there.
   grid's three cells too; the title gets no intrinsic width (`contain: inline-size`), or the box
   took the whole title's width and pushed the icons onto a row of their own on a phone. Its
   installed window, with no links, keeps a flex row.
+- **"My file does not play" opens a bug report that the visitor sends**, asked for by the owner
+  on 2026-11-08. Under the player page's element, once something has been played, it opens
+  GitHub's `bug_report.yml` form in a new tab without `opener`, its fields filled in by their
+  `id`s from what the page knows of the load: the file's name or the link, the switches, the
+  content type (`metadata`, or a refusal's `missingLibraries.mainLibrary`), the error, the
+  player's version and the event log, oldest first and without the statements. Nothing is sent
+  from the page, and the package goes only if the visitor attaches it, which GitHub takes renamed
+  to `.zip`, up to 25 MB. Every address loses its query and fragment, in the log too: a signed
+  URL carries its credentials there, and an issue is public. `labels` is not passed, since GitHub
+  answers a visitor who may not set labels with a 404, and the form adds `bug` itself. The log is
+  cut from its middle to keep the address under 7,000 characters, short of GitHub's 414.
 - **The header and the head's shared lines are partials** (`partials/`, put into each page by
   `scripts/lib/partials.mjs`, a `transformIndexHtml` hook that runs first, in dev and the build
   alike), since 2026-10-17, asked for by the owner after the Star button had to be added to eleven

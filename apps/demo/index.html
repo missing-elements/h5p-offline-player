@@ -173,6 +173,15 @@
            it names the package URL). -->
       <h5p-player preload="auto" frame copyright export embed></h5p-player>
 
+      <!-- Once something has been played: GitHub's bug report form, filled in from this page's log,
+           for the visitor to read and send. Nothing leaves the page on its own; see reportUrl in
+           demo/player-page.js. -->
+      <p class="report" id="report-row" hidden>
+        <button type="button" id="report" aria-describedby="report-note">My file does not play</button>
+        <span id="report-note">Opens a bug report on GitHub, filled in from the events below, for you to check and
+        send. Your file goes with it only if you attach it.</span>
+      </p>
+
       <h2>Events</h2>
       <pre class="log" id="log"></pre>
 
