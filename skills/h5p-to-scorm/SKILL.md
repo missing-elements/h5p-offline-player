@@ -7,9 +7,10 @@ license: MIT
 # Turn an H5P package into a SCORM zip
 
 `h5p-embed --scorm` writes one `.h5p` as a SCORM zip: the package, the player, the H5P runtime
-and a launch page that reports to the LMS. The LMS then records the score out of 100, passed or
-failed, each question's answer and the time spent, and keeps the learner's place for the next
-launch. An export from h5p.com or h5p.org, which leaves the libraries out, works too: the zip
+and a launch page that reports to the LMS. The other supported LMSs record the score out of 100, passed or
+failed, each question's answer and the time spent, and keep the learner's place. Frappe LMS records
+only a pass and the learner's place. An export from h5p.com or h5p.org, which leaves the libraries out,
+works too: the zip
 takes the ones it needs from the library pack.
 
 The commands need Node 22 or later. Keep `@latest` in them: without it, npm on an older Node
