@@ -573,11 +573,21 @@ describe('in an LMS', () => {
     expect(kept).toMatchObject({ 'cmi.core.score.min': '0', 'cmi.core.score.max': '100', 'cmi.core.score.raw': '66.67' })
     expect(kept['cmi.core.session_time']).toMatch(/^\d{2,4}:\d{2}:\d{2}\.\d{2}$/)
     // Each question's answer as an interaction, by index, as Moodle's report reads them: the
-    // question's words as the id, since SCORM 1.2 has no description field.
+    // question's number and words as the id, since SCORM 1.2 has no description field.
     expect(Object.keys(kept).filter((key) => /^cmi\.interactions\.\d+\.id$/.test(key))).toHaveLength(4)
-    expect(kept['cmi.interactions.0.id']).toMatch(/^[a-z0-9-]{3,80}$/)
+    expect(kept['cmi.interactions.0.id']).toMatch(/^Q1_[a-z0-9_]{1,40}$/)
+    expect(kept['cmi.interactions.2.id']).toMatch(/^Q3_[a-z0-9_]{1,40}$/)
     expect(kept).toMatchObject({ 'cmi.interactions.0.type': 'choice', 'cmi.interactions.0.result': 'correct', 'cmi.interactions.1.type': 'true-false', 'cmi.interactions.1.result': 'correct', 'cmi.interactions.2.type': 'fill-in', 'cmi.interactions.2.result': 'correct' })
-    expect(kept['cmi.interactions.0.student_response']).toBe(kept['cmi.interactions.0.correct_responses.0.pattern'])
+    // The typed-in answer with its response and the right one, as text a person reads: the blanks
+    // listed, and H5P's `{case_matters=false}` gone. The right one is each blank's first answer; the
+    // learner's "deflated" is the second the third blank takes. The choice and the true-false with
+    // their result alone, since 1.2 writes those answers in a form of its own.
+    expect(kept['cmi.interactions.2.student_response']).toBe('stored, Range, deflated, front')
+    expect(kept['cmi.interactions.2.correct_responses.0.pattern']).toBe('stored, Range, compressed, front')
+    for (const index of [0, 1]) {
+      expect(kept[`cmi.interactions.${index}.student_response`]).toBeUndefined()
+      expect(kept[`cmi.interactions.${index}.correct_responses.0.pattern`]).toBeUndefined()
+    }
     expect(kept['cmi.interactions.0.weighting']).toMatch(/^\d+$/)
     expect(kept['cmi.interactions.0.latency']).toMatch(/^\d{2,4}:\d{2}:\d{2}\.\d{2}$/)
     expect(kept['cmi.interactions.0.time']).toMatch(/^\d{2}:\d{2}:\d{2}$/)
@@ -734,68 +744,77 @@ describe('in an LMS', () => {
     // keeps no state of its own sends nothing else that would keep them.
     const [wrote, committed] = (await calls(page)).slice(-2)
     expect([wrote[0], wrote[1], committed[0]]).toEqual(['LMSSetValue', 'cmi.suspend_data', 'LMSCommit'])
-    expect((await decoded(first.sco, wrote[2])).questions).toEqual([['a', 'which-rivers-cross-germany']])
-    // Another question with the same words takes another id.
+    expect((await decoded(first.sco, wrote[2])).questions).toEqual([['a', 'Q1_which_rivers_cross_germany']])
+    // Another question with the same words takes its own number.
     await answer(first.sco, 'b', 'Which rivers cross Germany?')
     let kept = await values(page)
     expect(kept).toMatchObject({
-      'cmi.interactions.0.id': 'which-rivers-cross-germany',
+      'cmi.interactions.0.id': 'Q1_which_rivers_cross_germany',
       'cmi.interactions.0.type': 'choice',
-      'cmi.interactions.0.correct_responses.0.pattern': '0[,]2',
-      'cmi.interactions.0.student_response': '0[,]1',
       'cmi.interactions.0.result': 'wrong',
       'cmi.interactions.0.weighting': '2',
       'cmi.interactions.0.latency': '00:00:12.50',
-      'cmi.interactions.1.id': 'which-rivers-cross-germany-2'
+      'cmi.interactions.1.id': 'Q2_which_rivers_cross_germany'
     })
     expect(kept['cmi.interactions.0.time']).toMatch(/^\d{2}:\d{2}:\d{2}$/)
+    // 1.2 writes a choice in single characters, which H5P's `0[,]2` is not: the result alone.
+    expect(kept['cmi.interactions.0.correct_responses.0.pattern']).toBeUndefined()
+    expect(kept['cmi.interactions.0.student_response']).toBeUndefined()
 
-    // Answered again: the same index, the new answer, nothing added.
+    // Answered again: the same index, the new result, nothing added. What an earlier answer left
+    // there, here a choice's response and right one in H5P's notation as a zip before 1.2's answers
+    // were held to their types wrote them in an attempt it began, is emptied, not left beside it.
+    await page.evaluate(() => Object.assign((window as unknown as { values: Record<string, string> }).values, { 'cmi.interactions.0.student_response': '0[,]1', 'cmi.interactions.0.correct_responses.0.pattern': '0[,]2' }))
     await answer(first.sco, 'a', 'Which <em>rivers</em> cross Germany?', {}, { response: '0[,]2', success: true, score: { raw: 2, max: 2 } })
     kept = await values(page)
-    expect(kept).toMatchObject({ 'cmi.interactions.0.student_response': '0[,]2', 'cmi.interactions.0.result': 'correct' })
+    expect(kept).toMatchObject({ 'cmi.interactions.0.result': 'correct', 'cmi.interactions.0.student_response': '', 'cmi.interactions.0.correct_responses.0.pattern': '' })
     expect(kept['cmi.interactions.2.id']).toBeUndefined()
+    // A question answered for the first time writes neither, empty or not.
+    expect(kept['cmi.interactions.1.student_response']).toBeUndefined()
+    expect(kept['cmi.interactions.1.correct_responses.0.pattern']).toBeUndefined()
 
-    // An Essay's long answer, as `fill-in`, cut to what 1.2 keeps; a type 1.2 has not, left out;
-    // a question with no words, named by its id; a result that says nothing, neutral; one that
-    // says nothing but scores, as Fill in the Blanks does, by its marks.
+    // An Essay's long answer, as `fill-in`, its response cut to what 1.2 keeps; a type 1.2 has not,
+    // left out, with its response; a question with no words, named by its number alone; a result
+    // that says nothing, neutral; one that says nothing but scores, as Fill in the Blanks does, by
+    // its marks.
     await answer(first.sco, 'c', '', { interactionType: 'long-fill-in', correctResponsesPattern: [] }, { response: 'x'.repeat(300), success: undefined, score: undefined, duration: undefined })
     await answer(first.sco, 'd', 'Other', { interactionType: 'other' }, { success: undefined, score: { raw: 1, max: 2 } })
     kept = await values(page)
-    expect(kept).toMatchObject({ 'cmi.interactions.2.id': 'c', 'cmi.interactions.2.type': 'fill-in', 'cmi.interactions.2.result': 'neutral', 'cmi.interactions.3.id': 'other', 'cmi.interactions.3.result': '1' })
+    expect(kept).toMatchObject({ 'cmi.interactions.2.id': 'Q3', 'cmi.interactions.2.type': 'fill-in', 'cmi.interactions.2.result': 'neutral', 'cmi.interactions.3.id': 'Q4_other', 'cmi.interactions.3.result': '1' })
     expect(kept['cmi.interactions.2.student_response']).toHaveLength(255)
     expect(kept['cmi.interactions.2.correct_responses.0.pattern']).toBeUndefined()
     expect(kept['cmi.interactions.2.latency']).toBeUndefined()
     expect(kept['cmi.interactions.3.type']).toBeUndefined()
+    expect(kept['cmi.interactions.3.student_response']).toBeUndefined()
 
     // The questions go with the state, with no save of the content's, so the next session of the
     // attempt keeps their indexes and their ids.
     expect((await decoded(first.sco, (await values(page))['cmi.suspend_data'])).questions).toEqual([
-      ['a', 'which-rivers-cross-germany'],
-      ['b', 'which-rivers-cross-germany-2'],
-      ['c', 'c'],
-      ['d', 'other']
+      ['a', 'Q1_which_rivers_cross_germany'],
+      ['b', 'Q2_which_rivers_cross_germany'],
+      ['c', 'Q3'],
+      ['d', 'Q4_other']
     ])
     await leave(page)
     const second = await launch(page)
-    // The second of two questions with the same words, answered first this time, keeps its own id.
-    await answer(second.sco, 'b', 'Which rivers cross Germany?', {}, { response: '2' })
+    // The second of two questions with the same words, answered first this time, keeps its number.
+    await answer(second.sco, 'b', 'Which rivers cross Germany?', {}, { success: true, score: { raw: 2, max: 2 } })
     await answer(second.sco, 'e', 'A new one')
     kept = await values(page)
-    expect(kept).toMatchObject({ 'cmi.interactions.1.id': 'which-rivers-cross-germany-2', 'cmi.interactions.1.student_response': '2', 'cmi.interactions.4.id': 'a-new-one' })
+    expect(kept).toMatchObject({ 'cmi.interactions.1.id': 'Q2_which_rivers_cross_germany', 'cmi.interactions.1.result': 'correct', 'cmi.interactions.4.id': 'Q5_a_new_one' })
     expect(kept['cmi.interactions.5.id']).toBeUndefined()
 
     // An attempt the LMS started over, which it does at a launch, its interactions gone: they start
-    // again from the first index.
+    // again from the first index, and a question takes the number of its new one.
     await leave(page)
     await page.evaluate(() => {
       const lms = window as unknown as { values: Record<string, string> }
       for (const key of Object.keys(lms.values)) if (key.startsWith('cmi.interactions.')) delete lms.values[key]
     })
     const third = await launch(page)
-    await answer(third.sco, 'e', 'A new one', {}, { response: '1' })
+    await answer(third.sco, 'e', 'A new one')
     kept = await values(page)
-    expect(kept).toMatchObject({ 'cmi.interactions.0.id': 'a-new-one', 'cmi.interactions.0.student_response': '1' })
+    expect(kept).toMatchObject({ 'cmi.interactions.0.id': 'Q1_a_new_one', 'cmi.interactions.0.result': 'wrong' })
     expect(kept['cmi.interactions.1.id']).toBeUndefined()
     await context.close()
   })
@@ -808,15 +827,78 @@ describe('in an LMS', () => {
     const first = await launch(page)
     for (const sub of ['a', 'b', 'c']) await answer(first.sco, sub, `Question ${sub}`)
     let kept = await values(page)
-    expect([0, 1, 2].map((index) => kept[`cmi.interactions.${index}.id`])).toEqual(['question-a', 'question-b', 'question-c'])
+    expect([0, 1, 2].map((index) => kept[`cmi.interactions.${index}.id`])).toEqual(['Q1_question_a', 'Q2_question_b', 'Q3_question_c'])
 
     // The next session of the attempt: the count it loaded, and new questions after it.
     await leave(page)
     const second = await launch(page)
-    await answer(second.sco, 'b', 'Question b', {}, { response: '2' })
+    await answer(second.sco, 'b', 'Question b', {}, { success: true, score: { raw: 2, max: 2 } })
     for (const sub of ['d', 'e']) await answer(second.sco, sub, `Question ${sub}`)
     kept = await values(page)
-    expect(kept).toMatchObject({ 'cmi.interactions.1.student_response': '2', 'cmi.interactions.3.id': 'question-d', 'cmi.interactions.4.id': 'question-e' })
+    expect(kept).toMatchObject({ 'cmi.interactions.1.result': 'correct', 'cmi.interactions.3.id': 'Q4_question_d', 'cmi.interactions.4.id': 'Q5_question_e' })
+    await context.close()
+  })
+
+  it('names an answer by its number and its first words, in letters, digits and _ alone', async () => {
+    const { context, page } = await lmsPage()
+    const { sco } = await launch(page)
+    // Letters folded to ASCII and cut at a word; no Latin letters, the number alone; a long word cut
+    // where its words end.
+    await answer(sco, 'a', 'Wie heißt die Straße über den Fluß, die nach Łódź führt?')
+    await answer(sco, 'b', 'Что такое вода?')
+    await answer(sco, 'c', 'Supercalifragilisticexpialidocious-and-then-some-more-letters')
+    // Markup out and character references read, as a question type writes its words; a dotless ı.
+    await answer(sco, 'd', '<p>Don&rsquo;t&nbsp;stop &amp; go</p>')
+    await answer(sco, 'e', 'Kızılırmak nehri')
+    const kept = await values(page)
+    expect([0, 1, 2, 3, 4].map((index) => kept[`cmi.interactions.${index}.id`])).toEqual([
+      'Q1_wie_heisst_die_strasse_uber_den_fluss',
+      'Q2',
+      'Q3_supercalifragilisticexpialidocious_and',
+      'Q4_don_t_stop_go',
+      'Q5_kizilirmak_nehri'
+    ])
+    await context.close()
+  })
+
+  it('writes a SCORM 1.2 answer\'s response and the right one where they are the learner\'s own text or number, as text a person reads', async () => {
+    const { context, page } = await lmsPage()
+    const { sco } = await launch(page)
+    await answer(sco, 'a', 'Name a river', { interactionType: 'fill-in', correctResponsesPattern: ['{case_matters=false}Rhine'] }, { response: 'Rhine', success: true })
+    await answer(sco, 'b', 'How long is it, in km?', { interactionType: 'numeric', correctResponsesPattern: ['1233'] }, { response: '1230' })
+    await answer(sco, 'c', 'It flows into the North Sea', { interactionType: 'true-false', correctResponsesPattern: ['true'] }, { response: 'false' })
+    await answer(sco, 'd', 'Put them in order', { interactionType: 'sequencing', correctResponsesPattern: ['0[,]1[,]2'] }, { response: '1[,]0[,]2' })
+    await answer(sco, 'e', 'Match them', { interactionType: 'matching', correctResponsesPattern: ['0[.]1[,]1[.]0'] }, { response: '0[.]0[,]1[.]1' })
+    await answer(sco, 'f', 'Name two seas', { interactionType: 'fill-in', correctResponsesPattern: ['{case_matters=false}{lang=en}North Sea[,]Baltic'] }, { response: 'North Sea[,]Black Sea', success: false })
+    await answer(sco, 'g', 'Roughly how long, in km?', { interactionType: 'numeric', correctResponsesPattern: ['1200[:]1300'] }, { response: 'about 1230', success: undefined, score: undefined })
+    const kept = await values(page)
+    // H5P's `{case_matters=false}` and `{lang=en}` taken off the right answer, and blanks parted by
+    // `[,]` listed, in the answer given as in the right one.
+    expect(kept).toMatchObject({
+      'cmi.interactions.0.student_response': 'Rhine',
+      'cmi.interactions.0.correct_responses.0.pattern': 'Rhine',
+      'cmi.interactions.1.student_response': '1230',
+      'cmi.interactions.1.correct_responses.0.pattern': '1233',
+      'cmi.interactions.5.student_response': 'North Sea, Black Sea',
+      'cmi.interactions.5.correct_responses.0.pattern': 'North Sea, Baltic',
+      'cmi.interactions.6.type': 'numeric',
+      'cmi.interactions.6.result': 'neutral'
+    })
+    // A numeric answer that is not a number, 1.2's `CMIDecimal`, is not written: neither 2004's
+    // range nor words.
+    expect(kept['cmi.interactions.6.student_response']).toBeUndefined()
+    expect(kept['cmi.interactions.6.correct_responses.0.pattern']).toBeUndefined()
+    // The fill-in answered again with nothing typed: its earlier response emptied, its right one
+    // written again.
+    await answer(sco, 'a', 'Name a river', { interactionType: 'fill-in', correctResponsesPattern: ['{case_matters=false}Rhine'] }, { response: '', success: false })
+    expect(await values(page)).toMatchObject({ 'cmi.interactions.0.student_response': '', 'cmi.interactions.0.correct_responses.0.pattern': 'Rhine', 'cmi.interactions.0.result': 'wrong' })
+    // Their type and their result, but not H5P's notation, which 1.2 does not take for them.
+    for (const index of [2, 3, 4]) {
+      expect(kept[`cmi.interactions.${index}.type`]).toBe(['true-false', 'sequencing', 'matching'][index - 2])
+      expect(kept[`cmi.interactions.${index}.result`]).toBe('wrong')
+      expect(kept[`cmi.interactions.${index}.student_response`]).toBeUndefined()
+      expect(kept[`cmi.interactions.${index}.correct_responses.0.pattern`]).toBeUndefined()
+    }
     await context.close()
   })
 
@@ -980,6 +1062,9 @@ describe('in an LMS', () => {
     expect(kept).toMatchObject({ 'cmi.interactions.0.type': 'choice', 'cmi.interactions.0.result': 'correct', 'cmi.interactions.1.type': 'true-false', 'cmi.interactions.2.type': 'fill-in', 'cmi.interactions.3.result': 'incorrect' })
     expect(kept['cmi.interactions.0.learner_response']).toBe(kept['cmi.interactions.0.correct_responses.0.pattern'])
     expect(kept['cmi.interactions.0.student_response']).toBeUndefined()
+    // 2004 takes H5P's notation, which is its own, as written: the fill-in's too.
+    expect(kept['cmi.interactions.2.correct_responses.0.pattern']).toBe('{case_matters=false}stored[,]Range[,]compressed[,]front')
+    expect(kept['cmi.interactions.2.learner_response']).toBe('stored[,]Range[,]deflated[,]front')
     expect(kept['cmi.interactions.0.latency']).toMatch(/^PT(\d+H)?(\d+M)?\d+(\.\d{1,2})?S$/)
     expect(kept['cmi.interactions.0.timestamp']).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,2})?Z$/)
     expect(Object.keys(kept).some((key) => key.startsWith('cmi.core.'))).toBe(false)
