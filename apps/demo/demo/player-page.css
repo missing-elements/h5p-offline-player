@@ -642,6 +642,28 @@ progress[hidden] { display: none; }
 .message.offer:not([hidden]) { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .offer button[hidden] { display: none; }
 
+/* "My file does not play", under the player: a quiet pill, as the samples are, and what it does. */
+.report:not([hidden]) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.75rem;
+  margin: 0.75rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+.report button {
+  flex: none;
+  min-height: 2rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.85rem;
+}
+.report button:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.report span { flex: 1 1 18rem; }
+
 /* ---------------------------------------------------------------- the SCORM page's steps */
 
 /* A step: its number in a disc before its heading, and hidden until the page can reach it. */
