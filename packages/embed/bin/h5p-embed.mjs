@@ -25,7 +25,7 @@ Options:
   --pass-mark <0-100>    with --scorm, the score out of 100 that passes, in place of the
                          content's own pass or fail; the LMS gets it as the mastery score
   --completion-score     with --scorm, count content that finishes without a score, such as a
-                         presentation with no questions, as 100
+                         questionnaire, as 100
   --packages <origins>   play packages, and fetch library bundles, only from these origins
                          (comma or space separated; this site's own is always allowed). Add
                          any host a package URL redirects to, and https://cdn.jsdelivr.net for

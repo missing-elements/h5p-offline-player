@@ -377,9 +377,14 @@ one row each; an LMS added here gets a row there.
     written without a mark reads none, so an LMS's own mastery score never changes a default
     zip's status.
   - **Completion as 100.** A result with no score, neither `scaled` nor `raw` over a `max` above
-    0, as content without questions finishes, is reported as 100 (`scaled` 1) beside completed,
-    and passes a mark. H5P invents no score, so this is off unless asked; content that never
-    finishes, an Accordion or a Virtual Tour, stays incomplete.
+    0, as a questionnaire or a branching scenario without scoring finishes, is reported as 100
+    (`scaled` 1) beside completed, and passes a mark. H5P invents no score, so this is off unless
+    asked; content that never finishes, an Accordion or a Virtual Tour, stays incomplete. So does a
+    presentation or a book without questions, which the README and the command's help gave as the
+    example until #160 (2026-11-08): Course Presentation 1.27 and Interactive Book 1.15 send their
+    `completed` from a summary page they show only when they hold tasks. Played to its last slide,
+    the presentation sent `progressed` alone; the book's chapters say `completed` as sub-content,
+    which is not the book's result.
   - **Checked on 2026-11-05.** In Moodle 4.5.15 (Docker, `notes/scorm-spike`, the 2004 runs by
     `drive-options.mjs`): Moodle took the 2004 zips as `SCORM_1.3`, kept the objective (0.8,
     satisfied by measure) and the 1.2 mastery score (80). The quiz over two sessions resumed on
@@ -396,7 +401,8 @@ one row each; an LMS added here gets a row there.
     as 100, completed, passed and 100; and 1.2 with a mark of 80 failed at 66.67, the
     registration incomplete as for any failed 1.2 attempt there. The finishes with no score were
     the element's `finished` dispatched in the SCO's frame, as the tests do, since no package here
-    finishes without one. Completion as 100 without a mark ran in no LMS: it gives `completed`
+    finished without one; since #160 the h5p-to-scorm skill's test plays real ones under a stand-in
+    LMS. Completion as 100 without a mark ran in no LMS: it gives `completed`
     and 100, and in 2004 leaves success `unknown`, which a test holds (#142).
 
   `scorm-page.test.ts` drives the written site's page in Chromium: a chosen file read into its row
@@ -408,6 +414,18 @@ one row each; an LMS added here gets a row there.
   plan's facts to the command's zip, two writes of one plan under two titles to the same zip but
   for the manifest and the page, a title given to the page's builder to the command's `--title`,
   entry for entry, and a title given to the plan to its writes, which hash the package once.
+
+- **`skills/h5p-to-scorm/SKILL.md` is the contract with an agent** (#159, 2026-11-08), as
+  `skills/h5p-verify/SKILL.md` is the verifier's: what to ask first (the LMS, then a pass mark,
+  completion as 100 and 2004 only where they matter), the check that plays a package as the zip
+  plays it (`--libraries pack --no-refresh-libraries --no-downgrade-libraries`), the command and
+  its refusals, the *Supported LMSs* table with the setting each LMS needs, and what to tell the
+  user. It names only options on npm, since a skill is installed from `main`.
+  `apps/skills/tests/to-scorm.test.ts` runs its commands as it writes them on packages h5p-author
+  builds, plays their zips under a stand-in LMS as a learner (a quiz over two sessions in 1.2,
+  where its mark of 80 fails the 66.67 the quiz's own 50% passes; a questionnaire, a branching
+  scenario without scoring and a presentation without questions in 2004 with completion as 100),
+  and holds its table to the README's, so an LMS checked later is added to both.
 
 `tests/scorm.test.ts` checks the zip, the parts it carries, its stored entries' local headers and
 its refusals in Node. In Chromium it plays the unpacked zip under a page that holds the API and
@@ -442,7 +460,8 @@ Not covered:
 
 - any LMS but Moodle 4.5, Frappe LMS, SCORM Cloud, ILIAS 11, OpenOLAT 21.1 and Chamilo 3.0, and
   SCORM 2004 and the grading options in any but Moodle 4.5 and SCORM Cloud;
-- content that finishes without a score, in an LMS: the finish was dispatched;
+- content that finishes without a score, in a real LMS: it has played to its end only under the
+  skill's stand-in;
 - SCORM Cloud's launch in a frame of its player page, where it launched in its pop-up;
 - Firefox and Safari;
 - Moodle with `slasharguments` off, its popup window and its mobile app;

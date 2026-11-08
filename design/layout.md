@@ -347,8 +347,8 @@ apps/demo/                the demo app: the dev server for the whole repository,
                             site root -> dist-demo/
 
 apps/skills/              the skills' test project, a project of the kind a skill's user runs it in:
-                          it installs the commands the skills run with npx, the author package and
-                          the verifier, and the library pack; nothing in it ships. Out of the demo
+                          it installs the commands the skills run with npx, the author package,
+                          the verifier and the embed command, and the library pack; nothing in it ships. Out of the demo
                           since 2026-10-23, by the owner's choice
   tests/author-verify.test.ts  every h5p-author type file's example built, with sample media, checked
                             as saved content against the libraries it carries with nothing reported
@@ -366,6 +366,13 @@ apps/skills/              the skills' test project, a project of the kind a skil
                             result's screen-reader announcement, since Question Set 1.21 draws
                             neither on its result page (h5p/h5p-question-set#183), and drawn
                             after Check on a question on its own; Chromium only
+  tests/to-scorm.test.ts    the h5p-to-scorm skill's commands as it writes them, run on packages
+                            h5p-author builds, and their zips played as a learner under a stand-in
+                            LMS (#159): a quiz over two sessions in SCORM 1.2, which the skill's
+                            pass mark fails where the quiz's own passes; a questionnaire, a
+                            branching scenario without scoring and a presentation without questions
+                            in 2004 with completion as 100; and its LMS table held to the embed
+                            README's
 
 README.md                 what npm shows; ACCESSIBILITY.md, SECURITY.md, CONTRIBUTING.md, GLOSSARY.md,
                           CODE_OF_CONDUCT.md beside it
@@ -391,8 +398,10 @@ docs/                     the README's longer sections, one file each: the eleme
 skills/                   agent skills, one directory per skill, at the root because that is where
                           `npx skills add <owner/repo>` looks: h5p-verify (when to run the verifier and how
                           to read its report), h5p-player-setup (putting the player on a site), h5p-normalize (when
-                          a package needs rewriting to stream, and how to read the dry run)
-                          and h5p-author (any of 28 content types from a prompt, since #100: the
+                          a package needs rewriting to stream, and how to read the dry run),
+                          h5p-to-scorm (a package as a SCORM zip for an LMS, since #159: what to ask,
+                          the check, the command and its refusals, each LMS's setting; tested from
+                          apps/skills) and h5p-author (any of 28 content types from a prompt, since #100: the
                           type chosen with the user first, a source of only what differs from the
                           defaults, written from references/types/<Type>.md — notes, a tested
                           example and the fields, their section generated from the pack — built

@@ -4,7 +4,8 @@ A pnpm workspace: `packages/player`, `packages/runtime`, `packages/libraries`,
 `packages/normalize`, `packages/verify`, `packages/author`, `packages/cmi5`, `packages/embed`,
 `packages/vscode`, the demo site in `apps/demo`, and in `apps/skills` the tests of the agent
 skills, run from a project the way a skill's user runs them: every h5p-author type file's example
-built and played.
+built and played, and the h5p-to-scorm skill's commands run and their zips played under a stand-in
+LMS.
 
 ```bash
 pnpm install

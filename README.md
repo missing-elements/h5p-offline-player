@@ -131,18 +131,21 @@ reads the `.h5p` itself, with nothing to unzip, and
 
 [![skills.sh](https://skills.sh/b/missing-elements/h5p-offline-player)](https://skills.sh/missing-elements/h5p-offline-player)
 
-Four skills for Claude Code and other agents that can read files and run commands, installed
-with [skills](https://skills.sh/):
+Five skills for Claude Code and other agents that can read files and run commands, installed
+with [skills](https://skills.sh/); add `--skill <name>` for one of them. None needs a provider API
+key or an H5P server.
 
 ```bash
 npx skills add missing-elements/h5p-offline-player
 ```
 
-[`h5p-author`](https://github.com/missing-elements/h5p-offline-player/tree/main/skills/h5p-author)
-turns a prompt or a lesson into H5P content of any of 28 types, chosen with you first, checks it
-in the real player and opens it for you to play. `h5p-player-setup` puts H5P on a site,
-`h5p-normalize` fixes video that will not stream, and `h5p-verify` checks that a package plays.
-None needs a provider API key or an H5P server.
+| Skill | What it does |
+|---|---|
+| [`h5p-author`](https://github.com/missing-elements/h5p-offline-player/tree/main/skills/h5p-author) | Turns a prompt or a lesson into H5P content of any of 28 types, chosen with you first, checks it in the real player and opens it for you to play |
+| [`h5p-verify`](https://github.com/missing-elements/h5p-offline-player/tree/main/skills/h5p-verify) | Checks that a package plays, and opens it in your browser for you to try |
+| [`h5p-to-scorm`](https://github.com/missing-elements/h5p-offline-player/tree/main/skills/h5p-to-scorm) | Turns a package into a SCORM zip that an LMS plays, grades and resumes, and says what to set in yours |
+| [`h5p-player-setup`](https://github.com/missing-elements/h5p-offline-player/tree/main/skills/h5p-player-setup) | Puts H5P on a website, from the player on the site itself or framed from a domain of your own |
+| [`h5p-normalize`](https://github.com/missing-elements/h5p-offline-player/tree/main/skills/h5p-normalize) | Rewrites a package whose video will not stream |
 
 ## Contributing
 
