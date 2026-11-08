@@ -49,7 +49,9 @@ two that fit the material and objective, a sentence each on why, and wait for th
 
 Media come from the user; never invent them. For a type not listed, run
 `npx @missing-elements/h5p-author@latest schema <Type>` and say it has no notes here. Never
-read a library's semantics or code yourself.
+read a library's semantics or code yourself: the type file and `schema` say what a source may
+write, and an agent that works it out from the library spends two to three times as much for
+the same package.
 
 ## 2. Write the source
 
@@ -73,13 +75,17 @@ content holds have files too: H5P.AdvancedText, H5P.Image, H5P.Video, H5P.Text.
 
 ## 3. Build
 
+Build in a working folder of your own, not in the folder the user named:
+
 ```bash
 npx @missing-elements/h5p-author@latest build source.json course.h5p
 ```
 
-It writes nothing until the whole source is right, listing every problem by its path, and
-never overwrites a file. Fix and build to a new name. Pass its notes on to the user: texts
-left in English, a slide that holds too much.
+A source with a problem writes nothing: the build lists every problem by its path, so fix them
+all and run it again under the same name. Once a build has written its file it never writes
+over it, so a later build takes a new name (`course-2.h5p`). Copy the one you hand over to the
+name the user asked for; never delete a file to free a name. Pass the build's notes on to the
+user: texts left in English, a slide that holds too much.
 
 ## 4. Verify
 
@@ -87,7 +93,10 @@ left in English, a slide that holds too much.
 npx @missing-elements/h5p-verify@latest course.h5p
 ```
 
-Read `report.json` and look at `screenshot.png`: layout mistakes raise no error. Follow the
+It writes `course.verify/report.json` and `course.verify/screenshot.png` beside the package
+(`--out <folder>` puts them elsewhere). Read the report's `verdict`, `errors` and `warnings`,
+and look at the screenshot: layout mistakes raise no error. One run is enough: the build already
+writes what an H5P site's content check keeps, so `--untrusted` finds nothing more. Follow the
 `h5p-verify` skill's loop if it is installed. Fix the source, never by removing what fails.
 Without a browser, say the package is **unverified**.
 
@@ -100,15 +109,22 @@ npx @missing-elements/h5p-verify@latest course.h5p --preview
 ```
 
 Run it in the background; it ends once its tab has closed. Ask the user to work through all of
-it, wrong answers included; its Download button saves a copy. With browser tools of your own,
-add `--no-open` and play the address yourself. Where the command does not run on the user's
-computer, hand over the file and the command.
+it, wrong answers included; its Download button saves a copy. Where the command does not run on
+the user's computer, hand over the file and the command. If you already have a browser tool,
+add `--no-open` and play the address it prints with that tool. Do not write a browser script to
+do it: the person's own play is the check, and a script of your own costs more than the build.
 
-Deliver the `.h5p`, the source, the report, screenshot and full `revision`, the preview
-command, and any notes. A pass means it starts and draws, not that it is accurate, accessible
-or right for every LMS. The package carries the editor libraries an H5P site's upload check asks
-for, so a Moodle with no library installed accepts it (the one site tried). It carries H5P's libraries, each under its own licence, most
-MIT, listed in the pack's [`libraries.txt`](https://github.com/missing-elements/h5p-offline-player/blob/main/packages/libraries/libraries.txt):
-tell the user, so they check those terms before they distribute it. The H5P Preview extension (`MissingElements.h5p-preview`) plays it in
-VS Code, Cursor or VSCodium; `h5p-player-setup` puts it on a website, and `h5p-to-scorm` makes it a
-SCORM zip for an LMS.
+Deliver:
+
+- the `.h5p`, the source, `report.json`, `screenshot.png` and the report's full `revision`;
+- the preview command, and the build's notes;
+- what a pass means: it starts and draws, not that it is accurate, accessible or right for
+  every LMS;
+- that it carries the editor libraries an H5P site's upload check asks for, so a Moodle with no
+  library installed accepts it (the one site tried);
+- that it carries H5P's libraries, each under its own licence, most MIT, listed in the pack's
+  [`libraries.txt`](https://github.com/missing-elements/h5p-offline-player/blob/main/packages/libraries/libraries.txt),
+  so the user checks those terms before they distribute it;
+- where it goes next: the H5P Preview extension (`MissingElements.h5p-preview`) plays it in
+  VS Code, Cursor or VSCodium, `h5p-player-setup` puts it on a website, and `h5p-to-scorm`
+  makes it a SCORM zip for an LMS.

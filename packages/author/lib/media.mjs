@@ -118,6 +118,19 @@ function extensionOf(name) {
 }
 
 /**
+ * A URL's path decoded, or as written where an escape in it is not one, `%zz`: a name to keep,
+ * which nothing is gained by refusing.
+ * @param {string} path
+ */
+function decoded(path) {
+  try {
+    return decodeURIComponent(path)
+  } catch {
+    return path
+  }
+}
+
+/**
  * A path's last segment, past any slash it ends with, as Node's `basename` takes it.
  * @param {string} path
  */
@@ -176,7 +189,7 @@ export class MediaStore {
     this.idle = idle
     /** @type {StagedFile<F>[]} */
     this.files = []
-    /** @type {Map<string, { name: string, mime: string, width?: number, height?: number }>} by source, so one file named twice is copied once */
+    /** @type {Map<string, { name: string, mime: string, width?: number, height?: number }>} by kind and source, so one file named twice for one kind is copied once */
     this.known = new Map()
     /** @type {Set<string>} */
     this.names = new Set()
@@ -213,7 +226,8 @@ export class MediaStore {
       return { path: source, copyright }
     }
     const types = /** @type {Record<string, string>} */ (TYPES[kind])
-    let known = this.known.get(source)
+    const key = `${kind} ${source}`
+    let known = this.known.get(key)
     if (!known) {
       const staged = web ? await this.#download(source, kind, types, at, report) : await this.#local(source, types, at, report)
       if (!staged) return { path: source, copyright }
@@ -233,7 +247,7 @@ export class MediaStore {
         }
       }
       this.files.push({ name, from: staged.from })
-      this.known.set(source, described)
+      this.known.set(key, described)
       known = described
     }
     const { name, ...rest } = known
@@ -278,7 +292,7 @@ export class MediaStore {
   async #local(source, types, at, report) {
     const name = this.access.name(source)
     const extension = extensionOf(name)
-    if (!(extension in types)) {
+    if (!Object.hasOwn(types, extension)) {
       report(`${at}.path`, `${source}: this field takes ${Object.keys(types).map((each) => `.${each}`).join(', ')}`)
       return null
     }
@@ -336,7 +350,7 @@ export class MediaStore {
       }
       const named = extensionOf(lastSegment(new URL(response.url || url.href).pathname))
       const served = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
-      const extension = named in types ? named : Object.keys(types).find((each) => types[each] === served)
+      const extension = Object.hasOwn(types, named) ? named : Object.keys(types).find((each) => types[each] === served)
       if (!extension) {
         await response.body.cancel()
         report(`${at}.path`, `${source} is ${served || 'of an unknown type'}: this field takes ${Object.keys(types).map((each) => `.${each}`).join(', ')}`)
@@ -357,7 +371,7 @@ export class MediaStore {
       } catch (error) {
         return failed(error)
       }
-      const last = lastSegment(decodeURIComponent(new URL(response.url || url.href).pathname))
+      const last = lastSegment(decoded(new URL(response.url || url.href).pathname))
       const stem = (named && last.endsWith(`.${named}`) && last !== `.${named}` ? last.slice(0, -named.length - 1) : last) || kind
       return { from, extension, stem }
     } finally {

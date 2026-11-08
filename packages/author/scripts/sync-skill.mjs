@@ -4,7 +4,8 @@
 // weekly refresh does, and apps/skills' test fails when a file is out of date.
 import { readdir, readFile, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { GENERATED_END, GENERATED_START, schemaOf } from '../lib/author.mjs'
+import { schemaOf } from '../lib/author.mjs'
+import { withSection } from '../lib/schema.mjs'
 
 const folder = resolve(import.meta.dirname, '../../../skills/h5p-author/references/types')
 const check = process.argv.includes('--check')
@@ -13,11 +14,7 @@ for (const name of (await readdir(folder)).filter((file) => file.endsWith('.md')
   const path = join(folder, name)
   const text = await readFile(path, 'utf8')
   const section = await schemaOf(name.slice(0, -'.md'.length), { markdown: true })
-  const start = text.indexOf(GENERATED_START)
-  const end = text.indexOf(GENERATED_END)
-  const updated = start >= 0 && end > start
-    ? `${text.slice(0, start)}${section}${text.slice(end + GENERATED_END.length)}`
-    : `${text.trimEnd()}\n\n${section}\n`
+  const updated = withSection(text, section, name)
   if (updated === text) continue
   stale += 1
   if (check) console.error(`${name} is out of date with the pack`)

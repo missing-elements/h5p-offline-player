@@ -14,7 +14,8 @@ export * from './core.mjs'
  * index's SHA-256; a source's files are `File`s or `Blob`s the page was given, by name; and the
  * package comes back as a `Blob`, its media stored with their sizes and CRC in their local headers,
  * as embed's SCORM writer stores its entries since #92, so that the player reads each one's size
- * off its header on a host without `Range`. An mp4 goes in as it was given: moving its index to
+ * off its header on a host without `Range`, and before the libraries carried for an H5P site's
+ * upload check, as Node's build lays them out. An mp4 goes in as it was given: moving its index to
  * the front is the normalizer's, which runs in Node. It needs a secure context, https, localhost or
  * a Tauri window, for `crypto.subtle` and `crypto.randomUUID`.
  */
@@ -24,9 +25,10 @@ export * from './core.mjs'
  *   the `pack` export of `@missing-elements/h5p-libraries` as a bundler emits it: the index, each
  *   library with its part's URL
  * @typedef {{
- *   blob: Blob, manifest: Record<string, unknown>, content: Record<string, unknown>, libraries: string[],
+ *   blob: Blob, manifest: Record<string, unknown>, content: Record<string, unknown>, libraries: string[], install: string[],
  *   translations: import('./translate.mjs').TranslationReport[], notes: import('./build.mjs').Problem[], media: string[]
- * }} BuildResult the package, and what is worth telling about it
+ * }} BuildResult the package, and what is worth telling about it: `libraries`, the folders it plays
+ *   with; `install`, those it carries for an H5P site's upload check
  * @typedef {{ libraries: Pack | PackIndex | string | URL, files?: Map<string, Blob> | Record<string, Blob>, fetch?: typeof fetch }} BuildOptions
  *   `libraries`, a pack `openPack` opened, which a page keeps for its builds, or what to open one
  *   from; `files`, the files a source names, by the names it gives them; `fetch`, for media named by
@@ -158,16 +160,18 @@ export async function buildPackage(input, options) {
     const media = new MediaStore(pageMedia(files), { fetch: fetchImpl })
     const built = await composePackage(source, pack, media)
     const writer = new ZipWriter(new BlobWriter('application/zip'), { useWebWorkers: false })
-    await writePackage(writer, built, pack)
-    for (const item of media.files) {
-      // Stored, its size and CRC in its local header: written into a stream, zip.js would put them in a descriptor after it.
-      await writer.add(`content/${item.name}`, new BlobReader(item.from), { passThrough: true, compressionMethod: 0, uncompressedSize: item.from.size, crc32: await crcOf(item.from) })
-    }
+    await writePackage(writer, built, pack, async () => {
+      for (const item of media.files) {
+        // Stored, its size and CRC in its local header: written into a stream, zip.js would put them in a descriptor after it.
+        await writer.add(`content/${item.name}`, new BlobReader(item.from), { passThrough: true, compressionMethod: 0, uncompressedSize: item.from.size, crc32: await crcOf(item.from) })
+      }
+    })
     return {
       blob: await writer.close(),
       manifest: built.manifest,
       content: built.content,
       libraries: [...built.selected.keys()],
+      install: [...built.install.keys()],
       translations: built.translations,
       notes: built.notes,
       media: media.files.map((item) => item.name)

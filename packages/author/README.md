@@ -110,7 +110,9 @@ An unknown name lists the pack's content types.
 
 ## Options
 
-- `--libraries <folder>`: another copy of the pack's `parts/` folder, in place of the pinned one.
+- `--libraries <folder>` or `--libraries=<folder>`: another copy of the pack's `parts/` folder, in
+  place of the pinned one.
+- `-h`, `--help`; `-v`, `--version`: this package's version and the pack's.
 
 ## API
 
@@ -211,13 +213,14 @@ const { blob, notes } = await buildPackage(source, { libraries, files: { 'volga.
   Each part is fetched whole when a build first needs it, and checked against the index's SHA-256,
   as in Node. `close()` the pack when the page is done with it.
 - `buildPackage(source, { libraries, files, fetch })` throws a `SourceError` as in Node, and returns
-  `{ blob, manifest, content, libraries, translations, notes, media }`. Its options:
+  `{ blob, manifest, content, libraries, install, translations, notes, media }`, as in Node. Its options:
   - `libraries`: a pack `openPack` opened, or what to open one from for this build alone.
   - `files`: an object or a `Map` of the files a source names, by the names it gives them:
     `{ "path": "volga.png" }` takes `files['volga.png']`.
   - `fetch`: for media named by web address.
-- Media go in last and stored, each with its size and CRC in the header in front of it, as the player
-  reads them on a host without `Range`. An mp4 goes in as it was given. Moving its index to the
+- Media go in after the content and stored, each with its size and CRC in the header in front of
+  it, as the player reads them on a host without `Range`; the libraries carried for an H5P site's
+  upload check come after them, as in Node. An mp4 goes in as it was given. Moving its index to the
   front, so that it starts before the whole file has arrived, is the normalizer's job, which runs
   in Node: `npx @missing-elements/h5p-normalize@latest course.h5p`.
 

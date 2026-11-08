@@ -96,7 +96,7 @@ describe('the build in a page', () => {
     const page = await buildPackage(BLANKS, { libraries: opened })
     const node = await buildInNode(BLANKS, join(dir, 'blanks.h5p'))
     expect(page.blob.type).toBe('application/zip')
-    expect([page.manifest, page.content, page.libraries, page.notes, page.media]).toEqual([node.manifest, node.content, node.libraries, node.notes, node.media])
+    expect([page.manifest, page.content, page.libraries, page.install, page.notes, page.media]).toEqual([node.manifest, node.content, node.libraries, node.install, node.notes, node.media])
     // Each file by its name and hash, in order: comparing the bytes themselves with toEqual takes seconds.
     const hashes = ({ files }: { files: Map<string, Uint8Array> }) => [...files].map(([name, bytes]) => [name, createHash('sha256').update(bytes).digest('hex')])
     const fromPage = await archive(new Uint8Array(await page.blob.arrayBuffer()))
@@ -104,7 +104,7 @@ describe('the build in a page', () => {
     expect(hashes(fromPage)).toEqual(hashes(fromNode))
   })
 
-  it('stores media last, with their size and CRC in their local headers, and describes them as H5P records them', async () => {
+  it('stores media after the content, with their size and CRC in their local headers, and describes them as H5P records them', async () => {
     const picture = png(480, 270)
     const result = await buildPackage(QUIZ, { libraries: opened, files: { 'volga.png': new File([new Uint8Array(picture)], 'IMG_0412.png') } })
     expect(result.media).toEqual(['images/volga.png'])
@@ -114,10 +114,17 @@ describe('the build in a page', () => {
     expect(question.params.media.type.params.file).toEqual({ path: 'images/volga.png', mime: 'image/png', width: 480, height: 270, copyright: { license: 'U' } })
     const bytes = new Uint8Array(await result.blob.arrayBuffer())
     const { files, entries } = await archive(bytes)
-    expect(entries.at(-1)!.filename).toBe('content/images/volga.png')
+    // After the content, before the libraries carried for an H5P site's upload check, as Node's
+    // build lays them out: on a host without Range the media arrive before them (#162).
+    const names = entries.map(({ filename }) => filename)
+    const at = names.indexOf('content/images/volga.png')
+    expect(result.install.length).toBeGreaterThan(0)
+    expect(names[at - 1]).toBe('content/content.json')
+    expect(names.slice(at + 1).every((name) => result.install.some((folder) => name.startsWith(`${folder}/`)))).toBe(true)
+    expect(names.slice(at + 1).length).toBeGreaterThan(0)
     expect(files.get('content/images/volga.png')).toEqual(new Uint8Array(picture))
     // No data descriptor: the header says where the data ends.
-    expect(localHeader(bytes, entries.at(-1)!.offset)).toEqual({ signature: 0x04034b50, flags: 0, method: 0, crc32: crc32(picture), compressedSize: picture.length, size: picture.length })
+    expect(localHeader(bytes, entries[at].offset)).toEqual({ signature: 0x04034b50, flags: 0, method: 0, crc32: crc32(picture), compressedSize: picture.length, size: picture.length })
   })
 
   it('takes the files from a Map too, and names one the source names that the page did not give', async () => {

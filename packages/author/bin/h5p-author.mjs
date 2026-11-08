@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
+import { parseArgs } from 'node:util'
 import { buildPackage, schemaOf, SourceError } from '../lib/author.mjs'
 import { packVersion } from '../lib/node.mjs'
 
@@ -14,26 +15,34 @@ build   Makes a playable .h5p from a source: { "type", "title", "language", "lic
 schema  Prints a content type's fields as a source writes them: --markdown as a skill's
         type file carries them, --all with the interface texts.
 
+-h, --help      show this
+-v, --version   print this package's version and the pack's
+
 The libraries come from the pack this release pins (@missing-elements/h5p-libraries);
 --libraries names another copy's parts/ folder. Check every package with
 npx @missing-elements/h5p-verify@latest before handing it over.`
 
-/** @param {string[]} argv */
+/**
+ * The command line as the verifier's and embed's read theirs: `--libraries dir` or
+ * `--libraries=dir`, and `-h`, `-v`. Which flags a command takes is checked after.
+ * @param {string[]} argv
+ */
 function parse(argv) {
-  /** @type {string[]} */
-  const positional = []
+  const { values, positionals } = parseArgs({
+    args: argv,
+    allowPositionals: true,
+    options: {
+      libraries: { type: 'string' },
+      markdown: { type: 'boolean' },
+      all: { type: 'boolean' },
+      help: { type: 'boolean', short: 'h' },
+      version: { type: 'boolean', short: 'v' }
+    }
+  })
   /** @type {Record<string, string | true>} */
   const flags = {}
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]
-    if (arg === '--libraries') {
-      const value = argv[++i]
-      if (!value || value.startsWith('--')) throw new Error('--libraries needs a folder')
-      flags.libraries = value
-    } else if (arg.startsWith('--')) flags[arg.slice(2)] = true
-    else positional.push(arg)
-  }
-  return { positional, flags }
+  for (const [name, value] of Object.entries(values)) if (value !== undefined && value !== false) flags[name] = value
+  return { positional: positionals, flags }
 }
 
 try {
