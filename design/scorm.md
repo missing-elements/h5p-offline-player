@@ -54,21 +54,23 @@ one row each; an LMS added here gets a row there.
   **Each answer goes into `cmi.interactions`** (#124, 2026-11-04, asked for by two of three
   commenters on the Reddit demand check): every `answered` statement the element relays, by the
   part's `subContentId`, with an id a person reads, since 1.2 has no description field and the id
-  is what a report shows: the question's number, its index from 1, and its first words, 40
-  characters cut at a word, in letters, digits and `_` alone, as in
-  `Q3_which_rivers_cross_germany`; the number alone where the words have no Latin letters. That
-  is the form a commenter on the Reddit SCORM post uses (2026-11-08): 1.2 calls a
-  `CMIIdentifier` alphanumeric, and an LMS that holds it to that refuses the colon and the slash
-  that the earlier fallback for a question with no words, its activity's URL, could carry. The
-  number keeps two questions with the same words apart, where a `-2` did until then; in content
-  answered out of order, a Course Presentation or a book, it follows the order of answering, as
-  the index does. Then the xAPI type as 1.2 names it (`long-fill-in` as `fill-in`, `other` and an
-  unknown type left out), and the pattern and the response cut to 255 (`CMIFeedback`) **only
-  where they are the learner's own text or number, `fill-in` and `numeric`**: 1.2 holds a
-  choice, true-false, matching or sequencing answer to single characters, which H5P's `0[,]2`
-  and `true`, written in 2004's notation, are not. Moodle took them as they are, but a strict LMS
-  refuses them and LMSs read 1.2's form differently, the same commenter's reason to send none,
-  so since 2026-11-08 those answers carry their result alone. Then `correct` or `wrong` from `success`, or from the score
+  is what a report shows: the question's number, its index from 1, and its first words, as text
+  (markup out, character references read, or `&rsquo;` came out as `rsquo`), 40 characters cut
+  at a word, in letters, digits and `_` alone, as in `Q3_which_rivers_cross_germany`; the number
+  alone where the words have no Latin letters. After the form a commenter on the Reddit SCORM
+  post uses, `L2_Q3_refund_case` (2026-11-08): 1.2 calls a `CMIIdentifier` alphanumeric, and an
+  LMS that holds it to that refuses the colon and the slash that the earlier fallback for a
+  question with no words, its activity's URL, could carry. The number keeps two questions with
+  the same words apart, where a `-2` did until then; in content answered out of order, a Course
+  Presentation or a book, it follows the order of answering, as the index does. Then the xAPI
+  type as 1.2 names it (`long-fill-in` as `fill-in`, `other` and an unknown type left out), and
+  the pattern and the response cut to 255 (`CMIFeedback`) **only where they are the learner's
+  own text or number, `fill-in` and `numeric`**: 1.2 holds a choice, true-false, matching or
+  sequencing answer to single characters, which H5P's `0[,]2` and `true`, written in 2004's
+  notation, are not. Moodle took them as they are, but a strict LMS refuses them and LMSs read
+  1.2's form differently, the same commenter's reason to send none, so since 2026-11-08 those
+  answers carry their result alone: a conformance fix, as `docs/compatibility.md` names one.
+  Then `correct` or `wrong` from `success`, or from the score
   where the content says nothing, as Fill in the Blanks does not (full marks, none, or the marks
   themselves, a number 1.2 takes there), `neutral` with neither, the marks as `weighting`,
   `result.duration` as `latency`, the time of day. **One index per question, written over on a

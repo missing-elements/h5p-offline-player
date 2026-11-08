@@ -73,7 +73,7 @@ const FEEDBACK_LIMIT = scorm2004 ? 4000 : 255
 /** How much of a question's words a SCORM 1.2 id carries after its number, cut at a word. */
 const ID_WORDS_LIMIT = 40
 /** Latin letters that no decomposition takes to ASCII, as an id spells them. */
-const FOLDED = /** @type {Record<string, string>} */ ({ ß: 'ss', æ: 'ae', œ: 'oe', ø: 'o', đ: 'd', ł: 'l', þ: 'th', ð: 'd' })
+const FOLDED = /** @type {Record<string, string>} */ ({ ß: 'ss', æ: 'ae', œ: 'oe', ø: 'o', đ: 'd', ł: 'l', þ: 'th', ð: 'd', ı: 'i' })
 /** What 2004 keeps of a question's words, `cmi.interactions.n.description`: 250 characters. */
 const DESCRIPTION_LIMIT = 250
 /** The verb of a question answered. */
@@ -238,7 +238,9 @@ function questionKey(statement) {
 
 /**
  * The question's words, from the statement's description in the content's language, else the
- * first it gives; a question type that writes markup there has it taken out.
+ * first it gives, as text: a question type that writes markup there has it taken out, and the
+ * character references it writes, `&nbsp;` and `&rsquo;` among them, read, or a 1.2 id would
+ * spell them out (`Q1_don_rsquo_t`) and a 2004 description show them as they are.
  * @param {AnsweredStatement} statement
  * @param {string} language
  */
@@ -247,7 +249,9 @@ function questionText(statement, language) {
   if (!description || typeof description !== 'object') return ''
   const map = /** @type {Record<string, unknown>} */ (description)
   const text = map[language] ?? map['en-US'] ?? Object.values(map)[0]
-  return typeof text === 'string' ? text.replace(/<[^>]*>/g, ' ') : ''
+  if (typeof text !== 'string') return ''
+  const read = new DOMParser().parseFromString(text.replace(/<[^>]*>/g, ' '), 'text/html').documentElement.textContent ?? ''
+  return read.replace(/\s+/g, ' ').trim()
 }
 
 /**
@@ -269,7 +273,7 @@ function interactionId(text, key, index) {
   }
   const words = text
     .toLowerCase()
-    .replace(/[ßæœøđłþð]/g, (letter) => FOLDED[letter] ?? '')
+    .replace(new RegExp(`[${Object.keys(FOLDED).join('')}]`, 'g'), (letter) => FOLDED[letter] ?? '')
     .normalize('NFKD')
     .replace(/[̀-ͯ]/g, '')
     .replace(/[^a-z0-9]+/g, '_')
@@ -463,8 +467,7 @@ function recordAnswer(statement) {
   // the type, which 2004 needs before the pattern and the response it gives the form of.
   set(at('id'), id)
   if (scorm2004) {
-    // As text: the character references a question type writes, `&rsquo;` among them, read.
-    const words = (new DOMParser().parseFromString(questionText(statement, language), 'text/html').documentElement.textContent ?? '').replace(/\s+/g, ' ').trim()
+    const words = questionText(statement, language)
     if (words) set(at('description'), words.slice(0, DESCRIPTION_LIMIT))
   }
   const definition = statement.object?.definition

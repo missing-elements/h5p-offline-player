@@ -839,8 +839,17 @@ describe('in an LMS', () => {
     await answer(sco, 'a', 'Wie heißt die Straße über den Fluß, die nach Łódź führt?')
     await answer(sco, 'b', 'Что такое вода?')
     await answer(sco, 'c', 'Supercalifragilisticexpialidocious-and-then-some-more-letters')
+    // Markup out and character references read, as a question type writes its words; a dotless ı.
+    await answer(sco, 'd', '<p>Don&rsquo;t&nbsp;stop &amp; go</p>')
+    await answer(sco, 'e', 'Kızılırmak nehri')
     const kept = await values(page)
-    expect([0, 1, 2].map((index) => kept[`cmi.interactions.${index}.id`])).toEqual(['Q1_wie_heisst_die_strasse_uber_den_fluss', 'Q2', 'Q3_supercalifragilisticexpialidocious_and'])
+    expect([0, 1, 2, 3, 4].map((index) => kept[`cmi.interactions.${index}.id`])).toEqual([
+      'Q1_wie_heisst_die_strasse_uber_den_fluss',
+      'Q2',
+      'Q3_supercalifragilisticexpialidocious_and',
+      'Q4_don_t_stop_go',
+      'Q5_kizilirmak_nehri'
+    ])
     await context.close()
   })
 
