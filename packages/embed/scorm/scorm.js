@@ -70,7 +70,7 @@ const SUSPEND_DATA_LIMIT = scorm2004 ? 64000 : 4096
  * characters; in 2004 the longest the format allows, 4,000.
  */
 const FEEDBACK_LIMIT = scorm2004 ? 4000 : 255
-/** How much of a question's words a SCORM 1.2 id carries after its number, cut at a word. */
+/** How much of a question's words a SCORM 1.2 id carries after its number: cut at a word, or here where the first word is longer. */
 const ID_WORDS_LIMIT = 40
 /** Latin letters that no decomposition takes to ASCII, as an id spells them. */
 const FOLDED = /** @type {Record<string, string>} */ ({ ß: 'ss', æ: 'ae', œ: 'oe', ø: 'o', đ: 'd', ł: 'l', þ: 'th', ð: 'd', ı: 'i' })
@@ -465,21 +465,21 @@ if (questions.length > launchCount) questions = questions.slice(0, launchCount)
  * The question's index and the id it was written under: those it has, else the next index and
  * the id that names it. A question kept by an older zip, in the state it wrote, keeps its old id.
  * @param {AnsweredStatement} statement
- * @returns {{ index: number, id: string }}
+ * @returns {{ index: number, id: string, again: boolean }} `again` for a question this attempt answered before
  */
 function interactionFor(statement) {
   const key = questionKey(statement)
   const known = questions.findIndex((entry) => entry?.[0] === key)
-  if (known !== -1) return { index: known, id: /** @type {[string, string]} */ (questions[known])[1] }
+  if (known !== -1) return { index: known, id: /** @type {[string, string]} */ (questions[known])[1], again: true }
   const index = Math.max(questions.length, launchCount)
   const id = interactionId(questionText(statement, language), key, index)
   questions[index] = [key, id]
-  return { index, id }
+  return { index, id, again: false }
 }
 
 /** @param {AnsweredStatement} statement */
 function recordAnswer(statement) {
-  const { index, id } = interactionFor(statement)
+  const { index, id, again } = interactionFor(statement)
   /** @param {string} field */
   const at = (field) => `cmi.interactions.${index}.${field}`
   // The id first: it is the field that makes the record; then, in 2004, the question's words, and
@@ -512,8 +512,15 @@ function recordAnswer(statement) {
     right = scorm12Answer(pattern, type, true)
     given = scorm12Answer(result.response, type, false)
   }
+  // An answer to a question answered before is written over the earlier one, and 1.2 keeps a field
+  // the new answer leaves out: a response the learner typed then and not now, or a choice's in H5P's
+  // notation from a zip before 1.2's answers were held to their types, in an attempt it began. So in
+  // 1.2 such a field is emptied, and the record shows nothing of another answer.
+  const clears = again && !scorm2004
   if (right !== null) set(at('correct_responses.0.pattern'), right.slice(0, FEEDBACK_LIMIT))
+  else if (clears) set(at('correct_responses.0.pattern'), '')
   if (given !== null) set(at(scorm2004 ? 'learner_response' : 'student_response'), given.slice(0, FEEDBACK_LIMIT))
+  else if (clears) set(at('student_response'), '')
   set(at('result'), outcomeOf(result))
   if (typeof result.score?.max === 'number') set(at('weighting'), String(result.score.max))
   const latency = latencyOf(result.duration)

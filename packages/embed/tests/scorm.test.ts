@@ -761,11 +761,17 @@ describe('in an LMS', () => {
     expect(kept['cmi.interactions.0.correct_responses.0.pattern']).toBeUndefined()
     expect(kept['cmi.interactions.0.student_response']).toBeUndefined()
 
-    // Answered again: the same index, the new result, nothing added.
+    // Answered again: the same index, the new result, nothing added. What an earlier answer left
+    // there, here a choice's response and right one in H5P's notation as a zip before 1.2's answers
+    // were held to their types wrote them in an attempt it began, is emptied, not left beside it.
+    await page.evaluate(() => Object.assign((window as unknown as { values: Record<string, string> }).values, { 'cmi.interactions.0.student_response': '0[,]1', 'cmi.interactions.0.correct_responses.0.pattern': '0[,]2' }))
     await answer(first.sco, 'a', 'Which <em>rivers</em> cross Germany?', {}, { response: '0[,]2', success: true, score: { raw: 2, max: 2 } })
     kept = await values(page)
-    expect(kept).toMatchObject({ 'cmi.interactions.0.result': 'correct' })
+    expect(kept).toMatchObject({ 'cmi.interactions.0.result': 'correct', 'cmi.interactions.0.student_response': '', 'cmi.interactions.0.correct_responses.0.pattern': '' })
     expect(kept['cmi.interactions.2.id']).toBeUndefined()
+    // A question answered for the first time writes neither, empty or not.
+    expect(kept['cmi.interactions.1.student_response']).toBeUndefined()
+    expect(kept['cmi.interactions.1.correct_responses.0.pattern']).toBeUndefined()
 
     // An Essay's long answer, as `fill-in`, its response cut to what 1.2 keeps; a type 1.2 has not,
     // left out, with its response; a question with no words, named by its number alone; a result
@@ -882,6 +888,10 @@ describe('in an LMS', () => {
     // range nor words.
     expect(kept['cmi.interactions.6.student_response']).toBeUndefined()
     expect(kept['cmi.interactions.6.correct_responses.0.pattern']).toBeUndefined()
+    // The fill-in answered again with nothing typed: its earlier response emptied, its right one
+    // written again.
+    await answer(sco, 'a', 'Name a river', { interactionType: 'fill-in', correctResponsesPattern: ['{case_matters=false}Rhine'] }, { response: '', success: false })
+    expect(await values(page)).toMatchObject({ 'cmi.interactions.0.student_response': '', 'cmi.interactions.0.correct_responses.0.pattern': 'Rhine', 'cmi.interactions.0.result': 'wrong' })
     // Their type and their result, but not H5P's notation, which 1.2 does not take for them.
     for (const index of [2, 3, 4]) {
       expect(kept[`cmi.interactions.${index}.type`]).toBe(['true-false', 'sequencing', 'matching'][index - 2])

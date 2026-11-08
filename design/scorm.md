@@ -56,7 +56,7 @@ one row each; an LMS added here gets a row there.
   part's `subContentId`, with an id a person reads, since 1.2 has no description field and the id
   is what a report shows: the question's number, its index from 1, and its first words, as text
   (markup out, character references read, or `&rsquo;` came out as `rsquo`), 40 characters cut
-  at a word, in letters, digits and `_` alone, as in `Q3_which_rivers_cross_germany`; the number
+  at a word, or at the 40th where the first word runs longer, in letters, digits and `_` alone, as in `Q3_which_rivers_cross_germany`; the number
   alone where the words have no Latin letters. After the form a commenter on the Reddit SCORM
   post uses, `L2_Q3_refund_case` (2026-11-08): 1.2 calls a `CMIIdentifier` alphanumeric, and an
   LMS that holds it to that refuses the colon and the slash that the earlier fallback for a
@@ -82,7 +82,11 @@ one row each; an LMS added here gets a row there.
   `result.duration` as `latency`, the time of day. **One index per question, written over on a
   retry**, read in Moodle's code: its interactions report has one column per index for every
   learner (`get_scorm_question_count` takes the highest index found), so an entry per attempt
-  would set one learner's columns against another's. The index and the id come from the
+  would set one learner's columns against another's. Written over in 1.2, a response or a right
+  answer the new answer has none of is emptied, not left (the same day, from the PR's review):
+  1.2 keeps a field nothing writes again, so a fill-in typed then and left empty now, or a
+  choice's response in H5P's notation from a zip before the answers were held to their types,
+  would stand beside the new result. The index and the id come from the
   questions kept with the state (`questions` in `suspend_data`, a `[key, id]` per index, so that
   a question keeps its id in a later session, and one an older zip kept keeps the id that zip
   gave it), after
