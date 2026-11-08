@@ -151,7 +151,9 @@ package, the player and the H5P runtime, and a launch page that reports to the L
   never read them; the LMS's reports do;
 - the time spent in each session;
 - the learner's place: the content's saved state goes into `cmi.suspend_data`, compressed, and
-  the next launch continues from it. SCORM 1.2 keeps 4,096 characters; compressed, a quiz's state
+  the next launch continues from it, for a content type that saves one, as Question Set, Course
+  Presentation, Interactive Book, Interactive Video and most single questions do. An Accordion,
+  Image Hotspots, Flashcards or a Timeline starts over, as on any H5P site. SCORM 1.2 keeps 4,096 characters; compressed, a quiz's state
   takes about 200, a twelve-chapter Interactive Book about 1,000, and none of 23 real packages
   measured passed 1,100. One that does not fit is not saved, the last that fitted stays, and
   the page says so under the content, once. Moodle keeps 64,000 when its administrator turns
@@ -167,10 +169,15 @@ missing named.
 The package plays trusted: its own code runs on the LMS's origin, as every SCORM package's does.
 The LMS has to be served over https, since the player needs its Service Worker.
 
-Content that reports no result of its own, an Accordion or a Virtual Tour, stays `incomplete`:
-complete such an activity on viewing it instead. Replacing the zip with one written from another
-`.h5p`, or with other libraries from the pack, starts learners over, since their saved state
-belongs to what it was saved in.
+Content that reports no result of its own stays `incomplete`, such as an Accordion, a Virtual
+Tour, or a presentation or book with no questions in it: complete such an activity on viewing it
+instead.
+Replacing the zip with one written from another `.h5p`, or with other libraries from the pack,
+starts learners over, since their saved state belongs to what it was saved in.
+
+An [agent skill](https://github.com/missing-elements/h5p-offline-player/tree/main/skills/h5p-to-scorm)
+takes an agent through it, from checking the package to the setting each LMS needs:
+`npx skills add missing-elements/h5p-offline-player --skill h5p-to-scorm`.
 
 ### Options of the zip
 
@@ -186,8 +193,9 @@ Three, each off unless asked for; a zip written with none is the SCORM 1.2 zip d
   a mark the LMS holds of its own wins. Content that reports no score gets no pass or fail from
   it.
 - **Completion as 100** (`--completion-score`): content that finishes without a score, such as a
-  presentation without questions, is recorded as 100, for a gradebook that needs a number; with a
-  pass mark, that passes. Content that never finishes still stays `incomplete`.
+  questionnaire or a branching scenario without scoring, is recorded as 100, for a gradebook that
+  needs a number; with a pass mark, that passes. Content that never finishes, such as a
+  presentation or book with no questions in it, still stays `incomplete`.
 
 ### In the browser
 

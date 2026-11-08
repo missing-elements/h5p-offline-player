@@ -8,6 +8,7 @@
   },
   "devDependencies": {
     "@missing-elements/h5p-author": "workspace:*",
+    "@missing-elements/h5p-embed": "workspace:*",
     "@missing-elements/h5p-libraries": "workspace:*",
     "@missing-elements/h5p-verify": "workspace:*",
     "@types/node": "^26.6.6",

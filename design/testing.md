@@ -38,12 +38,15 @@ package's behaviour, the test moved into the package: the embed page asking befo
 package that needs its own code, and `resizer.js` answering a frame that loaded before it, are in
 `packages/embed/tests/site.test.ts`; the cmi5 page's were already in `packages/cmi5/tests/`.
 The skills are source too, tested from `apps/skills`, a project of their own (2026-10-23, the
-owner's choice): what they tell an agent to write builds and plays. h5p-author's own code is the
-author package's since #100, tested with it. Its tests were first in the demo, which had the pack
-and zip.js installed, and in the verifier's tests, and the playback test played the quiz through
-the installable app. It plays it in the verifier's preview now, the page the skill hands a person to
-review it in, and in Chromium only, where in the demo the `engines` job ran it in Firefox and
-WebKit too; the player's own suite covers the engines.
+owner's choice): what they tell an agent to write builds and plays. For h5p-to-scorm (#159) that is
+its commands, run as it writes them, and their zips, played as a learner under a stand-in LMS with
+real content; that is how a presentation without questions, the example `--completion-score` gave,
+was found never to finish (#160). h5p-author's own code is the author package's since #100, tested
+with it. Its tests were first in the demo, which had the pack and zip.js installed, and in the
+verifier's tests, and the playback test played the quiz through the installable app. It plays it in
+the verifier's preview now, the page the skill hands a person to review it in, and in Chromium
+only, where in the demo the `engines` job ran it in Firefox and WebKit too; the player's own suite
+covers the engines.
 
 The app's tests follow the same variable (`apps/demo/tests/engine.ts`; `tests/harness.ts`
 starts the dev server and the second-origin package host and waits on the element for all of

@@ -258,7 +258,7 @@ Read it before changing entry names, `untrusted`, the content check (`packages/r
 - **The verifier** (`packages/verify/`): [`design/verify.md`](design/verify.md).
 - **The author package** (`packages/author/`, `skills/h5p-author/`): [`design/author.md`](design/author.md).
 - **The VS Code extension** (`packages/vscode/`): [`design/vscode.md`](design/vscode.md).
-- **The SCORM package** (`packages/embed/lib/scorm*.mjs`, `packages/embed/scorm/`, the SCORM page): [`design/scorm.md`](design/scorm.md).
+- **The SCORM package** (`packages/embed/lib/scorm*.mjs`, `packages/embed/scorm/`, the SCORM page, `skills/h5p-to-scorm/`): [`design/scorm.md`](design/scorm.md).
 - **The embed site** (`packages/embed/` but its SCORM side, the demo's `/embed`): [`design/embed.md`](design/embed.md).
 - **cmi5** (`packages/cmi5/`, the demo's cmi5 page, CATAPULT): [`design/cmi5.md`](design/cmi5.md).
 - **The hosted demo and the app** (`apps/demo/`, `vercel.json`, `api/`): [`design/demo.md`](design/demo.md). It compiles the element from the player's source, not from `dist/`, as [`design/layout.md`](design/layout.md) explains.

@@ -63,6 +63,9 @@ importers:
       '@missing-elements/h5p-author':
         specifier: workspace:*
         version: link:../../packages/author
+      '@missing-elements/h5p-embed':
+        specifier: workspace:*
+        version: link:../../packages/embed
       '@missing-elements/h5p-libraries':
         specifier: workspace:*
         version: link:../../packages/libraries
