@@ -499,6 +499,35 @@ it('keeps the bar’s icons on its first row at every width, with Install off th
   await page.close()
 })
 
+it('puts the player right under the bar, and a message a little below it', async () => {
+  const { page, errors } = await openApp()
+  const choosing = page.waitForEvent('filechooser')
+  await page.click('#open')
+  await (await choosing).setFiles(QUIZ)
+  await playerIs(page, 'ready')
+  const belowBar = (selector: string) =>
+    page.evaluate(
+      (selector) => Math.round(document.querySelector(selector)!.getBoundingClientRect().top - document.querySelector('.topbar')!.getBoundingClientRect().bottom),
+      selector
+    )
+
+  // Room above the player costs the window's height: content that fits the window below the bar,
+  // as a book's chapter can, would scroll it by that much (#168). On a phone and a wide window alike.
+  for (const width of [1000, 600]) {
+    await page.setViewportSize({ width, height: 760 })
+    expect(await belowBar('h5p-player'), `at ${width}px`).toBe(0)
+  }
+  expect(errors).toEqual([])
+
+  // A message keeps room of its own, on the wide window.
+  await page.setViewportSize({ width: 1000, height: 760 })
+  await page.goto(`${origin}/app/?src=/demo/content/missing.h5p`)
+  await playerIs(page, 'error')
+  expect(await seen(page)).toMatchObject({ screen: 'player', message: expect.stringMatching(/./) })
+  expect(await belowBar('#message')).toBeGreaterThanOrEqual(16)
+  await page.close()
+})
+
 it('has a menu and an About dialog that Escape closes', async () => {
   const { page } = await openApp()
   const open = (selector: string) => page.evaluate((selector) => document.querySelector(selector)!.matches(':popover-open, [open]'), selector)

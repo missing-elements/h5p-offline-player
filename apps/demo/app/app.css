@@ -234,13 +234,15 @@
 .app .recent-list :focus-visible { outline-offset: -2px; }
 
 /* The player: as wide as the window on a phone, edge to edge, and at the page's width with room
-   around it on a larger screen. */
+   at its sides on a larger screen. Never with room above it: there it costs the window's height,
+   and content that fits the window below the bar, as a book's chapter can, would scroll the
+   window by that much (#168). A message above the player keeps room of its own. */
 .app[data-screen="player"] main { width: min(100%, var(--content)); padding: 0 0 env(safe-area-inset-bottom); }
 .app[data-screen="player"] .message { margin: 0.75rem var(--gutter) 0; }
 
 @media (min-width: 48rem) {
-  .app[data-screen="player"] main { width: min(100% - 2 * var(--gutter), var(--content)); padding-top: 1.25rem; }
-  .app[data-screen="player"] .message { margin: 0 0 1rem; }
+  .app[data-screen="player"] main { width: min(100% - 2 * var(--gutter), var(--content)); }
+  .app[data-screen="player"] .message { margin: 1.25rem 0 1rem; }
 }
 
 .app .stage { position: relative; }
