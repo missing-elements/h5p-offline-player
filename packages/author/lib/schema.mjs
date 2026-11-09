@@ -1,4 +1,4 @@
-import { allowedTags } from './text.mjs'
+import { editorWidget, takesMarkup } from './text.mjs'
 
 /**
  * A content type's fields as an author writes them, from its `semantics.json`: names, kinds,
@@ -65,8 +65,7 @@ function selectValues(field) {
 function kind(field, options, drawn = false) {
   switch (field.type) {
     case 'text': {
-      const tags = allowedTags(field)
-      if (!tags) return field.widget === 'textarea' ? 'text, multi-line' : 'text'
+      if (!takesMarkup(field)) return editorWidget(field) === 'textarea' ? 'text, multi-line' : 'text'
       const own = (Array.isArray(field.tags) ? field.tags : []).filter((/** @type {string} */ tag) => !['div', 'span', 'p', 'br'].includes(tag))
       return own.length ? `html: ${own.join(' ')}` : 'html'
     }

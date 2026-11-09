@@ -12,7 +12,7 @@ export { missingForInstall } from './install.mjs'
 export { loadLibraries, packageLibraries } from './libraries.mjs'
 export { GENERATED_END, GENERATED_START } from './schema.mjs'
 export { SourceError } from './source-error.mjs'
-export { allowedTags, markupText, plainText } from './text.mjs'
+export { allowedTags, editorWidget, markupText, plainText, takesMarkup } from './text.mjs'
 
 /**
  * @typedef {import('./build.mjs').Source} Source

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { allowedTags, blockTag, escapeText, markupText, plainText } from '../lib/text.mjs'
+import { allowedTags, blockTag, editorWidget, escapeText, markupText, plainText, takesMarkup } from '../lib/text.mjs'
 import { translateDefaults, translationFiles } from '../lib/translate.mjs'
 
 describe('text as H5P stores it', () => {
@@ -16,6 +16,31 @@ describe('text as H5P stores it', () => {
     expect(blockTag({ tags: ['strong'] })).toBe('div')
     expect(blockTag({ tags: ['strong'], enterMode: 'p' })).toBe('p')
     expect(blockTag({ tags: ['h2', 'strong'] })).toBe('p')
+  })
+
+  it('keeps an apostrophe and umlauts as typed in a plain box the content check filters', () => {
+    const notes: string[] = []
+    expect(plainText("Germany's Größe", (message) => notes.push(message), { filtered: true })).toBe("Germany's Größe")
+    expect(notes).toEqual([])
+    expect(plainText('Q&A "now" < 5 &amp; AT&T', (message) => notes.push(message), { filtered: true })).toBe('Q&amp;A &quot;now&quot; &lt; 5 &amp; AT&amp;T')
+    expect(notes).toHaveLength(1)
+    // A field the check escapes whole keeps the editor's escaping, umlauts as they are.
+    expect(plainText("Germany's Größe", () => {})).toBe('Germany&#39;s Größe')
+  })
+
+  it('takes markup only where the editor gives the field its rich-text widget', () => {
+    // Question Set 1.21's intro title: tags for the content check, a plain text box in the editor.
+    expect(takesMarkup({ type: 'text', tags: ['sub', 'sup', 'strong', 'em', 'code'] })).toBe(false)
+    expect(takesMarkup({ type: 'text', widget: 'textarea', tags: ['strong'] })).toBe(false)
+    expect(takesMarkup({ type: 'text', widget: 'html', tags: ['strong'] })).toBe(true)
+    // Speak the Words Set's introduction: a ShowWhen that draws the rich-text widget inside it.
+    const shown = { type: 'text', widget: 'showWhen', showWhen: { widget: 'html', rules: [] }, tags: ['strong'] }
+    expect(editorWidget(shown)).toBe('html')
+    expect(takesMarkup(shown)).toBe(true)
+    expect(editorWidget({ type: 'text', widget: 'showWhen', showWhen: { rules: [] } })).toBe('text')
+    expect(takesMarkup({ type: 'text', widget: 'showWhen', showWhen: { rules: [] }, tags: ['strong'] })).toBe(false)
+    // A rich-text field that lists no tags is escaped whole by the content check.
+    expect(takesMarkup({ type: 'text', widget: 'html' })).toBe(false)
   })
 
   it('wraps plain text written into a markup field as the editor wraps what an author types', () => {
