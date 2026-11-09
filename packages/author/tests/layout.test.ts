@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { buildPackage, SourceError } from '../lib/author.mjs'
 import { imageSize } from '../lib/media.mjs'
-import { GENERATED_END, GENERATED_START, schemaLines, schemaMarkdown } from '../lib/schema.mjs'
+import { GENERATED_END, GENERATED_START, schemaLines, schemaMarkdown, withSection } from '../lib/schema.mjs'
 import { jpeg, png } from './helpers/media'
 
 const META = { title: 'Layout', language: 'en', license: 'U', authors: [{ name: 'Ann Author', role: 'Author' }] }
@@ -259,6 +259,16 @@ describe('the schema a source is written from', () => {
     expect(interfaceTexts).toBe(2)
     expect(schemaLines(semantics).lines).toContain('- `x` number, required, hidden in the editor')
     expect(schemaLines(semantics, { all: true }).lines).toContain('  - `check` text = "Check"')
+  })
+
+  it('puts a type file\'s section between its markers, or after a file with none, and refuses broken markers (#162)', () => {
+    const section = `${GENERATED_START}\n\nnew\n\n${GENERATED_END}`
+    const old = `${GENERATED_START}\n\nold\n\n${GENERATED_END}`
+    expect(withSection(`# Notes\n\n${old}\n`, section, 'T.md')).toBe(`# Notes\n\n${section}\n`)
+    expect(withSection('# Notes\n', section, 'T.md')).toBe(`# Notes\n\n${section}\n`)
+    expect(() => withSection(`# Notes\n\n${GENERATED_START}\n\nold\n`, section, 'T.md')).toThrow('T.md: its generated section\'s markers are broken (1 start, 0 end)')
+    expect(() => withSection(`# Notes\n\n${GENERATED_END}\nold\n${GENERATED_START}\n`, section, 'T.md')).toThrow('(1 start, 1 end, the end first)')
+    expect(() => withSection(`${old}\n${old}\n`, section, 'T.md')).toThrow('(2 start, 2 end)')
   })
 
   it('writes a type file\'s generated section between its markers', () => {

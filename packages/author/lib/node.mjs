@@ -133,19 +133,20 @@ export async function buildPackage(input, output, options = {}) {
     const file = await open(staged, 'wx')
     try {
       const writer = new ZipWriter(Writable.toWeb(file.createWriteStream()), { useWebWorkers: false })
-      await writePackage(writer, built, pack)
-      for (const item of media.files) {
-        await writer.add(`content/${item.name}`, /** @type {ReadableStream<Uint8Array>} */ (Readable.toWeb(createReadStream(item.from))), { level: 0 })
-      }
+      await writePackage(writer, built, pack, async () => {
+        for (const item of media.files) {
+          await writer.add(`content/${item.name}`, /** @type {ReadableStream<Uint8Array>} */ (Readable.toWeb(createReadStream(item.from))), { level: 0 })
+        }
+      })
       await writer.close()
     } finally {
       await file.close()
     }
     let final = staged
     if (media.files.length) {
-      // Media stored and last, an mp4's index first: the layout a package streams in. The
-      // libraries carried for an H5P site's upload check go after the media, where `writePackage`
-      // put them after the content: a host that ignores `Range` then boots before they arrive.
+      // Media stored, an mp4's index first: the layout a package streams in. The libraries
+      // carried for an H5P site's upload check stay after the media, where `writePackage` put
+      // them: a host that ignores `Range` then boots, and plays the media, before they arrive.
       final = join(temporary, 'normalized.h5p')
       await normalizeArchive({ input: staged, output: final, last: [...built.install.keys()] })
     }

@@ -281,6 +281,8 @@ describe('any content type in the pack', () => {
 
   it('lists every problem a source has at once, each by its path, and writes nothing', async () => {
     expect(await problems({ ...META, type: 'H5P.Nope', params: {} })).toEqual(['type: the library pack has no content type H5P.Nope'])
+    // A version is saved content's, which checkContent takes; a build plays the pack's newest (#162).
+    expect(await problems({ ...META, type: 'H5P.Blanks 1.14', params: {} })).toEqual(['type: takes the machine name alone, "H5P.Blanks": the version is the pack\'s newest'])
     expect(await problems({ ...META, license: 'MIT', authors: [{ name: 'A' }], extra: 1, type: 'H5P.Blanks' })).toEqual([
       'extra: is not a field of a source; the fields are type, title, language, license, licenseVersion, authors, source, yearFrom, yearTo, params',
       expect.stringMatching(/^license: use one of/),
@@ -353,6 +355,7 @@ describe('media', () => {
       if (request.url === '/pictures/map.png') response.writeHead(200, { 'content-type': 'image/png' }).end(png(40, 20))
       else if (request.url === '/picture') response.writeHead(200, { 'content-type': 'image/png' }).end(png(10, 30))
       else if (request.url === '/page.html') response.writeHead(200, { 'content-type': 'text/html' }).end('<p>no</p>')
+      else if (request.url === '/odd%zz.png') response.writeHead(200, { 'content-type': 'image/png' }).end(png(20, 10))
       else if (request.url === '/trickle.png') {
         // Slow, and never silent for long: eight pieces, 100 ms apart.
         const bytes = png(40, 30)
@@ -487,8 +490,26 @@ describe('media', () => {
     expect(reported).toEqual([`params.silent.path: ${origin}/stalled.png could not be downloaded: nothing arrived for 0.3 s`])
   })
 
+  it('keeps a download whose address has an escape that is not one, under its name as written (#162)', async () => {
+    const reported: string[] = []
+    const store = new MediaStore(nodeMedia({ base: dir, temporary: dir }))
+    expect(await store.resolve({ type: 'image' }, { path: `${origin}/odd%zz.png` }, 'params.odd', (path, message) => reported.push(`${path}: ${message}`))).toMatchObject({ path: 'images/odd-zz.png', width: 20, height: 10 })
+    expect(reported).toEqual([])
+  })
+
+  it('copies one file named in an image field and a file field once for each, as H5P keeps them apart (#162)', async () => {
+    await writeFile(join(dir, 'chart.png'), png(30, 20))
+    const store = new MediaStore(nodeMedia({ base: dir, temporary: dir }))
+    const report = () => { throw new Error('no problem expected') }
+    expect(await store.resolve({ type: 'file' }, { path: 'chart.png' }, 'params.download', report)).toEqual({ path: 'files/chart.png', mime: 'image/png', copyright: { license: 'U' } })
+    expect(await store.resolve({ type: 'image' }, { path: 'chart.png' }, 'params.picture', report)).toEqual({ path: 'images/chart.png', mime: 'image/png', width: 30, height: 20, copyright: { license: 'U' } })
+    expect(await store.resolve({ type: 'image' }, { path: 'chart.png' }, 'params.again', report)).toMatchObject({ path: 'images/chart.png' })
+    expect(store.files.map(({ name }) => name)).toEqual(['files/chart.png', 'images/chart.png'])
+  })
+
   it('names a file that is missing, of a type the field does not take, or not downloadable', async () => {
     await writeFile(join(dir, 'notes.txt'), 'x')
+    await writeFile(join(dir, 'x.constructor'), 'x')
     expect(await problems({
       ...META,
       type: 'H5P.MemoryGame',
@@ -498,7 +519,8 @@ describe('media', () => {
           { image: { path: 'notes.txt' }, imageAlt: 'b' },
           { image: { path: `${origin}/gone.png` }, imageAlt: 'c' },
           { image: { path: `${origin}/page.html` }, imageAlt: 'd' },
-          { image: { path: 'ftp://example.org/a.png' }, imageAlt: 'e' }
+          { image: { path: 'ftp://example.org/a.png' }, imageAlt: 'e' },
+          { image: { path: 'x.constructor' }, imageAlt: 'f' }
         ]
       }
     }, { base: dir })).toEqual([
@@ -506,7 +528,9 @@ describe('media', () => {
       'params.cards[1].image.path: notes.txt: this field takes .png, .jpg, .jpeg, .gif, .bmp',
       `params.cards[2].image.path: ${origin}/gone.png answered 404`,
       `params.cards[3].image.path: ${origin}/page.html is text/html: this field takes .png, .jpg, .jpeg, .gif, .bmp`,
-      'params.cards[4].image.path: expected a file beside the source or an http(s) address'
+      'params.cards[4].image.path: expected a file beside the source or an http(s) address',
+      // A name an object's prototype has is no type (#162).
+      'params.cards[5].image.path: x.constructor: this field takes .png, .jpg, .jpeg, .gif, .bmp'
     ])
   })
 })
@@ -563,6 +587,11 @@ describe('the build', () => {
     expect(schema).toMatch(/^H5P\.TrueFalse 1\.\d+: True\/False Question\n- `media` group/)
     expect(schema).toContain('- `correct` one of "true" | "false" = "true"')
     await expect(exec(process.execPath, [bin, 'schema', 'H5P.Nope'])).rejects.toMatchObject({ stderr: expect.stringContaining('H5P.Blanks (Fill in the Blanks)') })
+    // --name=value, -h and -v, as the verifier and embed read them (#162).
+    expect((await exec(process.execPath, [bin, 'schema', 'H5P.TrueFalse', `--libraries=${parts}`])).stdout).toBe(schema)
+    expect((await exec(process.execPath, [bin, '-h'])).stdout).toMatch(/^Usage:\n {2}h5p-author build/)
+    expect((await exec(process.execPath, [bin, '-v'])).stdout).toMatch(/^@missing-elements\/h5p-author \d+\.\d+\.\d+, library pack \d+\.\d+\.\d+\n$/)
+    await expect(exec(process.execPath, [bin, 'build', 'a.json', 'a.h5p', '--markdown'])).rejects.toMatchObject({ code: 1, stderr: 'h5p-author: build does not take --markdown\n' })
   }, 120_000)
 })
 

@@ -167,6 +167,18 @@ describe('content authored from semantics', () => {
     expect(generate(semantics, { size: 3 }, [], STRICT).problems).toEqual([{ path: 'params.size', message: 'takes steps of 2' }])
   })
 
+  it('takes a multiple of a fractional step, which the editor\'s `%` misses by a rounding error (#162)', () => {
+    const semantics = [{ name: 'ratio', type: 'number', decimals: 2, step: 0.1 }]
+    for (const ratio of [0.3, 0.7, 2.3, 1234.5, 50000000.1]) expect(generate(semantics, { ratio }, [], STRICT).problems, String(ratio)).toEqual([])
+    // Half a step off, however large: the bound is the arithmetic's error, not a share of the value.
+    for (const ratio of [0.35, 50000000.05]) expect(generate(semantics, { ratio }, [], STRICT).problems, String(ratio)).toEqual([{ path: 'params.ratio', message: 'takes steps of 0.1' }])
+  })
+
+  it('takes a field named as an object\'s own properties are, toString or constructor, for what it is: not a field (#162)', () => {
+    const { problems } = generate([{ name: 'count', type: 'number', default: 1 }], JSON.parse('{ "toString": 1, "constructor": 2, "__proto__": 3 }'), [], STRICT)
+    expect(problems.map(({ path }) => path)).toEqual(['params.toString', 'params.constructor', 'params.__proto__'])
+  })
+
   it('stores plain text escaped and markup as the editor writes it, and refuses a tag the field does not take', () => {
     const { params, problems, notes } = generate([
       { name: 'title', type: 'text' },

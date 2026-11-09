@@ -52,7 +52,11 @@ export function readSource(input) {
   if (!isObject(input)) throw new SourceError([{ path: 'source', message: 'expected an object: { "type", "title", "language", "license", "authors", "params" }' }])
   const known = ['type', 'title', 'language', 'license', 'licenseVersion', 'authors', 'source', 'yearFrom', 'yearTo', 'params']
   for (const key of Object.keys(input)) if (!known.includes(key)) report(key, `is not a field of a source; the fields are ${known.join(', ')}`)
-  if (typeof input.type !== 'string' || !/^\S+$/.test(input.type.trim())) report('type', 'expected a content type\'s machine name, such as "H5P.Blanks"')
+  if (typeof input.type === 'string' && /^\S+\s+\d+\.\d+$/.test(input.type.trim())) {
+    // checkContent takes a version, as saved content names one; a build takes the pack's newest.
+    const [name] = input.type.trim().split(/\s/)
+    report('type', `takes the machine name alone, "${name}": the version is the pack's newest`)
+  } else if (typeof input.type !== 'string' || !/^\S+$/.test(input.type.trim())) report('type', 'expected a content type\'s machine name, such as "H5P.Blanks"')
   if (typeof input.title !== 'string' || !input.title.trim()) report('title', 'expected the activity\'s title')
   else if (input.title.length > 255) report('title', 'takes at most 255 characters')
   if (typeof input.language !== 'string') report('language', 'expected a BCP 47 language tag, such as "en" or "de-AT"')
@@ -223,21 +227,24 @@ export async function composePackage(source, pack, media) {
 
 /**
  * What a package holds but its media, in the order a package streams in: its manifest, the
- * libraries it plays with, each part's own files copied as they are, the content, then the
- * libraries an H5P site's upload check wants, which nothing reads as the package plays, so the
- * frame boots before they arrive on a host without `Range`. The caller adds the media after it,
- * last, and in Node has the normalizer keep those libraries after the media (`last`).
+ * libraries it plays with, each part's own files copied as they are, the content, the media
+ * `media` writes, then the libraries an H5P site's upload check wants, which nothing reads as the
+ * package plays: on a host without `Range` the frame boots and the media arrive before them. A
+ * page's build writes the package once, so the order is this one; Node's has the normalizer keep
+ * it (`last`) as it moves an mp4's index first.
  * @param {import('@zip.js/zip.js').ZipWriter<unknown>} writer
  * @param {{ manifest: Record<string, unknown>, content: Record<string, unknown>, selected: Map<string, import('./pack.mjs').PartLibrary>, install: Map<string, import('./pack.mjs').PartLibrary> }} built
  * @param {import('./pack.mjs').Pack} pack
+ * @param {() => Promise<void>} media adds the media to `writer`
  * @internal
  */
-export async function writePackage(writer, { manifest, content, selected, install }, pack) {
+export async function writePackage(writer, { manifest, content, selected, install }, pack, media) {
   /** @param {import('./pack.mjs').PartLibrary} part */
   const copy = (part) => writer.appendZip(pack.archiveOf(part), { filter: (entry) => !entry.directory && entry.filename.startsWith(`${part.folder}/`) })
   await writer.add('h5p.json', new TextReader(JSON.stringify(manifest)))
   for (const part of selected.values()) await copy(part)
   await writer.add('content/content.json', new TextReader(JSON.stringify(content)))
+  await media()
   for (const part of install.values()) await copy(part)
 }
 

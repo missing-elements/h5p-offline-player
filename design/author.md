@@ -212,7 +212,9 @@ to 3,000. Eleven things the code does not say by itself:
   98 rules resolve alike); and two comments said the editor sets what it does not, a Branching
   Question's own `nextContentId`, which it deletes, and a Game Map stage's `type`, which it keeps
   out of the content. Both fields are still written, being hidden and required, and the runtime
-  ignores the first and works the second out again.
+  ignores the first and works the second out again. One departure since (#162): a multiple of a
+  fractional step is taken within a rounding error, where the editor's `%` refuses 0.3 in steps
+  of 0.1; no library in the pack has such a step, and the content check checks none.
 
 - **A package installs on an H5P site** (2026-11-06, #146). H5P core's upload check wants every
   library a package carries to have its preloaded, dynamic and editor dependencies with it at the
@@ -222,8 +224,9 @@ to 3,000. Eleven things the code does not say by itself:
   wants* in libraries.md has the measurement). The owner's call: always carry them, since a `.h5p`
   a fresh Moodle refuses is broken, and a platform's export is as big. `lib/install.mjs` walks from
   the selected parts over the pack's index at exact versions, through what each added library
-  names in turn (`installClosure`), and `writePackage` copies them after the content, where nothing
-  reads them as the package plays; `h5p.json` lists what plays, as the platforms' exports write it.
+  names in turn (`installClosure`), and `writePackage` copies them after the content and the media,
+  where nothing reads them as the package plays, in a page's build too (#162: it wrote them before
+  the media); `h5p.json` lists what plays, as the platforms' exports write it.
   A package with media then goes through the normalizer, told to write the run after the media
   (`last`, #148), so with or without media a host without `Range` boots before the run arrives;
   over one with `Range` the player's warm takes only what `h5p.json` declares, and so leaves the

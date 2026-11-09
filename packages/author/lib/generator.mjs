@@ -288,7 +288,7 @@ export class ContentGenerator {
       }
     })
     for (const [key, value] of Object.entries(given)) {
-      if (key in out || fields.some((field) => field.name === key)) continue
+      if (Object.hasOwn(out, key) || fields.some((field) => field.name === key)) continue
       // Lenient, what the semantics do not name is kept as written: the content check removes
       // it, which a sweep file may mean to test.
       if (this.lenient) {
@@ -631,7 +631,10 @@ export class ContentGenerator {
   /**
    * A number as h5peditor-number.js checks it: within its range; with at most `decimals`
    * decimals, or none where the field has no `decimals` and no widget of its own draws it; and a
-   * multiple of `step`, counted from 0 as its `value % step` counts.
+   * multiple of `step`, counted from 0 as its `value % step` counts. Where it departs from the
+   * editor: a multiple of a fractional step is taken within a rounding error, where the editor's
+   * `%` refuses it (`0.3 % 0.1` is `0.0999…`); no library in the pack has a fractional step, and
+   * the content check checks none (packages/runtime/src/content-check.ts).
    * @param {any} field
    * @param {unknown} written
    * @param {string} path
@@ -647,7 +650,14 @@ export class ContentGenerator {
       const factor = 10 ** Number(field.decimals)
       if (Math.round(written * factor) / factor !== written) this.report(path, `takes ${field.decimals ? `at most ${field.decimals} decimals` : 'a whole number'}`)
     } else if (!field.widget && !this.drawn.has(field) && !Number.isInteger(written)) this.report(path, 'takes a whole number')
-    if (field.step !== undefined && Number(field.step) > 0 && written % Number(field.step) !== 0) this.report(path, `takes steps of ${field.step}`)
+    const step = Number(field.step)
+    if (field.step !== undefined && step > 0) {
+      const steps = written / step
+      // The value, the step and their quotient are each rounded once, so the quotient is off by
+      // at most about 1.5 Number.EPSILON of itself; the bound is four. A share as loose as 1e-9
+      // let 50000000.05 pass in steps of 0.1, half a step off.
+      if (Math.abs(steps - Math.round(steps)) > 4 * Number.EPSILON * Math.max(1, Math.abs(steps))) this.report(path, `takes steps of ${field.step}`)
+    }
     return written
   }
 
