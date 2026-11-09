@@ -1,5 +1,5 @@
 import { checkMetadata } from './metadata.mjs'
-import { markupText, plainText } from './text.mjs'
+import { allowedTags, markupText, plainText, takesMarkup } from './text.mjs'
 
 /**
  * Content for a content type, made from its own `semantics.json` as H5P's editor saves a form:
@@ -610,9 +610,12 @@ export class ContentGenerator {
       this.report(path, `expected text${typeof written === 'number' ? `, such as "${written}"` : ''}`)
       return undefined
     }
-    const stored = field.tags === undefined || field.tags === null
-      ? plainText(written, (message) => this.note(path, message))
-      : markupText(written, field, (message) => this.report(path, message), { saved: this.saved })
+    // Written text is stored as the editor's widget for the field stores what an author types;
+    // saved text, as the content check keeps it, which goes by the field's `tags` alone.
+    const markup = this.saved ? allowedTags(field) !== null : takesMarkup(field)
+    const stored = markup
+      ? markupText(written, field, (message) => this.report(path, message), { saved: this.saved })
+      : plainText(written, (message) => this.note(path, message), { filtered: allowedTags(field) !== null })
     const length = Array.from(stored).length
     if (typeof field.maxLength === 'number' && length > field.maxLength) this.report(path, `is ${length} characters as stored; it takes at most ${field.maxLength}`)
     if (field.regexp?.pattern && !(stored === '' && field.optional)) {
@@ -811,7 +814,7 @@ function selectValues(field) {
 /** A field's kind, as a problem names it. @param {any} field */
 function describe(field) {
   switch (field.type) {
-    case 'text': return field.tags ? 'markup text' : 'text'
+    case 'text': return takesMarkup(field) ? 'markup text' : 'text'
     case 'select': return `one of ${selectValues(field).map((value) => JSON.stringify(value)).join(', ')}`
     case 'library': return `sub-content: ${optionNames(field).join(', ')}`
     case 'image': case 'file': return `a file, { "path": "…" }`

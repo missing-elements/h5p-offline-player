@@ -1,9 +1,10 @@
 /**
- * Authored text as H5P stores it. A field without `tags` is plain text, which the platforms keep
- * escaped (PHP's `htmlspecialchars`, existing entities left alone). A field with `tags` holds
- * markup, as H5P's editor writes it into that field: the tags the field names, and the four the
- * content check always keeps, `div`, `span`, `p` and `br`. Anything else is refused by name, so a
- * source never reaches a learner in a form the platforms would have changed.
+ * Authored text as H5P stores it. A field H5P's editor gives its rich-text widget holds markup, as
+ * that widget writes it: the tags the field names, and the four the content check always keeps,
+ * `div`, `span`, `p` and `br`. Anything else is refused by name, so a source never reaches a
+ * learner in a form the platforms would have changed. Every other field is plain text, which the
+ * platforms keep escaped (PHP's `htmlspecialchars`, existing entities left alone), whether or not
+ * its semantics list `tags` (see `takesMarkup`).
  */
 
 /** An `&` that does not begin an entity. */
@@ -19,8 +20,34 @@ export function escapeText(value) {
 }
 
 /**
- * The tags a markup field keeps, as the content check derives them from its semantics: the four
- * it always keeps, the field's own, and those one of them implies. `null` for a plain text field.
+ * The widget H5P's editor draws a field with: its `widget`, or for a ShowWhen, the widget the
+ * ShowWhen draws inside it, else the field's type (h5peditor.js `getWidgetName`, H5PEditor.ShowWhen).
+ * @param {any} field
+ * @returns {string}
+ */
+export function editorWidget(field) {
+  if (field.widget === 'showWhen') return field.showWhen?.widget ?? field.type
+  return field.widget ?? field.type
+}
+
+/**
+ * Whether a text field holds markup: the editor gives it its rich-text widget, `html`, directly or
+ * inside a ShowWhen, and its semantics list `tags`. Every other text field is a box an author types
+ * plain text into: `ns.Text` and `ns.Textarea` store it with `htmlspecialchars` and wrap nothing,
+ * even where the semantics list `tags`, which then tell the content check what to keep, not what
+ * an author can write. Question Set 1.21's intro title, result message and progress text are such
+ * fields, and it draws the first two with `textContent`, so markup written there is shown as
+ * written. A rich-text field without `tags` is plain too: the content check escapes it.
+ * @param {any} field
+ */
+export function takesMarkup(field) {
+  return field.tags !== undefined && field.tags !== null && editorWidget(field) === 'html'
+}
+
+/**
+ * The tags a field keeps, as the content check derives them from its semantics: the four it
+ * always keeps, the field's own, and those one of them implies. `null` for a field that lists none.
+ * Which tags the check keeps is not whether an author writes markup there: `takesMarkup` says that.
  * @param {any} field
  * @returns {Set<string> | null}
  */
@@ -159,10 +186,24 @@ export function markupText(value, field, report, { saved = false } = {}) {
  * A plain text field's value as it is stored: escaped, as the platforms store what an author types
  * into it. A tag in it is shown to a learner as written, which is right for a quiz on HTML and a
  * mistake otherwise, so it is noted.
+ *
+ * `filtered`: the field is a plain text box whose semantics list `tags` (see `takesMarkup`), which
+ * the content check filters as markup rather than escaping whole. That filter keeps an apostrophe
+ * as it is, so it is stored as typed: escaped, as the editor's box escapes it (`&#039;`), it is
+ * shown as written where a content type draws the field with `textContent`, as Question Set 1.21
+ * draws its cover's title and its results heading. A `"` stays escaped all the same: the editor puts
+ * a stored value back into its box as `value="…"`, unescaped (`ns.createText`), so a bare one would
+ * cut the text short there. `&`, `<` and `>` stay escaped, as the filter would escape them, and are
+ * noted, since such a field shows them as entities.
  * @param {string} value
  * @param {(message: string) => void} note
+ * @param {{ filtered?: boolean }} [options]
  */
-export function plainText(value, note) {
+export function plainText(value, note, { filtered = false } = {}) {
   if (/<\/?[a-zA-Z][a-zA-Z0-9]*(\s[^<>]*)?\/?>/.test(value)) note('is plain text, so its tags are shown as written, not as markup')
-  return escapeText(value)
+  if (!filtered) return escapeText(value)
+  if (value.search(BARE_AMPERSAND) !== -1 || /["<>]/.test(value)) {
+    note('stores &, ", < and > as entities, which a content type that draws this field as plain text shows as written, as Question Set does its title and results heading: write "and", and “ ” for quotes')
+  }
+  return value.replace(BARE_AMPERSAND, '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')
 }

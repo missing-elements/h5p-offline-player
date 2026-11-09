@@ -37,14 +37,38 @@ to 3,000. Twelve things the code does not say by itself:
   left as the editor leaves it, asking nothing.
 - **Text is stored as the platforms store it.** A plain field is escaped as `htmlspecialchars`
   does, existing entities kept, and a tag in it is noted, since a learner sees it as written. A
-  field with `tags` takes markup with the tags the content check keeps for it (its own, `div`,
-  `span`, `p`, `br`, and what they imply), checked here rather than filtered later: any other tag,
-  an event handler, a style the field does not allow, a script address or a comment is a problem
-  by name. Plain text written into such a field is wrapped as the editor wraps typing: in `<p>`
-  where the field's `enterMode` is `p` or its tags offer headings, `pre`, `p` or `div`, in `<div>`
-  otherwise. Every plain default is escaped too, English or translated, and a `null` default (Course
-  Presentation's colours) is left out, which the content check would otherwise turn into a
-  warning. Every type file's example plays untrusted with no warning, which is the test of this.
+  field the editor gives its rich-text widget (`widget: "html"`, or a ShowWhen that draws one) takes
+  markup with the tags the content check keeps for it (its own, `div`, `span`, `p`, `br`, and what
+  they imply), checked here rather than filtered later: any other tag, an event handler, a style
+  the field does not allow, a script address or a comment is a problem by name. Plain text written
+  into such a field is wrapped as that widget wraps typing: in `<p>` where the field's `enterMode`
+  is `p` or its tags offer headings, `pre`, `p` or `div`, in `<div>` otherwise. Every plain default
+  is escaped too, English or translated, and a `null` default (Course Presentation's colours) is
+  left out, which the content check would otherwise turn into a warning. Every type file's example
+  plays untrusted with no warning, which is the test of this.
+- **`tags` say what the check keeps, the widget what an author writes** (2026-11-09). Up to author
+  0.5.0 any field that listed `tags` took markup, and plain text in it was wrapped. Five of
+  Question Set 1.21's fields list `tags` but are plain text boxes in the editor (`ns.Text`, which
+  stores `htmlspecialchars(value)` and wraps nothing, at the pinned commit): the intro title, the
+  result message, the progress text and the two old greetings. The set draws the first two with
+  H5P.Components' `textContent`, so a quiz from ChatGPT showed `<div>World War II: Five Historic
+  Events</div>` on its cover, and the type file had told the model both fields take HTML.
+  `takesMarkup` is now the rule, in the build, in its messages and in the type files; saved
+  content is still checked by `tags`, as the content check keeps it. Of the pack's 2,361 fields,
+  1,252 are of type `text`, whatever widget draws them, and these five were the only ones of those
+  that differed: the other 1,096 plain boxes and the 96 rich-text fields (Speak the Words Set's
+  ShowWhen among them) were stored as their widgets store them, and so were the 38 drawn as colour
+  selectors, the 6 text areas, the one date and the 10 hidden. The editor puts a default in
+  unescaped, and the server filters it by `tags`, so defaults still go by `tags`. One rule differs
+  from the editor, the owner's call the same day: in a plain box whose field lists `tags`
+  (`plainText`'s `filtered`), an apostrophe is stored as typed. The editor's box writes `&#039;`,
+  and H5P.Components 1.0.101 (upstream's newest) shows that as written, `Germany&#039;s`, on every
+  H5P site; the content check filters such a field as markup, which keeps an apostrophe, so a site
+  changes nothing. A `"` stays `&quot;`, since the editor puts a stored value back into its box as
+  `value="…"` unescaped (`ns.createText`), where a bare one would cut the text short; `&`, `<` and
+  `>` stay escaped, as the filter would escape them, and are noted, with "and" and “ ” as the way
+  round. Umlauts, ß and every other letter are stored as typed everywhere: neither the editor nor
+  the platforms escape them.
 - **Some types need what their editor widget does.** Course Presentation, Interactive Video, Game
   Map and Branching Scenario are edited on a slide, a video, a map and a tree of their own, which set
   fields the form hides (`widget: "none"`). `lib/types.mjs` does each one's work on the generated

@@ -279,6 +279,42 @@ describe('any content type in the pack', () => {
     expect(notes).toEqual([])
   })
 
+  it('stores a plain text box as plain text, though its field lists tags', async () => {
+    // Question Set 1.21's intro title and result message list tags, but the editor gives both a
+    // plain text box, and the set draws both with textContent: a <div> around them was shown.
+    const { content, notes } = await build({
+      ...META,
+      type: 'H5P.QuestionSet',
+      params: {
+        introPage: { showIntroPage: true, title: 'World War II: Five Historic Events', introduction: 'Five questions on the war.' },
+        endGame: { message: "Tom's result" },
+        questions: [{ library: 'H5P.TrueFalse', params: { question: 'The war in Europe ended in 1945.', correct: 'true' } }]
+      }
+    })
+    expect(content.introPage.title).toBe('World War II: Five Historic Events')
+    // An apostrophe as typed: the content check keeps it there, and the set shows an entity as written.
+    expect(content.endGame.message).toBe("Tom's result")
+    // The introduction is the set's rich-text field, wrapped as that widget wraps typing.
+    expect(content.introPage.introduction).toBe('<p>Five questions on the war.</p>')
+    expect(notes).toEqual([])
+
+    // German as typed, umlauts and ß included; &, " and < stored as entities, and noted.
+    const german = await build({ ...META, language: 'de', type: 'H5P.QuestionSet', params: {
+      introPage: { showIntroPage: true, title: 'Größte Ereignisse: "Krieg" & Frieden' },
+      questions: [{ library: 'H5P.TrueFalse', params: { question: 'Ja?', correct: 'true' } }]
+    } })
+    expect(german.content.introPage.title).toBe('Größte Ereignisse: &quot;Krieg&quot; &amp; Frieden')
+    expect(german.notes).toContainEqual({ path: 'params.introPage.title', message: expect.stringMatching(/^stores &, ", < and > as entities/) })
+
+    // Markup there is shown as written, as the editor's box would have stored it: noted, not refused.
+    const marked = await build({ ...META, type: 'H5P.QuestionSet', params: {
+      introPage: { showIntroPage: true, title: '<strong>WW2</strong>' },
+      questions: [{ library: 'H5P.TrueFalse', params: { question: 'Yes?', correct: 'true' } }]
+    } })
+    expect(marked.content.introPage.title).toBe('&lt;strong&gt;WW2&lt;/strong&gt;')
+    expect(marked.notes).toContainEqual({ path: 'params.introPage.title', message: 'is plain text, so its tags are shown as written, not as markup' })
+  })
+
   it('lists every problem a source has at once, each by its path, and writes nothing', async () => {
     expect(await problems({ ...META, type: 'H5P.Nope', params: {} })).toEqual(['type: the library pack has no content type H5P.Nope'])
     // A version is saved content's, which checkContent takes; a build plays the pack's newest (#162).

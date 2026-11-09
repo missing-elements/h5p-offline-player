@@ -81,7 +81,9 @@ export function translateDefaults(fields, translation) {
 
 /**
  * Every plain text default stored as the platforms store it, escaped: a default is what an author
- * would have left in the field, and the server escapes it on saving like anything typed there.
+ * would have left in the field, and the server escapes it on saving like anything typed there. The
+ * editor puts a default in as it stands, not escaped as its text box escapes typing, so a default in
+ * a field that lists `tags` is left to the server's filter, which keeps it, in a plain text box too.
  * @param {any[]} fields
  */
 function escapeDefaults(fields) {

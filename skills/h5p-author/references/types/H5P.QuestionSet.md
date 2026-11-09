@@ -49,7 +49,7 @@ A quiz: questions one after another, then a result page with the score.
 
 - `introPage` group — Quiz introduction
   - `showIntroPage` boolean — Display introduction
-  - `title` html: sub sup strong em code — Title: This title will be displayed above the introduction text.
+  - `title` text — Title: This title will be displayed above the introduction text.
   - `introduction` html: sub sup strong em code — Introduction text: This text will be displayed before the quiz starts.
   - `startButtonText` text = "Start Quiz" — Start button text
   - `backgroundImage` image file — Cover image
@@ -65,7 +65,7 @@ A quiz: questions one after another, then a result page with the score.
   - `showSolutionButton` boolean = true — Display solution button
   - `showRetryButton` boolean = true — Display retry button
   - `noResultMessage` text = "Finished" — No results message: Text displayed on end page when "Display results" is disabled
-  - `message` html: strong em code = "Results" — Results heading: This heading will be displayed at the end of the quiz when the user has answered all questions.
+  - `message` text = "Results" — Results heading: This heading will be displayed at the end of the quiz when the user has answered all questions.
   - `amountCorrect` text = "@finals of @totals correct" — Amount correct heading: Header to show the final score to the user on the end screen
   - `scoreBarLabel` text = "You got @finals out of @totals points" — Score announcer: This label will be used for announcing the final score to the user on the end screen
   - `scoreHeader` text = "Score" — Score heading: Header for the score part of the results table
@@ -74,9 +74,9 @@ A quiz: questions one after another, then a result page with the score.
     - `to` whole number 0–100 = 100
     - `feedback` text — Feedback for defined score range
   - `oldFeedback` group — Old Feedback
-    - `successGreeting` html: strong em code — Quiz passed greeting: This text will be displayed above the score if the user has successfully passed the quiz.
+    - `successGreeting` text — Quiz passed greeting: This text will be displayed above the score if the user has successfully passed the quiz.
     - `successComment` html: sub sup strong em a code — Passed comment: This comment will be displayed after the score if the user has successfully passed the quiz.
-    - `failGreeting` html: strong em code — Quiz failed title: This text will be displayed above the score if the user has failed the quiz.
+    - `failGreeting` text — Quiz failed title: This text will be displayed above the score if the user has failed the quiz.
     - `failComment` html: sub sup strong em a code — Failed comment: This comment will be displayed after the score if the user has failed the quiz.
   - `solutionButtonText` text = "Show solution" — Solution button label: Text for the solution button.
   - `retryButtonText` text = "Retry" — Retry button label: Text for the retry button.
