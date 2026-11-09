@@ -8,8 +8,9 @@ license: MIT
 
 You write a short source: the content type and only what its defaults cannot know.
 `@missing-elements/h5p-author` fills in the rest from the libraries, copies them, and checks
-every field. Needs Node 22 and a shell; nothing to install. Where `npx` cannot run, a page in
-the user's browser builds it instead (step 3), so never end with commands for the user to run.
+every field. Needs Node 22 and a shell; nothing to install. Where `npx` cannot install, it builds
+from two downloaded files, or a page in the user's browser builds it (step 3), so never end with
+commands for the user to run.
 Keep [LICENSE](./LICENSE) with the skill.
 
 ## 1. Choose the content type with the user
@@ -82,12 +83,34 @@ Build in a working folder of your own, not in the folder the user named:
 npx @missing-elements/h5p-author@latest build source.json course.h5p
 ```
 
-**If it cannot run here, for any reason, the build page builds it instead.** No shell, no Node,
-or no network (`EAI_AGAIN`, `ENOTFOUND`, a registry's 403, 404 or 503, as in ChatGPT): do not
-retry, try another way to install it, or end with commands for the user to run once npm works.
-[The build page](https://embed-my.github.io/build) builds the same package in the user's browser
-from the source alone, with no install. Give them a link that carries the source, written with
-Node or Python, which need no network:
+**If it cannot install here, build from files instead.** No network for npm (`EAI_AGAIN`,
+`ENOTFOUND`, a registry's 403, 404 or 503, as in ChatGPT): do not retry, try another way to
+install it, or end with commands for the user to run once npm works. Where Node runs and you can
+fetch a file (in ChatGPT, open each address with the browsing tool, then download it), fetch the
+build tool and the bundle of the source's own `type`, the libraries a build of that type reads.
+In both addresses and commands below, `<type>` is that machine name, such as `H5P.Blanks`: another
+type's bundle lacks what this one needs.
+
+```
+https://embed-my.github.io/bundles/h5p-author.mjs
+https://embed-my.github.io/bundles/<type>.zip
+```
+
+```bash
+unzip -q <type>.zip   # or: python3 -m zipfile -e <type>.zip .
+node h5p-author.mjs build source.json course.h5p --libraries parts
+```
+
+A build that stops at a part `parts/` lacks names it (an addon: H5P.MathDisplay, where the text
+holds math): fetch that part into `parts/`, such as
+`https://embed-my.github.io/bundles/parts/H5P.MathDisplay-1.0.h5p`, and build again. The verifier
+cannot run there either: hand the package over **unverified**, with the build page's link below
+for the user to play it before using it.
+
+**Where nothing can be fetched or run, the build page builds it.** No shell, no Node, or no
+download: [the build page](https://embed-my.github.io/build) builds the same package in the user's
+browser from the source alone, with no install. Give them a link that carries the source, written
+with Node or Python, which need no network:
 
 ```bash
 node -e "console.log('https://embed-my.github.io/build#source=' + require('zlib').deflateRawSync(require('fs').readFileSync('source.json')).toString('base64url'))"

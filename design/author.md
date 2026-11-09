@@ -15,7 +15,7 @@ already holds text to the content check's rules, from the pack an untrusted chec
 `apps/skills` plays every example untrusted too. Measured on a five-question quiz, at four
 characters a token: `content.json` was about 3,470 tokens to write by hand, after reading 3,900 to
 9,500 of a type's semantics; the source is 1,000 to 1,800 tokens, written from a type file of 200
-to 3,000. Twelve things the code does not say by itself:
+to 3,000. Thirteen things the code does not say by itself:
 
 - **One generator, three ways to run it.** The third, `saved`, checks content as H5P stores it
   (*Saved content is checked as the build checks what it writes*, below). `ContentGenerator` was the sweep's
@@ -277,6 +277,27 @@ to 3,000. Twelve things the code does not say by itself:
   an authoring tool's public address without "H5P" in it, and that origin already serves the
   player and the pack. It builds from `@missing-elements/h5p-libraries/install` at the version
   the author package pins, so the page plays with the pack it built from.
+- **A bundle per content type, where the pack cannot be installed** (2026-11-09, #166). The page
+  leaves the last steps to the user, but ChatGPT's sandbox runs Node and fetches a file its
+  browsing tool has opened: given the libraries as files, a chat builds and fixes its source
+  itself. The skill chooses the content type first, so the unit is the type. `bundleLibraries` is
+  the build's own rules over the most a source of the type can name: the type and every library
+  its library fields offer or give as their default, theirs in turn; `planPack` over all of them
+  as roots, as `closure` in `build.mjs` plans one package; `installClosure` over what that plans.
+  Both only ever add for more roots, so one source's libraries are within its type's bundle.
+  `writeBundle` zips them as `parts/`, with `libraries.txt`, without which the parts are not handed
+  on. The bundle carries the pack's whole index, not its own entries: a build from it plans as it
+  would from the pack, so it writes the same package (the skill's 32 examples were built both ways
+  and matched, but for the ids a build draws) or stops and names the part it lacks, where a cut-down
+  index would build a source with math without its addon and say nothing. No addon is in a
+  bundle: H5P.MathDisplay, 2.8 MB, joins wherever text holds math, and would more than double most
+  bundles, so a source that calls for it fetches that one part. A bundle rather than the parts,
+  since ChatGPT's download tool costs two calls a file, opened and then fetched: a Question Set's
+  33 parts would be 66. With pack 1.1.0 a question type's is 0.6 to 1.5 MB, a Question Set's
+  2.6 MB, a container's 4.3 to 8.4 MB, and the 55 content types' 99 MB in all, which is why
+  embed-my.github.io serves them (embed-my/embed-my.github.io#14) rather than the libraries
+  package on jsDelivr, whose cap is 50 MB. The build tool beside them is the command line as one
+  file, esbuild's: 558 kB, and it builds from an unzipped bundle with nothing installed.
 
 Not built: editing an existing package, which a tool beside it does with `checkContent` as its
 check; layout for Drag and Drop and Crossword; and any judgement of whether content is right, which

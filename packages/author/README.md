@@ -108,6 +108,26 @@ H5P.TrueFalse 1.8: True/False Question
 `--all` adds the interface texts; `--markdown` prints the section the skill's type files carry.
 An unknown name lists the pack's content types.
 
+## A content type's bundle
+
+```bash
+npx @missing-elements/h5p-author@latest bundle H5P.QuestionSet H5P.QuestionSet.zip
+```
+
+```
+Bundled H5P.QuestionSet 1.21 in /work/H5P.QuestionSet.zip: 33 parts from the library pack 1.1.0, 2.6 MB. Unzip it beside a source and build with --libraries parts.
+```
+
+The libraries a build of one content type reads, for a build where the pack cannot be installed,
+such as a chat's sandbox that reaches no npm registry: everything the type can hold, with the
+editor libraries an H5P site's upload check asks for. The zip holds `parts/`, the pack's whole
+index with those parts, and `libraries.txt`, the licences they are used under. A build from it
+writes the package the pack would. An addon is not in it: where a source's text calls for one,
+H5P.MathDisplay for math, the build stops and names the missing part, to copy into `parts/` from
+the pack's own `parts/` folder. With pack 1.1.0 a question type's bundle is about 1 MB, a Question
+Set's 2.6 MB, a container's up to 8.4 MB. `--all <folder>` writes one per content type,
+`<machine name>.zip`: 55, 99 MB in all. If one fails, none is left behind.
+
 ## Options
 
 - `--libraries <folder>` or `--libraries=<folder>`: another copy of the pack's `parts/` folder, in
@@ -128,8 +148,11 @@ const { output, manifest, content, libraries, install, translations, notes, medi
 plays with, `install` those carried for an H5P site's upload check. `missingForInstall(libraries)`
 is that check, over a package's `library.json` files: what a site with no library installed would
 refuse it for, empty for a build. `schemaOf(machineName, { markdown, all,
-libraries })` returns the field list. `ContentGenerator` is the engine underneath, also run by the
-repository's sweep of every content type.
+libraries })` returns the field list. `writeBundle(type, output, { libraries })` and
+`writeBundles(folder, { libraries })` write bundles, each `{ output, type, parts, size }`;
+`bundleLibraries(pack, type)` returns a bundle's parts, and `contentTypes(pack)` the pack's content
+types. `ContentGenerator` is the engine underneath, also run by the repository's sweep of every
+content type.
 
 A tool beside the build takes the libraries as the build loads them, the generator, and the
 build's rules for text:

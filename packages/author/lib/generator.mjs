@@ -753,7 +753,7 @@ export function libraryString(/** @type {any} */ library) {
 }
 
 /** @param {any} field @returns {{ machineName: string, major: number, minor: number }[]} */
-function libraryOptions(field) {
+export function libraryOptions(field) {
   return (field?.options ?? [])
     .map((/** @type {any} */ option) => /^(\S+) (\d+)\.(\d+)$/.exec(typeof option === 'string' ? option : option?.name ?? ''))
     .filter(Boolean)
