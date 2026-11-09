@@ -31,6 +31,8 @@ import { Pack } from './pack.mjs'
  * @typedef {{ output: string, type: string, parts: string[], size: number }} BundleResult
  *   `type`, the content type with the version bundled, `H5P.QuestionSet 1.21`; `parts`, the
  *   folders of the parts it holds; `size`, the zip's in bytes
+ * @typedef {{ dev: bigint, ino: bigint }} Made a file this module created, by the device and
+ *   inode it was given, which a file that takes its name later does not have
  */
 
 /**
@@ -209,7 +211,7 @@ export async function writeBundle(type, output, options = {}) {
   const files = await bundleFiles(partsFolder(options.libraries))
   const pack = await openPack(options.libraries)
   try {
-    return await writeZip(pack, files, await bundleLibraries(pack, type), output)
+    return (await writeZip(pack, files, await bundleLibraries(pack, type), output)).result
   } finally {
     await pack.close()
   }
@@ -219,7 +221,8 @@ export async function writeBundle(type, output, options = {}) {
  * Every content type's bundle (`contentTypes`), written as `writeBundle` writes one, to
  * `<machine name>.zip` in `folder`, which is made if it is not there. Nothing is written over: where
  * one of them is there already, nothing is written. All of them or none: one that fails takes those
- * written before it away again, so the call can be run again as it was.
+ * written before it away again, so the call can be run again as it was. A file another process has
+ * put at one of those names since is theirs, and stays.
  * @param {string} folder
  * @param {{ libraries?: string }} [options] `libraries`, a pack's parts folder in place of the pinned pack
  * @returns {Promise<BundleResult[]>} by machine name
@@ -233,16 +236,17 @@ export async function writeBundles(folder, options = {}) {
     const outputs = types.map((type) => join(folder, `${type}.zip`))
     for (const output of outputs) if (await lstat(output).then(() => true, () => false)) throw exists(output, 'h5p-author')
     await mkdir(folder, { recursive: true })
-    /** @type {BundleResult[]} */
-    const results = []
+    /** @type {{ result: BundleResult, made: Made }[]} */
+    const written = []
     try {
-      for (const [i, type] of types.entries()) results.push(await writeZip(pack, files, await bundleLibraries(pack, type), outputs[i]))
+      for (const [i, type] of types.entries()) written.push(await writeZip(pack, files, await bundleLibraries(pack, type), outputs[i]))
     } catch (error) {
-      // Only what this call wrote: each was created anew, after the check above found none there.
-      await Promise.all(results.map(({ output }) => rm(output, { force: true })))
+      // Only what this call made: a name is taken away if it still holds the file this call
+      // created, not if another process has replaced that since.
+      await Promise.all(written.map(({ result, made }) => removeIfMade(result.output, made)))
       throw error
     }
-    return results
+    return written.map(({ result }) => result)
   } finally {
     await pack.close()
   }
@@ -265,19 +269,39 @@ async function bundleFiles(directory) {
 }
 
 /**
- * A bundle's zip, created at `output` and removed again if it cannot be written whole.
+ * Takes away a file this module created, unless the name holds another file by now. A file another
+ * process has put there since is theirs, and removing by the name alone would take it. A guard,
+ * not a lock: the check and the removal are two calls, and Node removes a file by its name, so a
+ * file that takes the name in the gap between them is still lost.
+ * @param {string} path
+ * @param {Made} made
+ * @returns {Promise<void>}
+ * @internal
+ */
+export async function removeIfMade(path, made) {
+  const now = await lstat(path, { bigint: true }).catch(() => null)
+  if (now && now.dev === made.dev && now.ino === made.ino) await rm(path, { force: true })
+}
+
+/**
+ * A bundle's zip, created at `output`, and removed again if it cannot be written whole.
  * @param {Pack} pack with every part of `parts` opened, and so checked against the index
  * @param {{ index: Uint8Array, licences: Uint8Array }} files
  * @param {import('./pack.mjs').IndexEntry[]} parts the content type's first
  * @param {string} output
- * @returns {Promise<BundleResult>}
+ * @returns {Promise<{ result: BundleResult, made: Made }>} `made`, the file as created, for a caller
+ *   that takes it away again if a later one fails
  */
 async function writeZip(pack, { index, licences }, parts, output) {
   const file = await open(output, 'wx').catch((error) => {
     throw error?.code === 'EEXIST' ? exists(output, 'h5p-author') : error
   })
+  /** @type {Made | undefined} */
+  let made
   try {
     try {
+      const { dev, ino } = await file.stat({ bigint: true })
+      made = { dev, ino }
       const writer = new ZipWriter(Writable.toWeb(file.createWriteStream()), { useWebWorkers: false, lastModDate: BUNDLE_DATE, extendedTimestamp: false })
       await writer.add('parts/index.json', new Uint8ArrayReader(index))
       // A part is a zip already: stored as it is, the bytes checked against the index as it opened.
@@ -288,9 +312,14 @@ async function writeZip(pack, { index, licences }, parts, output) {
       await file.close()
     }
   } catch (error) {
-    await rm(output, { force: true })
+    // The file as created, if it is still there; one that could not be looked at was made a moment ago.
+    if (made) await removeIfMade(output, made)
+    else await rm(output, { force: true })
     throw error
   }
   const [main] = parts
-  return { output, type: `${main.machineName} ${main.majorVersion}.${main.minorVersion}`, parts: parts.map((entry) => entry.folder), size: (await stat(output)).size }
+  return {
+    result: { output, type: `${main.machineName} ${main.majorVersion}.${main.minorVersion}`, parts: parts.map((entry) => entry.folder), size: (await stat(output)).size },
+    made: /** @type {Made} */ (made)
+  }
 }

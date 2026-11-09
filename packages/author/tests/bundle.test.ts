@@ -1,11 +1,12 @@
 import { execFile } from 'node:child_process'
-import { copyFile, cp, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { copyFile, cp, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { BlobReader, Uint8ArrayWriter, ZipReader } from '@zip.js/zip.js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { buildPackage, bundleLibraries, contentTypes, missingForInstall, openPack, writeBundle, writeBundles } from '../lib/author.mjs'
+import { removeIfMade } from '../lib/node.mjs'
 
 /*
  * A content type's bundle (#166): the parts a build of the type reads, for a build where the pack
@@ -167,6 +168,31 @@ describe('writeBundle', () => {
     // Run again with the part back, it writes them all.
     await copyFile(join(parts, `${missing}.h5p`), join(copy, 'parts', `${missing}.h5p`))
     expect(await writeBundles(out, { libraries: join(copy, 'parts') })).toHaveLength(types.length)
+  })
+
+  it('takes a file away only while it is the one this call made, not once another process has replaced it', async () => {
+    const identity = async (path: string) => {
+      const { dev, ino } = await lstat(path, { bigint: true })
+      return { dev, ino }
+    }
+    // The file as made: taken away.
+    const mine = join(dir, 'made.zip')
+    await writeFile(mine, 'made')
+    await removeIfMade(mine, await identity(mine))
+    await expect(stat(mine)).rejects.toMatchObject({ code: 'ENOENT' })
+
+    // Replaced by another process since: theirs, and it stays. The first file is moved aside, not
+    // deleted, so that its inode is still taken and the new file cannot be given the same one.
+    const theirs = join(dir, 'replaced.zip')
+    await writeFile(theirs, 'made')
+    const made = await identity(theirs)
+    await rename(theirs, join(dir, 'replaced-first.zip'))
+    await writeFile(theirs, 'theirs')
+    await removeIfMade(theirs, made)
+    expect(await readFile(theirs, 'utf8')).toBe('theirs')
+
+    // Already gone: nothing to take, and no error.
+    await removeIfMade(mine, made)
   })
 
   it('refuses a pack without its licence list beside its parts', async () => {
