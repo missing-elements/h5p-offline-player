@@ -15,7 +15,7 @@ already holds text to the content check's rules, from the pack an untrusted chec
 `apps/skills` plays every example untrusted too. Measured on a five-question quiz, at four
 characters a token: `content.json` was about 3,470 tokens to write by hand, after reading 3,900 to
 9,500 of a type's semantics; the source is 1,000 to 1,800 tokens, written from a type file of 200
-to 3,000. Eleven things the code does not say by itself:
+to 3,000. Twelve things the code does not say by itself:
 
 - **One generator, three ways to run it.** The third, `saved`, checks content as H5P stores it
   (*Saved content is checked as the build checks what it writes*, below). `ContentGenerator` was the sweep's
@@ -241,6 +241,18 @@ to 3,000. Eleven things the code does not say by itself:
   gives `@missing-elements/h5p-libraries/install`'s, and a build from a pack without them is
   refused naming the first library and where the pack with them is, rather than writing a package
   a site refuses.
+- **Where `npx` cannot install, a page builds** (2026-11-09). The owner tried the skill in the
+  ChatGPT app, on a free account, and the build could not install: ChatGPT's sandbox reaches npm
+  only through OpenAI's own mirror, reported refusing every install from July 2026 (503, then
+  404), and the public registry not at all. Nothing in the skill can fix that, and a backend the
+  model calls would need a custom GPT or connector, which a free account cannot add. So the skill
+  hands over the source and a link to a build page, `https://embed-my.github.io/build`, where the
+  user's browser runs the page build (*A page builds too*), plays the package and downloads it.
+  The link carries the source in its fragment, raw-deflated and base64url, which no server sees.
+  The page lives in embed-my/embed-my.github.io, not in this repository's demo: the owner wanted
+  an authoring tool's public address without "H5P" in it, and that origin already serves the
+  player and the pack. It builds from `@missing-elements/h5p-libraries/install` at the version
+  the author package pins, so the page plays with the pack it built from.
 
 Not built: editing an existing package, which a tool beside it does with `checkContent` as its
 check; layout for Drag and Drop and Crossword; and any judgement of whether content is right, which

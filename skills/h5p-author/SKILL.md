@@ -8,8 +8,8 @@ license: MIT
 
 You write a short source: the content type and only what its defaults cannot know.
 `@missing-elements/h5p-author` fills in the rest from the libraries, copies them, and checks
-every field. Needs Node 22 and a shell; nothing to install. Keep [LICENSE](./LICENSE) with
-the skill.
+every field. Needs Node 22 and a shell; nothing to install, and where `npx` cannot install, a
+page builds it instead (step 3). Keep [LICENSE](./LICENSE) with the skill.
 
 ## 1. Choose the content type with the user
 
@@ -88,6 +88,20 @@ name the user asked for without writing over a file already there (`cp -n`). If 
 taken, ask, or where you cannot ask, take a new name and say so. Never delete or overwrite a file
 to free a name. Pass the build's notes on to the user: texts left in English, a slide that holds
 too much.
+
+Where `npx` cannot install, as in ChatGPT, whose npm mirror refuses, try no other way to install
+it. [The build page](https://embed-my.github.io/build) builds the same package in the user's
+browser from the source alone. Give the user a link that carries the source:
+
+```bash
+node -e "console.log('https://embed-my.github.io/build#source=' + require('zlib').deflateRawSync(require('fs').readFileSync('source.json')).toString('base64url'))"
+```
+
+With no shell, give the source for them to paste there. The page lists every problem by its path,
+with a button that copies them for the chat: fix them all and give a new link. A source that names
+files of its own waits for the user to choose them there. Steps 4 and 5 are then the user's, on
+that page: the package is **unverified** until they have played it there, and they download it
+from there.
 
 ## 4. Verify
 
