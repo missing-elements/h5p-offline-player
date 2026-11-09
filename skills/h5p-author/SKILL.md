@@ -121,7 +121,8 @@ Deliver:
 
 - the `.h5p` and the source;
 - `report.json`, `screenshot.png` and the report's full `revision`, from the run that passed;
-  where the verifier could not run, no report, and the package called **unverified**;
+  where it could not run, no report and call the package **unverified**; where it ran but failed,
+  give its report and reasons and say the package **failed verification**;
 - the preview command, and the build's notes;
 - what a pass means: it starts and draws, not that it is accurate, accessible or right for
   every LMS;
