@@ -54,20 +54,21 @@ to 3,000. Twelve things the code does not say by itself:
   H5P.Components' `textContent`, so a quiz from ChatGPT showed `<div>World War II: Five Historic
   Events</div>` on its cover, and the type file had told the model both fields take HTML.
   `takesMarkup` is now the rule, in the build, in its messages and in the type files; saved
-  content is still checked by `tags`, as the content check keeps it. Of the pack's 1,252 text
-  fields, these five were the only ones that differed: the other 1,096 plain boxes and the 96
-  rich-text fields (Speak the Words Set's ShowWhen among them) were stored as their widgets store
-  them, and so were 38 colour selectors, 6 text areas, one date and 10 hidden fields. The editor puts a default in unescaped, and the server filters it by
-  `tags`, so defaults still go by `tags`. One rule differs from the editor, the owner's call the
-  same day: in a plain box whose field lists `tags` (`plainText`'s `filtered`), an apostrophe is
-  stored as typed. The editor's box writes `&#039;`, and H5P.Components 1.0.101 (upstream's
-  newest) shows that as written, `Germany&#039;s`, on every H5P site; the content check filters
-  such a field as markup, which keeps an apostrophe, so a site changes nothing. A `"` stays
-  `&quot;`, since the editor puts a stored value back into its box as `value="…"` unescaped
-  (`ns.createText`), where a bare one would cut the text short; `&`, `<` and `>` stay escaped, as
-  the filter would escape them, and are noted, with "and" and “ ” as the way round. Umlauts, ß and
-  every other letter are stored as typed everywhere: neither the editor nor the platforms escape
-  them.
+  content is still checked by `tags`, as the content check keeps it. Of the pack's 2,361 fields,
+  1,252 are of type `text`, whatever widget draws them, and these five were the only ones of those
+  that differed: the other 1,096 plain boxes and the 96 rich-text fields (Speak the Words Set's
+  ShowWhen among them) were stored as their widgets store them, and so were the 38 drawn as colour
+  selectors, the 6 text areas, the one date and the 10 hidden. The editor puts a default in
+  unescaped, and the server filters it by `tags`, so defaults still go by `tags`. One rule differs
+  from the editor, the owner's call the same day: in a plain box whose field lists `tags`
+  (`plainText`'s `filtered`), an apostrophe is stored as typed. The editor's box writes `&#039;`,
+  and H5P.Components 1.0.101 (upstream's newest) shows that as written, `Germany&#039;s`, on every
+  H5P site; the content check filters such a field as markup, which keeps an apostrophe, so a site
+  changes nothing. A `"` stays `&quot;`, since the editor puts a stored value back into its box as
+  `value="…"` unescaped (`ns.createText`), where a bare one would cut the text short; `&`, `<` and
+  `>` stay escaped, as the filter would escape them, and are noted, with "and" and “ ” as the way
+  round. Umlauts, ß and every other letter are stored as typed everywhere: neither the editor nor
+  the platforms escape them.
 - **Some types need what their editor widget does.** Course Presentation, Interactive Video, Game
   Map and Branching Scenario are edited on a slide, a video, a map and a tree of their own, which set
   fields the form hides (`widget: "none"`). `lib/types.mjs` does each one's work on the generated
