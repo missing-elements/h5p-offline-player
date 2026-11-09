@@ -8,8 +8,9 @@ license: MIT
 
 You write a short source: the content type and only what its defaults cannot know.
 `@missing-elements/h5p-author` fills in the rest from the libraries, copies them, and checks
-every field. Needs Node 22 and a shell; nothing to install, and where `npx` cannot install, a
-page builds it instead (step 3). Keep [LICENSE](./LICENSE) with the skill.
+every field. Needs Node 22 and a shell; nothing to install. Where `npx` cannot run, a page in
+the user's browser builds it instead (step 3), so never end with commands for the user to run.
+Keep [LICENSE](./LICENSE) with the skill.
 
 ## 1. Choose the content type with the user
 
@@ -81,6 +82,24 @@ Build in a working folder of your own, not in the folder the user named:
 npx @missing-elements/h5p-author@latest build source.json course.h5p
 ```
 
+**If it cannot run here, for any reason, the build page builds it instead.** No shell, no Node,
+or no network (`EAI_AGAIN`, `ENOTFOUND`, a registry's 403, 404 or 503, as in ChatGPT): do not
+retry, try another way to install it, or end with commands for the user to run once npm works.
+[The build page](https://embed-my.github.io/build) builds the same package in the user's browser
+from the source alone, with no install. Give them a link that carries the source, written with
+Node or Python, which need no network:
+
+```bash
+node -e "console.log('https://embed-my.github.io/build#source=' + require('zlib').deflateRawSync(require('fs').readFileSync('source.json')).toString('base64url'))"
+python3 -c "import base64,zlib;c=zlib.compressobj(9,zlib.DEFLATED,-15);d=c.compress(open('source.json','rb').read())+c.flush();print('https://embed-my.github.io/build#source='+base64.urlsafe_b64encode(d).decode().rstrip('='))"
+```
+
+With neither, give the source for them to paste there. The page lists every problem by its path,
+with a button that copies them for the chat: fix them all and give a new link. A source that names
+files of its own waits for the user to choose them there. Steps 4 and 5 are then the user's, on
+that page: the package is **unverified** until they have played it there, and they download it
+from there.
+
 A source with a problem writes nothing: the build lists every problem by its path, so fix them
 all and run it again under the same name. Once a build has written its file it never writes
 over it, so a later build takes a new name (`course-2.h5p`). Copy the one you hand over to the
@@ -88,20 +107,6 @@ name the user asked for without writing over a file already there (`cp -n`). If 
 taken, ask, or where you cannot ask, take a new name and say so. Never delete or overwrite a file
 to free a name. Pass the build's notes on to the user: texts left in English, a slide that holds
 too much.
-
-Where `npx` cannot install, as in ChatGPT, whose npm mirror refuses, try no other way to install
-it. [The build page](https://embed-my.github.io/build) builds the same package in the user's
-browser from the source alone. Give the user a link that carries the source:
-
-```bash
-node -e "console.log('https://embed-my.github.io/build#source=' + require('zlib').deflateRawSync(require('fs').readFileSync('source.json')).toString('base64url'))"
-```
-
-With no shell, give the source for them to paste there. The page lists every problem by its path,
-with a button that copies them for the chat: fix them all and give a new link. A source that names
-files of its own waits for the user to choose them there. Steps 4 and 5 are then the user's, on
-that page: the package is **unverified** until they have played it there, and they download it
-from there.
 
 ## 4. Verify
 
