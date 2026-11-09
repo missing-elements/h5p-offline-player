@@ -218,7 +218,8 @@ export async function writeBundle(type, output, options = {}) {
 /**
  * Every content type's bundle (`contentTypes`), written as `writeBundle` writes one, to
  * `<machine name>.zip` in `folder`, which is made if it is not there. Nothing is written over: where
- * one of them is there already, nothing is written.
+ * one of them is there already, nothing is written. All of them or none: one that fails takes those
+ * written before it away again, so the call can be run again as it was.
  * @param {string} folder
  * @param {{ libraries?: string }} [options] `libraries`, a pack's parts folder in place of the pinned pack
  * @returns {Promise<BundleResult[]>} by machine name
@@ -234,7 +235,13 @@ export async function writeBundles(folder, options = {}) {
     await mkdir(folder, { recursive: true })
     /** @type {BundleResult[]} */
     const results = []
-    for (const [i, type] of types.entries()) results.push(await writeZip(pack, files, await bundleLibraries(pack, type), outputs[i]))
+    try {
+      for (const [i, type] of types.entries()) results.push(await writeZip(pack, files, await bundleLibraries(pack, type), outputs[i]))
+    } catch (error) {
+      // Only what this call wrote: each was created anew, after the check above found none there.
+      await Promise.all(results.map(({ output }) => rm(output, { force: true })))
+      throw error
+    }
     return results
   } finally {
     await pack.close()

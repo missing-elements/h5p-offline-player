@@ -288,7 +288,7 @@ to 3,000. Thirteen things the code does not say by itself:
   `writeBundle` zips them as `parts/`, with `libraries.txt`, without which the parts are not handed
   on. The bundle carries the pack's whole index, not its own entries: a build from it plans as it
   would from the pack, so it writes the same package (the skill's 32 examples were built both ways
-  and matched, but for the ids a build draws) or stops naming the part it lacks, where a cut-down
+  and matched, but for the ids a build draws) or stops and names the part it lacks, where a cut-down
   index would build a source with math without its addon and say nothing. No addon is in a
   bundle: H5P.MathDisplay, 2.8 MB, joins wherever text holds math, and would more than double most
   bundles, so a source that calls for it fetches that one part. A bundle rather than the parts,

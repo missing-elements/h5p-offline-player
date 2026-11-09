@@ -1,11 +1,11 @@
 import { execFile } from 'node:child_process'
-import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { copyFile, cp, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { BlobReader, Uint8ArrayWriter, ZipReader } from '@zip.js/zip.js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { buildPackage, bundleLibraries, contentTypes, missingForInstall, openPack, writeBundle } from '../lib/author.mjs'
+import { buildPackage, bundleLibraries, contentTypes, missingForInstall, openPack, writeBundle, writeBundles } from '../lib/author.mjs'
 
 /*
  * A content type's bundle (#166): the parts a build of the type reads, for a build where the pack
@@ -145,6 +145,28 @@ describe('writeBundle', () => {
     const built = await buildPackage(squares, output, { libraries: folder })
     expect(built.libraries).toContain(addon.folder)
     expect(built.notes.map(({ message }) => message)).toContainEqual(expect.stringContaining(`${addon.machineName} ${addon.majorVersion}.${addon.minorVersion}`))
+  })
+
+  it('writes every content type\'s or none: one that fails takes those before it away again', async () => {
+    // A copy of the pack without a part that only a later content type's bundle reads: an older
+    // minor kept for the upload check, which listing the content types never opens.
+    const types = (await contentTypes(pack)).map((type) => type.library.machineName)
+    const bundles: string[][] = []
+    for (const type of types) bundles.push((await bundleLibraries(pack, type)).map((entry) => entry.folder))
+    const firstNeeding = (folder: string) => bundles.findIndex((folders) => folders.includes(folder))
+    const missing = pack.libraries.filter((entry) => entry.installOnly).map((entry) => entry.folder).find((folder) => firstNeeding(folder) > 0)
+    expect(missing).toBeDefined()
+    const copy = join(dir, 'gappy')
+    await cp(parts, join(copy, 'parts'), { recursive: true })
+    await copyFile(join(parts, '../libraries.txt'), join(copy, 'libraries.txt'))
+    await rm(join(copy, 'parts', `${missing}.h5p`))
+
+    const out = join(dir, 'gappy-bundles')
+    await expect(writeBundles(out, { libraries: join(copy, 'parts') })).rejects.toThrow(`has no ${missing}.h5p`)
+    expect(await readdir(out)).toEqual([])
+    // Run again with the part back, it writes them all.
+    await copyFile(join(parts, `${missing}.h5p`), join(copy, 'parts', `${missing}.h5p`))
+    expect(await writeBundles(out, { libraries: join(copy, 'parts') })).toHaveLength(types.length)
   })
 
   it('refuses a pack without its licence list beside its parts', async () => {

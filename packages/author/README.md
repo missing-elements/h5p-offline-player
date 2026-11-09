@@ -122,10 +122,11 @@ The libraries a build of one content type reads, for a build where the pack cann
 such as a chat's sandbox that reaches no npm registry: everything the type can hold, with the
 editor libraries an H5P site's upload check asks for. The zip holds `parts/`, the pack's whole
 index with those parts, and `libraries.txt`, the licences they are used under. A build from it
-writes the package the pack would. An addon is not in it, so a source whose text calls for one,
-H5P.MathDisplay for math, stops naming the part to add to `parts/` from the pack's. With pack
-1.1.0 a question type's bundle is about 1 MB, a Question Set's 2.6 MB, a container's up to
-8.4 MB. `--all <folder>` writes one per content type, `<machine name>.zip`: 55, 99 MB in all.
+writes the package the pack would. An addon is not in it: where a source's text calls for one,
+H5P.MathDisplay for math, the build stops and names the missing part, to copy into `parts/` from
+the pack's own `parts/` folder. With pack 1.1.0 a question type's bundle is about 1 MB, a Question
+Set's 2.6 MB, a container's up to 8.4 MB. `--all <folder>` writes one per content type,
+`<machine name>.zip`: 55, 99 MB in all. If one fails, none is left behind.
 
 ## Options
 

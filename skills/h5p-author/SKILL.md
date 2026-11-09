@@ -87,16 +87,17 @@ npx @missing-elements/h5p-author@latest build source.json course.h5p
 `ENOTFOUND`, a registry's 403, 404 or 503, as in ChatGPT): do not retry, try another way to
 install it, or end with commands for the user to run once npm works. Where Node runs and you can
 fetch a file (in ChatGPT, open each address with the browsing tool, then download it), fetch the
-build tool and the content type's bundle, the libraries a build of that type reads, named by the
-type's machine name:
+build tool and the bundle of the source's own `type`, the libraries a build of that type reads.
+In both addresses and commands below, `<type>` is that machine name, such as `H5P.Blanks`: another
+type's bundle lacks what this one needs.
 
 ```
 https://embed-my.github.io/bundles/h5p-author.mjs
-https://embed-my.github.io/bundles/H5P.QuestionSet.zip
+https://embed-my.github.io/bundles/<type>.zip
 ```
 
 ```bash
-unzip -q H5P.QuestionSet.zip   # or: python3 -m zipfile -e H5P.QuestionSet.zip .
+unzip -q <type>.zip   # or: python3 -m zipfile -e <type>.zip .
 node h5p-author.mjs build source.json course.h5p --libraries parts
 ```
 
