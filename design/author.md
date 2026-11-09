@@ -276,7 +276,10 @@ to 3,000. Thirteen things the code does not say by itself:
   The page lives in embed-my/embed-my.github.io, not in this repository's demo: the owner wanted
   an authoring tool's public address without "H5P" in it, and that origin already serves the
   player and the pack. It builds from `@missing-elements/h5p-libraries/install` at the version
-  the author package pins, so the page plays with the pack it built from.
+  the author package pins, so the page plays with the pack it built from. A chat with no tool to
+  run at all, as ChatGPT on a free account once its data-analysis quota is spent (for hours, the
+  owner's test of 2026-11-09), cannot write the link: the skill has it put the whole source in its
+  reply, since that test's chat gave the page's bare address, which builds nothing.
 - **A bundle per content type, where the pack cannot be installed** (2026-11-09, #166). The page
   leaves the last steps to the user, but ChatGPT's sandbox runs Node and fetches a file its
   browsing tool has opened: given the libraries as files, a chat builds and fixes its source

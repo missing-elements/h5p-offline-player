@@ -117,11 +117,14 @@ node -e "console.log('https://embed-my.github.io/build#source=' + require('zlib'
 python3 -c "import base64,zlib;c=zlib.compressobj(9,zlib.DEFLATED,-15);d=c.compress(open('source.json','rb').read())+c.flush();print('https://embed-my.github.io/build#source='+base64.urlsafe_b64encode(d).decode().rstrip('='))"
 ```
 
-With neither, give the source for them to paste there. The page lists every problem by its path,
-with a button that copies them for the chat: fix them all and give a new link. A source that names
-files of its own waits for the user to choose them there. Steps 4 and 5 are then the user's, on
-that page: the package is **unverified** until they have played it there, and they download it
-from there.
+With neither, or no tool that runs anything at all (in ChatGPT, data analysis can be unavailable
+for hours), the page sees only what the user pastes: put the **whole source in your reply**, in one
+`json` code block, and tell them to paste it into the page. Never give the page's address without
+the source, in the link or beside it: it builds nothing. The page lists every problem by its path,
+with a button that copies them for the chat: fix them all and give a new link, or the whole source
+again. A source that names files of its own waits for the user to choose them there. Steps 4 and 5
+are then the user's, on that page: the package is **unverified** until they have played it there,
+and they download it from there.
 
 A source with a problem writes nothing: the build lists every problem by its path, so fix them
 all and run it again under the same name. Once a build has written its file it never writes
