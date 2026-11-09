@@ -1,13 +1,14 @@
 // The package as a caller sees it, by its own name: through the `types` condition, so this checks the
 // published declarations, not the source. `pnpm typecheck` writes them first.
 import {
-  allowedTags, buildPackage, checkContent, ContentGenerator, GENERATED_START, loadLibraries, markupText, openPack, packageLibraries, plainText, schemaOf, SourceError,
-  type BuildResult, type CheckedContent, type LibraryRecord, type LibrarySource, type PackageFiles, type Source, type TranslationReport
+  allowedTags, buildPackage, bundleLibraries, checkContent, ContentGenerator, contentTypes, GENERATED_START, loadLibraries, markupText, openPack, packageLibraries, plainText, schemaOf, SourceError,
+  writeBundle, writeBundles,
+  type BuildResult, type BundleResult, type CheckedContent, type LibraryRecord, type LibrarySource, type PackageFiles, type Source, type TranslationReport
 } from '@missing-elements/h5p-author'
 // @ts-expect-error The source reader is internal: a helper the tests import from its module.
 import { readSource } from '@missing-elements/h5p-author'
 import { buildPackage as buildInPage, openPack as openInPage, type BuildResult as PageBuildResult } from '@missing-elements/h5p-author/browser'
-import { checkContent as checkBeside, ContentGenerator as Generator, loadLibraries as loadBeside, type IndexEntry } from '@missing-elements/h5p-author/core'
+import { bundleLibraries as bundleBeside, checkContent as checkBeside, ContentGenerator as Generator, loadLibraries as loadBeside, type IndexEntry } from '@missing-elements/h5p-author/core'
 // @ts-expect-error The core builds nothing: a build is Node's or a page's.
 import { buildPackage as noBuild } from '@missing-elements/h5p-author/core'
 
@@ -81,4 +82,19 @@ export async function inAPage(pack: { libraries: IndexEntry[] }, picture: File):
   } finally {
     await libraries.close()
   }
+}
+
+/** A content type's bundle: its parts, and the zip a build without the pack reads. */
+export async function bundles(): Promise<BundleResult[]> {
+  const one: BundleResult = await writeBundle('H5P.Blanks', 'H5P.Blanks.zip', { libraries: 'parts' })
+  const pack = await openPack('parts')
+  try {
+    const entries: IndexEntry[] = await bundleLibraries(pack, 'H5P.Blanks')
+    const beside: IndexEntry[] = await bundleBeside(pack, 'H5P.Blanks')
+    const names: string[] = (await contentTypes(pack)).map((part) => part.library.machineName)
+    void [entries, beside, names, one.type, one.parts, one.size]
+  } finally {
+    await pack.close()
+  }
+  return [one, ...(await writeBundles('bundles'))]
 }

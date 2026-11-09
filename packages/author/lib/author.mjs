@@ -5,20 +5,23 @@
  * package pins, checked against its index. A tool beside the build takes the libraries as the build
  * loads them (`openPack`, `loadLibraries`, and `packageLibraries` for a package's own), its rules
  * for text (`markupText`, `plainText`, `allowedTags`), and the check it runs last on what it writes,
- * for saved content (`checkContent`). This is the entry for Node: `./core` is what of it needs no
- * Node, and `./browser` builds in a page.
+ * for saved content (`checkContent`). A content type's bundle (`writeBundle`) carries the parts a
+ * build of it reads, for a build where the pack cannot be installed. This is the entry for Node:
+ * `./core` is what of it needs no Node, and `./browser` builds in a page.
  */
 
+import { contentTypes } from './bundle.mjs'
 import { openPack } from './node.mjs'
 import { schemaLines, schemaMarkdown } from './schema.mjs'
 import { LAYOUTS } from './types.mjs'
 
 export * from './core.mjs'
-export { buildPackage, openPack } from './node.mjs'
+export { buildPackage, openPack, writeBundle, writeBundles } from './node.mjs'
 
 /**
  * @typedef {import('./node.mjs').BuildResult} BuildResult
  * @typedef {import('./node.mjs').BuildOptions} BuildOptions
+ * @typedef {import('./node.mjs').BundleResult} BundleResult
  */
 
 /**
@@ -34,12 +37,8 @@ export async function schemaOf(machineName, options = {}) {
   try {
     const entry = pack.newest(machineName)
     if (!entry) {
-      const runnable = []
-      for (const each of pack.libraries) {
-        const part = await pack.open(each)
-        if (part.library.runnable) runnable.push(`${each.machineName} (${part.library.title})`)
-      }
-      throw new Error(`The library pack has no ${machineName}. Its content types: ${[...new Set(runnable)].sort().join(', ')}`)
+      const types = (await contentTypes(pack)).map((part) => `${part.library.machineName} (${part.library.title})`)
+      throw new Error(`The library pack has no ${machineName}. Its content types: ${types.join(', ')}`)
     }
     const part = await pack.open(entry)
     if (!part.semantics) throw new Error(`${machineName} has no semantics: it is not a content type an author fills in`)
