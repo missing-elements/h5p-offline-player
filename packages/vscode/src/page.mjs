@@ -9,20 +9,28 @@
  * @param {boolean} settings.untrusted
  * @param {boolean} settings.newest with the pack's newer libraries
  * @param {string | null} settings.lang for a package that names no language
+ * @param {'light' | 'dark' | null} [settings.theme] VS Code's theme, which the page's colours follow
  */
 export function viewPage(settings) {
   // `<` as an escape, so that no file name can end the script block it is written into.
   const json = JSON.stringify(settings).replaceAll('<', '\\u003c')
+  // On <html> before the stylesheet applies, so the page never shows the other theme first; one of
+  // the two names or nothing. Without it the page follows the system, which need not be VS Code's.
+  const theme = settings.theme === 'light' || settings.theme === 'dark' ? settings.theme : null
   return `<!doctype html>
-<html lang="en">
+<html lang="en"${theme ? ` data-theme="${theme}"` : ''}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Preview</title>
+    <!-- The demo's page styles, from the player's files the extension carries: the page's colours,
+         light or dark as VS Code is, and the player's box while it loads. The bar above is the
+         webview's, in VS Code's own colours. -->
+    <link rel="stylesheet" href="/page.css" />
     <script type="module" src="/h5p-player.js"></script>
     <style>
-      body { margin: 0; background: #fff; }
-      h5p-player { display: block; min-height: 240px; }
+      body { min-height: 0; padding: 0.75rem var(--gutter) 1rem; }
+      h5p-player { margin-top: 0; }
     </style>
   </head>
   <body>
@@ -36,6 +44,17 @@ export function viewPage(settings) {
       const tell = (message) => {
         if (webview) parent.postMessage({ source: 'h5p-preview', ...message }, webview)
       }
+
+      // VS Code's theme as it changes, sent by the webview so that a switch does not reload the
+      // content: the one message this page takes, from the window around it at the webview's
+      // origin, and as one of the two names only.
+      window.addEventListener('message', (event) => {
+        if (!webview || event.origin !== webview || event.source !== parent) return
+        const message = event.data
+        if (message && message.source === 'h5p-preview-webview' && message.type === 'theme' && (message.theme === 'light' || message.theme === 'dark')) {
+          document.documentElement.dataset.theme = message.theme
+        }
+      })
 
       // The library pack the extension carries, for what a package lacks and, unless turned off,
       // for newer versions of what it carries.

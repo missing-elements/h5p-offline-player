@@ -100,6 +100,12 @@ driver along and the normalizer should not.
   download-url`) was the other way: it changes how the content looks, takes two clicks, and its
   dialog's button is English whatever the content's language.
 
+- **The preview page is the demo's page** (2026-11-10, #170): it links the player's `page.css` and
+  `mark.svg`, served from `dist/` as the element's script is, so the bar with the mark, the
+  Download button, the theme switch and the status strip with its state dot and timer are the
+  demo's own rules, not a copy that drifts. The owner found the system-styled page out of place
+  beside the demo and in Claude's browser panel, where the preview opens for them.
+
 Not built, deliberately: steps that click through the content and check the xAPI it sends, and a
 content digest for reviewing what was generated. A check of library versions against the hub's
 catalogue, the commonest reason a package that plays here is refused on upload (h5p-cli builds

@@ -100,6 +100,10 @@ describe('h5p-verify --preview', () => {
       expect(past.status).toBe(416)
       expect(past.headers.get('content-range')).toBe(`bytes */${bytes.length}`)
       expect((await fetch(`${preview.url}/__package/other.h5p`)).status).toBe(404)
+      // The demo's page styles and mark, from the player's dist/ as the element's script is.
+      const styles = await fetch(`${preview.url}/page.css`)
+      expect([styles.status, styles.headers.get('content-type')]).toEqual([200, 'text/css; charset=utf-8'])
+      expect((await fetch(`${preview.url}/mark.svg`)).headers.get('content-type')).toBe('image/svg+xml')
     } finally {
       preview.close()
     }
@@ -147,6 +151,12 @@ describe('h5p-verify --preview', () => {
     try {
       const page = await browser.newPage()
       await page.goto(`${preview.url}/`)
+      // Drawn by the demo's stylesheet: its sticky bar, and the strip's state once the content is up.
+      expect(await page.evaluate(() => getComputedStyle(document.querySelector('.topbar')!).position)).toBe('sticky')
+      // The file's name is the page's heading, and the live region is the message, not the timer.
+      expect(await page.getByRole('heading', { level: 1 }).textContent()).toBe('quiz.h5p')
+      expect(await page.evaluate(() => [...document.querySelectorAll('[role="status"]')].map((element) => element.id))).toEqual(['message'])
+      await page.waitForFunction(() => document.querySelector('#status')?.getAttribute('data-state') === 'ready', null, { timeout: 60_000 })
       const link = page.getByRole('link', { name: 'Download' })
       const [download] = await Promise.all([page.waitForEvent('download'), link.click()])
       expect(download.suggestedFilename()).toBe('quiz.h5p')
@@ -160,6 +170,25 @@ describe('h5p-verify --preview', () => {
         player.dispatchEvent(new CustomEvent('error', { detail: { message: 'Failed to fetch' } }))
       })
       expect(await page.locator('#status').textContent()).toContain('The preview has ended.')
+    } finally {
+      preview.close()
+      await browser.close()
+    }
+  }, 60_000)
+
+  it('follows a theme switched in another tab of the same preview', async () => {
+    const preview = await previewPackage({ file: quiz, port: 0 })
+    const browser = await launch(undefined)
+    try {
+      // One context, so the two tabs share the origin's storage, as a browser's tabs do.
+      const context = await browser.newContext()
+      const [first, second] = [await context.newPage(), await context.newPage()]
+      for (const page of [first, second]) await page.goto(`${preview.url}/`)
+      await first.click('.theme-toggle')
+      const pinned = await first.evaluate(() => document.documentElement.dataset.theme)
+      expect(pinned).toBe('dark')
+      await second.waitForFunction((theme) => document.documentElement.dataset.theme === theme, pinned, { timeout: 5000 })
+      expect(await second.locator('.theme-toggle').getAttribute('aria-label')).toBe('Switch to the light theme')
     } finally {
       preview.close()
       await browser.close()
