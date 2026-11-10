@@ -184,10 +184,9 @@ types. `sourceType(source, names)` is the content type a source is written in, a
 of the machine names given: its `type`, as it is or loosely (`"interactive-book"`), or where it has
 none the one name under `contentType` or `library`; `null` where none can be meant, and for a quiz
 in the published format (`{ "kind": … }`), which the build reads as a Question Set or a Multiple
-Choice by rules of its own. A page that
-hands a chat a type's notes with a source's problems asks it, and hands over the type the build
-took. `ContentGenerator` is the engine underneath, also run by the repository's sweep of every
-content type.
+Choice by rules of its own. A page that hands a chat a type's notes with a source's problems asks
+it, and hands over the type the build took. `ContentGenerator` is the engine underneath, also run by
+the repository's sweep of every content type.
 
 A tool beside the build takes the libraries as the build loads them, the generator, and the
 build's rules for text:
