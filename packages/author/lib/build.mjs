@@ -5,7 +5,7 @@ import { ContentGenerator, libraryString } from './generator.mjs'
 import { installClosure } from './install.mjs'
 import { loadLibraries } from './libraries.mjs'
 import { CC_VERSIONS, LICENSES, ROLES } from './metadata.mjs'
-import { machineNameOf, nearestNames } from './names.mjs'
+import { machineNameOf, NAMING_KEYS, namingKey, nearestNames } from './names.mjs'
 import { quizProblems, quizSource } from './quiz.mjs'
 import { SourceError } from './source-error.mjs'
 import { escapeText } from './text.mjs'
@@ -55,9 +55,9 @@ export const typeNames = (pack) => [...new Set(pack.libraries.filter((entry) => 
  * skill beside it writes a source's outer shape its own way, and each of these cost it a round in
  * which nothing inside was looked at:
  *
- * - the content type under another name, `contentType` or `library`, or named loosely as `type`,
+ * - the content type under another key, `contentType` or `library`, or named loosely as `type`,
  *   "interactive-book", which only `names` can tell;
- * - the title, language, licence and authors in an object, as H5P keeps them in `metadata`;
+ * - the title, language, licence and authors in `metadata`, where H5P keeps them;
  * - the content's fields beside `type`, with no `params` around them.
  *
  * Each is a problem, said once with what to write. `typed` is whether the content type is known,
@@ -86,34 +86,33 @@ export function sourceOf(input, names) {
   const at = Object.fromEntries(FIELDS.map((name) => [name, name]))
   let rest = Object.keys(input).filter((key) => !FIELDS.includes(key))
 
-  // The content type under another name: the one text beside the fields that names one.
+  // The content type under another key, `contentType` or `library`: the one that names one.
   let named = ''
   if (given.type === undefined) {
-    const keys = rest.filter((key) => typeof input[key] === 'string' && input[key].length <= 64 &&
-      (names ? machineNameOf(input[key], names) !== null : /^\s*H5P\.[^\s.]+(?:\s+\d+\.\d+(?:\.\d+)?)?\s*$/.test(input[key])))
-    if (keys.length === 1) {
-      const [key] = keys
-      named = names ? /** @type {{ machineName: string }} */ (machineNameOf(input[key], names)).machineName : input[key].trim().split(/\s+/)[0]
-      report(key, `is not a field of a source: the content type is its type: write "type": "${named}"`)
+    const others = Object.fromEntries(rest.map((key) => [key, input[key]]))
+    const keys = names ? [] : rest.filter((key) => NAMING_KEYS.includes(key) && typeof input[key] === 'string' && input[key].length <= 64 && /^\s*H5P\.[^\s.]+(?:\s+\d+\.\d+)?\s*$/.test(input[key]))
+    const found = names ? namingKey(others, names) : keys.length === 1 ? { key: keys[0], machineName: input[keys[0]].trim().split(/\s+/)[0] } : null
+    if (found) {
+      named = found.machineName
+      report(found.key, `is not a field of a source: the content type is its type: write "type": "${named}"`)
       given.type = named
-      rest = rest.filter((each) => each !== key)
+      rest = rest.filter((each) => each !== found.key)
     }
   }
-  // What a source says of itself, in an object of its own.
-  for (const key of [...rest]) {
-    const value = input[key]
-    if (!isObject(value)) continue
-    const own = OWN.filter((name) => given[name] === undefined && value[name] !== undefined)
-    if (!own.length) continue
-    report(key, `is not a field of a source: ${own.join(', ')} ${own.length === 1 ? 'is' : 'are'} written beside type, not in an object: write ${own.map((name) => `"${name}": …`).join(', ')} at the top`)
+  // What a source says of itself, in an object of its own: `metadata`, as H5P keeps it. Only
+  // there, since a field of the content, Question Set's `introPage`, may have a title too.
+  const value = rest.includes('metadata') && isObject(input.metadata) ? input.metadata : null
+  const own = value ? OWN.filter((name) => given[name] === undefined && value[name] !== undefined) : []
+  if (value && own.length) {
+    report('metadata', `is not a field of a source: ${own.join(', ')} ${own.length === 1 ? 'is' : 'are'} written beside type, not in an object: write ${own.map((name) => `"${name}": …`).join(', ')} at the top`)
     for (const name of own) {
       given[name] = value[name]
-      at[name] = `${key}.${name}`
+      at[name] = `metadata.${name}`
     }
     for (const inner of Object.keys(value)) {
-      if (!own.includes(inner)) report(`${key}.${inner}`, OWN.includes(inner) ? 'is written beside type already' : `is not a field of a source; ${fields}`)
+      if (!own.includes(inner)) report(`metadata.${inner}`, OWN.includes(inner) ? 'is written beside type already' : `is not a field of a source; ${fields}`)
     }
-    rest = rest.filter((each) => each !== key)
+    rest = rest.filter((each) => each !== 'metadata')
   }
   // The content's fields beside `type`.
   if (rest.length && given.params === undefined) {

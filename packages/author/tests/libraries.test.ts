@@ -83,6 +83,22 @@ describe('loadLibraries', () => {
     expect(entryOf(objects.entries, 'H5P.Column')?.semantics).not.toBeNull()
   })
 
+  it('loads a library named under type or contentType, as it is or loosely, and nothing for a text under another key (#174)', async () => {
+    // Sub-content as a chat with no skill writes it, in a field that takes several libraries: the
+    // generator reads what is written for it against the library it names, so that is loaded.
+    const { entries, translations } = await loadLibraries(pack, { type: 'H5P.Column', language: 'de', params: { content: [
+      { type: 'advancedtext', text: 'x' },
+      { content: { contentType: 'H5P.TrueFalse', params: {} } },
+      { content: { library: 'H5P.Dialogcards', params: { dialogs: [{ text: 'Tisch', answer: 'table' }] } } }
+    ] } })
+    expect(entryOf(entries, 'H5P.AdvancedText')?.semantics).not.toBeNull()
+    expect(entryOf(entries, 'H5P.TrueFalse')?.semantics).not.toBeNull()
+    // A card's answer that reads like a library's name loads nothing, and what is loaded only
+    // because it may be meant is no translation the content reports.
+    expect(entryOf(entries, 'H5P.Table')).toMatchObject({ semantics: null })
+    expect(translations.map((report) => report.library.split(' ')[0])).toEqual(['H5P.Column', 'H5P.Dialogcards'])
+  })
+
   it('marks the fields a layout sets optional, and leaves the pack\'s own semantics as they are', async () => {
     const { entries } = await loadLibraries(pack, content)
     expect(fieldAt(entryOf(entries, 'H5P.Video')!.semantics as Field[], 'visuals.poster')?.optional).toBe(true)

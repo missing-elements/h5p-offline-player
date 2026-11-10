@@ -1,6 +1,6 @@
 import { ownLibraries } from '@missing-elements/h5p-offline-player/plan'
 import { libraryOptions, libraryString } from './generator.mjs'
-import { machineNameOf } from './names.mjs'
+import { machineNameOf, NAMING_KEYS } from './names.mjs'
 import { SourceError } from './source-error.mjs'
 import { localize, translationFiles } from './translate.mjs'
 import { patchSemantics } from './types.mjs'
@@ -90,17 +90,17 @@ export async function loadLibraries(pack, { type, language, params }) {
       if (match && match[2] !== undefined) queue.push({ machineName: match[1], major: Number(match[2]) })
       else if (match) for (const entry of pack.libraries) if (entry.machineName === match[1]) queue.push({ machineName: match[1], major: entry.majorVersion })
       // What the generator takes to name a library though it is not written as one (#174), so
-      // that what is written for it is checked: `library` written loosely, "multichoice", and a
-      // machine name under another key, `contentType` or `type`. A name under another key is
-      // taken only as it is, so that a text that reads like one, a slide titled "Summary", loads
-      // nothing.
+      // that what is written for it is checked and not reported against no fields: `library`
+      // written loosely, "multichoice", and a name under `type` or `contentType`, as it is or
+      // loosely. Those keys only, as the generator reads them, so that a text that reads like a
+      // name under another, a card's answer "table", loads nothing.
       if (typeof value.library === 'string') {
         const found = machineNameOf(value.library, names)
         if (found && !found.exact) meant(found.machineName)
       } else {
-        for (const text of Object.values(value)) {
-          const found = typeof text === 'string' && text.length <= 64 ? machineNameOf(text, names) : null
-          if (found?.exact) meant(found.machineName)
+        for (const key of NAMING_KEYS) {
+          const found = machineNameOf(value[key], names)
+          if (found) meant(found.machineName)
         }
       }
       Object.values(value).forEach(named)

@@ -410,18 +410,24 @@ to 3,000. Nineteen things the code does not say by itself:
   interactive-book`, with no name offered: the next guesses were `book` and `flashcards`.
 
   So a build reads a source with the pack's names (`sourceOf`), and takes what can only be meant:
-  the content type under another key, or named loosely as `type`, the same letters and digits in
-  any case with or without `H5P.` (`names.mjs`); the source's own fields in an object; the
+  the content type under `contentType` or `library`, or named loosely as `type`, the same letters
+  and digits in any case with or without `H5P.` (`names.mjs`); the source's own fields in
+  `metadata`, and in no other object, since Question Set's `introPage` has a title too; the
   content's fields beside `type`. Each is a problem, said once with what to write, and the content
   is generated and checked in the same build wherever the type is known, with a stand-in for what
   is missing. A name that is no type has the nearest offered: those its letters are part of, and
   those they end with, not one they begin with, since the "image" of "image choice" is no lead.
   A title is not tried, "Multiple Choice" or "Image Choice": the pack's index has none, and
-  reading them takes every part, which a page cannot. Sub-content that names its library under
-  another key, `contentType` or `type`, is taken the same way, its parameters in `params` or
-  beside the name, where one text names a library the field takes; and a title beside them that
-  is no field of the library is the sub-content's own, its `metadata.title`, which had been two
-  problems a chapter.
+  reading them means fetching every part, 147 of them and some 15 MB, to name one type. A number
+  with no point is no version: "Question Set 2" is no Question Set. Sub-content that names its
+  library under `type` or `contentType` is taken the same way, its parameters in `params` or
+  beside the name, where one of the two names a library the field takes, at the major written
+  where the field takes it, and the loader loads that library, so what is written for it is
+  checked against its fields and not against none. No other key: in the 328 sources the tests
+  stored, every name found under another one was a text that reads like one, a card's answer
+  "table" six times, `main: "Question"` three times, `title` and `libraryTitle` "Text". A title beside the
+  parameters that is no field of the library is the sub-content's own, its `metadata.title`, in a
+  library field's place or in its group's, which had been two problems a chapter.
 
   With it 10 of the 12 were right by the second round and all 12 by the third, and every one
   plays. Of the 263 sources the earlier tests stored, written with the skill's text, 259 have the
