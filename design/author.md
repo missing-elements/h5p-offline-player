@@ -358,7 +358,9 @@ to 3,000. Eighteen things the code does not say by itself:
   So the problem names the item and shows it whole, `write params.content[0] as { "content": … }`.
   Only an object or a list, a text, a number or a flag whose name one group below has, in a field
   an author writes that takes such a value, is taken to belong there; an interface text is none,
-  since a question's text sent to a label of its name would build and read wrong.
+  since a question's text sent to a label of its name would build and read wrong. And an object
+  goes to a group only where it writes one of the group's fields: a Game Map's `map`, written for
+  the picture, was first sent to `behaviour.map`, the map's labels and fog, a name and no more.
 - **The package carries the skill's type files** (2026-11-10, #172). In the same measurement, what
   did most was no message: with the type files pasted back beside the first problems, the content
   type's and those of the libraries the source names, all 15 built by the second round, in two
@@ -368,6 +370,20 @@ to 3,000. Eighteen things the code does not say by itself:
   an export, for the page to hand over with a source's problems. They stay the skill's, at the
   repository's root where `npx skills add` looks, written by `sync:skill` as before; the copy is
   not in git, and `build.test.ts` holds it to the skill's files, file for file.
+
+  The same test on the 23 other content types the skill lists says how far each thing reaches:
+  two runs each, 46 first replies, each built package checked against what its task asked for.
+  16 were right at once. By the fourth round 35 were right under 0.6.0's messages and 36 under
+  the new ones, which is no difference: there a weak model does not misplace what it knows, it
+  does not know a type's names (`options`, `sequenceImages`, `questionnaireElements`) or its rules
+  (the right answer first, a card a pair), and a problem gives it one level's names a round. 9
+  and 7 packages built and were not what was asked, a question's feedback left out once no field
+  took it. With the type files handed back, 42 were right by the second round and 43 by the third,
+  and none stayed unbuilt; three had built at once and wrong, with no problem to hand a file back
+  with, and one source named a type the pack has not, which no file answers until the next round
+  names a real one. With the type's file before the first reply, one run of each of the 28 types,
+  all 28 were right at once and play. So the messages are for a type's levels, and the type's file
+  is what lets a weak model write any type: the page hands it back, the skill gives its address.
 - **The skill says where a container holds its sub-content** (2026-11-10, #172). The one thing in
   SKILL.md that repeats a type file, for the chat that cannot read one. Its line on sub-content
   names the three commonest places: an item of H5P.Column's `content` is
@@ -375,8 +391,10 @@ to 3,000. Eighteen things the code does not say by itself:
   `presentation.slides[].elements`, a book's chapter an H5P.Column. In the measurement above no
   first reply for a book, a page or slides built, 0 of 9; with that sentence in the skill's text
   all 9 built at once and play. A scenario, which it does not name, still took a round of
-  problems. The skill gives the type files' address on GitHub too, for a chat that has its text
-  and can open a link.
+  problems, and so do the six other listed types that hold content (Accordion, Questionnaire,
+  Interactive Video, Image Hotspots, Image Choice, Game Map): of 12 first replies 2 were right at
+  once with the sentence and 2 without, the Accordions. The skill gives the type files' address
+  on GitHub too, for a chat that has its text and can open a link.
 
 Not built: editing an existing package, which a tool beside it does with `checkContent` as its
 check; layout for Drag and Drop and Crossword; and any judgement of whether content is right, which

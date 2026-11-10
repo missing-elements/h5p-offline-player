@@ -956,7 +956,10 @@ function homesOf(fields, name, value, chain = [], found = []) {
 function takes(field, value) {
   if (field.type === 'group' && (field.fields ?? []).length === 1 && !field.isSubContent) return takes(field.fields[0], value)
   if (Array.isArray(value)) return ['list', 'video', 'audio'].includes(field.type) || (field.type === 'select' && Boolean(field.multiple))
-  if (isObject(value)) return ['group', 'library', 'image', 'file', 'video', 'audio'].includes(field.type)
+  // A group is the home of an object that writes a field of it. Its name alone is a coincidence:
+  // Game Map's `behaviour.map`, its labels and fog, is not where a `map` written for the picture goes.
+  if (isObject(value) && field.type === 'group') return Object.keys(value).some((key) => (field.fields ?? []).some((/** @type {any} */ each) => each.name === key))
+  if (isObject(value)) return ['library', 'image', 'file', 'video', 'audio'].includes(field.type)
   if (typeof value === 'string') return field.type === 'text' || (field.type === 'select' && !field.multiple)
   return typeof value === field.type
 }

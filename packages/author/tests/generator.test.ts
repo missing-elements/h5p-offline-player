@@ -383,6 +383,17 @@ describe('content authored from semantics', () => {
       { name: 'second', type: 'group', fields: [{ name: 'label', type: 'text', default: 'b' }, { name: 'y', type: 'number', default: 0 }] }
     ], { label: 'c' }, [], STRICT)
     expect(twice.problems).toEqual([{ path: 'params.label', message: 'is not a field here; the fields are first, second' }])
+    // Or where an object has a group's name and writes none of its fields: a `map` written for a
+    // picture is not Game Map's `behaviour.map`, and saying so would send the next source the wrong way.
+    const namesake = generate(semantics, { presentation: { slides: [{ title: 'One' }] }, deep: { picture: 'x' } }, [], STRICT)
+    expect(namesake.problems).toEqual([{ path: 'params.deep', message: 'is not a field here; the fields are presentation, behaviour, solo, and the interface texts' }])
+    expect(namesake.moved).toEqual([])
+    const written = generate(semantics, { presentation: { slides: [{ title: 'One' }] }, deep: { depth: 2, picture: 'x' } }, [], STRICT)
+    expect(written.problems.map(({ path, message }) => `${path}: ${message}`)).toEqual([
+      'params.deep: is a field of behaviour, not of this level: write params.behaviour.deep',
+      'params.deep.picture: is not a field here; the fields are mode, depth'
+    ])
+    expect(written.params.behaviour.deep.depth).toBe(2)
   })
 
   it('names a list it refused an item of, which then holds fewer items than were written (#172)', () => {
