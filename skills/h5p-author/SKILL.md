@@ -13,6 +13,10 @@ from two downloaded files, or a page in the user's browser builds it (step 3), s
 commands for the user to run.
 Keep [LICENSE](./LICENSE) with the skill.
 
+With this text alone and none of its files beside it, open https://missing-elements.github.io/h5p/skill/
+first and take every address from it: it writes out in full each file this text names and each
+file step 3 fetches, and a fetch tool may refuse an address put together from a name.
+
 ## 1. Choose the content type with the user
 
 Read [the brief](./references/authoring.md) once. If the user named no type, propose one or
@@ -59,10 +63,9 @@ the same package.
 
 Read the type's file, `references/types/<Type>.md`: notes, an example, its fields. Parts other
 content holds have files too: H5P.AdvancedText, H5P.Image, H5P.Video, H5P.Text. With this text
-alone and no file beside it, open the file at
-`https://missing-elements.github.io/h5p/build/types/<Type>.md`;
-where nothing opens, write the source from what you know of the type: the build says, for each
-place that is wrong, what to write there.
+alone and no file beside it, open the type's file at the address
+https://missing-elements.github.io/h5p/skill/ lists for it; where nothing opens, write the source
+from what you know of the type: the build says, for each place that is wrong, what to write there.
 
 ```json
 {
@@ -94,9 +97,10 @@ npx @missing-elements/h5p-author@latest build source.json course.h5p
 `ENOTFOUND`, a registry's 403, 404 or 503, as in ChatGPT): do not retry, try another way to
 install it, or end with commands for the user to run once npm works. Where Node runs and you can
 fetch a file (in ChatGPT, open each address with the browsing tool, then download it), fetch the
-build tool and the bundle of the source's own `type`, the libraries a build of that type reads.
-In both addresses and commands below, `<type>` is that machine name, such as `H5P.Blanks`: another
-type's bundle lacks what this one needs.
+build tool and the bundle of the source's own `type`, the libraries a build of that type reads,
+at the addresses https://missing-elements.github.io/h5p/skill/ lists for them. In both addresses
+and commands below, `<type>` is that machine name, such as `H5P.Blanks`: another type's bundle
+lacks what this one needs.
 
 ```
 https://missing-elements.github.io/h5p/bundles/h5p-author.mjs
