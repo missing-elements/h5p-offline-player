@@ -49,7 +49,8 @@ describe('the preview server', () => {
       packBase: '/__pack/',
       untrusted: true,
       newest: false,
-      lang: 'de'
+      lang: 'de',
+      theme: null
     })
     // Trusted and with the newest libraries unless the address says otherwise.
     const plain = settingsOf(await (await fetch(`${server.url}/view/${id}`)).text())
@@ -65,6 +66,20 @@ describe('the preview server', () => {
     const page = await (await fetch(`${server.url}/view/${id}`)).text()
     expect(page).not.toContain('</script><script>alert(1)')
     expect(settingsOf(page).name).toBe(name)
+    server.remove(id)
+  })
+
+  it('takes VS Code’s theme as light or dark, and nothing else', async () => {
+    const id = server.add(quiz, 'quiz.h5p', 'file:///courses/quiz.h5p')
+    const dark = await (await fetch(`${server.url}/view/${id}?theme=dark`)).text()
+    expect(settingsOf(dark).theme).toBe('dark')
+    expect(dark).toContain('<html lang="en" data-theme="dark">')
+    const light = await (await fetch(`${server.url}/view/${id}?theme=light`)).text()
+    expect(settingsOf(light).theme).toBe('light')
+    expect(light).toContain('<html lang="en" data-theme="light">')
+    const other = await (await fetch(`${server.url}/view/${id}?theme=${encodeURIComponent('"><script>')}`)).text()
+    expect(settingsOf(other).theme).toBeNull()
+    expect(other).toContain('<html lang="en">\n')
     server.remove(id)
   })
 

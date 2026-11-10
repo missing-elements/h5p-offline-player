@@ -1,0 +1,407 @@
+/* The page around the player, as the demo draws it: its colours for light and dark, the bar with
+   the mark and a byline, buttons, the status strip with its state dot and timer, the player's box
+   while it loads, cards and messages. Shipped with the player so that every page that holds it —
+   the demo, h5p-verify's preview, the H5P Preview extension's page, the build page — looks
+   the same and cannot drift: the demo imports this file and adds its own rules after it. Plain
+   CSS, nothing reaches into the element; the one rule that names it sets its box. A page sets
+   `data-theme="light"` or `"dark"` on <html> to pin a theme, and follows the system without. */
+
+:root {
+  color-scheme: light dark;
+
+  --bg: #ffffff;
+  --fg: #15171c;
+  --muted: #5b6370;
+  --line: #e2e6ec;
+  --line-strong: #c9d0d9;
+  --surface: #f6f8fa;
+  --surface-2: #eef1f5;
+  /* Code blocks are an ink panel in both themes, so code never reads as prose; the role colours
+     are the panel's and do not change with the page. */
+  --code-bg: #141a23;
+  --code-head: #1a212c;
+  --code-border: #141a23;
+  --code-line: #283141;
+  --tk-plain: #e2e7ef;
+  --tk-punct: #8f9aab;
+  --tk-comment: #8793a7;
+  --tk-string: #9ad6a8;
+  --tk-keyword: #d0a8ff;
+  --tk-function: #8db6ff;
+  --tk-tag: #7fd1e3;
+  --tk-attr: #f2c97d;
+  --tk-constant: #f5a97f;
+  --accent: #2f6df6;
+  --accent-ink: #ffffff;
+  --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+  --danger: #b4232a;
+  --warn: #8a5a00;
+  --ok: #1d7a42;
+  --star: #bf8700;
+  /* Which of the switch's two icons shows: the theme a press would bring. */
+  --icon-sun: none;
+  --icon-moon: inline;
+
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 10px 28px -18px rgb(0 0 0 / 0.22);
+  --gutter: clamp(1rem, 4vw, 2rem);
+  --content: 64rem;
+  --ease: 160ms ease;
+}
+
+/* The dark tokens, twice, because they apply in two cases that no one selector covers: the
+   system prefers dark and the visitor has not pinned light, or the visitor has pinned dark
+   whatever the system says. `data-theme` is set by demo/theme.js; with no script the first rule
+   is the whole theme and follows the system. `color-scheme` travels with a pin so the browser's
+   own parts — scrollbars, form controls, the canvas behind the page — follow it too. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1114;
+    --fg: #e8eaee;
+    --muted: #98a1ae;
+    --line: #262b33;
+    --line-strong: #363d47;
+    --surface: #171a1f;
+    --surface-2: #1e2229;
+    --code-bg: #090c11;
+    --code-head: #0e1218;
+    --code-border: #2a313c;
+    --code-line: #222935;
+    --accent: #7aa2ff;
+    --accent-ink: #0b1a3a;
+    --danger: #ff8f8f;
+    --warn: #f0c060;
+    --ok: #62d094;
+    --star: #e3b341;
+    --icon-sun: inline;
+    --icon-moon: none;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 14px 36px -20px rgb(0 0 0 / 0.7);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f1114;
+  --fg: #e8eaee;
+  --muted: #98a1ae;
+  --line: #262b33;
+  --line-strong: #363d47;
+  --surface: #171a1f;
+  --surface-2: #1e2229;
+  --code-bg: #090c11;
+  --code-head: #0e1218;
+  --code-border: #2a313c;
+  --code-line: #222935;
+  --accent: #7aa2ff;
+  --accent-ink: #0b1a3a;
+  --danger: #ff8f8f;
+  --warn: #f0c060;
+  --ok: #62d094;
+  --star: #e3b341;
+  --icon-sun: inline;
+  --icon-moon: none;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 14px 36px -20px rgb(0 0 0 / 0.7);
+}
+
+:root[data-theme="light"] { color-scheme: light; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --ease: 0ms; }
+  .badge::before { animation: none !important; }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+/* Hidden means hidden, whatever display a rule gives the element: the browser's own `[hidden]`
+   rule loses to any of them, `button`'s `display: inline-flex` below among them, which once left
+   the app's Start over button on screen with nothing open. */
+[hidden] { display: none !important; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--fg);
+  font: 400 clamp(0.95rem, 0.9rem + 0.25vw, 1.0625rem) / 1.6 system-ui, -apple-system, "Segoe UI",
+    Roboto, sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+a { color: var(--accent); text-underline-offset: 0.15em; }
+a:hover { text-decoration-thickness: 2px; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+code, kbd { font: 0.9em / 1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+p code, li code, .lede code { padding: 0.1em 0.35em; border-radius: 4px; background: var(--surface-2); }
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.75rem var(--gutter);
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: inherit;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* The favicon, drawn at header size: one file for the tab and the mark, so the two cannot drift. */
+.brand-mark {
+  display: block;
+  width: 1.7rem;
+  height: 1.7rem;
+}
+
+/* The name with its author on a line under it, so the bar is no wider for it. H5P Group's
+   trademark policy lets a name lead with "H5P" only beside who made it (h5p.org/trademark; see
+   AGENTS.md). The space before the byline keeps the link's name "… by Missing Elements". */
+.brand-name { display: flex; flex-direction: column; line-height: 1.15; }
+.brand-by { color: var(--muted); font-size: 0.72rem; font-weight: 500; letter-spacing: 0; }
+
+/* Wraps rather than overflows: a wider system font or a larger text setting on a narrow phone
+   pushed the fourth link past the edge, and the whole page scrolled sideways. */
+.topbar nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem; min-width: 0; }
+
+.topbar nav a {
+  padding: 0.375rem 0.7rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: background var(--ease), color var(--ease);
+}
+
+.topbar nav a:hover { background: var(--surface-2); color: var(--fg); }
+.topbar nav a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
+
+/* The right-hand end: the theme switch as an icon, and the repository's Star. */
+.topbar-actions { display: flex; align-items: center; gap: 0.25rem; margin-left: auto; }
+
+/* Where the brand, the nav and the actions fit on one line, the nav sits in the middle of the
+   bar: three columns, the outer two equal, so the middle one is centred whichever end is wider.
+   It needed 57rem with macOS's system font and a four-character star count, and 60rem in the
+   app, whose bar carries the menu's icon too (2026-10-17); one width for every page keeps the
+   bar the same height wherever a visitor goes, and the rest is room for a wider font. The old
+   breakpoint, 44rem, was already short of the 50rem the bar needed before the Star button, and
+   between the two the icons dropped to a row of their own at the left. */
+@media (min-width: 64rem) {
+  .topbar:has(nav) { display: grid; grid-template-columns: 1fr auto 1fr; }
+  .topbar > .brand { justify-self: start; }
+}
+
+/* Below that, the nav takes a row of its own, centred, under the brand and the icons; left to
+   wrap by itself it took the second line and pushed the icons to a third, at the left. */
+@media (width < 64rem) {
+  .topbar nav { order: 1; flex-basis: 100%; }
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  min-height: 0;
+  transition: background var(--ease), color var(--ease);
+}
+.icon-button:hover { background: var(--surface-2); color: var(--fg); }
+.icon-button svg { width: 1.15rem; height: 1.15rem; }
+
+/* The two icons ride on the theme tokens, so the swap needs no selector of its own. */
+.icon-sun { display: var(--icon-sun); }
+.icon-moon { display: var(--icon-moon); }
+
+button,
+.button,
+label.file {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--ease), border-color var(--ease), transform var(--ease);
+}
+
+/* A link drawn as a button, `<a class="button">`: the verifier's Download, the build page's. */
+.button { text-decoration: none; }
+button:hover, .button:hover, label.file:hover { background: var(--surface-2); }
+button:active, .button:active, label.file:active { transform: translateY(1px); }
+button.primary, .button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+button.primary:hover, .button.primary:hover { filter: brightness(1.06); }
+button:disabled { opacity: 0.5; cursor: default; transform: none; }
+/* Out of sight, not out of reach: a label takes no focus of its own, so the input has to, and
+   with it at `display: none` no key could open the picker. Enter or Space on it does now. */
+label.file { position: relative; }
+label.file input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
+label.file:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  min-height: 2.5rem;
+  margin: 1.25rem 0 0.5rem;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 0.9rem;
+  transition: border-color var(--ease);
+}
+
+.status[data-state="ready"] { border-left-color: var(--ok); }
+.status[data-state="error"] { border-left-color: var(--danger); }
+.status[data-state="probing"],
+.status[data-state="downloading"],
+.status[data-state="indexing"],
+.status[data-state="building"] { border-left-color: var(--accent); }
+/* The SCORM page's link to the zip it built, at the strip's right. */
+.status a { margin-left: auto; font-weight: 600; }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 7.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.badge::before {
+  content: "";
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.badge[data-state="ready"] { color: var(--ok); }
+.badge[data-state="ready"]::before { background: var(--ok); }
+.badge[data-state="error"] { color: var(--danger); }
+.badge[data-state="error"]::before { background: var(--danger); }
+
+.badge[data-state="probing"],
+.badge[data-state="downloading"],
+.badge[data-state="indexing"] { color: var(--accent); }
+
+.badge[data-state="probing"]::before,
+.badge[data-state="downloading"]::before,
+.badge[data-state="indexing"]::before { background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+
+/* Seconds since the load was asked for, frozen when the player is ready or has failed. */
+.timer {
+  margin-left: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.timer[hidden] { display: none; }
+
+.status[data-state="ready"] .timer { color: var(--fg); }
+
+@keyframes pulse { 50% { opacity: 0.35; } }
+
+.message {
+  margin: 0.75rem 0 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: 0.925rem;
+}
+
+.message[hidden] { display: none; }
+
+.message.error {
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  color: var(--danger);
+}
+
+.message.warning {
+  border-color: color-mix(in srgb, var(--warn) 35%, transparent);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  color: var(--warn);
+}
+
+.message.hint { border-color: var(--line); background: var(--surface); color: var(--muted); }
+
+/* ---------------------------------------------------------------- the player's box */
+
+h5p-player {
+  display: block;
+  margin-top: 1.25rem;
+}
+
+/* A box like the page's other boxes only while it is one: empty, loading, or failed, with a
+   height of its own since nothing in it gives one. Once content is up the element is as tall as
+   the content says — a minimum height left on it showed as empty space under a short quiz, and
+   under a video on a phone — and the frame fills it edge to edge while the content draws its
+   own chrome, so the border and shadow would double it, and a rounded box that clips cuts the
+   corners out of whatever the content puts there — a Question Set's footer bar, a
+   presentation's controls, a video's picture. The element reflects its state as an attribute. */
+h5p-player:not([state="ready"]) {
+  min-height: clamp(16rem, 55vh, 28rem);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  height: 100%;
+  padding: 1rem 1.125rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color var(--ease), box-shadow var(--ease), transform var(--ease);
+}
+
+a.card:hover { border-color: var(--line-strong); box-shadow: var(--shadow); transform: translateY(-1px); }
+.card strong { font-weight: 600; }
+.card span { color: var(--muted); font-size: 0.925rem; }

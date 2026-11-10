@@ -21,8 +21,8 @@ const pack = dirname(require.resolve('@missing-elements/h5p-libraries/parts/inde
 const licences = require.resolve('@missing-elements/h5p-libraries/libraries.txt')
 const verify = join(root, '..', 'verify', 'lib')
 
-/** The player's files, by the names the element looks for beside itself. */
-const PLAYER_FILES = ['h5p-player.js', 'h5p-sw.js', 'h5p-jobs.js']
+/** The player's files, by the names the element looks for beside itself, and the page's stylesheet and mark. */
+const PLAYER_FILES = ['h5p-player.js', 'h5p-sw.js', 'h5p-jobs.js', 'page.css', 'mark.svg']
 
 for (const [what, file] of [
   ['the player', join(player, 'h5p-sw.js')],

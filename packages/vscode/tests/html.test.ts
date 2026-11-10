@@ -59,8 +59,11 @@ class StandIn {
   }
 }
 
-/** The webview's script, run against stand-ins: what it posts to the extension, and a way to message it. */
-function runWebview(state?: object) {
+/**
+ * The webview's script, run against stand-ins: what it posts to the extension, and a way to message
+ * it. `environment` gives it a body, as VS Code marks one with its theme, and a MutationObserver.
+ */
+function runWebview(state?: object, environment: { body?: unknown; MutationObserver?: unknown } = {}) {
   const html = webviewHtml({ nonce: 'n0nce', config })
   const json = /<script type="application\/json" id="config">(.*?)<\/script>/s.exec(html)?.[1] ?? ''
   const elements = new Map<string, StandIn>()
@@ -74,9 +77,11 @@ function runWebview(state?: object) {
     acquireVsCodeApi: () => ({ postMessage: (message: Record<string, unknown>) => posted.push(message), getState: () => state, setState: () => {} }),
     document: {
       getElementById: (id: string) => (id === 'config' ? { textContent: json } : element(id)),
-      createElement: () => new StandIn()
+      createElement: () => new StandIn(),
+      body: environment.body
     },
     window: { origin: WEBVIEW_ORIGIN, addEventListener: (type: string, listener: Listener) => listeners.set(type, listener) },
+    MutationObserver: environment.MutationObserver,
     URL
   })
   const frame = element('frame')
@@ -104,18 +109,24 @@ function runPage(settings: Partial<Parameters<typeof viewPage>[0]> = {}, ancesto
   const player = new StandIn()
   const told: Array<[Record<string, unknown>, string]> = []
   const location = { href: 'http://127.0.0.1:4646/view/0123456789abcdef', ancestorOrigins }
+  const root = { dataset: {} as Record<string, string> }
+  const listeners = new Map<string, Listener>()
+  const webviewWindow = { postMessage: (message: Record<string, unknown>, origin: string) => told.push([message, origin]) }
   runInNewContext(inlineScript(page, /^\s*$/), {
     document: {
       title: '',
+      documentElement: root,
       getElementById: (id: string) => (id === 'settings' ? { textContent: json } : null),
       querySelector: (selector: string) => (selector === 'h5p-player' ? player : null)
     },
     location,
-    window: { location },
-    parent: { postMessage: (message: Record<string, unknown>, origin: string) => told.push([message, origin]) },
+    window: { location, addEventListener: (type: string, listener: Listener) => listeners.set(type, listener) },
+    parent: webviewWindow,
     URL
   })
-  return { player, told }
+  /** A message to the page, as `from` sends it. */
+  const receive = (data: unknown, from: { source: unknown; origin: string }) => (listeners.get('message') as Listener)({ data, ...from })
+  return { player, told, root, receive, webviewWindow }
 }
 
 describe('the webview', () => {
@@ -233,6 +244,63 @@ describe('the webview', () => {
   })
 })
 
+describe('VS Code’s theme', () => {
+  const SETTINGS = { name: 'quiz.h5p', src: '/__package/0123456789abcdef/quiz.h5p', packBase: '/__pack/', untrusted: false, newest: true, lang: null }
+
+  it('goes from the webview’s body to the page’s address, and to the page as it changes', () => {
+    const classes = new Set(['vscode-dark'])
+    const body = { classList: { contains: (name: string) => classes.has(name) } }
+    let changed = () => {}
+    class Observer {
+      constructor(callback: () => void) {
+        changed = callback
+      }
+      observe() {}
+    }
+    const { frame } = runWebview(undefined, { body, MutationObserver: Observer })
+    expect(frame.src).toBe('http://127.0.0.1:4646/view/0123456789abcdef?lang=en&theme=dark')
+
+    const sent: Array<[unknown, string]> = []
+    Object.assign(frame.contentWindow, { postMessage: (message: unknown, origin: string) => sent.push([message, origin]) })
+    // A high-contrast light theme carries `vscode-high-contrast` as well, for older webviews: light.
+    classes.clear()
+    classes.add('vscode-high-contrast-light').add('vscode-high-contrast')
+    changed()
+    classes.clear()
+    classes.add('vscode-high-contrast')
+    changed()
+    // The same theme again, or none VS Code names, says nothing.
+    changed()
+    classes.clear()
+    changed()
+    expect(sent).toEqual([
+      [{ source: 'h5p-preview-webview', type: 'theme', theme: 'light' }, config.origin],
+      [{ source: 'h5p-preview-webview', type: 'theme', theme: 'dark' }, config.origin]
+    ])
+  })
+
+  it('leaves the address without one where the webview’s body names none', () => {
+    expect(runWebview().frame.src).toBe('http://127.0.0.1:4646/view/0123456789abcdef?lang=en')
+  })
+
+  it('is on the page’s <html> before anything is drawn, as one of two names or not at all', () => {
+    expect(viewPage({ ...SETTINGS, theme: 'dark' })).toContain('<html lang="en" data-theme="dark">')
+    expect(viewPage({ ...SETTINGS, theme: '"><script>' as never })).toContain('<html lang="en">\n')
+    expect(viewPage(SETTINGS)).toContain('<html lang="en">\n')
+  })
+
+  it('changes on the page from the webview around it alone, and as light or dark only', () => {
+    const { root, receive, webviewWindow } = runPage()
+    receive({ source: 'h5p-preview-webview', type: 'theme', theme: 'light' }, { source: webviewWindow, origin: WEBVIEW_ORIGIN })
+    expect(root.dataset.theme).toBe('light')
+    receive({ source: 'h5p-preview-webview', type: 'theme', theme: 'dark' }, { source: webviewWindow, origin: config.origin })
+    receive({ source: 'h5p-preview-webview', type: 'theme', theme: 'dark' }, { source: {}, origin: WEBVIEW_ORIGIN })
+    receive({ source: 'h5p-preview-webview', type: 'theme', theme: 'red' }, { source: webviewWindow, origin: WEBVIEW_ORIGIN })
+    receive({ source: 'h5p-preview', type: 'theme', theme: 'dark' }, { source: webviewWindow, origin: WEBVIEW_ORIGIN })
+    expect(root.dataset.theme).toBe('light')
+  })
+})
+
 describe('the page a preview frames', () => {
   it('sets the element up by its attributes, which it reads once its module has defined it', () => {
     const { player } = runPage({ untrusted: true, newest: false, lang: 'de' })
@@ -307,4 +375,10 @@ describe('the page a preview frames', () => {
       [{ source: 'h5p-preview', type: 'error', code: 'bad-archive', message: 'Invalid preview source.', afterReady: false, missing: [], carried: false }, WEBVIEW_ORIGIN]
     ])
   })
+})
+
+it('draws the page with the player’s page.css, which the extension carries beside the element', () => {
+  const html = viewPage({ name: 'quiz.h5p', src: '/__package/0123456789abcdef/quiz.h5p', packBase: '/__pack/', untrusted: false, newest: true, lang: null })
+  expect(html).toContain('<link rel="stylesheet" href="/page.css" />')
+  expect(html).not.toContain('background: #fff')
 })
