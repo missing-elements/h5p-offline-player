@@ -97,6 +97,19 @@ h5p-author: The source has 3 problems:
   params.slides[0].elements[0].params.text: has <h1>, which this field does not take; it takes <a> <br> …
 ```
 
+A source's own fields are read the same way, for a chat that wrote one with no skill beside it.
+What its outer shape plainly means is taken and said once, and the content is checked in the same
+round: the content type under another key or named as it is spoken of (`"interactive-book"`,
+`"Question Set"`), the title, licence and authors in an object, the content's fields beside `type`.
+
+```
+h5p-author: The source has 4 problems:
+  contentType: is not a field of a source: the content type is its type: write "type": "H5P.InteractiveBook"
+  metadata: is not a field of a source: title, license, authors are written beside type, not in an object: write "title": …, "license": …, "authors": … at the top
+  language: expected a BCP 47 language tag, such as "en" or "de-AT"
+  params.chapters[0]: is the params of sub-content, without the sub-content around them: write params.chapters[0] as { "library": "H5P.Column", "metadata": { "title": … }, "params": { "content": … } }
+```
+
 The quiz format the h5p-author skill published first (`{ "kind": "question-set", "questions": [ … ] }`)
 is still taken, for a Multiple Choice question or a Question Set of them.
 

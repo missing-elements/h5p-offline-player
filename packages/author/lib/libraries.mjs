@@ -1,5 +1,6 @@
 import { ownLibraries } from '@missing-elements/h5p-offline-player/plan'
 import { libraryOptions, libraryString } from './generator.mjs'
+import { machineNameOf } from './names.mjs'
 import { SourceError } from './source-error.mjs'
 import { localize, translationFiles } from './translate.mjs'
 import { patchSemantics } from './types.mjs'
@@ -74,6 +75,11 @@ export async function loadLibraries(pack, { type, language, params }) {
   const namedFolders = new Set()
   /** @type {Map<string, TranslationReport>} by folder, in the order loaded */
   const reports = new Map()
+  const names = [...new Set(pack.libraries.map((entry) => entry.machineName))]
+  /** Every major of a library the generator may take what is written to mean, as one a field takes unnamed. */
+  const meant = (/** @type {string} */ machineName) => {
+    for (const entry of pack.libraries) if (entry.machineName === machineName) queue.push({ machineName, major: entry.majorVersion, unnamed: true })
+  }
   /** @param {unknown} value */
   const named = (value) => {
     if (Array.isArray(value)) value.forEach(named)
@@ -83,6 +89,20 @@ export async function loadLibraries(pack, { type, language, params }) {
       // pack has: each is loaded.
       if (match && match[2] !== undefined) queue.push({ machineName: match[1], major: Number(match[2]) })
       else if (match) for (const entry of pack.libraries) if (entry.machineName === match[1]) queue.push({ machineName: match[1], major: entry.majorVersion })
+      // What the generator takes to name a library though it is not written as one (#174), so
+      // that what is written for it is checked: `library` written loosely, "multichoice", and a
+      // machine name under another key, `contentType` or `type`. A name under another key is
+      // taken only as it is, so that a text that reads like one, a slide titled "Summary", loads
+      // nothing.
+      if (typeof value.library === 'string') {
+        const found = machineNameOf(value.library, names)
+        if (found && !found.exact) meant(found.machineName)
+      } else {
+        for (const text of Object.values(value)) {
+          const found = typeof text === 'string' && text.length <= 64 ? machineNameOf(text, names) : null
+          if (found?.exact) meant(found.machineName)
+        }
+      }
       Object.values(value).forEach(named)
     }
   }

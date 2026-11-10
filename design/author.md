@@ -15,7 +15,7 @@ already holds text to the content check's rules, from the pack an untrusted chec
 `apps/skills` plays every example untrusted too. Measured on a five-question quiz, at four
 characters a token: `content.json` was about 3,470 tokens to write by hand, after reading 3,900 to
 9,500 of a type's semantics; the source is 1,000 to 1,800 tokens, written from a type file of 200
-to 3,000. Eighteen things the code does not say by itself:
+to 3,000. Nineteen things the code does not say by itself:
 
 - **One generator, three ways to run it.** The third, `saved`, checks content as H5P stores it
   (*Saved content is checked as the build checks what it writes*, below). `ContentGenerator` was the sweep's
@@ -396,6 +396,40 @@ to 3,000. Eighteen things the code does not say by itself:
   Interactive Video, Image Hotspots, Image Choice, Game Map): of 12 first replies 2 were right at
   once with the sentence and 2 without, the Accordions. The skill gives the type files' address
   on GitHub too, for a chat that has its text and can open a link.
+- **A source's own fields do not hide its content, and its outer shape is taken as it is meant**
+  (2026-11-10, #174). Gemini in Chrome, given a link to the skill's folder, which shows a chat the
+  file names and none of the text, wrote a book its own way: `contentType` for `type`, and the
+  title, licence and authors in a `metadata` object, as H5P keeps them. The build checked a
+  source's own fields, then the type's name, then the content, and stopped at each: seven
+  problems of the outer shape, then thirty of the content, and a package at the third try.
+  Measured on Haiku in that position, the request as it was worded and no skill text, six content
+  types, two runs each, the build page's copy pasted back: with 0.7.0 none was right at once, 3
+  by the second round, 8 of 12 by the fourth, and four never. All twelve first sources had the
+  content's fields beside `type` with no `params`, nine named the type as it is spoken of, and six
+  of the nine second rounds were one problem, `the library pack has no content type
+  interactive-book`, with no name offered: the next guesses were `book` and `flashcards`.
+
+  So a build reads a source with the pack's names (`sourceOf`), and takes what can only be meant:
+  the content type under another key, or named loosely as `type`, the same letters and digits in
+  any case with or without `H5P.` (`names.mjs`); the source's own fields in an object; the
+  content's fields beside `type`. Each is a problem, said once with what to write, and the content
+  is generated and checked in the same build wherever the type is known, with a stand-in for what
+  is missing. A name that is no type has the nearest offered: those its letters are part of, and
+  those they end with, not one they begin with, since the "image" of "image choice" is no lead.
+  A title is not tried, "Multiple Choice" or "Image Choice": the pack's index has none, and
+  reading them takes every part, which a page cannot. Sub-content that names its library under
+  another key, `contentType` or `type`, is taken the same way, its parameters in `params` or
+  beside the name, where one text names a library the field takes; and a title beside them that
+  is no field of the library is the sub-content's own, its `metadata.title`, which had been two
+  problems a chapter.
+
+  With it 10 of the 12 were right by the second round and all 12 by the third, and every one
+  plays. Of the 263 sources the earlier tests stored, written with the skill's text, 257 have the
+  same problems and none builds with one build and not the other; the 36 sources of the type
+  files and the quiz format build the same package. `readSource` keeps its contract, a source's
+  own problems thrown, without the pack's names. What the build page must do with it is its own:
+  hand the type's file back for a type that is named loosely, which its rule, the source's `type`
+  as written, does not.
 
 Not built: editing an existing package, which a tool beside it does with `checkContent` as its
 check; layout for Drag and Drop and Crossword; and any judgement of whether content is right, which

@@ -1,4 +1,5 @@
 import { checkMetadata } from './metadata.mjs'
+import { machineNameOf, namingKey } from './names.mjs'
 import { isInterfaceText } from './schema.mjs'
 import { allowedTags, markupText, plainText, takesMarkup } from './text.mjs'
 
@@ -100,6 +101,13 @@ export class ContentGenerator {
    * @type {Map<string, string>}
    */
   #written = new Map()
+
+  /**
+   * Sub-content put together from an object that had its parameters beside its library's name,
+   * by where those are written: its problems are named there.
+   * @type {WeakMap<object, string>}
+   */
+  #flat = new WeakMap()
 
   /**
    * @param {Map<string, PackEntry>} pack every library folder the content may use, by folder name
@@ -353,6 +361,23 @@ export class ContentGenerator {
    * @returns {Record<string, any>}
    */
   #placed(fields, given, path) {
+    // Sub-content in the group's place that names its library under another key than `library`
+    // (#174), its parameters in `params` or beside the name: what is no field of the group.
+    let flat = false
+    const holders = fields.filter((field) => field.type === 'library')
+    if (typeof given.library !== 'string' && holders.length) {
+      const outside = Object.keys(given).filter((key) => !SUB_CONTENT.includes(key) && !fields.some((field) => field.name === key))
+      const named = namingKey(pick(given, outside), holders.flatMap((field) => optionNames(field)))
+      const beside = named ? outside.filter((key) => key !== named.key) : []
+      const loose = named && !isObject(given.params) && beside.length > 0
+      const meant = !named ? null : loose
+        ? { ...omit(given, [named.key, ...beside]), library: named.machineName, params: pick(given, beside) }
+        : { ...omit(given, [named.key]), library: named.machineName }
+      if (meant && holderOf(fields, meant)) {
+        given = meant
+        flat = Boolean(loose)
+      }
+    }
     const holder = holderOf(fields, given)
     if (holder) {
       const subContent = pick(given, SUB_CONTENT)
@@ -360,6 +385,11 @@ export class ContentGenerator {
         .map((key) => key === 'library' ? `"library": ${JSON.stringify(given.library)}` : `"${key}": { … }`)
       const beside = Object.keys(given).filter((key) => !SUB_CONTENT.includes(key) && fields.some((field) => field.name === key)).map((key) => `, "${key}": …`)
       this.report(path, `is sub-content, but here it goes inside an object, in its field ${holder.name}: write ${path} as { "${holder.name}": { ${shown.join(', ')} }${beside.join('')} }`)
+      if (flat) {
+        // Its parameters are where the object is, not in a `params` of it: the nearer move first.
+        this.#flat.set(subContent, path)
+        this.#move(path, `${path}.${holder.name}.params`)
+      }
       this.#move(path, `${path}.${holder.name}`)
       given = { ...omit(given, SUB_CONTENT), [holder.name]: subContent }
     }
@@ -483,20 +513,37 @@ export class ContentGenerator {
         return items.length > 0 || !optional ? items : undefined
       }
       case 'library':
-        if (isObject(written) && typeof written.library === 'string') return this.writtenLibrary(written, stack, path, field)
+        if (isObject(written) && typeof written.library === 'string') return this.writtenLibrary(written, stack, path, field, this.#flat.get(written))
         if (written !== undefined && !this.lenient) {
-          // The parameters of the one library the field takes, without the sub-content around
-          // them, as a book's chapters written `{ "content": [ … ] }` (#172): said so, and checked
-          // as its parameters in the same round, named by where they are written.
-          const entry = !this.saved && isObject(written) ? this.#only(field) : null
-          const own = entry ? Object.keys(written).filter((key) => (entry.semantics ?? []).some((/** @type {any} */ each) => each.name === key)) : []
-          if (entry && own.length) {
-            const metadata = own.includes('metadata') ? undefined : written.metadata
-            this.report(path, `is the params of sub-content, without the sub-content around them: write ${path} as { "library": "${entry.library.machineName}", "params": { "${own[0]}": … }${metadata === undefined ? '' : ', "metadata": { … }'} }`)
-            this.#move(path, `${path}.params`)
-            return this.writtenLibrary({ library: entry.library.machineName, params: metadata === undefined ? written : omit(written, ['metadata']), ...(metadata === undefined ? {} : { metadata }) }, stack, path, field, path)
+          // Sub-content that names its library under another key than `library`, `contentType` or
+          // `type`, as a source written with no skill beside it does (#174): the one text in it
+          // that names a library the field takes.
+          const named = !this.saved && isObject(written) ? namingKey(omit(written, SUB_CONTENT), optionNames(field)) : null
+          const major = named ? libraryOptions(field).find((option) => option.machineName === named.machineName)?.major : undefined
+          const entry = this.saved || !isObject(written) ? null : named ? this.find(named.machineName, major) : this.#only(field)
+          if (named && isObject(written.params)) {
+            this.report(`${path}.${named.key}`, `is the sub-content's library: write "library": "${named.machineName}"`)
+            // Its parameters are checked where the library's fields are at hand.
+            return entry?.semantics ? this.writtenLibrary({ ...omit(written, [named.key]), library: named.machineName }, stack, path, field) : undefined
           }
-          this.report(path, `expected sub-content, ${subContentOf(field, written)}`)
+          // The parameters of sub-content without the sub-content around them: of the one library
+          // the field takes, as a book's chapters written `{ "content": [ … ] }` (#172), or of the
+          // one named beside them, `{ "type": "H5P.MultiChoice", "question": … }` (#174). Said so,
+          // and checked as its parameters in the same round, named by where they are written.
+          let params = named ? omit(written, [named.key]) : written
+          const own = entry ? Object.keys(params).filter((key) => (entry.semantics ?? []).some((/** @type {any} */ each) => each.name === key)) : []
+          if (entry && own.length) {
+            let metadata = own.includes('metadata') ? undefined : params.metadata
+            // A title beside them that is no field of the library is the sub-content's own, as a
+            // chapter's is: its `metadata.title`.
+            const titled = metadata === undefined && typeof params.title === 'string' && !own.includes('title')
+            if (titled) metadata = { title: params.title }
+            if (metadata !== undefined) params = omit(params, titled ? ['title'] : ['metadata'])
+            this.report(path, `is the params of sub-content, without the sub-content around them: write ${path} as { "library": "${entry.library.machineName}"${metadata === undefined ? '' : titled ? ', "metadata": { "title": … }' : ', "metadata": { … }'}, "params": { "${own[0]}": … } }`)
+            this.#move(path, `${path}.params`)
+            return this.writtenLibrary({ library: entry.library.machineName, params, ...(metadata === undefined ? {} : { metadata }) }, stack, path, field, path)
+          }
+          this.report(path, `expected sub-content, ${subContentOf(field, named ? named.machineName : written)}`)
           return undefined
         }
         // A default names the content the editor starts with (h5peditor.js puts it in the
@@ -657,6 +704,12 @@ export class ContentGenerator {
       if (!entry) return written
       return { ...this.subContent(entry, written.params, undefined, stack, path), ...omit(written, ['params']), library: libraryString(entry.library) }
     }
+    // A library named loosely, "multichoice", where only one the field takes can be meant (#174).
+    const loose = field && !this.saved ? machineNameOf(written.library, optionNames(field)) : null
+    if (loose && !loose.exact) {
+      this.report(`${path}.library`, `takes the machine name, "${loose.machineName}"`)
+      written = { ...written, library: loose.machineName }
+    }
     const match = /^\s*(\S+?)(?:\s+(\d+)\.(\d+))?\s*$/.exec(written.library)
     if (!match) {
       this.report(`${path}.library`, `expected a library's machine name, such as ${optionNames(field)[0] ?? '"H5P.MultiChoice"'}`)
@@ -689,6 +742,11 @@ export class ContentGenerator {
       const started = isObject(field?.default) && typeof field.default.library === 'string' && field.default.library.trim().split(/\s+/)[0] === machineName
       const minor = match[3] === undefined ? undefined : Number(match[3])
       return this.subContent(entry, written.params, written.metadata, stack, path, { id: written.subContentId, minor, closed: started })
+    }
+    // Sub-content's title is its `metadata.title`; written beside `library`, it is taken for it.
+    if (typeof written.title === 'string' && written.metadata === undefined) {
+      this.report(`${path}.title`, 'is the sub-content\'s title, which is in its metadata: write "metadata": { "title": … }')
+      written = { ...omit(written, ['title']), metadata: { title: written.title } }
     }
     for (const key of Object.keys(written)) {
       if (!['library', 'params', 'metadata'].includes(key)) this.report(`${path}.${key}`, 'is not part of sub-content; write library, params and metadata')
