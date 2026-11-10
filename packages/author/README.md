@@ -99,8 +99,9 @@ h5p-author: The source has 3 problems:
 
 A source's own fields are read the same way, for a chat that wrote one with no skill beside it.
 What its outer shape plainly means is taken and said once, and the content is checked in the same
-round: the content type under `contentType` or named as it is spoken of (`"interactive-book"`,
-`"Question Set"`), the title, licence and authors in `metadata`, the content's fields beside `type`.
+round: the content type under `contentType` or `library`, or named as it is spoken of
+(`"interactive-book"`, `"Question Set"`), the title, language, licence and authors in `metadata`,
+the content's fields beside `type`.
 
 ```
 h5p-author: The source has 4 problems:
