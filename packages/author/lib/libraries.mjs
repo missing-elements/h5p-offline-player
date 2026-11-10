@@ -1,5 +1,5 @@
 import { ownLibraries } from '@missing-elements/h5p-offline-player/plan'
-import { libraryString } from './generator.mjs'
+import { libraryOptions, libraryString } from './generator.mjs'
 import { SourceError } from './source-error.mjs'
 import { localize, translationFiles } from './translate.mjs'
 import { patchSemantics } from './types.mjs'
@@ -92,9 +92,11 @@ export async function loadLibraries(pack, { type, language, params }) {
     for (const field of fields) {
       if (field.type === 'library' && isObject(field.default)) named(field.default)
       if (field.type === 'library') {
-        const options = (field.options ?? []).map((/** @type {unknown} */ option) => /^(\S+) (\d+)\.\d+$/.exec(String(option))).filter(Boolean)
-        if (options.length && options.every((/** @type {RegExpExecArray} */ option) => option[1] === options[0][1])) {
-          for (const option of options) queue.push({ machineName: option[1], major: Number(option[2]), unnamed: true })
+        // Read as the generator reads them, a name or `{ name }`, so that the two agree on which
+        // library is a field's only one.
+        const options = libraryOptions(field)
+        if (options.length && options.every(({ machineName }) => machineName === options[0].machineName)) {
+          for (const { machineName, major } of options) queue.push({ machineName, major, unnamed: true })
         }
       }
       if (field.fields) defaults(field.fields)

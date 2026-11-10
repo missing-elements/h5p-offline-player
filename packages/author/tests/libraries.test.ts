@@ -62,6 +62,25 @@ describe('loadLibraries', () => {
     expect(named.translations.map((report) => report.library.split(' ')[0])).toEqual(['H5P.InteractiveBook', 'H5P.Column', 'H5P.TrueFalse'])
     // A field that takes several is left alone: Column's own content loads nothing it does not name.
     expect(entryOf(named.entries, 'H5P.MultiChoice')).toMatchObject({ semantics: null })
+    // An option written `{ name }`, as semantics may write one and the generator reads it, counts too.
+    const book = pack.newest('H5P.InteractiveBook')!
+    const source: LibrarySource = {
+      libraries: pack.libraries,
+      newest: (machineName, major) => pack.newest(machineName, major),
+      open: async (entry) => {
+        const part = await pack.open(pack.libraries.find(({ folder }) => folder === entry.folder)!)
+        if (entry.folder !== book.folder) return part
+        // A chapter is a group of one field, the page's library field.
+        const semantics = (part.semantics as Field[]).map((field) => field.name !== 'chapters' ? field : {
+          ...field,
+          field: { ...field.field!, fields: field.field!.fields!.map((page) => ({ ...page, options: (page as Field & { options: string[] }).options.map((name) => ({ name })) })) }
+        })
+        return { ...part, semantics }
+      },
+      translation: (part, name) => pack.translation(part, name)
+    }
+    const objects = await loadLibraries(source, { type: 'H5P.InteractiveBook', language: 'en', params: {} })
+    expect(entryOf(objects.entries, 'H5P.Column')?.semantics).not.toBeNull()
   })
 
   it('marks the fields a layout sets optional, and leaves the pack\'s own semantics as they are', async () => {
