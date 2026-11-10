@@ -377,9 +377,10 @@ to 3,000. Nineteen things the code does not say by itself:
   organisation's site serves the skill from the release its build page pins, at
   `https://missing-elements.github.io/h5p/skill/`, a page that writes out each file's full address,
   since a chat's fetch tool may open only addresses it has seen whole and `SKILL.md`'s relative
-  links are not (missing-elements.github.io#15). The skill gives a chat the site's address for a
-  type's file, not raw.githubusercontent.com's. Installing the
-  skill stays the way: nothing is fetched while the chat works.
+  links are not (missing-elements.github.io#15). The skill sends a chat to that page for every
+  address (*A chat with the skill's text alone takes every address from the skill's page*, below),
+  not to raw.githubusercontent.com. Installing the skill stays the way: nothing is fetched while
+  the chat works.
 
   The same test on the 23 other content types the skill lists says how far each thing reaches:
   two runs each, 46 first replies, each built package checked against what its task asked for.
@@ -403,8 +404,8 @@ to 3,000. Nineteen things the code does not say by itself:
   all 9 built at once and play. A scenario, which it does not name, still took a round of
   problems, and so do the six other listed types that hold content (Accordion, Questionnaire,
   Interactive Video, Image Hotspots, Image Choice, Game Map): of 12 first replies 2 were right at
-  once with the sentence and 2 without, the Accordions. The skill gives the type files' address
-  on GitHub too, for a chat that has its text and can open a link.
+  once with the sentence and 2 without, the Accordions. The skill gives a chat that has its text
+  and can open a link the type files' addresses too, on the organisation's site since #178.
 - **A source's own fields do not hide its content, and its outer shape is taken as it is meant**
   (2026-11-10, #174). Gemini in Chrome, given a link to the skill's folder, which shows a chat the
   file names and none of the text, wrote a book its own way: `contentType` for `type`, and the
@@ -448,6 +449,25 @@ to 3,000. Nineteen things the code does not say by itself:
   as written, does not. `sourceType(source, names)` is the build's reading of a source's type,
   exported for it (#176), so that the page hands over the type the build took and keeps no copy
   of the rule: on the 328 stored sources it names what `sourceOf` does in every one.
+- **A chat with the skill's text alone takes every address from the skill's page** (2026-11-10,
+  #180). An outside review of the skill, by a model given its link, found that `SKILL.md` gave such
+  a chat addresses to put together: the brief as a relative link, a type's file as
+  `…/h5p/build/types/<Type>.md`, a bundle as `…/h5p/bundles/<type>.zip`; its own fetch tool refused
+  `…/bundles/H5P.Blanks.zip` put together from the last. `/h5p/skill/` wrote out the skill's files
+  whole for this (*The package carries the skill's type files*, above), but `SKILL.md` never named
+  it and it listed no bundle. So `SKILL.md` sends a chat that has its text alone to the page first,
+  to take every address from it, and the page lists the build tool and every bundle too, named by
+  the author package's `contentTypes`, the list `writeBundles` writes from
+  (missing-elements.github.io#17). The patterns stay in step 3, for a chat whose tool takes them.
+  Measured on Haiku in a stand-in for such a chat, a fetch tool that opens only addresses seen
+  whole and npm cut off, asked for a three-question Question Set: with 0.9.0's text both runs were
+  refused the brief, the type file and the bundle, chose an author and a licence the user had not
+  given, which the brief they could not open says never to do, and ended with a build page link.
+  With the new text all six opened the page, the brief and both type files, nothing refused; of
+  the three given the build tool as it is served, two built from the bundle at once, packages that
+  play, and the third reached npm and built with it. The first three had the tool swapped for a
+  stand-in that logged its runs, and each refused to run it, as it should: a test serves the file
+  as it is.
 
 Not built: editing an existing package, which a tool beside it does with `checkContent` as its
 check; layout for Drag and Drop and Crossword; and any judgement of whether content is right, which

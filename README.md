@@ -149,7 +149,8 @@ npx skills add missing-elements/h5p-offline-player
 
 A chat that cannot install a skill can be given `h5p-author` as a link instead:
 [missing-elements.github.io/h5p/skill/](https://missing-elements.github.io/h5p/skill/) lists each
-of its files at its full address, from the release the build page runs.
+of its files at its full address, and each file its build fetches where npm cannot be reached,
+from the release the build page runs.
 
 ## Contributing
 
