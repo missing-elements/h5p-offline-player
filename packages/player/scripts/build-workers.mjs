@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { copyFile, readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { transform } from 'esbuild'
 import { buildJobsWorker, buildMountModule, buildPlanModule, buildServiceWorker, playerNotice } from './lib/worker-bundle.mjs'
@@ -45,4 +45,9 @@ await writeFile(
   'utf8'
 )
 
-console.log(`[build-workers] ${await sizeOf('h5p-player.js')} (minified after Vite), ${await sizeOf('h5p-sw.js')}, ${await sizeOf('h5p-sw-mount.js')}, ${await sizeOf('h5p-jobs.js')}, ${await sizeOf('h5p-plan.js')}`)
+// The page around the player, for the pages that hold it — h5p-verify's preview, the extension's
+// page, the build page, the demo: the demo's tokens and components, and the mark. Copied as
+// they are, so a page imports `@missing-elements/h5p-offline-player/page.css` and nothing drifts.
+for (const name of ['page.css', 'mark.svg']) await copyFile(resolve(rootDir, 'page', name), resolve(distDir, name))
+
+console.log(`[build-workers] ${await sizeOf('h5p-player.js')} (minified after Vite), ${await sizeOf('h5p-sw.js')}, ${await sizeOf('h5p-sw-mount.js')}, ${await sizeOf('h5p-jobs.js')}, ${await sizeOf('h5p-plan.js')}, ${await sizeOf('page.css')}`)

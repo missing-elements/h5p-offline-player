@@ -32,6 +32,7 @@
       "types": "./types/plan.d.ts",
       "default": "./dist/h5p-plan.js"
     },
+    "./page.css": "./dist/page.css",
     "./dist/*": "./dist/*"
   },
   "files": [

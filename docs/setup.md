@@ -136,6 +136,17 @@ Words and AR Scavenger. A frame from another site gets neither unless the page a
 embed package's [README](../packages/embed#readme) has the page's query parameters, the policy
 files it writes for each kind of host, and the SCORM package it can write instead.
 
+## A page in the demo's look
+
+The player ships the demo's page styles as `@missing-elements/h5p-offline-player/page.css`: its
+colours for light and dark, the bar, buttons, the status strip and the player's box while it
+loads; `dist/mark.svg` is the mark. `h5p-verify --preview`, the H5P Preview extension and
+the build page draw their pages with it, and a page of your own can:
+
+```html
+<link rel="stylesheet" href="node_modules/@missing-elements/h5p-offline-player/dist/page.css" />
+```
+
 ## When something goes wrong
 
 [Troubleshooting](troubleshooting.md) lists the symptoms, causes and fixes. A site that allows

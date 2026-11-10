@@ -308,3 +308,9 @@ describe('the page a preview frames', () => {
     ])
   })
 })
+
+it('draws the page with the player’s page.css, which the extension carries beside the element', () => {
+  const html = viewPage({ name: 'quiz.h5p', src: '/__package/0123456789abcdef/quiz.h5p', packBase: '/__pack/', untrusted: false, newest: true, lang: null })
+  expect(html).toContain('<link rel="stylesheet" href="/page.css" />')
+  expect(html).not.toContain('background: #fff')
+})

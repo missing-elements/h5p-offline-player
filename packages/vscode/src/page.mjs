@@ -19,10 +19,14 @@ export function viewPage(settings) {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Preview</title>
+    <!-- The demo's page styles, from the player's files the extension carries: the page's colours,
+         light or dark as VS Code is, and the player's box while it loads. The bar above is the
+         webview's, in VS Code's own colours. -->
+    <link rel="stylesheet" href="/page.css" />
     <script type="module" src="/h5p-player.js"></script>
     <style>
-      body { margin: 0; background: #fff; }
-      h5p-player { display: block; min-height: 240px; }
+      body { min-height: 0; padding: 0.75rem var(--gutter) 1rem; }
+      h5p-player { margin-top: 0; }
     </style>
   </head>
   <body>

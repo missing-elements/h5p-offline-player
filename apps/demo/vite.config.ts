@@ -165,6 +165,9 @@ export default defineConfig(({ command }) => ({
     // `dist/h5p-plan.js` first (`build` in package.json), as `pnpm dev` does.
     alias: [
       { find: /^@missing-elements\/h5p-offline-player$/, replacement: ELEMENT },
+      // The page's stylesheet the same way: player-page.css imports it by the package's name, and
+      // here that is the source, so the demo needs no build of the player for it either.
+      { find: /^@missing-elements\/h5p-offline-player\/page\.css$/, replacement: resolve(playerDir, 'page', 'page.css') },
       { find: /^@missing-elements\/h5p-cmi5$/, replacement: CMI5 }
     ]
   },

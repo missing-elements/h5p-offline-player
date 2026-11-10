@@ -152,6 +152,11 @@ and committed, as are the app's install screenshots (`pnpm demo:screenshots`), w
   the pattern is a glob: until 2026-10-27 it was, and `quiz [v2].h5p` never matched itself, so its
   previews never played again. The suite's file is named `package [v2] {draft}.h5p` for that.
 
+- **The page is the demo's page** (2026-11-10, #170): it links the player's `page.css`, carried in
+  `assets/player/` with the element's files, so the player's box while it loads and the page's
+  colours, light or dark as VS Code is, are the demo's rules. The bar above it keeps VS Code's own
+  theme colours, as an editor's page should.
+
 Tests. `tests/*.test.ts` run in Node with the rest of `pnpm test`: the server against the built
 player, runtime and pack, with its run of ports and Restricted Mode, and the webview's and the
 page's scripts run against stand-ins. `tests/vscode/run.mjs` downloads VS Code into

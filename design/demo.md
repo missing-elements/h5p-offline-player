@@ -294,6 +294,15 @@ SPA-fallback trap described above cannot happen there.
   longest prefix of the page's — so a page names no current link. The footers stay in the pages:
   each lists its own links. The per-page metadata — title, description, Open Graph and Twitter
   tags, each written two or three times — is the obvious next candidate and has not been done.
+- **The page's design is the player's `page.css`** (2026-11-10, #170). The colours for light and
+  dark, the bar, the buttons, the status strip, the player's box, cards and messages moved from
+  `player-page.css` to `packages/player/page/page.css`, which the player ships in `dist/` and the
+  demo imports first; the config aliases the package path to the source, as it does the element's.
+  The verifier's preview, the extension's page and the build page import the same file, so
+  the pages around the player look the same and cannot drift from the demo. The bar's three-column
+  grid applies to a bar with a nav (`.topbar:has(nav)`): a bar of a brand and its actions keeps the
+  actions at its end. The owner asked for it on 2026-11-10, after the verifier's preview opened in
+  Claude's browser panel in the browser's system styles.
 - **Caching.** Hashed files under `/assets/` are immutable; `h5p-sw.js` and `frame-assets/` are
   `no-cache`; `fixtures/` revalidate hourly. `frame-assets/` was hourly, with a day of
   `stale-while-revalidate`, until #49: its file names stay the same from one runtime to the next,

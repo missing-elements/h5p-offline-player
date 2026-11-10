@@ -100,6 +100,10 @@ describe('h5p-verify --preview', () => {
       expect(past.status).toBe(416)
       expect(past.headers.get('content-range')).toBe(`bytes */${bytes.length}`)
       expect((await fetch(`${preview.url}/__package/other.h5p`)).status).toBe(404)
+      // The demo's page styles and mark, from the player's dist/ as the element's script is.
+      const styles = await fetch(`${preview.url}/page.css`)
+      expect([styles.status, styles.headers.get('content-type')]).toEqual([200, 'text/css; charset=utf-8'])
+      expect((await fetch(`${preview.url}/mark.svg`)).headers.get('content-type')).toBe('image/svg+xml')
     } finally {
       preview.close()
     }
@@ -147,6 +151,9 @@ describe('h5p-verify --preview', () => {
     try {
       const page = await browser.newPage()
       await page.goto(`${preview.url}/`)
+      // Drawn by the demo's stylesheet: its sticky bar, and the strip's state once the content is up.
+      expect(await page.evaluate(() => getComputedStyle(document.querySelector('.topbar')!).position)).toBe('sticky')
+      await page.waitForFunction(() => document.querySelector('#status')?.getAttribute('data-state') === 'ready', null, { timeout: 60_000 })
       const link = page.getByRole('link', { name: 'Download' })
       const [download] = await Promise.all([page.waitForEvent('download'), link.click()])
       expect(download.suggestedFilename()).toBe('quiz.h5p')

@@ -84,6 +84,11 @@ packages/player/          @missing-elements/h5p-offline-player — the published
   tests/package-types.ts    the published declarations as a caller on `nodenext` sees them, checked by
                             tsconfig.consumer.json (see *Types for the plain-JS packages*)
   public/                   generated, not in git: the runtime's dist/ as frame-assets/, and the test fixtures
+  page/                     page.css and mark.svg, copied to dist/ by build-workers (#170): the page around the
+                            player as the demo draws it — colours for light and dark, the bar, buttons, the
+                            status strip, the player's box — exported as `./page.css`; the demo imports the
+                            source by alias, h5p-verify's preview, the extension's page and the build
+                            page take it from the package, so none of them drifts from the demo
   NOTICE.md                 zip.js's notice, and where the runtime went; shipped with the package
 
 packages/runtime/         @missing-elements/h5p-runtime — the H5P core runtime, GPL-3.0-only, a package of its
