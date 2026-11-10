@@ -42,6 +42,15 @@ export function languageTag(value) {
 }
 
 /**
+ * VS Code's theme as the webview names it in the address, `light` or `dark`, and nothing else.
+ * @param {string | null} value
+ * @returns {'light' | 'dark' | null}
+ */
+export function themeName(value) {
+  return value === 'light' || value === 'dark' ? value : null
+}
+
+/**
  * @typedef {object} PreviewServer
  * @property {string} url `http://127.0.0.1:<port>`, no trailing slash
  * @property {(file: string, name: string, key: string) => string} add serves `file` under the id of `key`
@@ -86,7 +95,8 @@ export async function startServer({ roots, packDir, port = PORTS, restricted = (
           // otherwise play it trusted. The tab's switch in a trusted workspace is the address's.
           untrusted: restricted() || query.get('untrusted') === '1',
           newest: query.get('newest') !== '0',
-          lang: languageTag(query.get('lang'))
+          lang: languageTag(query.get('lang')),
+          theme: themeName(query.get('theme'))
         })
         response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }).end(page)
         return true

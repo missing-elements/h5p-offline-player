@@ -132,7 +132,9 @@ and committed, as are the app's install screenshots (`pnpm demo:screenshots`), w
   comes from neither, and played trusted, sharing the page's origin, it can post as the page, so the
   most it can do is misreport its own state. Until 2026-10-27 the webview relayed whatever the page
   posted, a `mode` among them, which the extension took for the tab's switches and Open in Browser
-  played by. `tests/html.test.ts` runs both scripts in Node against stand-ins for their elements.
+  played by. The page takes one message the other way, the theme, from its parent window at the
+  webview's origin, as `light` or `dark` and nothing else. `tests/html.test.ts` runs both scripts
+  in Node against stand-ins for their elements.
 - **A file that is not on this computer is copied first.** `extensionKind` is `ui` alone, so the
   extension runs beside the webview, which reaches only this computer's loopback; a remote or
   virtual workspace's file is copied to a temporary folder through `workspace.fs`, and copied again
@@ -154,8 +156,14 @@ and committed, as are the app's install screenshots (`pnpm demo:screenshots`), w
 
 - **The page is the demo's page** (2026-11-10, #170): it links the player's `page.css`, carried in
   `assets/player/` with the element's files, so the player's box while it loads and the page's
-  colours, light or dark as VS Code is, are the demo's rules. The bar above it keeps VS Code's own
-  theme colours, as an editor's page should.
+  colours are the demo's rules. The bar above it keeps VS Code's own theme colours, as an editor's
+  page should. The page's colours follow VS Code's theme, not the system's: the page is a frame
+  of its own, and its `prefers-color-scheme` is the system's, which need not be the editor's (found
+  in review, on #171). The webview reads the theme from the class VS Code puts on its body, a
+  high-contrast theme as the light or dark one it is built on, and names it in the page's address,
+  which the server writes onto `<html>` as `data-theme` before anything is drawn; a theme changed
+  while the preview is open goes to the page as a message, since a reload would lose the
+  learner's place.
 
 Tests. `tests/*.test.ts` run in Node with the rest of `pnpm test`: the server against the built
 player, runtime and pack, with its run of ports and Restricted Mode, and the webview's and the

@@ -95,6 +95,17 @@ export function webviewHtml({ nonce, config }) {
       const mode = Object.assign({ untrusted: config.untrusted, newest: config.newest }, vscode.getState())
       let ready = null
 
+      // VS Code's theme, for the page's colours: light, or dark, a high-contrast theme as the one it
+      // is built on. VS Code marks the webview's body with it, and a high-contrast light theme with
+      // \`vscode-high-contrast\` too, for older webviews, so light is asked first.
+      function themeOf() {
+        const list = document.body && document.body.classList
+        if (!list) return null
+        if (list.contains('vscode-high-contrast-light') || list.contains('vscode-light')) return 'light'
+        if (list.contains('vscode-dark') || list.contains('vscode-high-contrast')) return 'dark'
+        return null
+      }
+
       function play() {
         if (config.restricted) mode.untrusted = true
         untrustedBox.checked = mode.untrusted
@@ -109,6 +120,8 @@ export function webviewHtml({ nonce, config }) {
         if (mode.untrusted) url.searchParams.set('untrusted', '1')
         if (!mode.newest) url.searchParams.set('newest', '0')
         if (config.lang) url.searchParams.set('lang', config.lang)
+        const theme = themeOf()
+        if (theme) url.searchParams.set('theme', theme)
         ready = null
         media.hidden = true
         say('Opening…')
@@ -210,6 +223,18 @@ export function webviewHtml({ nonce, config }) {
           play()
         }
       })
+
+      // A theme changed while the preview is open reaches the page at once, as a message to the
+      // frame at the server's origin: reloading it would lose the learner's place.
+      if (typeof MutationObserver === 'function' && document.body) {
+        let shownTheme = themeOf()
+        new MutationObserver(() => {
+          const theme = themeOf()
+          if (!theme || theme === shownTheme) return
+          shownTheme = theme
+          if (frame.contentWindow) frame.contentWindow.postMessage({ source: 'h5p-preview-webview', type: 'theme', theme }, config.origin)
+        }).observe(document.body, { attributes: true, attributeFilter: ['class'] })
+      }
 
       play()
     </script>
