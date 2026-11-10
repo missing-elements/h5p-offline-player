@@ -424,8 +424,9 @@ to 3,000. Nineteen things the code does not say by itself:
   problems a chapter.
 
   With it 10 of the 12 were right by the second round and all 12 by the third, and every one
-  plays. Of the 263 sources the earlier tests stored, written with the skill's text, 257 have the
-  same problems and none builds with one build and not the other; the 36 sources of the type
+  plays. Of the 263 sources the earlier tests stored, written with the skill's text, 259 have the
+  same problems, the other four being books whose chapters had a title beside them, 13 problems
+  now 7, and none builds with one build and not the other; the 36 sources of the type
   files and the quiz format build the same package. `readSource` keeps its contract, a source's
   own problems thrown, without the pack's names. What the build page must do with it is its own:
   hand the type's file back for a type that is named loosely, which its rule, the source's `type`
