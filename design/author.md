@@ -370,7 +370,13 @@ to 3,000. Nineteen things the code does not say by itself:
   `skills/h5p-author/references/types/*.md` into the package, `references/types/<Type>.md`, each
   an export, for the page to hand over with a source's problems. They stay the skill's, at the
   repository's root where `npx skills add` looks, written by `sync:skill` as before; the copy is
-  not in git, and `build.test.ts` holds it to the skill's files, file for file.
+  not in git, and `build.test.ts` holds it to the skill's files, file for file. Since #178 the
+  skill's text travels with them, `SKILL.md` and `references/authoring.md`, each an export too:
+  the Claude app, given a link to the skill on GitHub, answered that GitHub's rate limit kept it
+  out, since GitHub limits anonymous requests per address and a chat app's are shared. The
+  organisation's site serves the skill from the release its build page pins, and the skill gives
+  a chat the site's address for a type's file, not raw.githubusercontent.com's. Installing the
+  skill stays the way: nothing is fetched while the chat works.
 
   The same test on the 23 other content types the skill lists says how far each thing reaches:
   two runs each, 46 first replies, each built package checked against what its task asked for.

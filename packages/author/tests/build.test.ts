@@ -784,20 +784,27 @@ describe('the build', () => {
 })
 
 describe('the package', () => {
-  it('carries the skill\'s type files, copied as it is packed, for a page to hand to a chat (#172)', async () => {
-    const skill = resolve(import.meta.dirname, '../../../skills/h5p-author/references/types')
+  it('carries the skill\'s text and type files, copied as it is packed, for a page to hand to a chat (#172, #178)', async () => {
+    const skill = resolve(import.meta.dirname, '../../../skills/h5p-author')
     const copied = resolve(import.meta.dirname, '../references/types')
-    const { stdout } = await exec(process.execPath, [resolve(import.meta.dirname, '../scripts/copy-type-files.mjs')])
-    const names = (await readdir(skill)).filter(name => name.endsWith('.md')).sort()
+    const { stdout } = await exec(process.execPath, [resolve(import.meta.dirname, '../scripts/copy-skill.mjs')])
+    const names = (await readdir(join(skill, 'references/types'))).filter(name => name.endsWith('.md')).sort()
     expect(names).toContain('H5P.InteractiveBook.md')
-    expect(stdout).toContain(`Copied ${names.length} type files`)
+    expect(stdout).toContain(`Copied SKILL.md, references/authoring.md and ${names.length} type files`)
     expect((await readdir(copied)).sort()).toEqual(names)
-    for (const name of names) expect(await readFile(join(copied, name), 'utf8'), name).toBe(await readFile(join(skill, name), 'utf8'))
+    for (const name of names) expect(await readFile(join(copied, name), 'utf8'), name).toBe(await readFile(join(skill, 'references/types', name), 'utf8'))
+    // The skill's text beside them, as it is, for a site to serve to a chat given a link.
+    for (const name of ['SKILL.md', 'references/authoring.md']) {
+      expect(await readFile(resolve(import.meta.dirname, '..', name), 'utf8'), name).toBe(await readFile(join(skill, name), 'utf8'))
+    }
     // Packed and found: in `files`, copied by `prepack`, and each one an export of its own.
     const manifest = JSON.parse(await readFile(resolve(import.meta.dirname, '../package.json'), 'utf8'))
-    expect(manifest.files).toContain('references')
-    expect(manifest.scripts.prepack).toContain('node scripts/copy-type-files.mjs')
-    expect(createRequire(import.meta.url).resolve('@missing-elements/h5p-author/references/types/H5P.InteractiveBook.md')).toBe(join(copied, 'H5P.InteractiveBook.md'))
+    expect(manifest.files).toEqual(expect.arrayContaining(['references', 'SKILL.md']))
+    expect(manifest.scripts.prepack).toContain('node scripts/copy-skill.mjs')
+    const require = createRequire(import.meta.url)
+    expect(require.resolve('@missing-elements/h5p-author/references/types/H5P.InteractiveBook.md')).toBe(join(copied, 'H5P.InteractiveBook.md'))
+    expect(require.resolve('@missing-elements/h5p-author/SKILL.md')).toBe(resolve(import.meta.dirname, '../SKILL.md'))
+    expect(require.resolve('@missing-elements/h5p-author/references/authoring.md')).toBe(resolve(import.meta.dirname, '../references/authoring.md'))
   })
 })
 

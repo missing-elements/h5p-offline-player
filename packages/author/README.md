@@ -135,7 +135,10 @@ An unknown name lists the pack's content types.
 The package carries those type files too, as the release has them:
 `@missing-elements/h5p-author/references/types/H5P.TrueFalse.md` is the type's notes, an example and
 these fields. A page that builds for a chat with no skill beside it hands them over with a source's
-problems, as the [build page](https://missing-elements.github.io/h5p/build/) does.
+problems, as the [build page](https://missing-elements.github.io/h5p/build/) does. The skill's text
+travels with them, `@missing-elements/h5p-author/SKILL.md` and its brief,
+`references/authoring.md`, for a site to serve to a chat given a link to the skill: GitHub limits
+the requests of an address many users share, as a chat app's is.
 
 ## A content type's bundle
 
