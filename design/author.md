@@ -270,12 +270,17 @@ to 3,000. Fourteen things the code does not say by itself:
   only through OpenAI's own mirror, reported refusing every install from July 2026 (503, then
   404), and the public registry not at all. Nothing in the skill can fix that, and a backend the
   model calls would need a custom GPT or connector, which a free account cannot add. So the skill
-  hands over the source and a link to a build page, `https://embed-my.github.io/build`, where the
-  user's browser runs the page build (*A page builds too*), plays the package and downloads it.
+  hands over the source and a link to a build page, `https://missing-elements.github.io/h5p/build/`,
+  where the user's browser runs the page build (*A page builds too*), plays the package and
+  downloads it.
   The link carries the source in its fragment, raw-deflated and base64url, which no server sees.
-  The page lives in embed-my/embed-my.github.io, not in this repository's demo: the owner wanted
-  an authoring tool's public address without "H5P" in it, and that origin already serves the
-  player and the pack. It builds from `@missing-elements/h5p-libraries/install` at the version
+  The page lives on the organisation's own site, missing-elements/missing-elements.github.io, not
+  in this repository's demo, and in that site's look. It was first on embed-my.github.io, since
+  the owner wanted an authoring tool's domain without "H5P" in it, and moved on 2026-11-10, where
+  the owner found it fits better (that repository's #7). The domain still has no "H5P" in it: the
+  word is only in the path, under a domain that names its owner, as the trademark policy's
+  approved h5p.terrisblog.com does. embed-my's `/build` redirects there with the fragment, so a
+  link already written still builds. It builds from `@missing-elements/h5p-libraries/install` at the version
   the author package pins, so the page plays with the pack it built from. A chat with no tool to
   run at all, as ChatGPT on a free account once its data-analysis quota is spent (for hours, the
   owner's test of 2026-11-09), cannot write the link: the skill has it put the whole source in its
@@ -297,10 +302,13 @@ to 3,000. Fourteen things the code does not say by itself:
   bundles, so a source that calls for it fetches that one part. A bundle rather than the parts,
   since ChatGPT's download tool costs two calls a file, opened and then fetched: a Question Set's
   33 parts would be 66. With pack 1.1.0 a question type's is 0.6 to 1.5 MB, a Question Set's
-  2.6 MB, a container's 4.3 to 8.4 MB, and the 55 content types' 99 MB in all, which is why
-  embed-my.github.io serves them (embed-my/embed-my.github.io#14) rather than the libraries
-  package on jsDelivr, whose cap is 50 MB. The build tool beside them is the command line as one
-  file, esbuild's: 558 kB, and it builds from an unzipped bundle with nothing installed.
+  2.6 MB, a container's 4.3 to 8.4 MB, and the 55 content types' 99 MB in all, which is why a
+  site serves them rather than the libraries package on jsDelivr, whose cap is 50 MB: since
+  2026-11-10 missing-elements.github.io, under `/h5p/bundles/` beside the build page, and before
+  that embed-my.github.io (embed-my/embed-my.github.io#14), whose `/bundles/` stays until the next
+  pack release for copies of the skill installed earlier. The build tool beside them is the
+  command line as one file, which the site's Vite bundles: 575 kB, and it builds from an unzipped
+  bundle with nothing installed.
 - **A preview inside Claude is the desktop app's browser panel, not a card** (2026-11-10). A
   connector's card in Claude is an iframe under Claude's policy, measured that day in Claude
   Desktop 4.23118.1 with a probe server: it fetches from the hosts the server declares, grows to

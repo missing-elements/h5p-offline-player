@@ -92,8 +92,8 @@ In both addresses and commands below, `<type>` is that machine name, such as `H5
 type's bundle lacks what this one needs.
 
 ```
-https://embed-my.github.io/bundles/h5p-author.mjs
-https://embed-my.github.io/bundles/<type>.zip
+https://missing-elements.github.io/h5p/bundles/h5p-author.mjs
+https://missing-elements.github.io/h5p/bundles/<type>.zip
 ```
 
 ```bash
@@ -103,18 +103,18 @@ node h5p-author.mjs build source.json course.h5p --libraries parts
 
 A build that stops at a part `parts/` lacks names it (an addon: H5P.MathDisplay, where the text
 holds math): fetch that part into `parts/`, such as
-`https://embed-my.github.io/bundles/parts/H5P.MathDisplay-1.0.h5p`, and build again. The verifier
+`https://missing-elements.github.io/h5p/bundles/parts/H5P.MathDisplay-1.0.h5p`, and build again. The verifier
 cannot run there either: hand the package over **unverified**, with the build page's link below
 for the user to play it before using it.
 
 **Where nothing can be fetched or run, the build page builds it.** No shell, no Node, or no
-download: [the build page](https://embed-my.github.io/build) builds the same package in the user's
+download: [the build page](https://missing-elements.github.io/h5p/build/) builds the same package in the user's
 browser from the source alone, with no install. Give them a link that carries the source, written
 with Node or Python, which need no network:
 
 ```bash
-node -e "console.log('https://embed-my.github.io/build#source=' + require('zlib').deflateRawSync(require('fs').readFileSync('source.json')).toString('base64url'))"
-python3 -c "import base64,zlib;c=zlib.compressobj(9,zlib.DEFLATED,-15);d=c.compress(open('source.json','rb').read())+c.flush();print('https://embed-my.github.io/build#source='+base64.urlsafe_b64encode(d).decode().rstrip('='))"
+node -e "console.log('https://missing-elements.github.io/h5p/build/#source=' + require('zlib').deflateRawSync(require('fs').readFileSync('source.json')).toString('base64url'))"
+python3 -c "import base64,zlib;c=zlib.compressobj(9,zlib.DEFLATED,-15);d=c.compress(open('source.json','rb').read())+c.flush();print('https://missing-elements.github.io/h5p/build/#source='+base64.urlsafe_b64encode(d).decode().rstrip('='))"
 ```
 
 With neither, or no tool that runs anything at all (in ChatGPT, data analysis can be unavailable
