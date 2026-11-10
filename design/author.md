@@ -15,7 +15,7 @@ already holds text to the content check's rules, from the pack an untrusted chec
 `apps/skills` plays every example untrusted too. Measured on a five-question quiz, at four
 characters a token: `content.json` was about 3,470 tokens to write by hand, after reading 3,900 to
 9,500 of a type's semantics; the source is 1,000 to 1,800 tokens, written from a type file of 200
-to 3,000. Thirteen things the code does not say by itself:
+to 3,000. Fourteen things the code does not say by itself:
 
 - **One generator, three ways to run it.** The third, `saved`, checks content as H5P stores it
   (*Saved content is checked as the build checks what it writes*, below). `ContentGenerator` was the sweep's
@@ -301,6 +301,15 @@ to 3,000. Thirteen things the code does not say by itself:
   embed-my.github.io serves them (embed-my/embed-my.github.io#14) rather than the libraries
   package on jsDelivr, whose cap is 50 MB. The build tool beside them is the command line as one
   file, esbuild's: 558 kB, and it builds from an unzipped bundle with nothing installed.
+- **A preview inside Claude is the desktop app's browser panel, not a card** (2026-11-10). A
+  connector's card in Claude is an iframe under Claude's policy, measured that day in Claude
+  Desktop 4.23118.1 with a probe server: it fetches from the hosts the server declares, grows to
+  what it asks for, and played a one-document copy of a quiz (the core, the libraries and their
+  files inline) 70 ms after its frame loaded, but it can register no worker, and Claude drops
+  `frameDomains`, so neither the player's own page nor a YouTube frame opens in it, and a media
+  file reaches it only dropped in by hand. Claude's desktop app has a browser panel at its side
+  where the verifier's preview opens: a real browser, in which the player runs as it is, video
+  included. The owner chose the panel, with media to come, and the card was not built.
 
 Not built: editing an existing package, which a tool beside it does with `checkContent` as its
 check; layout for Drag and Drop and Crossword; and any judgement of whether content is right, which
