@@ -190,11 +190,23 @@ export async function composePackage(source, pack, media) {
   // what the editor's widgets set and check what they would not let pass. Where the source has a
   // problem already, the check finds the same one again, or the gap it left: a value missing
   // where the generator refused what was written inside it. Only what it finds elsewhere is added.
+  // Since #172 it is named by where the source has it, which is another place than the content's
+  // for what the generator moved to its field; such a move is a problem of the source's, but
+  // nothing was refused there, so what the check finds inside it is added like any other. And
+  // what it says of a list an item of which was refused, or of anything in one, is left out: the
+  // list it counted is shorter than the one written, its items at other indices, so a book whose
+  // chapters were all refused had "0 items" besides.
   const checked = checkContent({ entries, main: mainLibrary, translations }, { type: libraryString(mainLibrary.library), params: generated })
   const fromSource = [...problems]
-  const known = (/** @type {Problem} */ problem) => fromSource.some(({ path }) => path === problem.path || inside(problem.path, path) ||
-    (inside(path, problem.path) && valueAt(checked.params, problem.path) === undefined))
-  for (const problem of checked.problems) if (!known(problem)) problems.push(problem)
+  const moves = new Set(generator.moved.map(({ from }) => from))
+  const inSource = (/** @type {string} */ path) => generator.moved.reduce((at, { from, to }) => at === to || inside(at, to) ? from + at.slice(to.length) : at, path)
+  const shortened = (/** @type {string} */ path) => generator.shortened.some((list) => path === list || inside(path, list))
+  for (const { path: inContent, message } of checked.problems) {
+    const path = inSource(inContent)
+    const known = fromSource.some((problem) => problem.path === path || (inside(path, problem.path) && !moves.has(problem.path)) ||
+      (inside(problem.path, path) && valueAt(checked.params, inContent) === undefined))
+    if (!known && !shortened(path)) problems.push({ path, message })
+  }
   for (const added of checked.notes) if (!notes.some(({ path, message }) => path === added.path && message === added.message)) notes.push(added)
   if (problems.length) throw new SourceError(problems)
   const content = checked.params

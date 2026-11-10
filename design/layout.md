@@ -190,9 +190,10 @@ packages/author/          @missing-elements/h5p-author — a playable .h5p of an
                             `packageLibraries`, a package's own over the pack's (#107); no Node
                             import of its own, nor has lib/source-error.mjs, `SourceError` (#106)
   lib/generator.mjs         `ContentGenerator`: content from a type's `semantics.json`, authoring
-                            (every written value checked as the editor's form would), lenient, as
-                            the sweep runs it, or saved, as `checkContent` runs it; moved out of the
-                            demo on 2026-11-01 (#100)
+                            (every written value checked as the editor's form would, and what is
+                            written in the wrong place said once, put where it belongs and checked
+                            there, #172), lenient, as the sweep runs it, or saved, as `checkContent`
+                            runs it; moved out of the demo on 2026-11-01 (#100)
   lib/types.mjs             what the editor's own widgets set and check, per content type: Course
                             Presentation's layout, Interactive Video's placement, Branching
                             Scenario's paths, Game Map's stages, Find the Hotspot's areas
@@ -205,7 +206,9 @@ packages/author/          @missing-elements/h5p-author — a playable .h5p of an
   scripts/                  sync-skill.mjs writes the skill's type files' generated sections from the
                             pack (`pnpm --filter @missing-elements/h5p-author sync:skill`);
                             check-pack-published.mjs, the publish guard for the pinned pack and player,
-                            and the normalizer's `./crc32`
+                            and the normalizer's `./crc32`; copy-type-files.mjs, `prepack`'s copy of
+                            the skill's type files into `references/types/`, which the package
+                            carries and git does not (#172)
   tests/                    node tests: the generator, text and translations, layouts and schema, the
                             loader, builds with media from disk and a local server, the command, the
                             quiz format, the check of saved content, the demo's packages among it, and

@@ -58,7 +58,11 @@ the same package.
 ## 2. Write the source
 
 Read the type's file, `references/types/<Type>.md`: notes, an example, its fields. Parts other
-content holds have files too: H5P.AdvancedText, H5P.Image, H5P.Video, H5P.Text.
+content holds have files too: H5P.AdvancedText, H5P.Image, H5P.Video, H5P.Text. With this text
+alone and no file beside it, open the file at
+`https://raw.githubusercontent.com/missing-elements/h5p-offline-player/main/skills/h5p-author/references/types/<Type>.md`;
+where nothing opens, write the source from what you know of the type: the build says, for each
+place that is wrong, what to write there.
 
 ```json
 {
@@ -74,6 +78,9 @@ content holds have files too: H5P.AdvancedText, H5P.Image, H5P.Video, H5P.Text.
 - A file is `{ "path": "photo.jpg" }`, beside the source or a web address, with `copyright`
   when known.
 - Sub-content is `{ "library": "H5P.MultiChoice", "params": { … }, "metadata": { "title": "…" } }`.
+  Where it sits is the type file's to say, a level deeper than a guess puts it: an item of
+  H5P.Column's `content` is `{ "content": <sub-content> }`, a slide's element
+  `{ "action": <sub-content> }` in `presentation.slides[].elements`, a book's chapter an H5P.Column.
 
 ## 3. Build
 

@@ -470,6 +470,9 @@ const branchingScenario = {
         // question, is -1 here: the field is hidden and required, and would be reported unset.
         if (node.nextContentId === undefined) node.nextContentId = -1
         const alternatives = node?.type?.params?.branchingQuestion?.alternatives ?? []
+        // Without alternatives it goes nowhere, which the list's own size reports: taken as an
+        // end, so that it is not reported again as a loop, which it is not (#172).
+        if (!alternatives.length) return [-1]
         return alternatives.map((/** @type {any} */ alternative, /** @type {number} */ j) => check(alternative?.nextContentId, `${nodeAt}.type.params.branchingQuestion.alternatives[${j}].nextContentId`))
       }
       if (node?.nextContentId === undefined) {
