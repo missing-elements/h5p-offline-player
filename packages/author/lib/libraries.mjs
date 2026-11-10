@@ -50,7 +50,10 @@ const isObject = (value) => value !== null && typeof value === 'object' && !Arra
  * build loads them: the content type, every library its parameters name, and every one a library
  * field names as its default. Each library's semantics come with the interface texts of its own
  * translation for the language and with the fields a layout sets marked optional
- * (`patchSemantics`). Every other library of the pack is in the map too, without its semantics.
+ * (`patchSemantics`). A library that is the only one a field takes is loaded too, named or not
+ * (#172): a book's chapters written without their H5P.Column can then be read as its parameters
+ * and checked. Such a library is in `translations` only where the content names it. Every other
+ * library of the pack is in the map too, without its semantics.
  * @param {LibrarySource} pack
  * @param {{ type: string, language: string, params?: unknown }} content `type` a machine name, with
  *   a major and minor when known, `H5P.Blanks` or `H5P.Blanks 1.14`
@@ -65,8 +68,12 @@ export async function loadLibraries(pack, { type, language, params }) {
   const main = /^(\S+?)(?:\s+(\d+)\.\d+)?$/.exec(String(type).trim())
   const mainEntry = main ? pack.newest(main[1], main[2] === undefined ? undefined : Number(main[2])) : null
   if (!mainEntry) throw new SourceError([{ path: 'type', message: `the library pack has no content type ${type}` }])
-  /** @type {{ machineName: string, major?: number }[]} */
+  /** @type {{ machineName: string, major?: number, unnamed?: boolean }[]} */
   const queue = [{ machineName: mainEntry.machineName, major: mainEntry.majorVersion }]
+  /** @type {Set<string>} the folders of the libraries the content names, or a default does */
+  const namedFolders = new Set()
+  /** @type {Map<string, TranslationReport>} by folder, in the order loaded */
+  const reports = new Map()
   /** @param {unknown} value */
   const named = (value) => {
     if (Array.isArray(value)) value.forEach(named)
@@ -84,13 +91,20 @@ export async function loadLibraries(pack, { type, language, params }) {
   const defaults = (fields) => {
     for (const field of fields) {
       if (field.type === 'library' && isObject(field.default)) named(field.default)
+      if (field.type === 'library') {
+        const options = (field.options ?? []).map((/** @type {unknown} */ option) => /^(\S+) (\d+)\.\d+$/.exec(String(option))).filter(Boolean)
+        if (options.length && options.every((/** @type {RegExpExecArray} */ option) => option[1] === options[0][1])) {
+          for (const option of options) queue.push({ machineName: option[1], major: Number(option[2]), unnamed: true })
+        }
+      }
       if (field.fields) defaults(field.fields)
       if (field.field) defaults([field.field])
     }
   }
   while (queue.length) {
-    const { machineName, major } = /** @type {{ machineName: string, major?: number }} */ (queue.shift())
+    const { machineName, major, unnamed } = /** @type {{ machineName: string, major?: number, unnamed?: boolean }} */ (queue.shift())
     const entry = pack.newest(machineName, major)
+    if (entry && !unnamed) namedFolders.add(entry.folder)
     if (!entry || entries.has(entry.folder)) continue
     const part = await pack.open(entry)
     let semantics = part.semantics
@@ -99,11 +113,12 @@ export async function loadLibraries(pack, { type, language, params }) {
       const localized = await localize(semantics, files, libraryString(part.library))
       semantics = patchSemantics(part.library.machineName, localized.semantics)
       // By folder, not identity: a source may build its records anew on each call.
-      if (part.library.runnable || entry.folder === mainEntry.folder) translations.push(localized.report)
+      if (part.library.runnable || entry.folder === mainEntry.folder) reports.set(entry.folder, localized.report)
       defaults(semantics)
     }
     entries.set(entry.folder, { folder: entry.folder, library: part.library, semantics })
   }
+  for (const [folder, report] of reports) if (namedFolders.has(folder)) translations.push(report)
   // Every library the index knows stays findable, so a name the pre-pass did not see is reported
   // as a library of the pack and not as an unknown one; its semantics are read when it is found.
   for (const entry of pack.libraries) {

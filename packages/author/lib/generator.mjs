@@ -1,4 +1,5 @@
 import { checkMetadata } from './metadata.mjs'
+import { isInterfaceText } from './schema.mjs'
 import { allowedTags, markupText, plainText, takesMarkup } from './text.mjs'
 
 /**
@@ -22,6 +23,17 @@ import { allowedTags, markupText, plainText, takesMarkup } from './text.mjs'
  * not a problem, where the content names another minor of its library than the semantics are of:
  * the player upgrades content written for an older minor, which may be what moves it, and plays
  * content written for a newer one without it.
+ *
+ * Authoring, a problem says what to write, and what was written in another place than its field's
+ * is checked in the same round (#172). A source written without its type's file gets a type's
+ * levels wrong before anything else, and each such mistake hid all that was written inside it
+ * until the next build: sub-content in the place of the group that holds it in one of its fields,
+ * a field a level above the group that has it, and the parameters of the one library a field takes
+ * without the sub-content around them. Each is reported once, where it was written, and then
+ * generated where it belongs, its own problems named by where the source has them; `moved` says
+ * what went where, for whoever checks the content afterwards. A list an item of which was refused
+ * is named too, in `shortened`: it holds fewer items than were written, at other indices, so that
+ * what a later check says of it is not of the list in the source.
  *
  * The editor is h5p-editor-php-library's form at commit 3bec2594356cf1be4e6401f7e7e557650720aa9b
  * (2026-10-08), and H5PEditor.ShowWhen 1.0.9 at 93678737300e084cb9390a691d3e1ad4e793fbaa for
@@ -58,6 +70,9 @@ const SUB_CONTENT_ID = /^\{?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f
  */
 const FILE_KEYS = { file: [], image: ['width', 'height', 'originalImage'], video: ['width', 'height', 'codecs', 'quality', 'bitrate'], audio: [] }
 
+/** What sub-content is written with, and the id H5P stores with it. */
+const SUB_CONTENT = ['library', 'params', 'metadata', 'subContentId']
+
 /**
  * @typedef {{ folder: string, library: any, semantics: any[] | null }} PackEntry
  * @typedef {{ path: string, message: string }} Problem
@@ -78,6 +93,13 @@ export class ContentGenerator {
    * @type {{ library: any, minor: number } | null}
    */
   #other = null
+
+  /**
+   * Where the source has what is stored in another place than it was written in, by the place it
+   * is stored in: its problems are named by where it was written.
+   * @type {Map<string, string>}
+   */
+  #written = new Map()
 
   /**
    * @param {Map<string, PackEntry>} pack every library folder the content may use, by folder name
@@ -103,6 +125,13 @@ export class ContentGenerator {
     this.unset = []
     /** @type {{ fields: any[], given: Record<string, any> }[]} the levels a `showWhen` path climbs, innermost last */
     this.scopes = []
+    /** @type {string[]} written lists an item of which was refused: each holds fewer items than were written, at other indices */
+    this.shortened = []
+    /**
+     * @type {{ from: string, to: string }[]} what was written in another place than its field's:
+     *   where the source has it, and where the content does, outermost first
+     */
+    this.moved = []
   }
 
   /**
@@ -277,10 +306,10 @@ export class ContentGenerator {
     /** @type {Record<string, unknown>} */
     const out = {}
     if (!this.lenient && written !== undefined && !isObject(written)) {
-      this.report(path, `expected an object with the fields ${names(fields)}`)
+      this.report(path, `expected an object with the fields ${fieldNames(fields)}`)
       return out
     }
-    const given = isObject(written) ? written : {}
+    const given = !isObject(written) ? {} : this.lenient || this.saved ? written : this.#placed(fields, written, path)
     this.#level(fields, given, () => {
       for (const field of fields) {
         const value = this.field(this.#shown(field), given[field.name], stack, lenient, `${path}.${field.name}`)
@@ -297,9 +326,65 @@ export class ContentGenerator {
       else if (this.saved && this.#other) {
         out[key] = value
         this.note(`${path}.${key}`, otherMinor(this.#other))
-      } else this.report(`${path}.${key}`, `is not a field here; the fields are ${names(fields)}`)
+      } else this.report(`${path}.${key}`, `is not a field here; the fields are ${fieldNames(fields)}`)
     }
     return out
+  }
+
+  /**
+   * What was written for a level, with what was written in another place than its field's put
+   * there, so that it is checked in the same round as what holds it. Each is reported once, where
+   * it was written, with what to write, and what is wrong inside it is named by where it was
+   * written too. Two mistakes, the ones a source written without its type's file makes first:
+   *
+   * - Sub-content in the place of the group that holds it: `{ "library", "params" }` where an item
+   *   of a Column's `content` is `{ "content": { "library", "params" } }`, and a slide's element
+   *   `{ "action": … }`. It was three problems an item, none of which said what to write. The
+   *   problem names the item and shows it whole, since "it goes in the field content" was read as
+   *   the list of that name, which the item is in already.
+   * - A field a level or more above the group that has it: `params.slides` for Course
+   *   Presentation's `params.presentation.slides`, `params.enableRetry` for a question's
+   *   `params.behaviour.enableRetry`. Only where one group within the level has a field of that
+   *   name that takes such a value, and nothing is written there. An interface text is no such
+   *   field: a question's text sent to a label of the same name would build, and read wrong.
+   * @param {any[]} fields
+   * @param {Record<string, any>} given
+   * @param {string} path
+   * @returns {Record<string, any>}
+   */
+  #placed(fields, given, path) {
+    const holder = holderOf(fields, given)
+    if (holder) {
+      const subContent = pick(given, SUB_CONTENT)
+      const shown = ['library', 'params', 'metadata'].filter((key) => Object.hasOwn(subContent, key))
+        .map((key) => key === 'library' ? `"library": ${JSON.stringify(given.library)}` : `"${key}": { … }`)
+      const beside = Object.keys(given).filter((key) => !SUB_CONTENT.includes(key) && fields.some((field) => field.name === key)).map((key) => `, "${key}": …`)
+      this.report(path, `is sub-content, but here it goes inside an object, in its field ${holder.name}: write ${path} as { "${holder.name}": { ${shown.join(', ')} }${beside.join('')} }`)
+      this.#move(path, `${path}.${holder.name}`)
+      given = { ...omit(given, SUB_CONTENT), [holder.name]: subContent }
+    }
+    for (const [key, value] of Object.entries(given)) {
+      if (value === null || value === undefined || fields.some((field) => field.name === key)) continue
+      const homes = homesOf(fields, key, value)
+      if (homes.length !== 1) continue
+      const placed = placedIn(omit(given, [key]), homes[0], key, value)
+      if (!placed) continue
+      const home = homes[0].join('.')
+      this.report(`${path}.${key}`, `is a field of ${home}, not of this level: write ${path}.${home}.${key}`)
+      this.#move(`${path}.${key}`, `${path}.${home}.${key}`)
+      given = placed
+    }
+    return given
+  }
+
+  /**
+   * Notes what is stored in another place than it was written in.
+   * @param {string} from where the source has it
+   * @param {string} to where the content does
+   */
+  #move(from, to) {
+    this.#written.set(to, from)
+    this.moved.push({ from, to })
   }
 
   /**
@@ -312,6 +397,8 @@ export class ContentGenerator {
    */
   field(field, written, stack, lenient, path) {
     const optional = field.optional || lenient
+    // What is stored in another place than it was written in is named by where it was written.
+    path = this.#written.get(path) ?? path
     if (written === null) {
       if (!this.lenient && !field.optional && field.default === undefined && field.type !== 'boolean') this.report(path, 'is required and cannot be null')
       return undefined
@@ -356,10 +443,21 @@ export class ContentGenerator {
             if (field.min !== undefined && written.length < field.min && !lenient) this.report(path, `has ${written.length} item${written.length === 1 ? '' : 's'}; it takes at least ${field.min}`)
             if (field.max !== undefined && written.length > field.max) this.report(path, `has ${written.length} items; it takes at most ${field.max}`)
           }
-          // Saved, an item that holds nothing an author has to write is one the editor started an
-          // optional list with, and nobody filled: nothing is asked of it.
-          return this.#level([], {}, () => written.map((each, index) =>
-            this.field(item, each, stack, lenient || (this.saved && field.optional === true && !holds(item, each)), `${path}[${index}]`)).filter((each) => each !== undefined))
+          return this.#level([], {}, () => {
+            /** @type {unknown[]} */
+            const items = []
+            let refused = false
+            written.forEach((each, index) => {
+              const before = this.problems.length
+              // Saved, an item that holds nothing an author has to write is one the editor started
+              // an optional list with, and nobody filled: nothing is asked of it.
+              const value = this.field(item, each, stack, lenient || (this.saved && field.optional === true && !holds(item, each)), `${path}[${index}]`)
+              if (value !== undefined) items.push(value)
+              else if (this.problems.length > before) refused = true
+            })
+            if (refused) this.shortened.push(path)
+            return items
+          })
         }
         if (written !== undefined && !this.lenient) {
           this.report(path, 'expected a list')
@@ -387,7 +485,18 @@ export class ContentGenerator {
       case 'library':
         if (isObject(written) && typeof written.library === 'string') return this.writtenLibrary(written, stack, path, field)
         if (written !== undefined && !this.lenient) {
-          this.report(path, `expected sub-content, { "library": "${optionNames(field)[0] ?? 'H5P.…'}", "params": { … } }`)
+          // The parameters of the one library the field takes, without the sub-content around
+          // them, as a book's chapters written `{ "content": [ … ] }` (#172): said so, and checked
+          // as its parameters in the same round, named by where they are written.
+          const entry = !this.saved && isObject(written) ? this.#only(field) : null
+          const own = entry ? Object.keys(written).filter((key) => (entry.semantics ?? []).some((/** @type {any} */ each) => each.name === key)) : []
+          if (entry && own.length) {
+            const metadata = own.includes('metadata') ? undefined : written.metadata
+            this.report(path, `is the params of sub-content, without the sub-content around them: write ${path} as { "library": "${entry.library.machineName}", "params": { "${own[0]}": … }${metadata === undefined ? '' : ', "metadata": { … }'} }`)
+            this.#move(path, `${path}.params`)
+            return this.writtenLibrary({ library: entry.library.machineName, params: metadata === undefined ? written : omit(written, ['metadata']), ...(metadata === undefined ? {} : { metadata }) }, stack, path, field, path)
+          }
+          this.report(path, `expected sub-content, ${subContentOf(field, written)}`)
           return undefined
         }
         // A default names the content the editor starts with (h5peditor.js puts it in the
@@ -439,13 +548,15 @@ export class ContentGenerator {
    * @returns {T}
    */
   #quietly(generate) {
-    const counts = [this.problems.length, this.notes.length, this.unset.length]
+    const counts = [this.problems.length, this.notes.length, this.unset.length, this.shortened.length, this.moved.length]
     try {
       return generate()
     } finally {
       this.problems.length = counts[0]
       this.notes.length = counts[1]
       this.unset.length = counts[2]
+      this.shortened.length = counts[3]
+      for (const { to } of this.moved.splice(counts[4])) this.#written.delete(to)
     }
   }
 
@@ -519,6 +630,17 @@ export class ContentGenerator {
   }
 
   /**
+   * The one library a field takes, as the pack has it: what parameters written without their
+   * sub-content are taken to be of.
+   * @param {any} field
+   */
+  #only(field) {
+    const options = libraryOptions(field)
+    if (!options.length || options.some((option) => option.machineName !== options[0].machineName)) return null
+    return this.find(options[0].machineName, options[0].major)
+  }
+
+  /**
    * Written sub-content: the library it names, its parameters filled in from that library's
    * semantics. Lenient, a library the pack does not have is kept as written, for the check to
    * remove or the runtime to refuse; authoring, it is a problem, as is one the field does not take.
@@ -526,8 +648,9 @@ export class ContentGenerator {
    * @param {string[]} stack
    * @param {string} path
    * @param {any} field the library field, or null for a default the semantics give
+   * @param {string} [at] where its parameters are written, where that is not in its `params`
    */
-  writtenLibrary(written, stack, path, field) {
+  writtenLibrary(written, stack, path, field, at) {
     if (this.lenient) {
       const match = /^(\S+) (\d+)\.(\d+)$/.exec(written.library)
       const entry = match ? this.find(match[1], Number(match[2])) : null
@@ -574,7 +697,7 @@ export class ContentGenerator {
     else if (isObject(written.metadata)) {
       for (const key of Object.keys(written.metadata)) if (key !== 'title') this.report(`${path}.metadata.${key}`, 'is not set per sub-content here; write only its title, the rest comes from the source')
     }
-    return this.subContent(entry, written.params, written.metadata, stack, path)
+    return this.subContent(entry, written.params, written.metadata, stack, path, { at })
   }
 
   /**
@@ -583,11 +706,12 @@ export class ContentGenerator {
    * @param {any} metadata its written metadata
    * @param {string[]} stack
    * @param {string} path
-   * @param {{ id?: unknown, minor?: number, closed?: boolean }} [saved] saved sub-content's id, the
-   *   minor of its library it names, and whether nothing is asked of it
+   * @param {{ id?: unknown, minor?: number, closed?: boolean, at?: string }} [saved] saved
+   *   sub-content's id, the minor of its library it names, and whether nothing is asked of it;
+   *   `at`, where its parameters are written, where that is not in its `params`
    */
-  subContent(entry, written, metadata, stack, path, { id, minor, closed = false } = {}) {
-    const params = this.#of(entry, minor, () => this.fields(entry.semantics ?? [], written, [...stack, entry.library.machineName], closed, `${path}.params`))
+  subContent(entry, written, metadata, stack, path, { id, minor, closed = false, at = `${path}.params` } = {}) {
+    const params = this.#of(entry, minor, () => this.fields(entry.semantics ?? [], written, [...stack, entry.library.machineName], closed, at))
     return {
       library: libraryString(entry.library),
       params,
@@ -765,6 +889,96 @@ function optionNames(field) {
   return libraryOptions(field).map((option) => option.machineName)
 }
 
+/**
+ * Sub-content as a field takes it, for a problem to show: with the library named where the field
+ * takes one alone, or where what was written names one it takes; else with every library it
+ * takes, since the first of several read as the one to write, and a scenario's texts came back as
+ * branching questions.
+ * @param {any} field
+ * @param {unknown} [written]
+ */
+function subContentOf(field, written) {
+  const taken = [...new Set(optionNames(field))]
+  const named = typeof written === 'string' ? written.trim().split(/\s+/)[0] : undefined
+  const library = taken.length === 1 ? taken[0] : taken.find((name) => name === named)
+  if (library) return `{ "library": "${library}", "params": { … } }`
+  return `{ "library": "${taken.length ? '…' : 'H5P.…'}", "params": { … } }${taken.length ? `, of ${taken.join(', ')}` : ''}`
+}
+
+/**
+ * The field of a group that sub-content written in the group's place belongs in: the one library
+ * field that takes its library, or the group's only library field. None where `library` is a field
+ * of the group that holds no sub-content, where that field is written too, or where more than one
+ * could be meant.
+ * @param {any[]} fields
+ * @param {Record<string, any>} given
+ */
+function holderOf(fields, given) {
+  if (typeof given.library !== 'string') return null
+  const holders = fields.filter((field) => field.type === 'library')
+  if (fields.some((field) => SUB_CONTENT.includes(field.name) && field.type !== 'library')) return null
+  const machineName = given.library.trim().split(/\s+/)[0]
+  const taking = holders.filter((field) => optionNames(field).includes(machineName))
+  const holder = taking.length === 1 ? taking[0] : holders.length === 1 ? holders[0] : null
+  return holder && (holder.name === 'library' || !Object.hasOwn(given, holder.name)) ? holder : null
+}
+
+/**
+ * The ways from a level's fields to a field of this name in a group within it, one an author
+ * writes and that takes a value of the kind written: for each, the groups' names, outermost
+ * first. So a list written as `slides` is Course Presentation's `presentation.slides` and not its
+ * interface text `l10n.slides`. A group of one field is no level of a source, being written as
+ * that field's value.
+ * @param {any[]} fields
+ * @param {string} name
+ * @param {unknown} value
+ * @param {string[]} [chain]
+ * @param {string[][]} [found]
+ */
+function homesOf(fields, name, value, chain = [], found = []) {
+  for (const field of fields) {
+    const children = field.fields ?? []
+    if (field.type !== 'group' || (children.length === 1 && !field.isSubContent) || isInterfaceText(field)) continue
+    const within = [...chain, field.name]
+    if (children.some((/** @type {any} */ child) => child.name === name && !isInterfaceText(child) && takes(child, value))) found.push(within)
+    homesOf(children, name, value, within, found)
+  }
+  return found
+}
+
+/**
+ * Whether a field takes a value of this kind: a list, an object, a text, a number, or true or
+ * false. A group of one field takes what that field does.
+ * @param {any} field
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function takes(field, value) {
+  if (field.type === 'group' && (field.fields ?? []).length === 1 && !field.isSubContent) return takes(field.fields[0], value)
+  if (Array.isArray(value)) return ['list', 'video', 'audio'].includes(field.type) || (field.type === 'select' && Boolean(field.multiple))
+  if (isObject(value)) return ['group', 'library', 'image', 'file', 'video', 'audio'].includes(field.type)
+  if (typeof value === 'string') return field.type === 'text' || (field.type === 'select' && !field.multiple)
+  return typeof value === field.type
+}
+
+/**
+ * What is written for a level, with a value put in a group within it, each group within the one
+ * named before; or null where something is written there already, or one of the groups is written
+ * as something else than an object.
+ * @param {Record<string, any>} given
+ * @param {string[]} chain
+ * @param {string} key
+ * @param {unknown} value
+ * @returns {Record<string, any> | null}
+ */
+function placedIn(given, chain, key, value) {
+  if (!chain.length) return Object.hasOwn(given, key) ? null : { ...given, [key]: value }
+  const [name, ...rest] = chain
+  if (given[name] !== undefined && !isObject(given[name])) return null
+  const placed = placedIn(given[name] ?? {}, rest, key, value)
+  return placed && { ...given, [name]: placed }
+}
+
 /** What a field's semantics add to what the platforms keep of its value. @param {any} field @returns {string[]} */
 function extraAttributes(field) {
   return Array.isArray(field?.extraAttributes) ? field.extraAttributes.filter((/** @type {unknown} */ name) => typeof name === 'string') : []
@@ -828,6 +1042,16 @@ function names(fields) {
   return fields.map((field) => field.name).join(', ')
 }
 
+/**
+ * A level's fields by name, for a problem to list: those an author writes, and the interface
+ * texts as one, since a translation supplies them and an Interactive Book has 35.
+ * @param {any[]} fields
+ */
+function fieldNames(fields) {
+  const written = fields.filter((field) => !isInterfaceText(field))
+  return written.length && written.length < fields.length ? `${names(written)}, and the interface texts` : names(fields)
+}
+
 /** @param {string} html */
 function stripTags(html) {
   return html.replace(/<[^<>]*>/g, ' ').replace(/\s+/g, ' ').trim()
@@ -836,6 +1060,11 @@ function stripTags(html) {
 /** @param {any} object @param {string[]} keys */
 function omit(object, keys) {
   return Object.fromEntries(Object.entries(object).filter(([key]) => !keys.includes(key)))
+}
+
+/** @param {any} object @param {string[]} keys */
+function pick(object, keys) {
+  return Object.fromEntries(Object.entries(object).filter(([key]) => keys.includes(key)))
 }
 
 /** @param {unknown} value @returns {value is Record<string, any>} */

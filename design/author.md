@@ -15,7 +15,7 @@ already holds text to the content check's rules, from the pack an untrusted chec
 `apps/skills` plays every example untrusted too. Measured on a five-question quiz, at four
 characters a token: `content.json` was about 3,470 tokens to write by hand, after reading 3,900 to
 9,500 of a type's semantics; the source is 1,000 to 1,800 tokens, written from a type file of 200
-to 3,000. Fourteen things the code does not say by itself:
+to 3,000. Eighteen things the code does not say by itself:
 
 - **One generator, three ways to run it.** The third, `saved`, checks content as H5P stores it
   (*Saved content is checked as the build checks what it writes*, below). `ContentGenerator` was the sweep's
@@ -318,6 +318,65 @@ to 3,000. Fourteen things the code does not say by itself:
   file reaches it only dropped in by hand. Claude's desktop app has a browser panel at its side
   where the verifier's preview opens: a real browser, in which the player runs as it is, video
   included. The owner chose the panel, with media to come, and the card was not built.
+
+- **A problem says what to write, and what is in the wrong place is checked all the same**
+  (2026-11-10, #172). The owner gave the skill to Gemini in Chrome, which could not build a simple
+  Interactive Book and quoted `params.chapters: has 0 items; it takes at least 1`. A chat there has
+  the skill's text, no type file and nothing to run, so it learns a type's shape from the build's
+  problems alone. Measured that way with the weakest Claude model, Haiku 5.5: SKILL.md's text, each
+  reply built as the build page builds it, its problems pasted back in the page's words, up to four
+  rounds; an Interactive Book, a Course Presentation, a Column, a Question Set and a Branching
+  Scenario, three runs each, the same 15 first replies under each set of messages. With 0.6.0's
+  messages 3 built at once, the Question Sets, 8 by the second round, 12 by the third, 13 by the
+  fourth, and two scenarios never. What cost the rounds was a type's levels, not its fields:
+  - Sub-content in the place of the group that holds it, `{ "library", "params" }` where a
+    Column's item is `{ "content": { … } }`, a slide's element `{ "action": { … } }` and a
+    scenario's node `{ "type": { … } }`: 9 of the 24 failed rounds, three or four problems an item,
+    one of them a list of 35 libraries, none saying what to write.
+  - A field a level above its group, `params.slides` for `params.presentation.slides`: the build
+    said it was no field there and checked nothing of what was written in it, so the next round
+    found what was wrong inside, an `<h1>` a slide's text does not take.
+  - A book's chapters written as pages, `{ "title", "content": [ … ] }`, with no H5P.Column around
+    them, in two of three books: "expected sub-content", and then "has 0 items", which the last
+    check counted after the generator had refused the chapters and which was not so.
+  - "expected sub-content, { "library": "H5P.BranchingQuestion" … }" for a field that takes seven
+    libraries: the first read as the one to write, and a scenario's texts came back as questions.
+
+  So the generator says each such thing once, by its path and with what to write there, then puts
+  what was written where it belongs and checks it, naming what is wrong inside by where the source
+  has it (`moved`, by which the build's last check names what it finds too). The one library a
+  field takes is loaded whether or not a source names it, which is what reads a chapter without
+  its Column as the Column's parameters. What the last check says of a list an item of which was
+  refused is left out, the list being another than the one written (`shortened`). A field that
+  takes several libraries names them all. A scenario's question with no alternatives is reported
+  as that and not as a loop besides. And a problem's list of fields names those an author writes,
+  the interface texts as one: a book's was 39 names long. With these messages the same first
+  replies built 12 by the second round and all 15 by the third, and every package built under
+  either set plays (h5p-verify). The first wording, "is sub-content, which goes in the field
+  content here", did worse than the three problems it replaced: a Column's list and its items'
+  field are both `content`, one run sent the same source again and one made the list an object.
+  So the problem names the item and shows it whole, `write params.content[0] as { "content": … }`.
+  Only an object or a list, a text, a number or a flag whose name one group below has, in a field
+  an author writes that takes such a value, is taken to belong there; an interface text is none,
+  since a question's text sent to a label of its name would build and read wrong.
+- **The package carries the skill's type files** (2026-11-10, #172). In the same measurement, what
+  did most was no message: with the type files pasted back beside the first problems, the content
+  type's and those of the libraries the source names, all 15 built by the second round, in two
+  runs of the twelve that had failed. A chat with the skill has those files; one in a browser has
+  the build page, which has the package and no skill. So `prepack` copies
+  `skills/h5p-author/references/types/*.md` into the package, `references/types/<Type>.md`, each
+  an export, for the page to hand over with a source's problems. They stay the skill's, at the
+  repository's root where `npx skills add` looks, written by `sync:skill` as before; the copy is
+  not in git, and `build.test.ts` holds it to the skill's files, file for file.
+- **The skill says where a container holds its sub-content** (2026-11-10, #172). The one thing in
+  SKILL.md that repeats a type file, for the chat that cannot read one. Its line on sub-content
+  names the three commonest places: an item of H5P.Column's `content` is
+  `{ "content": <sub-content> }`, a slide's element `{ "action": <sub-content> }` in
+  `presentation.slides[].elements`, a book's chapter an H5P.Column. In the measurement above no
+  first reply for a book, a page or slides built, 0 of 9; with that sentence in the skill's text
+  all 9 built at once and play. A scenario, which it does not name, still took a round of
+  problems. The skill gives the type files' address on GitHub too, for a chat that has its text
+  and can open a link.
 
 Not built: editing an existing package, which a tool beside it does with `checkContent` as its
 check; layout for Drag and Drop and Crossword; and any judgement of whether content is right, which

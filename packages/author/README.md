@@ -87,6 +87,16 @@ h5p-author: The source has 2 problems:
   params.behaviour.sideways: is not a field here; the fields are enableRetry, enableSolutionsButton, …
 ```
 
+What is written in the wrong place is said once, with what to write, and still checked, so that
+what is wrong inside it comes in the same round:
+
+```
+h5p-author: The source has 3 problems:
+  params.slides: is a field of presentation, not of this level: write params.presentation.slides
+  params.slides[0].elements[0]: is sub-content, but here it goes inside an object, in its field action: write params.slides[0].elements[0] as { "action": { "library": "H5P.AdvancedText", "params": { … } } }
+  params.slides[0].elements[0].params.text: has <h1>, which this field does not take; it takes <a> <br> …
+```
+
 The quiz format the h5p-author skill published first (`{ "kind": "question-set", "questions": [ … ] }`)
 is still taken, for a Multiple Choice question or a Question Set of them.
 
@@ -107,6 +117,11 @@ H5P.TrueFalse 1.8: True/False Question
 
 `--all` adds the interface texts; `--markdown` prints the section the skill's type files carry.
 An unknown name lists the pack's content types.
+
+The package carries those type files too, as the release has them:
+`@missing-elements/h5p-author/references/types/H5P.TrueFalse.md` is the type's notes, an example and
+these fields. A page that builds for a chat with no skill beside it hands them over with a source's
+problems, as the [build page](https://missing-elements.github.io/h5p/build/) does.
 
 ## A content type's bundle
 

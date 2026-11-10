@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process'
 import { cp, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { createServer, type Server } from 'node:http'
+import { createRequire } from 'node:module'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -337,6 +338,45 @@ describe('any content type in the pack', () => {
     expect((await readdir(dir)).filter(name => name.startsWith('failed-') || name.startsWith('.h5p-author-'))).toEqual([])
   })
 
+  it('says what to write for what is in the wrong place, checks it in the same build, and counts no list it refused an item of (#172)', async () => {
+    // A book's chapters as a chat without the type's file writes them: pages of their own, with no
+    // H5P.Column around them, and sub-content in the place of a page's items. Every one of it in
+    // one build, by where the source has it; it was "expected sub-content" and "has 0 items".
+    expect(await problems({ ...META, type: 'H5P.InteractiveBook', params: { chapters: [
+      { title: 'Sources', content: [{ library: 'H5P.AdvancedText', params: { text: 'A river begins at its source.' } }] }
+    ] } })).toEqual([
+      'params.chapters[0]: is the params of sub-content, without the sub-content around them: write params.chapters[0] as { "library": "H5P.Column", "params": { "content": … } }',
+      'params.chapters[0].content[0]: is sub-content, but here it goes inside an object, in its field content: write params.chapters[0].content[0] as { "content": { "library": "H5P.AdvancedText", "params": { … } } }',
+      'params.chapters[0].title: is not a field here; the fields are content',
+      'params.chapters[0].metadata.title: is required: the chapter\'s name in the table of contents'
+    ])
+    // A chapter refused whole leaves the list shorter: no count of what is left, and nothing said
+    // of the chapter after it under the index of the one refused.
+    expect(await problems({ ...META, type: 'H5P.InteractiveBook', params: { chapters: [
+      'Sources',
+      { library: 'H5P.Column', params: { content: [{ content: { library: 'H5P.AdvancedText', params: { text: 'A river ends at its mouth.' } } }] } }
+    ] } })).toEqual(['params.chapters[0]: expected sub-content, { "library": "H5P.Column", "params": { … } }'])
+    // A list a level above its group, and what is wrong inside it, in the same build.
+    expect(await problems({ ...META, type: 'H5P.CoursePresentation', params: { slides: [
+      { elements: [{ library: 'H5P.AdvancedText', params: { text: '<h1>Water</h1>' }, x: 5, y: 5 }] }
+    ] } })).toEqual([
+      'params.slides: is a field of presentation, not of this level: write params.presentation.slides',
+      'params.slides[0].elements[0]: is sub-content, but here it goes inside an object, in its field action: write params.slides[0].elements[0] as { "action": { "library": "H5P.AdvancedText", "params": { … } }, "x": …, "y": … }',
+      expect.stringMatching(/^params\.slides\[0\]\.elements\[0\]\.params\.text: has <h1>, which this field does not take/)
+    ])
+    // What only the last check finds, inside what was moved, is said too, by where the source has
+    // it: a scenario's node with no next. And a question with no alternatives is not a loop.
+    expect(await problems({ ...META, type: 'H5P.BranchingScenario', params: { branchingScenario: { title: 'A complaint', content: [
+      { library: 'H5P.AdvancedText', params: { text: 'A customer calls.' } },
+      { type: { library: 'H5P.BranchingQuestion', params: { question: 'What do you say?' } } }
+    ] } } })).toEqual([
+      'params.branchingScenario.content[0]: is sub-content, but here it goes inside an object, in its field type: write params.branchingScenario.content[0] as { "type": { "library": "H5P.AdvancedText", "params": { … } } }',
+      'params.branchingScenario.content[1].type.params.question: is a field of branchingQuestion, not of this level: write params.branchingScenario.content[1].type.params.branchingQuestion.question',
+      'params.branchingScenario.content[1].type.params.branchingQuestion.alternatives: is required: write at least 2 items',
+      'params.branchingScenario.content[0].nextContentId: is required: the index in content of the node that follows, or -1 to end the scenario here'
+    ])
+  })
+
   it('takes sub-content by machine name, at the pack\'s version, with its title', async () => {
     const { content, manifest } = await build({
       ...META,
@@ -629,6 +669,24 @@ describe('the build', () => {
     expect((await exec(process.execPath, [bin, '-v'])).stdout).toMatch(/^@missing-elements\/h5p-author \d+\.\d+\.\d+, library pack \d+\.\d+\.\d+\n$/)
     await expect(exec(process.execPath, [bin, 'build', 'a.json', 'a.h5p', '--markdown'])).rejects.toMatchObject({ code: 1, stderr: 'h5p-author: build does not take --markdown\n' })
   }, 120_000)
+})
+
+describe('the package', () => {
+  it('carries the skill\'s type files, copied as it is packed, for a page to hand to a chat (#172)', async () => {
+    const skill = resolve(import.meta.dirname, '../../../skills/h5p-author/references/types')
+    const copied = resolve(import.meta.dirname, '../references/types')
+    const { stdout } = await exec(process.execPath, [resolve(import.meta.dirname, '../scripts/copy-type-files.mjs')])
+    const names = (await readdir(skill)).filter(name => name.endsWith('.md')).sort()
+    expect(names).toContain('H5P.InteractiveBook.md')
+    expect(stdout).toContain(`Copied ${names.length} type files`)
+    expect((await readdir(copied)).sort()).toEqual(names)
+    for (const name of names) expect(await readFile(join(copied, name), 'utf8'), name).toBe(await readFile(join(skill, name), 'utf8'))
+    // Packed and found: in `files`, copied by `prepack`, and each one an export of its own.
+    const manifest = JSON.parse(await readFile(resolve(import.meta.dirname, '../package.json'), 'utf8'))
+    expect(manifest.files).toContain('references')
+    expect(manifest.scripts.prepack).toContain('node scripts/copy-type-files.mjs')
+    expect(createRequire(import.meta.url).resolve('@missing-elements/h5p-author/references/types/H5P.InteractiveBook.md')).toBe(join(copied, 'H5P.InteractiveBook.md'))
+  })
 })
 
 describe('installing on an H5P site (#146)', () => {

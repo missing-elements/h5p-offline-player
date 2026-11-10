@@ -51,6 +51,19 @@ describe('loadLibraries', () => {
     expect(translations.find((report) => report.library.startsWith('H5P.InteractiveVideo '))?.translation).toBe('de')
   })
 
+  it('loads the only library a field takes, named or not, and reports its translation only where it is named (#172)', async () => {
+    // A book's chapters written without their H5P.Column: its semantics are what reads them as its
+    // parameters, and nothing is said of its translation, which the content does not use yet.
+    const unnamed = await loadLibraries(pack, { type: 'H5P.InteractiveBook', language: 'de', params: { chapters: [{ content: [] }] } })
+    expect(entryOf(unnamed.entries, 'H5P.Column')?.semantics).not.toBeNull()
+    expect(unnamed.translations.map((report) => report.library.split(' ')[0])).toEqual(['H5P.InteractiveBook'])
+    // Named, it is reported where it was before: after the content type, in the order named.
+    const named = await loadLibraries(pack, { type: 'H5P.InteractiveBook', language: 'de', params: { chapters: [{ library: 'H5P.Column', params: { content: [{ content: { library: 'H5P.TrueFalse', params: {} } }] } }] } })
+    expect(named.translations.map((report) => report.library.split(' ')[0])).toEqual(['H5P.InteractiveBook', 'H5P.Column', 'H5P.TrueFalse'])
+    // A field that takes several is left alone: Column's own content loads nothing it does not name.
+    expect(entryOf(named.entries, 'H5P.MultiChoice')).toMatchObject({ semantics: null })
+  })
+
   it('marks the fields a layout sets optional, and leaves the pack\'s own semantics as they are', async () => {
     const { entries } = await loadLibraries(pack, content)
     expect(fieldAt(entryOf(entries, 'H5P.Video')!.semantics as Field[], 'visuals.poster')?.optional).toBe(true)
