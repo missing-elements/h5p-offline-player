@@ -319,8 +319,12 @@ describe('any content type in the pack', () => {
   it('lists every problem a source has at once, each by its path, and writes nothing', async () => {
     expect(await problems({ ...META, type: 'H5P.Nope', params: {} })).toEqual(['type: the library pack has no content type H5P.Nope'])
     // A version is saved content's, which checkContent takes; a build plays the pack's newest (#162).
-    expect(await problems({ ...META, type: 'H5P.Blanks 1.14', params: {} })).toEqual(['type: takes the machine name alone, "H5P.Blanks": the version is the pack\'s newest'])
-    expect(await problems({ ...META, license: 'MIT', authors: [{ name: 'A' }], extra: 1, type: 'H5P.Blanks' })).toEqual([
+    // What is wrong in the content is said in the same round as what is wrong beside it (#174).
+    expect(await problems({ ...META, type: 'H5P.Blanks 1.14', params: {} })).toEqual([
+      'type: takes the machine name alone, "H5P.Blanks": the version is the pack\'s newest',
+      'params.questions: is required: write at least 1 item'
+    ])
+    expect(await problems({ ...META, license: 'MIT', authors: [{ name: 'A' }], extra: 1, type: 'H5P.Blanks', params: { questions: ['The *Danube* flows east.'] } })).toEqual([
       'extra: is not a field of a source; the fields are type, title, language, license, licenseVersion, authors, source, yearFrom, yearTo, params',
       expect.stringMatching(/^license: use one of/),
       'authors[0].role: use one of Author, Editor, Licensee, Originator'
@@ -345,10 +349,10 @@ describe('any content type in the pack', () => {
     expect(await problems({ ...META, type: 'H5P.InteractiveBook', params: { chapters: [
       { title: 'Sources', content: [{ library: 'H5P.AdvancedText', params: { text: 'A river begins at its source.' } }] }
     ] } })).toEqual([
-      'params.chapters[0]: is the params of sub-content, without the sub-content around them: write params.chapters[0] as { "library": "H5P.Column", "params": { "content": … } }',
-      'params.chapters[0].content[0]: is sub-content, but here it goes inside an object, in its field content: write params.chapters[0].content[0] as { "content": { "library": "H5P.AdvancedText", "params": { … } } }',
-      'params.chapters[0].title: is not a field here; the fields are content',
-      'params.chapters[0].metadata.title: is required: the chapter\'s name in the table of contents'
+      // Its title beside them is the chapter's own, shown where it goes (#174): it was two more
+      // problems, "is not a field here" and "metadata.title: is required".
+      'params.chapters[0]: is the params of sub-content, without the sub-content around them: write params.chapters[0] as { "library": "H5P.Column", "metadata": { "title": … }, "params": { "content": … } }',
+      'params.chapters[0].content[0]: is sub-content, but here it goes inside an object, in its field content: write params.chapters[0].content[0] as { "content": { "library": "H5P.AdvancedText", "params": { … } } }'
     ])
     // A chapter refused whole leaves the list shorter: no count of what is left, and nothing said
     // of the chapter after it under the index of the one refused.
@@ -375,6 +379,114 @@ describe('any content type in the pack', () => {
       'params.branchingScenario.content[1].type.params.branchingQuestion.alternatives: is required: write at least 2 items',
       'params.branchingScenario.content[0].nextContentId: is required: the index in content of the node that follows, or -1 to end the scenario here'
     ])
+  })
+
+  it('checks the content in the same build as the source\'s own fields, and takes what its outer shape plainly means (#174)', async () => {
+    // A book as Gemini wrote it from a link to the skill and none of its text: the content type as
+    // `contentType`, the source's own fields in `metadata`, as H5P keeps them, and sub-content that
+    // names its library the same way. It was seven problems, all of the outer shape, and the round
+    // after thirty, three an item, one of them a list of 35 libraries.
+    expect(await problems({
+      contentType: 'H5P.InteractiveBook',
+      metadata: { title: 'Physics', license: 'CC BY', authors: [{ name: 'Ann Author', role: 'Author' }], defaultLanguage: 'en' },
+      params: { chapters: [{ title: 'Newton', content: [{ contentType: 'H5P.AdvancedText', params: { text: '<h1>F = ma</h1>' } }] }] }
+    })).toEqual([
+      'contentType: is not a field of a source: the content type is its type: write "type": "H5P.InteractiveBook"',
+      'metadata: is not a field of a source: title, license, authors are written beside type, not in an object: write "title": …, "license": …, "authors": … at the top',
+      'metadata.defaultLanguage: is not a field of a source; the fields are type, title, language, license, licenseVersion, authors, source, yearFrom, yearTo, params',
+      'language: expected a BCP 47 language tag, such as "en" or "de-AT"',
+      'params.chapters[0]: is the params of sub-content, without the sub-content around them: write params.chapters[0] as { "library": "H5P.Column", "metadata": { "title": … }, "params": { "content": … } }',
+      'params.chapters[0].content[0]: is sub-content, but here it goes inside an object, in its field content: write params.chapters[0].content[0] as { "content": { "library": "H5P.AdvancedText", "params": { … } } }',
+      expect.stringMatching(/^params\.chapters\[0\]\.content\[0\]\.params\.text: has <h1>, which this field does not take/)
+    ])
+    // As the weakest model wrote one with no skill: the content's fields beside `type`, the type
+    // by the name it is spoken of. Each round had gone to one of these, with nothing inside looked at.
+    const chapter = { library: 'H5P.Column', metadata: { title: 'Newton' }, params: { content: [{ content: { library: 'H5P.AdvancedText', params: { text: 'F = ma' } } }] } }
+    expect(await problems({ type: 'interactive-book', title: 'Physics', chapters: [chapter, 'Einstein'] })).toEqual([
+      'params: is not written: the content\'s fields go in it, not beside type: write "params": { "chapters": … }',
+      'type: takes the machine name, "H5P.InteractiveBook"',
+      'language: expected a BCP 47 language tag, such as "en" or "de-AT"',
+      expect.stringMatching(/^license: use one of/),
+      'authors: name at least one author: [{ "name": "…", "role": "Author" }]',
+      'params.chapters[1]: expected sub-content, { "library": "H5P.Column", "params": { … } }'
+    ])
+    // With `params` written, what is beside `type` is no field of the content.
+    expect(await problems({ ...META, type: 'H5P.InteractiveBook', chapters: [], params: { chapters: [chapter] } })).toEqual([
+      'chapters: is not a field of a source; the fields are type, title, language, license, licenseVersion, authors, source, yearFrom, yearTo, params'
+    ])
+    // A source's own field that the top has too is said so, and a year in the object is taken.
+    expect(await problems({ ...META, type: 'H5P.InteractiveBook', metadata: { title: 'Other', yearFrom: 2020 }, params: { chapters: [chapter] } })).toEqual([
+      'metadata: is not a field of a source: yearFrom is written beside type, not in an object: write "yearFrom": … at the top',
+      'metadata.title: is written beside type already'
+    ])
+
+    // A type named as it is spoken of is the one type of those letters; one that is none has the nearest named.
+    expect(await problems({ ...META, type: 'Question Set', params: { questions: [{ library: 'H5P.TrueFalse', params: { question: 'Yes?', correct: 'true' } }] } })).toEqual(['type: takes the machine name, "H5P.QuestionSet"'])
+    expect(await problems({ ...META, type: 'book', params: {} })).toEqual(['type: the library pack has no content type book; nearest: H5P.InteractiveBook'])
+    expect(await problems({ ...META, type: 'fill-in-the-blanks', params: {} })).toEqual(['type: the library pack has no content type fill-in-the-blanks; nearest: H5P.Blanks'])
+    // "Question Set 2" is no Question Set: a number with no point is no version.
+    expect(await problems({ ...META, type: 'Question Set 2', params: {} })).toEqual(['type: the library pack has no content type Question Set 2'])
+    // Two keys that each name a type: neither is taken for it. A text under another key is no
+    // name of the type, however it reads, nor is an object other than `metadata` the source's
+    // own fields: Question Set's `introPage` has a title too.
+    expect(await problems({ ...META, contentType: 'H5P.Blanks', library: 'H5P.DragText', params: {} })).toEqual([
+      expect.stringMatching(/^contentType: is not a field of a source; the fields are/),
+      expect.stringMatching(/^library: is not a field of a source; the fields are/),
+      'type: expected a content type\'s machine name, such as "H5P.Blanks"'
+    ])
+    expect(await problems({ ...META, description: 'Summary', params: {} })).toEqual([
+      expect.stringMatching(/^description: is not a field of a source; the fields are/),
+      'type: expected a content type\'s machine name, such as "H5P.Blanks"'
+    ])
+    expect(await problems({ ...META, title: undefined, type: 'H5P.QuestionSet', introPage: { showIntroPage: true, title: 'Welcome' }, questions: [{ library: 'H5P.TrueFalse', params: { question: 'Yes?', correct: 'true' } }] })).toEqual([
+      'params: is not written: the content\'s fields go in it, not beside type: write "params": { "introPage": …, "questions": … }',
+      'title: expected the activity\'s title'
+    ])
+
+    // Sub-content with its library under another key and its parameters beside it, in a field
+    // that takes several libraries: the parameters of the one it names, checked as such.
+    expect(await problems({ ...META, type: 'H5P.QuestionSet', params: { questions: [
+      { type: 'H5P.MultiChoice', question: 'Which?', answers: [{ text: 'a', correct: true }, { text: 'b', correct: false }], sideways: 1 }
+    ] } })).toEqual([
+      'params.questions[0]: is the params of sub-content, without the sub-content around them: write params.questions[0] as { "library": "H5P.MultiChoice", "params": { "question": … } }',
+      expect.stringMatching(/^params\.questions\[0\]\.sideways: is not a field here; the fields are media, question, answers/)
+    ])
+    // The same in the place of the group that holds it: what is no field of the group is its parameters.
+    expect(await problems({ ...META, type: 'H5P.CoursePresentation', params: { presentation: { slides: [
+      { elements: [{ type: 'H5P.AdvancedText', x: 5, y: 5, width: 90, height: 20, text: '<h1>Water</h1>' }] }
+    ] } } })).toEqual([
+      'params.presentation.slides[0].elements[0]: is sub-content, but here it goes inside an object, in its field action: write params.presentation.slides[0].elements[0] as { "action": { "library": "H5P.AdvancedText", "params": { … } }, "x": …, "y": …, "width": …, "height": … }',
+      expect.stringMatching(/^params\.presentation\.slides\[0\]\.elements\[0\]\.text: has <h1>, which this field does not take/)
+    ])
+    // A name under `type` or `contentType` written loosely, in a field that takes several
+    // libraries: the library it names is loaded, so what is written for it is checked against its
+    // fields in the same round, and not against none.
+    expect(await problems({ ...META, type: 'H5P.Column', params: { content: [{ type: 'advancedtext', text: '<h1>Hi</h1>' }, { content: { contentType: 'advanced-text', params: { text: '<h1>Hi</h1>' } } }] } })).toEqual([
+      'params.content[0]: is sub-content, but here it goes inside an object, in its field content: write params.content[0] as { "content": { "library": "H5P.AdvancedText", "params": { … } } }',
+      expect.stringMatching(/^params\.content\[0\]\.text: has <h1>, which this field does not take/),
+      'params.content[1].content.contentType: is the sub-content\'s library: write "library": "H5P.AdvancedText"',
+      expect.stringMatching(/^params\.content\[1\]\.content\.params\.text: has <h1>, which this field does not take/)
+    ])
+    // A title beside sub-content in its group's place is its own, with `library` or another key.
+    expect(await problems({ ...META, type: 'H5P.Column', params: { content: [{ library: 'H5P.AdvancedText', title: 'One', params: { text: 'x' } }, { type: 'H5P.AdvancedText', title: 'Two', text: 'y' }] } })).toEqual([
+      'params.content[0]: is sub-content, but here it goes inside an object, in its field content: write params.content[0] as { "content": { "library": "H5P.AdvancedText", "params": { … } } }',
+      'params.content[0].title: is the sub-content\'s title, which is in its metadata: write "metadata": { "title": … }',
+      'params.content[1]: is sub-content, but here it goes inside an object, in its field content: write params.content[1] as { "content": { "library": "H5P.AdvancedText", "params": { … } } }',
+      'params.content[1].title: is the sub-content\'s title, which is in its metadata: write "metadata": { "title": … }'
+    ])
+    // A library named loosely, or with a version of three parts, a title beside `library`, and
+    // two keys that each name a library.
+    expect(await problems({ ...META, type: 'H5P.Column', params: { content: [{ content: { library: 'advancedtext', params: { text: 'x' } } }, { content: { library: 'H5P.AdvancedText 1.1.5', params: { text: 'x' } } }] } })).toEqual([
+      'params.content[0].content.library: takes the machine name, "H5P.AdvancedText"',
+      'params.content[1].content.library: takes the machine name, "H5P.AdvancedText"'
+    ])
+    expect(await problems({ ...META, type: 'H5P.InteractiveBook', params: { chapters: [{ ...chapter, metadata: undefined, title: 'Newton' }] } })).toEqual([
+      'params.chapters[0].title: is the sub-content\'s title, which is in its metadata: write "metadata": { "title": … }'
+    ])
+    expect(await problems({ ...META, type: 'H5P.QuestionSet', params: { questions: [{ type: 'H5P.MultiChoice', contentType: 'H5P.TrueFalse', question: 'Which?' }] } })).toEqual([
+      expect.stringMatching(/^params\.questions\[0\]: expected sub-content, \{ "library": "…", "params": \{ … \} \}, of H5P\.MultiChoice, /)
+    ])
+    expect((await readdir(dir)).filter(name => name.startsWith('failed-') || name.startsWith('.h5p-author-'))).toEqual([])
   })
 
   it('takes sub-content by machine name, at the pack\'s version, with its title', async () => {

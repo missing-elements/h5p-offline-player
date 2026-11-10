@@ -322,17 +322,137 @@ describe('content authored from semantics', () => {
       metadata: (entry, written) => ({ contentType: entry.library.title, title: written?.title })
     })
     expect(problems.map(({ path, message }) => `${path}: ${message}`)).toEqual([
-      'params.chapters[0]: is the params of sub-content, without the sub-content around them: write params.chapters[0] as { "library": "H5P.AdvancedText", "params": { "text": … } }',
+      // A title beside them that is no field of the library is the sub-content's own (#174).
+      'params.chapters[0]: is the params of sub-content, without the sub-content around them: write params.chapters[0] as { "library": "H5P.AdvancedText", "metadata": { "title": … }, "params": { "text": … } }',
       expect.stringMatching(/^params\.chapters\[0\]\.text: has <h1>, which this field does not take/),
-      'params.chapters[0].title: is not a field here; the fields are text',
-      'params.chapters[1]: is the params of sub-content, without the sub-content around them: write params.chapters[1] as { "library": "H5P.AdvancedText", "params": { "text": … }, "metadata": { … } }'
+      'params.chapters[1]: is the params of sub-content, without the sub-content around them: write params.chapters[1] as { "library": "H5P.AdvancedText", "metadata": { … }, "params": { "text": … } }'
     ])
+    expect(params.chapters[0].metadata.title).toBe('First')
     expect(params.chapters[1]).toMatchObject({ library: 'H5P.AdvancedText 1.1', params: { text: '<div>Two</div>' }, metadata: { title: 'Second' } })
     expect(moved).toEqual([{ from: 'params.chapters[0]', to: 'params.chapters[0].params' }, { from: 'params.chapters[1]', to: 'params.chapters[1].params' }])
     expect(shortened).toEqual([])
     // Not where the field takes several libraries, or none of what is written is a field of the one.
     const other = generate(book, { chapters: [{ heading: 'One' }] }, [TEXT], STRICT)
     expect(other.problems).toEqual([{ path: 'params.chapters[0]', message: 'expected sub-content, { "library": "H5P.AdvancedText", "params": { … } }' }])
+  })
+
+  it('takes sub-content that names its library under another key, its params in params or beside the name (#174)', () => {
+    const CHOICE = { machineName: 'H5P.MultiChoice', minor: 16, title: 'Multiple Choice', semantics: [{ name: 'question', type: 'text', label: 'Question' }] }
+    const titled: GeneratorOptions = { ...STRICT, metadata: (entry, written) => ({ contentType: entry.library.title, title: written?.title }) }
+    const show = (problems: { path: string, message: string }[]) => problems.map(({ path, message }) => `${path}: ${message}`)
+    // A field that takes two libraries: the one text in the object that names one says which.
+    const set = [{ name: 'questions', type: 'list', min: 1, field: { name: 'question', type: 'library', options: ['H5P.MultiChoice 1.16', 'H5P.AdvancedText 1.1'] } }]
+    const { params, problems, moved } = generate(set, { questions: [
+      { contentType: 'H5P.MultiChoice', params: { question: 'Which?', sideways: 1 } },
+      { type: 'advancedtext', text: '<h1>Two</h1>', title: 'Second' },
+      { type: 'H5P.MultiChoice', contentType: 'H5P.AdvancedText', question: 'Which?' },
+      { type: 'essay', question: 'Why?' }
+    ] }, [TEXT, CHOICE], titled)
+    expect(show(problems)).toEqual([
+      'params.questions[0].contentType: is the sub-content\'s library: write "library": "H5P.MultiChoice"',
+      'params.questions[0].params.sideways: is not a field here; the fields are question',
+      // Beside the name, they are its parameters, and a title that is no field of it its own.
+      'params.questions[1]: is the params of sub-content, without the sub-content around them: write params.questions[1] as { "library": "H5P.AdvancedText", "metadata": { "title": … }, "params": { "text": … } }',
+      expect.stringMatching(/^params\.questions\[1\]\.text: has <h1>, which this field does not take/),
+      // Two keys that each name a library, and a name that is none the field takes: nothing is guessed.
+      'params.questions[2]: expected sub-content, { "library": "…", "params": { … } }, of H5P.MultiChoice, H5P.AdvancedText',
+      'params.questions[3]: expected sub-content, { "library": "…", "params": { … } }, of H5P.MultiChoice, H5P.AdvancedText'
+    ])
+    expect(params.questions[0]).toMatchObject({ library: 'H5P.MultiChoice 1.16', params: { question: 'Which?' } })
+    expect(params.questions[1]).toMatchObject({ library: 'H5P.AdvancedText 1.1', params: { text: '<h1>Two</h1>' }, metadata: { title: 'Second' } })
+    expect(moved).toEqual([{ from: 'params.questions[1]', to: 'params.questions[1].params' }])
+
+    // Under another key than type or contentType a text is no name: a field's only library takes
+    // it as its own, `{ "text": "H5P.AdvancedText" }` its text, and a title "Text" is a title.
+    const only = [{ name: 'intro', type: 'library', options: ['H5P.AdvancedText 1.1'] }]
+    const named = generate(only, { intro: { text: 'H5P.AdvancedText' } }, [TEXT, CHOICE], STRICT)
+    expect(show(named.problems)).toEqual(['params.intro: is the params of sub-content, without the sub-content around them: write params.intro as { "library": "H5P.AdvancedText", "params": { "text": … } }'])
+    expect(named.params.intro).toMatchObject({ library: 'H5P.AdvancedText 1.1', params: { text: '<div>H5P.AdvancedText</div>' } })
+    const textTitled = generate(set, { questions: [{ contentType: 'H5P.AdvancedText', title: 'Text', params: { text: 'One' } }] }, [{ ...TEXT, machineName: 'H5P.Text' }, TEXT, CHOICE], titled)
+    expect(show(textTitled.problems)).toEqual([
+      'params.questions[0].contentType: is the sub-content\'s library: write "library": "H5P.AdvancedText"',
+      'params.questions[0].title: is the sub-content\'s title, which is in its metadata: write "metadata": { "title": … }'
+    ])
+    expect(textTitled.params.questions[0]).toMatchObject({ library: 'H5P.AdvancedText 1.1', params: { text: '<div>One</div>' }, metadata: { title: 'Text' } })
+
+    // A version written with the name is kept, where the field takes two majors of the library:
+    // what is written is checked against the major it names, not the first one the field takes.
+    const CHILD = { machineName: 'H5P.Child', semantics: [{ name: 'old', type: 'text' }] }
+    const CHILD2 = { machineName: 'H5P.Child', major: 2, semantics: [{ name: 'new', type: 'text' }] }
+    const both = [{ name: 'child', type: 'library', options: ['H5P.Child 1.0', 'H5P.Child 2.0'] }]
+    const second = generate(both, { child: { type: 'H5P.Child 2.0', params: { new: 'x' } } }, [CHILD, CHILD2], STRICT)
+    expect(show(second.problems)).toEqual(['params.child.type: is the sub-content\'s library: write "library": "H5P.Child 2.0"'])
+    expect(second.params.child).toMatchObject({ library: 'H5P.Child 2.0', params: { new: 'x' } })
+    const flat = generate(both, { child: { contentType: 'H5P.Child 2.0', new: 'x' } }, [CHILD, CHILD2], STRICT)
+    expect(show(flat.problems)).toEqual(['params.child: is the params of sub-content, without the sub-content around them: write params.child as { "library": "H5P.Child 2.0", "params": { "new": … } }'])
+    expect(flat.params.child).toMatchObject({ library: 'H5P.Child 2.0', params: { new: 'x' } })
+    // A major the field does not take is left off, and the field's first is taken.
+    const none = generate(both, { child: { type: 'H5P.Child 3.0', params: { old: 'x' } } }, [CHILD, CHILD2], STRICT)
+    expect(show(none.problems)).toEqual(['params.child.type: is the sub-content\'s library: write "library": "H5P.Child"'])
+
+    // In the place of the group that holds it, what is no field of the group is its parameters,
+    // named by where the source has them; with `params` written, it stays what it is.
+    const slide = [{ name: 'elements', type: 'list', field: { name: 'element', type: 'group', fields: [
+      { name: 'action', type: 'library', options: ['H5P.AdvancedText 1.1', 'H5P.MultiChoice 1.16'] },
+      { name: 'x', type: 'number', default: 0 }
+    ] } }]
+    const held = generate(slide, { elements: [
+      { type: 'H5P.AdvancedText', x: 5, text: '<h1>One</h1>' },
+      { contentType: 'H5P.MultiChoice 1.16', params: { question: 'Which?' }, colour: 'red' }
+    ] }, [TEXT, CHOICE], STRICT)
+    expect(show(held.problems)).toEqual([
+      'params.elements[0]: is sub-content, but here it goes inside an object, in its field action: write params.elements[0] as { "action": { "library": "H5P.AdvancedText", "params": { … } }, "x": … }',
+      expect.stringMatching(/^params\.elements\[0\]\.text: has <h1>, which this field does not take/),
+      'params.elements[1]: is sub-content, but here it goes inside an object, in its field action: write params.elements[1] as { "action": { "library": "H5P.MultiChoice 1.16", "params": { … } } }',
+      'params.elements[1].colour: is not a field here; the fields are action, x'
+    ])
+    expect(held.params.elements[0]).toMatchObject({ x: 5, action: { library: 'H5P.AdvancedText 1.1', params: { text: '<h1>One</h1>' } } })
+
+    // A title beside it, with its parameters beside the name, in `params` or with `library`, is
+    // its own where it is no field of the group or of its library: its `metadata.title`, said
+    // where it is written, and not a field of the group or a parameter.
+    const titledHeld = generate(slide, { elements: [
+      { type: 'H5P.AdvancedText', title: 'One', text: 'First' },
+      { contentType: 'H5P.AdvancedText', title: 'Two', params: { text: 'Second' } },
+      { library: 'H5P.AdvancedText', title: 'Three', params: { text: 'Third' } }
+    ] }, [TEXT, CHOICE], titled)
+    expect(show(titledHeld.problems)).toEqual([
+      'params.elements[0]: is sub-content, but here it goes inside an object, in its field action: write params.elements[0] as { "action": { "library": "H5P.AdvancedText", "params": { … } } }',
+      'params.elements[0].title: is the sub-content\'s title, which is in its metadata: write "metadata": { "title": … }',
+      'params.elements[1]: is sub-content, but here it goes inside an object, in its field action: write params.elements[1] as { "action": { "library": "H5P.AdvancedText", "params": { … } } }',
+      'params.elements[1].title: is the sub-content\'s title, which is in its metadata: write "metadata": { "title": … }',
+      'params.elements[2]: is sub-content, but here it goes inside an object, in its field action: write params.elements[2] as { "action": { "library": "H5P.AdvancedText", "params": { … } } }',
+      'params.elements[2].title: is the sub-content\'s title, which is in its metadata: write "metadata": { "title": … }'
+    ])
+    expect(titledHeld.params.elements.map((element: { action: unknown }) => element.action)).toMatchObject([
+      { params: { text: '<div>First</div>' }, metadata: { title: 'One' } }, { params: { text: '<div>Second</div>' }, metadata: { title: 'Two' } }, { params: { text: '<div>Third</div>' }, metadata: { title: 'Three' } }
+    ])
+    // A library with a title of its own takes the one beside its parameters as that.
+    const CARDS = { machineName: 'H5P.Dialogcards', minor: 9, semantics: [{ name: 'title', type: 'text', optional: true }, { name: 'description', type: 'text', optional: true }] }
+    const cards = generate([{ name: 'elements', type: 'list', field: { name: 'element', type: 'group', fields: [{ name: 'action', type: 'library', options: ['H5P.Dialogcards 1.9'] }, { name: 'x', type: 'number', default: 0 }] } }],
+      { elements: [{ type: 'H5P.Dialogcards', title: 'Words', description: 'Learn them' }] }, [CARDS], titled)
+    expect(show(cards.problems)).toEqual(['params.elements[0]: is sub-content, but here it goes inside an object, in its field action: write params.elements[0] as { "action": { "library": "H5P.Dialogcards", "params": { … } } }'])
+    expect(cards.params.elements[0].action).toMatchObject({ params: { title: 'Words', description: 'Learn them' } })
+    // The nearer move first, so that what a later check finds in the parameters is named where they are written.
+    expect(held.moved).toEqual([
+      { from: 'params.elements[0]', to: 'params.elements[0].action.params' }, { from: 'params.elements[0]', to: 'params.elements[0].action' },
+      { from: 'params.elements[1]', to: 'params.elements[1].action' }
+    ])
+
+    // `library` written loosely is the one library of those letters the field takes, and a title beside it the sub-content's.
+    const loose = generate(set, { questions: [
+      { library: 'multichoice', params: { question: 'Which?' } },
+      { library: 'H5P.MultiChoice', title: 'First', params: { question: 'Which?' } }
+    ] }, [TEXT, CHOICE], titled)
+    expect(show(loose.problems)).toEqual([
+      'params.questions[0].library: takes the machine name, "H5P.MultiChoice"',
+      'params.questions[1].title: is the sub-content\'s title, which is in its metadata: write "metadata": { "title": … }'
+    ])
+    expect(loose.params.questions.map(({ library }: { library: string }) => library)).toEqual(['H5P.MultiChoice 1.16', 'H5P.MultiChoice 1.16'])
+    expect(loose.params.questions[1].metadata.title).toBe('First')
+    // Saved content is as it is: a name under another key is no library of it.
+    const saved = generate(set, { questions: [{ contentType: 'H5P.MultiChoice', params: { question: 'Which?' } }] }, [TEXT, CHOICE], { saved: true })
+    expect(show(saved.problems)).toEqual(['params.questions[0]: expected sub-content, { "library": "…", "params": { … } }, of H5P.MultiChoice, H5P.AdvancedText'])
   })
 
   it('says where a field written above the group that has it belongs, and checks it there in the same round (#172)', () => {

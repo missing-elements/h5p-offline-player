@@ -1,9 +1,10 @@
 import { BlobReader, BlobWriter, ZipWriter } from '@zip.js/zip.js'
 import { crc32 } from '@missing-elements/h5p-normalize/crc32'
 import { packLibrariesIn } from '@missing-elements/h5p-offline-player/plan'
-import { composePackage, readSource, writePackage } from './build.mjs'
+import { composePackage, sourceOf, typeNames, writePackage } from './build.mjs'
 import { MediaStore } from './media.mjs'
 import { Pack } from './pack.mjs'
+import { SourceError } from './source-error.mjs'
 
 export * from './core.mjs'
 
@@ -154,11 +155,13 @@ export async function buildPackage(input, options) {
   secure()
   const { libraries, files = {}, fetch: fetchImpl = pageFetch } = options ?? {}
   if (!libraries) throw new TypeError('Name the library pack: a pack openPack opened, the pack export of @missing-elements/h5p-libraries, or the address of a copy of its parts/ folder')
-  const source = readSource(input)
   const pack = libraries instanceof Pack ? libraries : await openPack(libraries)
   try {
+    // With the pack's names, as the command's build reads a source (#174).
+    const read = sourceOf(input, typeNames(pack))
+    if (!read.typed) throw new SourceError(read.problems)
     const media = new MediaStore(pageMedia(files), { fetch: fetchImpl })
-    const built = await composePackage(source, pack, media)
+    const built = await composePackage(read.source, pack, media, read.problems)
     const writer = new ZipWriter(new BlobWriter('application/zip'), { useWebWorkers: false })
     await writePackage(writer, built, pack, async () => {
       for (const item of media.files) {

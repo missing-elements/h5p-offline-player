@@ -5,10 +5,11 @@ import { Readable, Writable } from 'node:stream'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { Uint8ArrayReader, ZipWriter } from '@zip.js/zip.js'
 import { normalizeArchive } from '@missing-elements/h5p-normalize'
-import { composePackage, readSource, writePackage } from './build.mjs'
+import { composePackage, sourceOf, typeNames, writePackage } from './build.mjs'
 import { bundleLibraries, contentTypes } from './bundle.mjs'
 import { MediaStore } from './media.mjs'
 import { Pack } from './pack.mjs'
+import { SourceError } from './source-error.mjs'
 
 /**
  * What only Node does of a build: the pack read from disk, a source's files read beside it and
@@ -142,13 +143,16 @@ export async function buildPackage(input, output, options = {}) {
   // Before any work, and again as the package lands, for a file that appears in between.
   if (await lstat(output).then(() => true, () => false)) throw exists(output)
   if (!(await stat(dirname(output)).catch(() => null))?.isDirectory()) throw new Error(`${dirname(output)} is not a folder to write the package in`)
-  const source = readSource(input)
   const pack = await openPack(options.libraries)
   let temporary
   try {
+    // With the pack's names, so that a content type named loosely is known, and the content of a
+    // source whose own fields have problems is checked in the same round (#174).
+    const read = sourceOf(input, typeNames(pack))
+    if (!read.typed) throw new SourceError(read.problems)
     temporary = await mkdtemp(join(dirname(output), '.h5p-author-'))
     const media = new MediaStore(nodeMedia({ base: options.base ?? process.cwd(), temporary }), { fetch: options.fetch })
-    const built = await composePackage(source, pack, media)
+    const built = await composePackage(read.source, pack, media, read.problems)
     const staged = join(temporary, 'package.h5p')
     const file = await open(staged, 'wx')
     try {
