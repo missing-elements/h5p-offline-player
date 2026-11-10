@@ -140,9 +140,9 @@ files it writes for each kind of host, and the SCORM package it can write instea
 
 The player ships the demo's page styles as `@missing-elements/h5p-offline-player/page.css`: its
 colours for light and dark, the bar, buttons, the status strip and the player's box while it
-loads; `dist/mark.svg` is the mark. `h5p-verify --preview`, the H5P Preview extension and
-the build page draw their pages with it, and a page of your own can, through a bundler that takes
-CSS (Vite, webpack 5 with a CSS loader):
+loads; `dist/mark.svg` is the mark. `h5p-verify --preview` and the H5P Preview extension draw
+their pages with it, and a page of your own can, through a bundler that takes CSS (Vite, webpack 5
+with a CSS loader):
 
 ```js
 import '@missing-elements/h5p-offline-player/page.css'

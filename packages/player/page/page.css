@@ -1,7 +1,7 @@
 /* The page around the player, as the demo draws it: its colours for light and dark, the bar with
    the mark and a byline, buttons, the status strip with its state dot and timer, the player's box
    while it loads, cards and messages. Shipped with the player so that every page that holds it —
-   the demo, h5p-verify's preview, the H5P Preview extension's page, the build page — looks
+   the demo, h5p-verify's preview, the H5P Preview extension's page — looks
    the same and cannot drift: the demo imports this file and adds its own rules after it. Plain
    CSS, nothing reaches into the element; the one rule that names it sets its box. A page sets
    `data-theme="light"` or `"dark"` on <html> to pin a theme, and follows the system without. */
@@ -255,7 +255,7 @@ label.file {
   transition: background var(--ease), border-color var(--ease), transform var(--ease);
 }
 
-/* A link drawn as a button, `<a class="button">`: the verifier's Download, the build page's. */
+/* A link drawn as a button, `<a class="button">`: the verifier's Download. */
 .button { text-decoration: none; }
 button:hover, .button:hover, label.file:hover { background: var(--surface-2); }
 button:active, .button:active, label.file:active { transform: translateY(1px); }

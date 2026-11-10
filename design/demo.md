@@ -298,8 +298,10 @@ SPA-fallback trap described above cannot happen there.
   dark, the bar, the buttons, the status strip, the player's box, cards and messages moved from
   `player-page.css` to `packages/player/page/page.css`, which the player ships in `dist/` and the
   demo imports first; the config aliases the package path to the source, as it does the element's.
-  The verifier's preview, the extension's page and the build page import the same file, so
-  the pages around the player look the same and cannot drift from the demo. The bar's three-column
+  The verifier's preview and the extension's page import the same file, so the pages around the
+  player look the same and cannot drift from the demo. The build page is not one of them: on
+  missing-elements.github.io since 2026-11-10, it takes that site's own look (*Where `npx` cannot
+  install, a page builds*, design/author.md). The bar's three-column
   grid applies to a bar with a nav (`.topbar:has(nav)`): a bar of a brand and its actions keeps the
   actions at its end. The owner asked for it on 2026-11-10, after the verifier's preview opened in
   Claude's browser panel in the browser's system styles.

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.0
+
+The page around the player takes the look of the player's demo site and of h5p-verify's preview:
+their colours, and the player's box while a package loads. It follows VS Code's theme, light or
+dark, a high-contrast theme taken as the one it is built on, and changes with it while a package
+plays, without reloading it. The bar above keeps VS Code's own colours.
+
+A package with an empty file plays. The player answered every empty file with an error, so a
+library that loads an empty script failed to load, and an empty picture or language file was
+missing. A package that lacks libraries now names each one once, where an old export listed some
+dozens of times. Player 1.6.0 and library pack 1.1.0 inside; the pack plays the same libraries as
+in 0.4.0.
+
 ## 0.4.0
 
 The library pack inside is 1.0.1, with the H5P hub's newer Branching Scenario, Flashcards, Memory
