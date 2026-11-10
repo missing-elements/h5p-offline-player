@@ -24,7 +24,7 @@ Two columns of pictures; the learner drags each one on the left onto its match o
 
 ## Fields of H5P.ImagePair 1.4
 
-A source names its own `title`, `language`, `license` and `authors` beside `type` and `params`, which holds the fields below: the build refuses one without any of them. The author's name is the user's to give: ask for it when they have not.
+The example is `type` and `params` alone, and `params` holds the fields below. A source also names its own `title`, `language`, `license` and `authors`, all four required: the build refuses a source that leaves out any of them. The author's name is the user's to give: ask for it when they have not.
 
 - `taskDescription` text = "Drag images from the left to match them with… — Task Description: A guide telling the user how to solve this task.
 - `cards` list 2–100 of, required — Cards

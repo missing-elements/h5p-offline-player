@@ -281,6 +281,8 @@ describe('the schema a source is written from', () => {
     const type = schemaMarkdown({ machineName: 'H5P.Test', majorVersion: 1, minorVersion: 2, runnable: 1 }, semantics)
     expect(type.startsWith(`${GENERATED_START}\n\n## Fields of H5P.Test 1.2\n\n${SOURCE_FIELDS}\n\n- `)).toBe(true)
     for (const field of ['`title`', '`language`', '`license`', '`authors`']) expect(SOURCE_FIELDS).toContain(field)
+    expect(SOURCE_FIELDS).toContain('all four required')
+    expect(SOURCE_FIELDS).toContain('The example is `type` and `params` alone')
     expect(SOURCE_FIELDS).toContain('ask for it')
     expect(schemaMarkdown({ machineName: 'H5P.Test', majorVersion: 1, minorVersion: 2, runnable: 0 }, semantics)).not.toContain(SOURCE_FIELDS)
   })

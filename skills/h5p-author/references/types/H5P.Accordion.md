@@ -22,7 +22,7 @@ Text in panels that open on a click, for reference material a learner looks up. 
 
 ## Fields of H5P.Accordion 1.0
 
-A source names its own `title`, `language`, `license` and `authors` beside `type` and `params`, which holds the fields below: the build refuses one without any of them. The author's name is the user's to give: ask for it when they have not.
+The example is `type` and `params` alone, and `params` holds the fields below. A source also names its own `title`, `language`, `license` and `authors`, all four required: the build refuses a source that leaves out any of them. The author's name is the user's to give: ask for it when they have not.
 
 - `panels` list 1–100 of, required — Panels
   - `title` text, required — Title

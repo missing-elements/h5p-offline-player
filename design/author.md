@@ -479,7 +479,9 @@ to 3,000. Nineteen things the code does not say by itself:
   `SKILL.md` asks before the source is written, step 2's first point says every source names the
   four, and `schemaMarkdown` writes the same under each content type's Fields heading
   (`SOURCE_FIELDS`; not a part's, which is sub-content), for a chat that has the type file
-  alone, as the build page hands it over. Measured on Haiku in the chat stand-in (a fetch tool
+  alone, as the build page hands it over. It says the example is `type` and `params` alone rather
+  than the example holding the four: a name written in an example would be copied as the author
+  and build, where the model is to ask. Measured on Haiku in the chat stand-in (a fetch tool
   that opens only whole addresses, npm cut off, a user who answers when asked), a Question Set
   asked for with no author named: with 0.9.1's text two of three runs asked, from the brief's
   list, and the third wrote "Quiz author" and built; with this text all three asked before

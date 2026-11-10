@@ -24,7 +24,7 @@ The learner builds a summary statement by statement, picking the true one from e
 
 ## Fields of H5P.Summary 1.10
 
-A source names its own `title`, `language`, `license` and `authors` beside `type` and `params`, which holds the fields below: the build refuses one without any of them. The author's name is the user's to give: ask for it when they have not.
+The example is `type` and `params` alone, and `params` holds the fields below. A source also names its own `title`, `language`, `license` and `authors`, all four required: the build refuses a source that leaves out any of them. The author's name is the user's to give: ask for it when they have not.
 
 - `intro` html: strong em u a ul ol h2 h3 hr pre code = "Choose the correct statement." — Introduction text: Will be displayed above the summary task.
 - `summaries` list 1–100 of, required — Summary
