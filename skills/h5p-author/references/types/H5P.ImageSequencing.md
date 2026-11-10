@@ -24,6 +24,8 @@ Pictures shown shuffled, which the learner puts in order: stages of a process, a
 
 ## Fields of H5P.ImageSequencing 1.1
 
+A source names its own `title`, `language`, `license` and `authors` beside `type` and `params`, which holds the fields below: the build refuses one without any of them. The author's name is the user's to give: ask for it when they have not.
+
 - `taskDescription` text = "Drag to arrange the images in the correct se… — Task Description: A guide telling the user how to solve this task.
 - `altTaskDescription` text = "Make the following list be ordered correctly… — Alternate Task Description: A guide intended for visually impaired users on how to solve this task.
 - `sequenceImages` list 3+ of, required — Images

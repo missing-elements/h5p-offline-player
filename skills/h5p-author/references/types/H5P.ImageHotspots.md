@@ -26,6 +26,8 @@ A picture with spots that open text, a picture, audio or video when clicked: a l
 
 ## Fields of H5P.ImageHotspots 1.11
 
+A source names its own `title`, `language`, `license` and `authors` beside `type` and `params`, which holds the fields below: the build refuses one without any of them. The author's name is the user's to give: ask for it when they have not.
+
 - `image` image file, required — Background image
 - `backgroundImageAltText` text — Alternative text for background image: If the browser can't load the image this text will be displayed instead. Also used by assistive technologies.
 - `globalIconType` one of "icon" | "image" | "numbers" = "icon" — Global hotspot Icon

@@ -24,6 +24,8 @@ Cards face down, turned two at a time, until every pair is found.
 
 ## Fields of H5P.MemoryGame 1.3
 
+A source names its own `title`, `language`, `license` and `authors` beside `type` and `params`, which holds the fields below: the build refuses one without any of them. The author's name is the user's to give: ask for it when they have not.
+
 - `cards` list 2–100 of, required — Cards
   - `image` image file, required — Image
   - `imageAlt` text, required — Alternative text for Image: Describe what can be seen in the photo. The text is read by text-to-speech tools needed by visually impaired users.

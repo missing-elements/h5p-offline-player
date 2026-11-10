@@ -38,6 +38,8 @@ Slides with text, pictures, video and questions; a summary slide with the score 
 
 ## Fields of H5P.CoursePresentation 1.27
 
+A source names its own `title`, `language`, `license` and `authors` beside `type` and `params`, which holds the fields below: the build refuses one without any of them. The author's name is the user's to give: ask for it when they have not.
+
 - `presentation` group
   - `slides` list of
     - `elements` list of

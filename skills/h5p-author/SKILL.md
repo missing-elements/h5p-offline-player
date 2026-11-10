@@ -22,6 +22,11 @@ file step 3 fetches, and a fetch tool may refuse an address put together from a 
 Read [the brief](./references/authoring.md) once. If the user named no type, propose one or
 two that fit the material and objective, a sentence each on why, and wait for their choice.
 
+If they gave no author's name, ask for it before you write the source, with the licence (`U`
+when they do not know it): in the reply that proposes the type, or in one of its own. Every
+source names its author, the build refuses one without, and the name is theirs to give, never
+one you make up. Ask once, and wait.
+
 | Type | Use it for |
 |---|---|
 | H5P.MultiChoice | one question, one or several right answers |
@@ -75,6 +80,8 @@ from what you know of the type: the build says, for each place that is wrong, wh
 }
 ```
 
+- Every source names its own `title`, `language`, `license` and `authors` beside `type` and
+  `params`, as above, whatever a type file's example leaves out; the author is the user's.
 - `params` holds only fields that differ from their defaults. Never interface texts (Check,
   Retry…): they come from the libraries' translations for `language`.
 - Text is plain, or markup with only the tags a field marked `html` lists.

@@ -40,6 +40,8 @@ A map with stages, each holding exercises; finishing a stage opens the stages jo
 
 ## Fields of H5P.GameMap 1.5
 
+A source names its own `title`, `language`, `license` and `authors` beside `type` and `params`, which holds the fields below: the build refuses one without any of them. The author's name is the user's to give: ask for it when they have not.
+
 - `showTitleScreen` boolean = false — Show title screen
 - `titleScreen` group — Title screen
   - `titleScreenIntroduction` html: sub sup strong em code u del a ul ol hr pre code = "<p style=\"text-align: center;\"></p>" — Introduction

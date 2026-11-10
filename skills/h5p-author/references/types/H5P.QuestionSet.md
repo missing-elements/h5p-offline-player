@@ -47,6 +47,8 @@ A quiz: questions one after another, then a result page with the score.
 
 ## Fields of H5P.QuestionSet 1.21
 
+A source names its own `title`, `language`, `license` and `authors` beside `type` and `params`, which holds the fields below: the build refuses one without any of them. The author's name is the user's to give: ask for it when they have not.
+
 - `introPage` group — Quiz introduction
   - `showIntroPage` boolean — Display introduction
   - `title` text — Title: This title will be displayed above the introduction text.

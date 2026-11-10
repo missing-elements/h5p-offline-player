@@ -32,6 +32,8 @@ A book of chapters with a table of contents, each chapter a page of text, media 
 
 ## Fields of H5P.InteractiveBook 1.15
 
+A source names its own `title`, `language`, `license` and `authors` beside `type` and `params`, which holds the fields below: the build refuses one without any of them. The author's name is the user's to give: ask for it when they have not.
+
 - `showCoverPage` boolean = false — Enable book cover
 - `bookCover` group; only when showCoverPage is true — Cover Page
   - `coverDescription` html: sub sup strong em code u del a ul ol h1 h2 h3 h4 h5 h6 pre hr table = "<p style=\"text-align: center;\"></p>" — Cover description: This text will be the description of your book.

@@ -221,8 +221,15 @@ export function withSection(text, section, name) {
 }
 
 /**
+ * What a source of any content type names beside its fields. A type file's example shows only
+ * `type` and `params`, and a chat that copies it left the author out, the one of them it has no
+ * value of its own for (#182). A part other content holds has none: it is sub-content.
+ */
+export const SOURCE_FIELDS = 'A source names its own `title`, `language`, `license` and `authors` beside `type` and `params`, which holds the fields below: the build refuses one without any of them. The author\'s name is the user\'s to give: ask for it when they have not.'
+
+/**
  * The generated section of a type file: the fields, under a heading, between markers that a
- * refresh rewrites.
+ * refresh rewrites, and for a content type what a source names beside them.
  * @param {any} library its `library.json`
  * @param {any[]} semantics
  * @param {SchemaOptions} [options]
@@ -234,6 +241,7 @@ export function schemaMarkdown(library, semantics, options = {}) {
     '',
     `## Fields of ${library.machineName} ${library.majorVersion}.${library.minorVersion}`,
     '',
+    ...(library.runnable ? [SOURCE_FIELDS, ''] : []),
     ...fields,
     '',
     interfaceTexts

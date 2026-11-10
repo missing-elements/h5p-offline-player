@@ -31,6 +31,8 @@ A survey: open questions and multiple-choice questions with no right answer, the
 
 ## Fields of H5P.Questionnaire 1.3
 
+A source names its own `title`, `language`, `license` and `authors` beside `type` and `params`, which holds the fields below: the build refuses one without any of them. The author's name is the user's to give: ask for it when they have not.
+
 - `questionnaireElements` list 1+ of, required — Questionnaire elements
   - `library` sub-content: H5P.OpenEndedQuestion | H5P.SimpleMultiChoice, required — Library: Choose a library
   - `requiredField` boolean = false — Required field

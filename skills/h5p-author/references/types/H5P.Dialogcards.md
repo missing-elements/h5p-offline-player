@@ -24,6 +24,8 @@ Flash cards: a prompt on the front, the answer on the back, turned by the learne
 
 ## Fields of H5P.Dialogcards 1.9
 
+A source names its own `title`, `language`, `license` and `authors` beside `type` and `params`, which holds the fields below: the build refuses one without any of them. The author's name is the user's to give: ask for it when they have not.
+
 - `title` html: strong em code — Heading
 - `mode` one of "normal" | "repetition" = "normal" — Mode: Mode of presenting the dialog cards
 - `description` html: strong em code — Task description

@@ -23,6 +23,8 @@ Quick questions, one after another, each with one right answer of two to four; t
 
 ## Fields of H5P.SingleChoiceSet 1.11
 
+A source names its own `title`, `language`, `license` and `authors` beside `type` and `params`, which holds the fields below: the build refuses one without any of them. The author's name is the user's to give: ask for it when they have not.
+
 - `choices` list 1+ of, required — List of questions
   - `question` html: strong em code, required — Question
   - `answers` list 2–4 of html: strong em code, required — Alternatives - first alternative is the correct one.

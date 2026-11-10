@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { buildPackage, SourceError } from '../lib/author.mjs'
 import { imageSize } from '../lib/media.mjs'
-import { GENERATED_END, GENERATED_START, schemaLines, schemaMarkdown, withSection } from '../lib/schema.mjs'
+import { GENERATED_END, GENERATED_START, schemaLines, schemaMarkdown, SOURCE_FIELDS, withSection } from '../lib/schema.mjs'
 import { jpeg, png } from './helpers/media'
 
 const META = { title: 'Layout', language: 'en', license: 'U', authors: [{ name: 'Ann Author', role: 'Author' }] }
@@ -275,6 +275,14 @@ describe('the schema a source is written from', () => {
     const markdown = schemaMarkdown({ machineName: 'H5P.Test', majorVersion: 1, minorVersion: 2 }, semantics)
     expect(markdown.startsWith(`${GENERATED_START}\n\n## Fields of H5P.Test 1.2\n`)).toBe(true)
     expect(markdown.endsWith(`\`h5p-author schema H5P.Test --all\` lists them, for a source to set one.\n\n${GENERATED_END}`)).toBe(true)
+  })
+
+  it('says what a content type\'s source names beside its fields, the author asked of the user, and not for a part (#182)', () => {
+    const type = schemaMarkdown({ machineName: 'H5P.Test', majorVersion: 1, minorVersion: 2, runnable: 1 }, semantics)
+    expect(type.startsWith(`${GENERATED_START}\n\n## Fields of H5P.Test 1.2\n\n${SOURCE_FIELDS}\n\n- `)).toBe(true)
+    for (const field of ['`title`', '`language`', '`license`', '`authors`']) expect(SOURCE_FIELDS).toContain(field)
+    expect(SOURCE_FIELDS).toContain('ask for it')
+    expect(schemaMarkdown({ machineName: 'H5P.Test', majorVersion: 1, minorVersion: 2, runnable: 0 }, semantics)).not.toContain(SOURCE_FIELDS)
   })
 })
 

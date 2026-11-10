@@ -468,6 +468,22 @@ to 3,000. Nineteen things the code does not say by itself:
   play, and the third reached npm and built with it. The first three had the tool swapped for a
   stand-in that logged its runs, and each refused to run it, as it should: a test serves the file
   as it is.
+- **A source's own fields are written where a chat reads, and the author is asked for**
+  (2026-11-11, #182). The owner's run in ChatGPT on 0.9.1 wrote a quiz with no `authors`. Each
+  of the 28 content types the skill lists refuses a source without `title`, `language`,
+  `license` or `authors` (each built with `params` alone), and each type's own required fields
+  are marked in its file's Fields section; but every type file's example is `type` and `params`,
+  and since #180 a chat reads it. Of the four, only the author has nothing to fall back on: the
+  language comes from the request, the licence is `U`. The owner's call: the model asks for the
+  author's name once, up front, with the type, and writes none it made up. So step 1 of
+  `SKILL.md` asks before the source is written, step 2's first point says every source names the
+  four, and `schemaMarkdown` writes the same under each content type's Fields heading
+  (`SOURCE_FIELDS`; not a part's, which is sub-content), for a chat that has the type file
+  alone, as the build page hands it over. Measured on Haiku in the chat stand-in (a fetch tool
+  that opens only whole addresses, npm cut off, a user who answers when asked), a Question Set
+  asked for with no author named: with 0.9.1's text two of three runs asked, from the brief's
+  list, and the third wrote "Quiz author" and built; with this text all three asked before
+  fetching the build tool and built with the name they were given. All six packages play.
 
 Not built: editing an existing package, which a tool beside it does with `checkContent` as its
 check; layout for Drag and Drop and Crossword; and any judgement of whether content is right, which

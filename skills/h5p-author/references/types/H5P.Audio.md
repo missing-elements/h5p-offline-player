@@ -18,6 +18,8 @@ An audio player. On its own it suits a listening task beside other content; in a
 
 ## Fields of H5P.Audio 1.5
 
+A source names its own `title`, `language`, `license` and `authors` beside `type` and `params`, which holds the fields below: the build refuses one without any of them. The author's name is the user's to give: ask for it when they have not.
+
 - `files` audio files, required — Source files
 - `playerMode` one of "minimalistic" | "full" | "transparent" = "minimalistic" — Player mode: Select the layout of the player.
 - `fitToWrapper` boolean = false; only when playerMode is "minimalistic" or playerMode is "full" — Fit to wrapper
