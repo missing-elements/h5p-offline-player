@@ -374,8 +374,11 @@ to 3,000. Nineteen things the code does not say by itself:
   skill's text travels with them, `SKILL.md` and `references/authoring.md`, each an export too:
   the Claude app, given a link to the skill on GitHub, answered that GitHub's rate limit kept it
   out, since GitHub limits anonymous requests per address and a chat app's are shared. The
-  organisation's site serves the skill from the release its build page pins, and the skill gives
-  a chat the site's address for a type's file, not raw.githubusercontent.com's. Installing the
+  organisation's site serves the skill from the release its build page pins, at
+  `https://missing-elements.github.io/h5p/skill/`, a page that writes out each file's full address,
+  since a chat's fetch tool may open only addresses it has seen whole and `SKILL.md`'s relative
+  links are not (missing-elements.github.io#15). The skill gives a chat the site's address for a
+  type's file, not raw.githubusercontent.com's. Installing the
   skill stays the way: nothing is fetched while the chat works.
 
   The same test on the 23 other content types the skill lists says how far each thing reaches:

@@ -147,6 +147,10 @@ npx skills add missing-elements/h5p-offline-player
 | [`h5p-player-setup`](https://github.com/missing-elements/h5p-offline-player/tree/main/skills/h5p-player-setup) | Puts H5P on a website, from the player on the site itself or framed from a domain of your own |
 | [`h5p-normalize`](https://github.com/missing-elements/h5p-offline-player/tree/main/skills/h5p-normalize) | Rewrites a package whose video will not stream |
 
+A chat that cannot install a skill can be given `h5p-author` as a link instead:
+[missing-elements.github.io/h5p/skill/](https://missing-elements.github.io/h5p/skill/) lists each
+of its files at its full address, from the release the build page runs.
+
 ## Contributing
 
 A pnpm workspace: see [CONTRIBUTING.md](https://github.com/missing-elements/h5p-offline-player/blob/main/CONTRIBUTING.md),

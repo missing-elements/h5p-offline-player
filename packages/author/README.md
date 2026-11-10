@@ -137,8 +137,9 @@ The package carries those type files too, as the release has them:
 these fields. A page that builds for a chat with no skill beside it hands them over with a source's
 problems, as the [build page](https://missing-elements.github.io/h5p/build/) does. The skill's text
 travels with them, `@missing-elements/h5p-author/SKILL.md` and its brief,
-`references/authoring.md`, for a site to serve to a chat given a link to the skill: GitHub limits
-the requests of an address many users share, as a chat app's is.
+`references/authoring.md`, for a site to serve to a chat given a link to the skill, as
+[missing-elements.github.io/h5p/skill/](https://missing-elements.github.io/h5p/skill/) does:
+GitHub limits the requests of an address many users share, as a chat app's is.
 
 ## A content type's bundle
 
