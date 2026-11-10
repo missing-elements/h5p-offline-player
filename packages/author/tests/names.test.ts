@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { machineNameOf, namingKey, nearestNames } from '../lib/names.mjs'
+import { sourceOf } from '../lib/build.mjs'
+import { machineNameOf, namingKey, nearestNames, sourceType } from '../lib/names.mjs'
 
 // The names a chat with no skill beside it wrote for a content type (#174), against a pack's.
 const NAMES = ['H5P.InteractiveBook', 'H5P.Blanks', 'H5P.AdvancedBlanks', 'H5P.Dialogcards', 'H5P.MultiChoice', 'H5P.QuestionSet', 'H5P.CoursePresentation', 'H5P.Flashcards', 'H5P.Text', 'H5P.AdvancedText', 'H5PEditor.Blanks']
@@ -69,5 +70,34 @@ describe('a library named another way than by its machine name', () => {
     expect(namingKey({ type: 'Fill in the blanks of this long sentence about H5P.Blanks, which is no name of a library' }, NAMES)).toBeNull()
     // Two keys that each name one: neither is taken.
     expect(namingKey({ type: 'text', contentType: 'Blanks' }, NAMES)).toBeNull()
+  })
+
+  it('reads the content type a source is written in as the build does, for a page to hand over its notes (#176)', () => {
+    const cases: [unknown, string | null][] = [
+      [{ type: 'H5P.InteractiveBook' }, 'H5P.InteractiveBook'],
+      [{ type: 'interactive-book', chapters: [] }, 'H5P.InteractiveBook'],
+      [{ type: ' H5P.Blanks 1.14 ' }, 'H5P.Blanks'],
+      [{ contentType: 'H5P.InteractiveBook', metadata: { title: 'Physics' } }, 'H5P.InteractiveBook'],
+      [{ library: 'question set', params: {} }, 'H5P.QuestionSet'],
+      // `type` is the source's own: under another key a name is read only where there is none.
+      [{ type: 'interactive-book', contentType: 'H5P.Blanks' }, 'H5P.InteractiveBook'],
+      [{ type: 'book', contentType: 'H5P.Blanks' }, null],
+      // Two that name one, a name under another key, a title that reads like one, none at all.
+      [{ contentType: 'H5P.Blanks', library: 'H5P.Dialogcards' }, null],
+      [{ mainLibrary: 'H5P.Blanks' }, null],
+      [{ title: 'Text', params: {} }, null],
+      [{ type: 'Question Set 2' }, null],
+      [{}, null],
+      // A quiz in the published format has rules of its own, and what is no object names nothing.
+      [{ kind: 'question-set', questions: [] }, null], [{ kind: 'question-set', type: 'H5P.Blanks', questions: [] }, null],
+      [null, null], [[{ type: 'H5P.Blanks' }], null], ['H5P.Blanks', null]
+    ]
+    for (const [source, type] of cases) expect(sourceType(source, NAMES), JSON.stringify(source)).toBe(type)
+    // What the build takes the source's type to be, the same in every case it reads one.
+    for (const [source] of cases) {
+      if (!source || typeof source !== 'object' || Array.isArray(source) || 'kind' in source) continue
+      const read = sourceOf(source, NAMES)
+      expect(sourceType(source, NAMES), JSON.stringify(source)).toBe(read.typed ? read.source.type : null)
+    }
   })
 })

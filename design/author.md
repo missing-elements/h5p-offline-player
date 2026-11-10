@@ -436,7 +436,9 @@ to 3,000. Nineteen things the code does not say by itself:
   files and the quiz format build the same package. `readSource` keeps its contract, a source's
   own problems thrown, without the pack's names. What the build page must do with it is its own:
   hand the type's file back for a type that is named loosely, which its rule, the source's `type`
-  as written, does not.
+  as written, does not. `sourceType(source, names)` is the build's reading of a source's type,
+  exported for it (#176), so that the page hands over the type the build took and keeps no copy
+  of the rule: on the 328 stored sources it names what `sourceOf` does in every one.
 
 Not built: editing an existing package, which a tool beside it does with `checkContent` as its
 check; layout for Drag and Drop and Crossword; and any judgement of whether content is right, which
