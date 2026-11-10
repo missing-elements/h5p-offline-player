@@ -394,6 +394,21 @@ describe('content authored from semantics', () => {
       'params.deep.picture: is not a field here; the fields are mode, depth'
     ])
     expect(written.params.behaviour.deep.depth).toBe(2)
+    // Or one that writes only the group's interface texts, which a source does not write: they would
+    // be moved, checked there and refused, and the problem would say a label's place, not that it is no field.
+    const labelled = [{ name: 'wrapper', type: 'group', fields: [
+      { name: 'panel', type: 'group', fields: [{ name: 'depth', type: 'number', default: 1 }, { name: 'l10n', type: 'group', common: true, fields: [{ name: 'retry', type: 'text', default: 'Retry' }, { name: 'check', type: 'text', default: 'Check' }] }] },
+      { name: 'other', type: 'boolean', default: true }
+    ] }]
+    const texts = generate(labelled, { panel: { l10n: { retry: 'Again' } } }, [], STRICT)
+    expect(texts.problems).toEqual([{ path: 'params.panel', message: 'is not a field here; the fields are wrapper' }])
+    expect(texts.moved).toEqual([])
+    const both = generate(labelled, { panel: { depth: 2, l10n: { retry: 'Again' } } }, [], STRICT)
+    // One that writes a field of the group besides is moved, on that field's account.
+    expect(both.problems.map(({ path, message }) => `${path}: ${message}`)).toEqual([
+      'params.panel: is a field of wrapper, not of this level: write params.wrapper.panel'
+    ])
+    expect(both.params.wrapper.panel.depth).toBe(2)
   })
 
   it('names a list it refused an item of, which then holds fewer items than were written (#172)', () => {

@@ -958,7 +958,8 @@ function takes(field, value) {
   if (Array.isArray(value)) return ['list', 'video', 'audio'].includes(field.type) || (field.type === 'select' && Boolean(field.multiple))
   // A group is the home of an object that writes a field of it. Its name alone is a coincidence:
   // Game Map's `behaviour.map`, its labels and fog, is not where a `map` written for the picture goes.
-  if (isObject(value) && field.type === 'group') return Object.keys(value).some((key) => (field.fields ?? []).some((/** @type {any} */ each) => each.name === key))
+  // Nor is an interface text such a field: a source never writes one, so `{ l10n }` alone proves nothing.
+  if (isObject(value) && field.type === 'group') return Object.keys(value).some((key) => (field.fields ?? []).some((/** @type {any} */ each) => each.name === key && !isInterfaceText(each)))
   if (isObject(value)) return ['library', 'image', 'file', 'video', 'audio'].includes(field.type)
   if (typeof value === 'string') return field.type === 'text' || (field.type === 'select' && !field.multiple)
   return typeof value === field.type

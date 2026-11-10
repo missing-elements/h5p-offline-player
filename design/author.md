@@ -359,8 +359,9 @@ to 3,000. Eighteen things the code does not say by itself:
   Only an object or a list, a text, a number or a flag whose name one group below has, in a field
   an author writes that takes such a value, is taken to belong there; an interface text is none,
   since a question's text sent to a label of its name would build and read wrong. And an object
-  goes to a group only where it writes one of the group's fields: a Game Map's `map`, written for
-  the picture, was first sent to `behaviour.map`, the map's labels and fog, a name and no more.
+  goes to a group only where it writes one of the group's fields, not one of its interface texts:
+  a Game Map's `map`, written for the picture, was first sent to `behaviour.map`, the map's labels
+  and fog, a name and no more, and an object that holds only a group's `l10n` is no proof of it.
 - **The package carries the skill's type files** (2026-11-10, #172). In the same measurement, what
   did most was no message: with the type files pasted back beside the first problems, the content
   type's and those of the libraries the source names, all 15 built by the second round, in two
