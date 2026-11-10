@@ -33,13 +33,16 @@
       "default": "./lib/browser.mjs"
     },
     "./references/types/*.md": "./references/types/*.md",
+    "./references/authoring.md": "./references/authoring.md",
+    "./SKILL.md": "./SKILL.md",
     "./package.json": "./package.json"
   },
   "files": [
     "bin",
     "lib",
     "references",
-    "types"
+    "types",
+    "SKILL.md"
   ],
   "keywords": [
     "h5p",
@@ -56,7 +59,7 @@
     "test:unit": "pnpm --filter @missing-elements/h5p-offline-player build:plan && vitest run --project node",
     "typecheck": "pnpm types && tsc -p tsconfig.json",
     "sync:skill": "pnpm --filter @missing-elements/h5p-offline-player build:plan && node scripts/sync-skill.mjs",
-    "prepack": "node -e \"require('node:fs').copyFileSync('../../LICENSE', 'LICENSE')\" && node scripts/copy-type-files.mjs && pnpm types",
+    "prepack": "node -e \"require('node:fs').copyFileSync('../../LICENSE', 'LICENSE')\" && node scripts/copy-skill.mjs && pnpm types",
     "prepublishOnly": "node -e \"if (!/^pnpm\\//.test(process.env.npm_config_user_agent || '')) { console.error('Publish with pnpm publish: npm would ship the workspace: dependency ranges as they are, and the package would not install.'); process.exit(1) }\" && node scripts/check-pack-published.mjs && pnpm typecheck && pnpm test",
     "types": "pnpm --filter @missing-elements/h5p-offline-player exec tsc -b && node -e \"require('node:fs').rmSync('types', { recursive: true, force: true })\" && tsc -p tsconfig.types.json"
   },
