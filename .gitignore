@@ -18,6 +18,9 @@ packages/player/LICENSE
 packages/normalize/LICENSE
 packages/verify/LICENSE
 packages/author/LICENSE
+# The h5p-author skill's text, which the author's `prepack` copies beside its type files (#178).
+packages/author/SKILL.md
+packages/author/references/authoring.md
 packages/cmi5/LICENSE
 packages/embed/LICENSE
 

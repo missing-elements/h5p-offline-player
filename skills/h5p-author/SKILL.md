@@ -60,7 +60,7 @@ the same package.
 Read the type's file, `references/types/<Type>.md`: notes, an example, its fields. Parts other
 content holds have files too: H5P.AdvancedText, H5P.Image, H5P.Video, H5P.Text. With this text
 alone and no file beside it, open the file at
-`https://raw.githubusercontent.com/missing-elements/h5p-offline-player/main/skills/h5p-author/references/types/<Type>.md`;
+`https://missing-elements.github.io/h5p/build/types/<Type>.md`;
 where nothing opens, write the source from what you know of the type: the build says, for each
 place that is wrong, what to write there.
 
