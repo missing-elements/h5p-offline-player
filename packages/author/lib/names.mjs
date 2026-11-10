@@ -97,3 +97,20 @@ export function namingKey(given, names) {
   }
   return found.length === 1 ? found[0] : null
 }
+
+/**
+ * The content type a source is written in, as a build reads it (#174, #176): of the machine names
+ * given, the one its `type` names, as it is or loosely, "interactive-book"; where it has no `type`,
+ * the one name under `contentType` or `library`. Null where none of them can be meant, and for a
+ * quiz in the published format, which is read by rules of its own. A page that hands a chat the
+ * type's notes with a source's problems asks this, so that it hands over the type the build took.
+ * @param {unknown} source
+ * @param {Iterable<string>} names machine names
+ * @returns {string | null}
+ */
+export function sourceType(source, names) {
+  if (source === null || typeof source !== 'object' || Array.isArray(source) || 'kind' in source) return null
+  const given = /** @type {Record<string, unknown>} */ (source)
+  const named = given.type !== undefined ? machineNameOf(given.type, names) : namingKey(given, names)
+  return named?.machineName ?? null
+}

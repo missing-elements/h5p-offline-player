@@ -180,7 +180,11 @@ refuse it for, empty for a build. `schemaOf(machineName, { markdown, all,
 libraries })` returns the field list. `writeBundle(type, output, { libraries })` and
 `writeBundles(folder, { libraries })` write bundles, each `{ output, type, parts, size }`;
 `bundleLibraries(pack, type)` returns a bundle's parts, and `contentTypes(pack)` the pack's content
-types. `ContentGenerator` is the engine underneath, also run by the repository's sweep of every
+types. `sourceType(source, names)` is the content type a source is written in, as a build reads it,
+of the machine names given: its `type`, as it is or loosely (`"interactive-book"`), or where it has
+none the one name under `contentType` or `library`; `null` where none can be meant. A page that
+hands a chat a type's notes with a source's problems asks it, and hands over the type the build
+took. `ContentGenerator` is the engine underneath, also run by the repository's sweep of every
 content type.
 
 A tool beside the build takes the libraries as the build loads them, the generator, and the
