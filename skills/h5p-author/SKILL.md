@@ -154,14 +154,19 @@ node -e "console.log('https://missing-elements.github.io/h5p/build/#source=' + r
 python3 -c "import base64,zlib;c=zlib.compressobj(9,zlib.DEFLATED,-15);d=c.compress(open('source.json','rb').read())+c.flush();print('https://missing-elements.github.io/h5p/build/#source='+base64.urlsafe_b64encode(d).decode().rstrip('='))"
 ```
 
+**A link is only what one of these commands printed here, handed over whole: no command run, no
+link.** Never write a `#source=` link yourself, from memory or after an example, even when asked
+for one: its text is compressed, so it cannot be typed, and one wrong character leaves the page
+nothing to build.
+
 With neither, or no tool that runs anything at all (in ChatGPT, data analysis can be unavailable
-for hours), the page sees only what the user pastes: put the **whole source in your reply**, in one
-`json` code block, and tell them to paste it into the page. Never give the page's address without
-the source, in the link or beside it: it builds nothing. The page lists every problem by its path,
-with a button that copies them for the chat: fix them all and give a new link, or the whole source
-again. A source that names files of its own waits for the user to choose them there. Steps 4 and 5
-are then the user's, on that page: the package is **unverified** until they have played it there,
-and they download it from there.
+for hours), give no link: the page sees only what the user pastes, so put the **whole source in
+your reply**, in one `json` code block, and tell them to paste it into the page. Never give the
+page's address without the source, in the link or beside it: it builds nothing. The page lists
+every problem by its path, with a button that copies them for the chat: fix them all and give a
+new link, or the whole source again. A source that names files of its own waits for the user to
+choose them there. Steps 4 and 5 are then the user's, on that page: the package is **unverified**
+until they have played it there, and they download it from there.
 
 A source with a problem writes nothing: the build lists every problem by its path, so fix them
 all and run it again under the same name. Once a build has written its file it never writes

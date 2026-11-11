@@ -285,6 +285,14 @@ to 3,000. Nineteen things the code does not say by itself:
   run at all, as ChatGPT on a free account once its data-analysis quota is spent (for hours, the
   owner's test of 2026-11-09), cannot write the link: the skill has it put the whole source in its
   reply, since that test's chat gave the page's bare address, which builds nothing.
+  A link is only what a command printed (2026-11-11). A link ChatGPT gave the owner carried 3,167
+  characters that were no deflate stream, its table broken at byte 82 of 2,375: the chat had
+  typed them itself, made up or copied wrong, and the page built nothing. So the skill says it
+  outright: a link is what one of its two commands printed there, handed over whole, and where no
+  command ran there is none. Haiku with the skill's text and no tool gave the source as a `json`
+  block and no link under the old text and the new (12 replies, half of them asked for a link to
+  click), so the rule costs that position nothing, and what it changes in ChatGPT is not
+  measured. No rule reaches a link copied wrong between the command's output and the reply.
 - **A bundle per content type, where the pack cannot be installed** (2026-11-09, #166). The page
   leaves the last steps to the user, but ChatGPT's sandbox runs Node and fetches a file its
   browsing tool has opened: given the libraries as files, a chat builds and fixes its source
