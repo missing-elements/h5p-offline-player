@@ -40,7 +40,7 @@ A map with stages, each holding exercises; finishing a stage opens the stages jo
 
 ## Fields of H5P.GameMap 1.5
 
-The example is `type` and `params` alone, and `params` holds the fields below. A source also names its own `title`, `language`, `license` and `authors`, all four required: the build refuses a source that leaves out any of them. The author's name and the licence are the user's: ask for them, and if they skip it, write the name you know them by, or "Unknown", and `U`.
+The example is `type` and `params` alone, and `params` holds the fields below. A source also names its own `title`, `language`, `license` and `authors`, all four required: the build refuses a source that leaves out any of them. The author's name and the licence are the user's: ask for what they have not given. For a name they skip, write the one you know them by, or "Unknown"; for a licence they skip, `U`.
 
 - `showTitleScreen` boolean = false — Show title screen
 - `titleScreen` group — Title screen

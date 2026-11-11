@@ -28,10 +28,11 @@ below, propose one or two that fit the material and objective, a sentence each o
 to choose, and wait: "a quiz" or "flash cards" says what they want, not which type. Ask nothing
 else in that message.
 
-Once they have chosen, ask in a message of its own for the author's name and the licence, unless
-they gave both, and say they may skip it; then wait. A skip takes the name you know them by, or "Unknown", and
-the licence `U` (undisclosed). Every source names its author and the build refuses one without,
-but never write a name made up for them.
+Once they have chosen, ask in a message of its own for the author's name and the licence, only
+for what they have not given yet, and say they may skip; then wait. What they gave stays as they
+gave it. A name they skip is the one you know them by, or "Unknown"; a licence they skip is `U`
+(undisclosed). Every source names its author and the build refuses one without, but never write
+a name made up for them.
 
 | Type | Use it for |
 |---|---|
