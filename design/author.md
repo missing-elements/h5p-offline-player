@@ -468,6 +468,42 @@ to 3,000. Nineteen things the code does not say by itself:
   play, and the third reached npm and built with it. The first three had the tool swapped for a
   stand-in that logged its runs, and each refused to run it, as it should: a test serves the file
   as it is.
+- **A source's own fields are written where a chat reads, and the author is asked for**
+  (2026-11-11, #182). The owner's run in ChatGPT on 0.9.1 wrote a quiz with no `authors`. Each
+  of the 28 content types the skill lists refuses a source without `title`, `language`,
+  `license` or `authors` (each built with `params` alone), and each type's own required fields
+  are marked in its file's Fields section; but every type file's example is `type` and `params`,
+  and since #180 a chat reads it. Of the four, only the author has nothing to fall back on: the
+  language comes from the request, the licence is `U`. The owner's flow, the same day: the
+  content type, chosen with the user; then the author and licence, asked once the type is chosen,
+  which the user gives or skips, each on its own: a name they skip is the one the model knows
+  them by, or "Unknown", a licence they skip `U`, what they gave stays, and never a name made
+  up; then the source; then the build the environment allows best, said to the user. So
+  `SKILL.md` names that order before step 1, step 1 asks for the type and then the author and
+  licence, step 2's first point says every source names the four, step 3
+  opens with the three ways to build and what each needs (npm here, two files here, the build
+  page in the user's browser, with no attempt here first where nothing runs or fetches), and
+  `schemaMarkdown` writes the same under each content type's Fields heading
+  (`SOURCE_FIELDS`; not a part's, which is sub-content), for a chat that has the type file
+  alone, as the build page hands it over. It says the example is `type` and `params` alone rather
+  than the example holding the four: a name written in an example would be copied as the author
+  and build, where the model is to ask. Measured on Haiku in the chat stand-in (a fetch tool
+  that opens only whole addresses, npm cut off, a scripted user who answers when asked): with
+  0.9.1's text and a Question Set named, two of three runs asked for the author, from the brief's
+  list, and the third wrote "Quiz author" and built. With the flow, a quiz asked for and neither
+  type nor author named: until step 1 said that "a quiz" names no type, four of six runs chose
+  the Question Set themselves, three of them asking for the author in the same message; since,
+  all four proposed two types and waited, then asked for the author and licence on their own,
+  and wrote the name given or, on a skip, "Unknown" and `U`. Every package plays. The skip was
+  first written for both at once ("a skip takes the name you know them by, or "Unknown", and
+  the licence `U`"), which cubic's review of #183 read as replacing a name the user gave when
+  they skip only the licence. Haiku did not read it so: three runs on that text (a name and no
+  licence, a licence and no name, the author named in the request and the licence skipped) kept
+  what was given. It is written out all the same, each on its own and only what is missing asked
+  for, so that no reader has to guess: on the new text five of five runs (those three, both
+  skipped, both given) wrote what was given and the default for what was skipped, and the run
+  with the author named in the request asked for the licence alone. Those eight packages play
+  too.
 
 Not built: editing an existing package, which a tool beside it does with `checkContent` as its
 check; layout for Drag and Drop and Crossword; and any judgement of whether content is right, which

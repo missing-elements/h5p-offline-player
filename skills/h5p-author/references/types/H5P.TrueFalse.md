@@ -26,6 +26,8 @@ One statement the learner marks true or false.
 
 ## Fields of H5P.TrueFalse 1.8
 
+The example is `type` and `params` alone, and `params` holds the fields below. A source also names its own `title`, `language`, `license` and `authors`, all four required: the build refuses a source that leaves out any of them. The author's name and the licence are the user's: ask for what they have not given. For a name they skip, write the one you know them by, or "Unknown"; for a licence they skip, `U`.
+
 - `media` group — Media
   - `type` sub-content: H5P.Image | H5P.Video | H5P.Audio — Type: Optional media to display above the question.
   - `disableImageZooming` boolean = false; only when type is "H5P.Image 1.1" — Disable image zooming

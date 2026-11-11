@@ -31,6 +31,8 @@ A picture in which the learner clicks the right area: a part of a diagram, a pla
 
 ## Fields of H5P.ImageHotspotQuestion 1.8
 
+The example is `type` and `params` alone, and `params` holds the fields below. A source also names its own `title`, `language`, `license` and `authors`, all four required: the build refuses a source that leaves out any of them. The author's name and the licence are the user's: ask for what they have not given. For a name they skip, write the one you know them by, or "Unknown"; for a licence they skip, `U`.
+
 - `imageHotspotQuestion` group — Image Hotspot Question Editor
   - `backgroundImageSettings` image file, required — Background image
   - `hotspotSettings` group — Hotspots

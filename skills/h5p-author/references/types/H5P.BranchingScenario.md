@@ -38,6 +38,8 @@ A story in which the learner's choices lead to different paths and endings: deci
 
 ## Fields of H5P.BranchingScenario 1.11
 
+The example is `type` and `params` alone, and `params` holds the fields below. A source also names its own `title`, `language`, `license` and `authors`, all four required: the build refuses a source that leaves out any of them. The author's name and the licence are the user's: ask for what they have not given. For a name they skip, write the one you know them by, or "Unknown"; for a licence they skip, `U`.
+
 - `branchingScenario` group — Branching Scenario Editor
   - `title` text, required — Title
   - `startScreen` group — Start screen

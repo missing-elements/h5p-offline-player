@@ -29,6 +29,8 @@ Events along a time line, each with a date, a headline and a text, browsed in or
 
 ## Fields of H5P.Timeline 1.1
 
+The example is `type` and `params` alone, and `params` holds the fields below. A source also names its own `title`, `language`, `license` and `authors`, all four required: the build refuses a source that leaves out any of them. The author's name and the licence are the user's: ask for what they have not given. For a name they skip, write the one you know them by, or "Unknown"; for a licence they skip, `U`.
+
 - `timeline` group — Timeline
   - `headline` text, required — Headline: Main timeline heading goes here (first page)
   - `text` html: strong em del a ul ol hr code — Body Text: The main timeline body goes here (first page).

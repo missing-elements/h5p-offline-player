@@ -24,6 +24,8 @@ A page of content one below another: text, pictures, video and questions, in the
 
 ## Fields of H5P.Column 1.22
 
+The example is `type` and `params` alone, and `params` holds the fields below. A source also names its own `title`, `language`, `license` and `authors`, all four required: the build refuses a source that leaves out any of them. The author's name and the licence are the user's: ask for what they have not given. For a name they skip, write the one you know them by, or "Unknown"; for a licence they skip, `U`.
+
 - `content` list 1+ of, required — List of Column Content
   - `content` sub-content: H5P.Accordion | H5P.Agamotto | H5P.Audio | H5P.AudioRecorder | H5P.Blanks | H5P.Chart | H5P.Collage | H5P.CoursePresentation | H5P.Dialogcards | H5P.DocumentationTool | H5P.DragQuestion | H5P.DragText | H5P.Essay | H5P.GuessTheAnswer | H5P.Table | H5P.AdvancedText | H5P.IFrameEmbed | H5P.Image | H5P.ImageHotspots | H5P.ImageHotspotQuestion | H5P.ImageSlider | H5P.InteractiveVideo | H5P.Link | H5P.MarkTheWords | H5P.MemoryGame | H5P.MultiChoice | H5P.Questionnaire | H5P.QuestionSet | H5P.Row | H5P.SingleChoiceSet | H5P.Summary | H5P.Timeline | H5P.TrueFalse | H5P.Video | H5P.MultiMediaChoice, required — Content
   - `useSeparator` one of "auto" | "disabled" | "enabled" = "auto" — Separate content with a horizontal ruler
