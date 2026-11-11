@@ -17,15 +17,21 @@ With this text alone and none of its files beside it, open https://missing-eleme
 first and take every address from it: it writes out in full each file this text names and each
 file step 3 fetches, and a fetch tool may refuse an address put together from a name.
 
-## 1. Choose the content type with the user
+Work in this order, one question at a time: the content type, chosen with the user; then the
+author and licence, which they give or skip; then the source; then the build, the best way this
+environment allows.
 
-Read [the brief](./references/authoring.md) once. If the user named no type, propose one or
-two that fit the material and objective, a sentence each on why, and wait for their choice.
+## 1. Choose the content type, then the author and licence, with the user
 
-If they gave no author's name, ask for it before you write the source, with the licence (`U`
-when they do not know it): in the reply that proposes the type, or in one of its own. Every
-source names its author, the build refuses one without, and the name is theirs to give, never
-one you make up. Ask once, and wait.
+Read [the brief](./references/authoring.md) once. Unless the user named a type from the table
+below, propose one or two that fit the material and objective, a sentence each on why, ask them
+to choose, and wait: "a quiz" or "flash cards" says what they want, not which type. Ask nothing
+else in that message.
+
+Once they have chosen, ask in a message of its own for the author's name and the licence, unless
+they gave both, and say they may skip it; then wait. A skip takes the name you know them by, or "Unknown", and
+the licence `U` (undisclosed). Every source names its author and the build refuses one without,
+but never write a name made up for them.
 
 | Type | Use it for |
 |---|---|
@@ -81,7 +87,8 @@ from what you know of the type: the build says, for each place that is wrong, wh
 ```
 
 - Every source names its own `title`, `language`, `license` and `authors` beside `type` and
-  `params`, as above, whatever a type file's example leaves out; the author is the user's.
+  `params`, as above, whatever a type file's example leaves out; the author and licence are the
+  ones step 1 settled.
 - `params` holds only fields that differ from their defaults. Never interface texts (Check,
   Retry…): they come from the libraries' translations for `language`.
 - Text is plain, or markup with only the tags a field marked `html` lists.
@@ -93,6 +100,17 @@ from what you know of the type: the build says, for each place that is wrong, wh
   `{ "action": <sub-content> }` in `presentation.slides[].elements`, a book's chapter an H5P.Column.
 
 ## 3. Build
+
+Build the best way this environment allows, and tell the user which you take:
+
+- **Here, with npm**: a shell that reaches the npm registry (Claude Code, a terminal). The
+  command below.
+- **Here, from two files**: Node runs and files can be fetched, but npm cannot install, as in
+  ChatGPT. *If it cannot install here*, below.
+- **In the user's browser**: nothing here runs, or nothing fetches, as in Gemini or a chat with
+  no tools. *The build page*, below, with no attempt here first.
+
+Take the first that applies, and the next if it fails.
 
 Build in a working folder of your own, not in the folder the user named:
 

@@ -13,11 +13,12 @@ Use what the user already gave. Ask for what is missing and matters:
   texts too, from their own translations, which are often incomplete.
 - **Media**, for a type that needs them: files the user has, or web addresses they may use,
   with who made them and under which licence.
-- **Author and licence**: the author's name, which every source needs and only the user can
-  give (never make one up), and the licence for the whole, an H5P code: `U`
+- **Author and licence**, asked once the type is chosen: the author's name, which every source
+  needs, and the licence for the whole, an H5P code: `U`
   (undisclosed, when unknown), `CC BY`, `CC BY-SA`, `CC BY-ND`, `CC BY-NC`, `CC BY-NC-SA`,
   `CC BY-NC-ND`, `CC0 1.0`, `CC PDM`, `GNU GPL`, `PD`, `ODC PDDL` or `C`; `licenseVersion`
-  `4.0` for a CC BY one. Never choose a licence the user has not.
+  `4.0` for a CC BY one. The user may skip them: then the name you know them by, or "Unknown",
+  and `U`. Never make up a name, or choose a licence the user has not.
 - **A pass mark**, for scored content an LMS records, and what a learner who passes or fails
   is told.
 - **Where it goes**: an LMS, a website, a file to hand out.

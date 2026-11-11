@@ -38,7 +38,7 @@ Slides with text, pictures, video and questions; a summary slide with the score 
 
 ## Fields of H5P.CoursePresentation 1.27
 
-The example is `type` and `params` alone, and `params` holds the fields below. A source also names its own `title`, `language`, `license` and `authors`, all four required: the build refuses a source that leaves out any of them. The author's name is the user's to give: ask for it when they have not.
+The example is `type` and `params` alone, and `params` holds the fields below. A source also names its own `title`, `language`, `license` and `authors`, all four required: the build refuses a source that leaves out any of them. The author's name and the licence are the user's: ask for them, and if they skip it, write the name you know them by, or "Unknown", and `U`.
 
 - `presentation` group
   - `slides` list of

@@ -224,10 +224,11 @@ export function withSection(text, section, name) {
  * What a source of any content type names beside its fields. A type file's example shows only
  * `type` and `params`, and a chat that copies it left the author out, the one of them it has no
  * value of its own for (#182). The example says so here rather than holding them: a name written
- * in it would be copied as the author and build, where the model is to ask. A part other content
- * holds has none: it is sub-content.
+ * in it would be copied as the author and build, where the model is to ask, and on a skip to
+ * write the name it knows the user by, or "Unknown". A part other content holds has none: it is
+ * sub-content.
  */
-export const SOURCE_FIELDS = 'The example is `type` and `params` alone, and `params` holds the fields below. A source also names its own `title`, `language`, `license` and `authors`, all four required: the build refuses a source that leaves out any of them. The author\'s name is the user\'s to give: ask for it when they have not.'
+export const SOURCE_FIELDS = 'The example is `type` and `params` alone, and `params` holds the fields below. A source also names its own `title`, `language`, `license` and `authors`, all four required: the build refuses a source that leaves out any of them. The author\'s name and the licence are the user\'s: ask for them, and if they skip it, write the name you know them by, or "Unknown", and `U`.'
 
 /**
  * The generated section of a type file: the fields, under a heading, between markers that a

@@ -474,19 +474,25 @@ to 3,000. Nineteen things the code does not say by itself:
   `license` or `authors` (each built with `params` alone), and each type's own required fields
   are marked in its file's Fields section; but every type file's example is `type` and `params`,
   and since #180 a chat reads it. Of the four, only the author has nothing to fall back on: the
-  language comes from the request, the licence is `U`. The owner's call: the model asks for the
-  author's name once, up front, with the type, and writes none it made up. So step 1 of
-  `SKILL.md` asks before the source is written, step 2's first point says every source names the
-  four, and `schemaMarkdown` writes the same under each content type's Fields heading
+  language comes from the request, the licence is `U`. The owner's flow, the same day: the
+  content type, chosen with the user; then the author and licence, asked once the type is chosen,
+  which the user gives or skips, a skip taking the name the model knows them by, or "Unknown",
+  and `U`, never a name made up; then the source; then the build the environment allows best,
+  said to the user. So `SKILL.md` names that order before step 1, step 1 asks for the type and
+  then the author and licence, step 2's first point says every source names the four, step 3
+  opens with the three ways to build and what each needs (npm here, two files here, the build
+  page in the user's browser, with no attempt here first where nothing runs or fetches), and `schemaMarkdown` writes the same under each content type's Fields heading
   (`SOURCE_FIELDS`; not a part's, which is sub-content), for a chat that has the type file
   alone, as the build page hands it over. It says the example is `type` and `params` alone rather
   than the example holding the four: a name written in an example would be copied as the author
   and build, where the model is to ask. Measured on Haiku in the chat stand-in (a fetch tool
-  that opens only whole addresses, npm cut off, a user who answers when asked), a Question Set
-  asked for with no author named: with 0.9.1's text two of three runs asked, from the brief's
-  list, and the third wrote "Quiz author" and built; with this text all three asked before
-  fetching the build tool and built with the name they were given, and so did three more runs on
-  the line as the review reworded it. Every package plays.
+  that opens only whole addresses, npm cut off, a scripted user who answers when asked): with
+  0.9.1's text and a Question Set named, two of three runs asked for the author, from the brief's
+  list, and the third wrote "Quiz author" and built. With the flow, a quiz asked for and neither
+  type nor author named: until step 1 said that "a quiz" names no type, four of six runs chose
+  the Question Set themselves, three of them asking for the author in the same message; since,
+  all four proposed two types and waited, then asked for the author and licence on their own,
+  and wrote the name given or, on a skip, "Unknown" and `U`. Every package plays.
 
 Not built: editing an existing package, which a tool beside it does with `checkContent` as its
 check; layout for Drag and Drop and Crossword; and any judgement of whether content is right, which
