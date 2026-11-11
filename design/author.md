@@ -485,7 +485,8 @@ to 3,000. Nineteen things the code does not say by itself:
   that opens only whole addresses, npm cut off, a user who answers when asked), a Question Set
   asked for with no author named: with 0.9.1's text two of three runs asked, from the brief's
   list, and the third wrote "Quiz author" and built; with this text all three asked before
-  fetching the build tool and built with the name they were given. All six packages play.
+  fetching the build tool and built with the name they were given, and so did three more runs on
+  the line as the review reworded it. Every package plays.
 
 Not built: editing an existing package, which a tool beside it does with `checkContent` as its
 check; layout for Drag and Drop and Crossword; and any judgement of whether content is right, which
