@@ -291,8 +291,17 @@ SPA-fallback trap described above cannot happen there.
   `scripts/lib/partials.mjs`, a `transformIndexHtml` hook that runs first, in dev and the build
   alike), since 2026-10-17, asked for by the owner after the Star button had to be added to eleven
   copies of the bar. The nav marks the page it is on itself — the link whose address is the
-  longest prefix of the page's — so a page names no current link. The footers stay in the pages:
-  each lists its own links. The per-page metadata — title, description, Open Graph and Twitter
+  longest prefix of the page's — so a page names no current link. The nav's last link, Build,
+  leaves the site: it goes to the build page on missing-elements.github.io (*Where `npx` cannot
+  install, a page builds*, design/author.md), asked for by the owner on 2026-11-11 with a sentence
+  in the front page's lede that says what that page is for. An address on another site is never
+  a prefix of a page's own, so it is never the marked one. With seven links the bar is as high
+  as it was at every width from 320 to 1440 px, and on one line it needs 950 px, 1002 px in the
+  app (890 and 942 before), measured with macOS's system font and a four-character star count:
+  the room `page.css` leaves under its 64rem for a wider font is smaller. With text 6% wider the
+  bar still fits at 1024 px; with 13% it does not, as far as 1040 px: the pages' nav wraps to a
+  second row, and the app's bar, which does not wrap, scrolls sideways, as it did only at 19%
+  before. The footers stay in the pages: each lists its own links. The per-page metadata — title, description, Open Graph and Twitter
   tags, each written two or three times — is the obvious next candidate and has not been done.
 - **The page's design is the player's `page.css`** (2026-11-10, #170). The colours for light and
   dark, the bar, the buttons, the status strip, the player's box, cards and messages moved from
