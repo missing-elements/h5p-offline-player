@@ -642,6 +642,120 @@ const imageHotspotQuestion = {
   }
 }
 
+/* ---------------------------------------------------------------- Fill in the Blanks */
+
+/**
+ * The gaps of one block of text, found as H5P.Blanks 1.14 finds them (`handleBlanks` in its
+ * `js/blanks.js`): from an asterisk to the next, the tags between them taken out, an empty pair
+ * passed over, and the character after a gap never read as the start of the next. The library
+ * takes the tags out in one pass; here they are taken out until none is left, which differs only
+ * for a tag written inside a tag (`<<em>em>`), and leaves no tag that one pass would have joined.
+ * @param {string} question
+ * @returns {{ raw: string, content: string }[]} each gap as written, asterisks included, and what the library reads of it
+ */
+function blanksGaps(question) {
+  const gaps = []
+  let start = question.indexOf('*')
+  while (start !== -1) {
+    const end = question.indexOf('*', start + 1)
+    if (end === -1) break
+    let content = question.slice(start + 1, end)
+    for (let before = ''; before !== content; ) {
+      before = content
+      content = content.replaceAll(/<\/?[a-z]*\d?>/gi, '')
+    }
+    if (content.length) gaps.push({ raw: question.slice(start, end + 1), content })
+    start = question.indexOf('*', content.length ? end + 2 : end + 1)
+  }
+  return gaps
+}
+
+/**
+ * A backslash written to escape a slash or a colon in a gap's answer, `*1\/2*` or `*10\:30*`.
+ * Nothing in H5P.Blanks escapes either (`parseSolution`: the first colon starts the tip, and what
+ * is before it is split at every slash), so the answer ends in the backslash and what follows is
+ * another answer, or the tip: the package builds, plays, and takes "1\" or "2". What the library
+ * does take is an entity, which holds neither character as it is split and which it decodes in
+ * each answer: `*1&#47;2*` is the answer 1/2, and the problem writes the gap out that way. An
+ * answer that is a backslash and no more is left alone, being one a text may ask for.
+ * @type {Layout}
+ */
+const blanks = {
+  after(params, path, context) {
+    if (!Array.isArray(params?.questions)) return
+    params.questions.forEach((/** @type {unknown} */ question, /** @type {number} */ i) => {
+      if (typeof question !== 'string') return
+      for (const { raw, content } of blanksGaps(question)) {
+        const tipStart = content.indexOf(':')
+        const answers = (tipStart === -1 ? content : content.slice(0, tipStart)).split('/')
+        const escapes = answers.some((answer, at) => answer.endsWith('\\') && answer.trim() !== '\\' && (at < answers.length - 1 || tipStart !== -1))
+        if (!escapes) continue
+        // The gap as it was meant: a backslash's slash or colon part of the answer, up to the
+        // first colon no backslash stands before, where the tip starts.
+        let meant = ''
+        for (let at = 0; at < content.length; at++) {
+          const next = content[at + 1]
+          if (content[at] === '\\' && (next === '/' || next === ':')) {
+            meant += next === '/' ? '&#47;' : '&#58;'
+            at++
+          } else if (content[at] === ':') {
+            meant += content.slice(at)
+            break
+          } else meant += content[at]
+        }
+        const taken = answers.map((answer) => `"${answer.trim()}"`).join(' or ')
+        context.report(
+          `${path}.questions[${i}]`,
+          `\`${raw}\`: a backslash escapes nothing in a gap, so H5P.Blanks takes ${taken} here${tipStart === -1 ? '' : `, with the tip "${content.slice(tipStart + 1).trim()}"`}. ` +
+            `In an answer write \`/\` as \`&#47;\` and \`:\` as \`&#58;\`: \`*${meant}*\``
+        )
+      }
+    })
+  }
+}
+
+/* ---------------------------------------------------------------- Drag the Words */
+
+/** A gap as a problem shows it: whole when short, its start otherwise. @param {string} text @param {number} most */
+const shortened = (text, most) => (text.length > most ? `${text.slice(0, most - 1)}…` : text)
+
+/**
+ * A gap H5P.DragText 1.10 cannot take apart. Its `lex` (in `dist/h5p-drag-text.js`) finds a gap's
+ * tip, from a colon up to a backslash, and its two feedbacks, from `\+` and `\-` up to a backslash
+ * or a colon, each with a pattern that may match more than once, and takes each out of the word
+ * with one `replace` of all its matches at once: with two, nothing is taken out. A colon in the
+ * feedback is the way to two: the feedback ends there, what follows is a second tip, and the
+ * learner drags the word with every tip still in it. A colon in the tip itself is none, the tip
+ * running on over it. The word is worked out here as the library does, to show what would be
+ * dragged.
+ * @type {Layout}
+ */
+const dragText = {
+  after(params, path, context) {
+    if (typeof params?.textField !== 'string') return
+    let gap = 0
+    for (const part of params.textField.replace(/(\r\n|\n|\r)/gm, '<br/>').split(/(\*.*?\*)/)) {
+      if (!part.startsWith('*') || !part.endsWith('*')) continue
+      gap++
+      const tips = part.match(/(:([^\\*]+))/g) ?? []
+      const right = part.match(/(\\\+([^\\*:]+))/g) ?? []
+      const wrong = part.match(/(\\-([^\\*:]+))/g) ?? []
+      if (tips.length < 2 && right.length < 2 && wrong.length < 2) continue
+      let word = part.slice(1, -1)
+      for (const matches of [tips, right, wrong]) if (matches.length) word = word.replace(String(matches), '')
+      const [why, write] =
+        tips.length > 1 && /\\[+-][^*]*:/.test(part)
+          ? ['its feedback holds a `:`, where H5P.DragText ends the feedback and starts another tip', 'Write `:` once in a gap, before the tip, and none in the feedback']
+          : tips.length > 1
+            ? ['`:` starts a tip more than once in it', 'Write `:` once in a gap, before the tip']
+            : right.length > 1
+              ? ['`\\+` stands more than once in it', 'Write `\\+` once in a gap, before the feedback for the right word']
+              : ['`\\-` stands more than once in it', 'Write `\\-` once in a gap, before the feedback for a wrong word']
+      context.report(`${path}.textField`, `gap ${gap}, \`${shortened(part, 60)}\`: ${why}, and it then leaves them in the word: the learner would drag "${shortened(word.replace(/\s+$/, ''), 70)}". ${write}`)
+    }
+  }
+}
+
 /* ---------------------------------------------------------------- Video */
 
 /** @type {Layout} */
@@ -650,6 +764,8 @@ const video = { optional: ['visuals.poster'] }
 /** @type {Record<string, Layout>} */
 export const LAYOUTS = {
   'H5P.QuestionSet': questionSet,
+  'H5P.Blanks': blanks,
+  'H5P.DragText': dragText,
   'H5P.InteractiveBook': interactiveBook,
   'H5P.CoursePresentation': coursePresentation,
   'H5P.InteractiveVideo': interactiveVideo,

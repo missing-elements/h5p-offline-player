@@ -3,6 +3,7 @@
 Text with gaps the learner types the missing words into. For recall of exact words: terms, names, spellings.
 
 - Each item of `questions` is one block of text with its gaps, marked as the Fields section below says: `*answer*`, alternatives with `/`, a tip after `:`.
+- An answer that holds `/` or `:` itself writes them as `&#47;` and `&#58;`: `*km&#47;h*` takes km/h and `*10&#58;30*` takes 10:30, where `*km/h*` takes km or h and `*10:30*` is the answer 10 with the tip 30. A backslash escapes nothing.
 - Answers are compared as typed. `behaviour.caseSensitive: false` for names that may be capitalised either way; `behaviour.acceptSpellingErrors: true` forgives a wrong letter.
 - `text` is the instruction above the blocks.
 

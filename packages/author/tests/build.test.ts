@@ -329,6 +329,24 @@ describe('any content type in the pack', () => {
       expect.stringMatching(/^license: use one of/),
       'authors[0].role: use one of Author, Editor, Licensee, Originator'
     ])
+    // A licence written with its version, as it is spoken of: the problem says where the version
+    // goes, and names the licence it read. The list of names alone had a chat drop the version.
+    const blanks = { type: 'H5P.Blanks', params: { questions: ['The *Danube* flows east.'] } }
+    expect(await problems({ ...META, ...blanks, license: 'CC BY 4.0' })).toEqual(['license: "CC BY 4.0" holds the version too: write "license": "CC BY" and "licenseVersion": "4.0"'])
+    expect(await problems({ ...META, ...blanks, license: 'cc-by-sa-4.0' })).toEqual(['license: "cc-by-sa-4.0" holds the version too: write "license": "CC BY-SA" and "licenseVersion": "4.0"'])
+    expect(await problems({ ...META, ...blanks, license: 'CC BY-NC 5.0' })).toEqual(['license: "CC BY-NC 5.0" holds a version too: write "license": "CC BY-NC" and "licenseVersion", one of 4.0, 3.0, 2.5, 2.0, 1.0'])
+    expect(await problems({ ...META, ...blanks, license: 'CC BY 4.0', licenseVersion: '4.0' })).toEqual(['license: "CC BY 4.0" holds the version too, which licenseVersion names: write "license": "CC BY"'])
+    expect(await problems({ ...META, ...blanks, license: 'CC-BY-4.0', licenseVersion: '9' })).toEqual([
+      'license: "CC-BY-4.0" holds the version too, which licenseVersion names: write "license": "CC BY"',
+      'licenseVersion: use one of 4.0, 3.0, 2.5, 2.0, 1.0'
+    ])
+    expect((await build({ ...META, ...blanks, license: 'CC BY', licenseVersion: '4.0' })).manifest).toMatchObject({ license: 'CC BY', licenseVersion: '4.0' })
+    // CC0 1.0 is one code, version and all, and no versioned CC BY.
+    expect((await build({ ...META, ...blanks, license: 'CC0 1.0' })).manifest).toMatchObject({ license: 'CC0 1.0' })
+    expect(await problems({ ...META, ...blanks, license: 'CC0', licenseVersion: '1.0' })).toEqual([
+      expect.stringMatching(/^license: use one of "U", "CC BY", .*"CC0 1\.0"/),
+      'licenseVersion: is for a Creative Commons BY licence only'
+    ])
     expect(await problems({
       ...META,
       type: 'H5P.TrueFalse',
