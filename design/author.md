@@ -15,7 +15,7 @@ already holds text to the content check's rules, from the pack an untrusted chec
 `apps/skills` plays every example untrusted too. Measured on a five-question quiz, at four
 characters a token: `content.json` was about 3,470 tokens to write by hand, after reading 3,900 to
 9,500 of a type's semantics; the source is 1,000 to 1,800 tokens, written from a type file of 200
-to 3,000. Twenty-three things the code does not say by itself:
+to 3,000. Twenty-four things the code does not say by itself:
 
 - **One generator, three ways to run it.** The third, `saved`, checks content as H5P stores it
   (*Saved content is checked as the build checks what it writes*, below). `ContentGenerator` was the sweep's
@@ -607,7 +607,27 @@ to 3,000. Twenty-three things the code does not say by itself:
   by step 3's command under the link, 3 of 4, and the fourth sent the user to the link's page to
   say how it went, where every other miss said nothing. The command is kept: what a command
   printed is what a weak model hands over, and the line goes wherever the link goes, the bundle
-  route included.
+  route included. With step 5 saying the line goes in every case, it reached 5 of 5, two plain
+  sources and three with a picture.
+
+  A link carries the text of a source and not the files it names (cubic's review): the page asks
+  for those by name once it has the source, and a picture at a web address reaches it only where
+  its host lets another site fetch it. So for a source that names a file, by any `path`, the
+  commands print the feedback line alone, and in the build page's route such a source goes over
+  whole, to be pasted, its files chosen on the page. It is decided by the source and not by its
+  type: nearly every type takes media, Multiple Choice, Question Set, Column, a book and slides
+  among them, and most sources name none. The source file goes over as before, the files it names
+  said by name, since a build reads them beside it; they are not copied, a video being large.
+  When the commands printed a line saying why there was no link, above the feedback line, 3 of 3
+  runs with a picture passed on neither: they wrote the reason in their own words and left the
+  address out. With the feedback line printed alone, 3 of 3 passed it on, none gave a link, and 2
+  of 3 named the picture.
+- **The skill names no product** (2026-11-12, the owner's call). Its routes were told apart by
+  the apps they were measured in; they now say what each needs: a shell that reaches the npm
+  registry, Node and a download where npm cannot install, or nothing that runs or fetches. What a
+  name carried is kept as what an agent can observe: the registry's errors, a sandbox that
+  downloads only what a browsing tool has opened, a code tool that can be unavailable for hours.
+  This file keeps the apps' names where it records what was measured in them.
 
 Not built: editing an existing package, which a tool beside it does with `checkContent` as its
 check; layout for Drag and Drop and Crossword; and any judgement of whether content is right, which
