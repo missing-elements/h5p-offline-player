@@ -223,6 +223,48 @@ describe('Game Map', () => {
   })
 })
 
+describe('Fill in the Blanks', () => {
+  it('refuses a backslash written to escape a slash or a colon in an answer, and writes the gap out as the library takes it', async () => {
+    expect(await problems('H5P.Blanks', { questions: ['Half is *1\\/2* and the train leaves at *10\\:30*.', 'Speed is in *km\\/h:a unit*.'] })).toEqual([
+      'params.questions[0]: `*1\\/2*`: a backslash escapes nothing in a gap, so H5P.Blanks takes "1\\" or "2" here. In an answer write `/` as `&#47;` and `:` as `&#58;`: `*1&#47;2*`',
+      'params.questions[0]: `*10\\:30*`: a backslash escapes nothing in a gap, so H5P.Blanks takes "10\\" here, with the tip "30". In an answer write `/` as `&#47;` and `:` as `&#58;`: `*10&#58;30*`',
+      'params.questions[1]: `*km\\/h:a unit*`: a backslash escapes nothing in a gap, so H5P.Blanks takes "km\\" or "h" here, with the tip "a unit". In an answer write `/` as `&#47;` and `:` as `&#58;`: `*km&#47;h:a unit*`'
+    ])
+    // Wherever the type sits.
+    expect(await problems('H5P.Column', { content: [{ content: { library: 'H5P.Blanks', params: { questions: ['Half is *1\\/2*.'] } } }] })).toEqual([
+      expect.stringMatching(/^params\.content\[0\]\.content\.params\.questions\[0\]: `\*1\\\/2\*`: a backslash escapes nothing/)
+    ])
+  })
+
+  it('takes every gap the library reads as its author may have meant it', async () => {
+    // Alternatives, a tip, an answer that is a backslash, a backslash in a tip or outside a gap,
+    // and the entities, which the library decodes in each answer: `*1&#47;2*` is the answer 1/2.
+    const questions = [
+      'The *Danube/Donau:It flows through Vienna* reaches the Black Sea at *10:30*.',
+      'A path is split by a *\\/backslash*, as in C:\\/temp, and a tip may hold one: *slash:not \\/ this*.',
+      'Half is *1&#47;2*, the train leaves at *10&#58;30*, speed is in *km&#47;h*.'
+    ]
+    expect((await build('H5P.Blanks', { questions })).questions).toEqual(questions.map((each) => `<p>${each}</p>`))
+  })
+})
+
+describe('Drag the Words', () => {
+  it('refuses a gap the library cannot take apart, and says what the learner would drag', async () => {
+    expect(await problems('H5P.DragText', {
+      textField: 'Yo *hablo:primera persona\\+Correcto: termina en -o.\\-No: la forma es «hablo».* español.\nTú *hablas:segunda persona* bien.\nÉl *habla\\+Bien\\+Muy bien* y ella *habla\\-No\\-Tampoco*.'
+    })).toEqual([
+      'params.textField: gap 1, `*hablo:primera persona\\+Correcto: termina en -o.\\-No: la fo…`: its feedback holds a `:`, where H5P.DragText ends the feedback and starts another tip, and it then leaves them in the word: the learner would drag "hablo:primera persona: termina en -o.: la forma es «hablo».". Write `:` once in a gap, before the tip, and none in the feedback',
+      'params.textField: gap 3, `*habla\\+Bien\\+Muy bien*`: `\\+` stands more than once in it, and it then leaves them in the word: the learner would drag "habla\\+Bien\\+Muy bien". Write `\\+` once in a gap, before the feedback for the right word',
+      'params.textField: gap 4, `*habla\\-No\\-Tampoco*`: `\\-` stands more than once in it, and it then leaves them in the word: the learner would drag "habla\\-No\\-Tampoco". Write `\\-` once in a gap, before the feedback for a wrong word'
+    ])
+  })
+
+  it('takes a tip that holds a colon, feedback without one, and a colon written as an entity', async () => {
+    const textField = 'Yo *hablo:primera persona: yo\\+Correcto, termina en -o.\\-No, la forma es «hablo».* español.\nEl tren sale a las *7&#58;45\\+Correcto&#58; menos cuarto.* y va a 90 *km/h*.'
+    expect((await build('H5P.DragText', { textField, distractors: '*hablas* *10:30:00*' })).textField).toBe(textField)
+  })
+})
+
 describe('chapters and question sets', () => {
   it('asks for a chapter\'s title, which the book\'s contents list it by', async () => {
     expect(await problems('H5P.InteractiveBook', { chapters: [{ library: 'H5P.Column', params: { content: [{ content: question }] } }] })).toEqual([

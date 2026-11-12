@@ -512,6 +512,72 @@ to 3,000. Nineteen things the code does not say by itself:
   skipped, both given) wrote what was given and the default for what was skipped, and the run
   with the author named in the request asked for the licence alone. Those eight packages play
   too.
+- **A text's own marks are said where a chat reads, and what a library cannot take apart is a
+  problem** (2026-11-12, #187). Haiku with a shell and the skill built each of the 32 content
+  types that need no media twice: 64 packages, all built, all passing the verifier with no
+  warning, and four played wrong with no word from either. Two were Drag and Drop, which has no
+  type file here. The other two were a text's marks:
+  - Fill in the Blanks, asked for the answers 1/2, 10:30 and km/h: `*10:30*` is the answer 10
+    with the tip 30 and `*km/h*` takes km or h, since a gap's first colon starts its tip and
+    what is before it is split at every slash (`parseSolution`, H5P.Blanks 1.14).
+  - Drag the Words with a colon in a gap's feedback: the feedback ends there, what follows is a
+    second tip, and `lex` (H5P.DragText 1.10) takes a gap's tips out of its word with one
+    `replace` of all of them, which with two takes out none: the learner drags
+    "hablo:primera persona: termina en -o.".
+
+  Measured where it costs most, Haiku as a chat with the skill's text and no tool, the type, the
+  author and "licence CC BY 4.0" given, each reply built, played, and the library's own key
+  (`getXAPIData`) held against what was asked for. With 0.9.3's text, of 30 first replies:
+  - none wrote the licence's version in its own field: 27 wrote `"license": "CC BY 4.0"`, which
+    the build refused with the list of names, and 3 wrote `CC BY` alone. `licenseVersion` was
+    named in the brief only. Pasted back, the list of names had all 12 replies drop the version.
+  - Fill in the Blanks: all 5 with `SKILL.md` alone wrote the answers as asked, and with the type
+    file 2 of 5 wrote `*1\/2*`, an escape nothing reads, and the other 3 other answers than
+    those asked for.
+  - Drag the Words: 2 of 5 with the type file wrote a colon in feedback.
+
+  What the library does take in an answer is an entity: `parseSolution` decodes each answer's
+  entities, and `&#58;` holds no colon as the gap is split. Played, `*10&#58;30*`,
+  `*km&#47;h*` and `*1&#47;2*` gave the key 10:30, km/h and 1/2, the four answers typed scored
+  4 of 4, and "10" was wrong. In Drag the Words a word written `7&#58;45` is drawn 7:45 and
+  scores, and feedback with `&#58;` shows a colon; the key in its xAPI statement keeps the
+  entity as written. In Mark the Words neither character is a mark. So:
+  - `SKILL.md` says a Creative Commons licence's version is a field of its own, and says of a
+    gap's `/` and `:` what they are and how an answer holds one; the two type files say it
+    with their own examples. The version is in the sentence and not in the example: with it in
+    the example, 3 of 7 replies gave a licence the user had named without a version one of 4.0,
+    and without, none of 5.
+  - A licence written with its version is a problem that names the licence it read and where the
+    version goes (`sourceOf`), the SPDX spelling too.
+  - A backslash before a slash or a colon in a gap's answers is a problem, the gap written out
+    as the library takes it (`LAYOUTS['H5P.Blanks']`). An answer that is a backslash and no
+    more is left alone.
+  - A gap of Drag the Words whose tip or feedback pattern matches twice is a problem, with the
+    word as the library would leave it (`LAYOUTS['H5P.DragText']`). A colon in the tip is
+    none: the tip runs on over it.
+
+  With them, of the first replies that wrote a source, in the same position: Fill in the Blanks
+  took the three answers as asked in 23 of 23, with the type file or without; Drag the Words
+  with its type file drew its words whole in 9 of 9, and without it in 9 of 12, the other three
+  refused for a field of their own making or `distractors` written as a list, and none built
+  and wrong; the version was in its own field in 47 of 47, and a licence skipped was `U` in 5 of
+  5. Three Mark the Words kept a sentence with 10:30 and km/h in it word for word, its words
+  marked as they stand; each was refused for the task description, which a chat without the
+  type file does not know the type requires. Over the
+  replies that had gone wrong, the build's problems pasted back in the build page's words: 8 of
+  8 right in one round, the Blanks with the answers asked for, where the first wording, which
+  told a chat to word the sentence another way, had two of four make two gaps of each answer.
+
+  `*10:30*` as written is not refused: it is a tip to the library, may be one to its author,
+  and a build cannot tell which. A note saying how each such gap was read, left to the chat,
+  did nothing: of 5 replies two sent the same source again, one wrote `\:`, one look-alike
+  characters, one asked. The type file handed back beside the licence's problem had 1 of 3
+  write the entities. A problem in the build's form saying which gap its author did not mean,
+  as a page could copy once they had looked, had 4 of 4; that page is not built. Run over the
+  94 real packages of the owner's corpus and the demo, 53 of these two types in them with 266
+  gaps, the two checks report nothing; over the 1,216 sources these tests stored, only the 17
+  known to play wrong. Not tried: a text edited afterwards in H5P's own editor, whose rich-text
+  widget may write an entity back as its character.
 
 Not built: editing an existing package, which a tool beside it does with `checkContent` as its
 check; layout for Drag and Drop and Crossword; and any judgement of whether content is right, which

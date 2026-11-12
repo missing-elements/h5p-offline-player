@@ -157,10 +157,22 @@ export function sourceOf(input, names) {
   }
   if (tag) source.language = given.language
   else report(at.language, 'expected a BCP 47 language tag, such as "en" or "de-AT"')
+  // A licence written with its version, "CC BY 4.0", as it is spoken of: H5P keeps the version in
+  // a field of its own. The names alone, which this problem used to list, had a chat drop the
+  // version to fit them.
+  const versioned = typeof given.license === 'string' ? /^CC[ -](BY(?:-(?:NC-SA|NC-ND|NC|ND|SA))?)[ -]v?(\d\.\d)$/i.exec(given.license.trim()) : null
+  const license = versioned ? `CC ${versioned[1].toUpperCase()}` : given.license
   if (LICENSES.includes(given.license)) source.license = given.license
-  else report(at.license, `use one of ${LICENSES.map((each) => JSON.stringify(each)).join(', ')}; "U" when it is not known`)
+  else if (versioned) {
+    const written = JSON.stringify(given.license)
+    if (given.licenseVersion !== undefined) report(at.license, `${written} holds the version too, which licenseVersion names: write "license": "${license}"`)
+    else if (CC_VERSIONS.includes(versioned[2])) report(at.license, `${written} holds the version too: write "license": "${license}" and "licenseVersion": "${versioned[2]}"`)
+    else report(at.license, `${written} holds a version too: write "license": "${license}" and "licenseVersion", one of ${CC_VERSIONS.join(', ')}`)
+    source.license = license
+    if (given.licenseVersion === undefined && CC_VERSIONS.includes(versioned[2])) source.licenseVersion = versioned[2]
+  } else report(at.license, `use one of ${LICENSES.map((each) => JSON.stringify(each)).join(', ')}; "U" when it is not known`)
   if (given.licenseVersion !== undefined) {
-    if (!String(given.license).startsWith('CC ') || given.license === 'CC0 1.0' || given.license === 'CC PDM') report(at.licenseVersion, 'is for a Creative Commons BY licence only')
+    if (!String(license).startsWith('CC ') || license === 'CC0 1.0' || license === 'CC PDM') report(at.licenseVersion, 'is for a Creative Commons BY licence only')
     else if (!CC_VERSIONS.includes(given.licenseVersion)) report(at.licenseVersion, `use one of ${CC_VERSIONS.join(', ')}`)
     else source.licenseVersion = given.licenseVersion
   }

@@ -89,10 +89,15 @@ from what you know of the type: the build says, for each place that is wrong, wh
 
 - Every source names its own `title`, `language`, `license` and `authors` beside `type` and
   `params`, as above, whatever a type file's example leaves out; the author and licence are the
-  ones step 1 settled.
+  ones step 1 settled. A Creative Commons licence's version is a field of its own, written
+  where the user gave one: "CC BY 4.0" is `"license": "CC BY", "licenseVersion": "4.0"`.
 - `params` holds only fields that differ from their defaults. Never interface texts (Check,
   Retry…): they come from the libraries' translations for `language`.
 - Text is plain, or markup with only the tags a field marked `html` lists.
+- In a gap of H5P.Blanks `/` separates answers and `:` starts a tip, and in a gap of
+  H5P.DragText `:` starts a tip. Where one belongs to the answer itself, write `&#47;` for `/`
+  and `&#58;` for `:`: `*10&#58;30*` takes 10:30, where `*10:30*` is the answer 10 with the
+  tip 30. A backslash escapes nothing.
 - A file is `{ "path": "photo.jpg" }`, beside the source or a web address, with `copyright`
   when known.
 - Sub-content is `{ "library": "H5P.MultiChoice", "params": { … }, "metadata": { "title": "…" } }`.

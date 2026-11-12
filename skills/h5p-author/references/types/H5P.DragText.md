@@ -3,6 +3,7 @@
 Text with gaps the learner fills by dragging words from a list. Easier than typing them: recognition, not recall.
 
 - `textField` is plain text with the words to drag marked `*word*`; a tip after `:`, feedback after `\+` (right) and `\-` (wrong), as the Fields section shows.
+- `:` stands once in a gap, before the tip, and feedback holds none: feedback ends at a `:`, and the tip then stays in the word the learner drags. A colon in the word itself is written `&#58;`: `*7&#58;45*` is the word 7:45, where `*7:45*` is the word 7 with the tip 45.
 - Each gap has one right word. Line breaks in `textField` are kept.
 - `distractors` adds wrong words to the list, in the same `*word*` form.
 
