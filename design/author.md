@@ -212,7 +212,13 @@ to 3,000. Twenty-four things the code does not say by itself:
   conditions; interface texts and the fields a layout sets left out. The weekly pack refresh runs
   `sync:skill`; `apps/skills`' test fails on a file out of date, and builds and plays every
   example. 28 content types have files, and the parts other content holds (Text, Image, Video);
-  any other type's fields are one `h5p-author schema` away.
+  any other type's fields are one `h5p-author schema` away. Where npm cannot install, SKILL.md
+  names that command for the one-file tool with the type's bundle, `node h5p-author.mjs schema
+  <Type> --libraries parts` (2026-11-12): given only the npx form, Haiku reading the skill by its
+  link with no registry ran the tool without `--libraries` in 4 of 4 runs and met Node's "Cannot
+  find package '@missing-elements/h5p-libraries'", and one of them gave the tool up and wrote a
+  Crossword from memory; given the command, 4 of 4 had the fields at once and built a package
+  the verifier passed (Crossword and Find the Words, two runs each).
 - **The editor is pinned, and not watched** (2026-11-01, the owner's choice, as for the content
   check). Nothing the editor does decides whether a package plays: the libraries and the platforms'
   validator do, both pinned here too. A change in the editor makes a build differ from what the

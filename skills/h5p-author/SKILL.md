@@ -66,7 +66,9 @@ a name made up for them.
 | H5P.GameMap | stages on a map, each with exercises (a map) |
 
 Media come from the user; never invent them. For a type not listed, run
-`npx @missing-elements/h5p-author@latest schema <Type>` and say it has no notes here. Never
+`npx @missing-elements/h5p-author@latest schema <Type>` and say it has no notes here. Where npx
+cannot install, fetch the build tool and that type's bundle as step 3 says, unzip the bundle, and
+run `node h5p-author.mjs schema <Type> --libraries parts` instead. Never
 read a library's semantics or code yourself: the type file and `schema` say what a source may
 write, and an agent that works it out from the library spends two to three times as much for
 the same package.
