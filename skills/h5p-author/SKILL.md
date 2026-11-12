@@ -66,7 +66,9 @@ a name made up for them.
 | H5P.GameMap | stages on a map, each with exercises (a map) |
 
 Media come from the user; never invent them. For a type not listed, run
-`npx @missing-elements/h5p-author@latest schema <Type>` and say it has no notes here. Never
+`npx @missing-elements/h5p-author@latest schema <Type>` and say it has no notes here. Where npx
+cannot install, fetch the build tool and that type's bundle as step 3 says, unzip the bundle, and
+run `node h5p-author.mjs schema <Type> --libraries parts` instead. Never
 read a library's semantics or code yourself: the type file and `schema` say what a source may
 write, and an agent that works it out from the library spends two to three times as much for
 the same package.
@@ -153,12 +155,12 @@ for the user to play it before using it.
 **Where nothing can be fetched or run, the build page builds it.** No shell, no Node, or no
 download: [the build page](https://missing-elements.github.io/h5p/build/) builds the same package in the user's
 browser from the source alone, with no install. Give them a link that carries the source, written
-with Node or Python, which need no network, and the line under it, where to say how it went. A
-source that names files gets that line alone: a link carries its text, not the files:
+with Node or Python, which need no network. A source that names files gets none: a link carries
+its text, not the files:
 
 ```bash
-node -e "const s=require('fs').readFileSync('source.json'),f=[];JSON.parse(s,(k,v)=>(k==='path'&&typeof v==='string'&&f.push(v),v));f.length||console.log('https://missing-elements.github.io/h5p/build/#source='+require('zlib').deflateRawSync(s).toString('base64url'));console.log('How did it go? Say so by email or on GitHub: https://missing-elements.github.io/h5p/build/#feedback-heading')"
-python3 -c "import base64,json,zlib;s=open('source.json','rb').read();f=[];json.loads(s,object_hook=lambda o:(isinstance(o.get('path'),str) and f.append(o['path']),o)[1]);c=zlib.compressobj(9,zlib.DEFLATED,-15);d=c.compress(s)+c.flush();f or print('https://missing-elements.github.io/h5p/build/#source='+base64.urlsafe_b64encode(d).decode().rstrip('='));print('How did it go? Say so by email or on GitHub: https://missing-elements.github.io/h5p/build/#feedback-heading')"
+node -e "const s=require('fs').readFileSync('source.json'),f=[];JSON.parse(s,(k,v)=>(k==='path'&&typeof v==='string'&&f.push(v),v));console.log(f.length?'No link: the source names files, which a link cannot carry.':'https://missing-elements.github.io/h5p/build/#source='+require('zlib').deflateRawSync(s).toString('base64url'))"
+python3 -c "import base64,json,zlib;s=open('source.json','rb').read();f=[];json.loads(s,object_hook=lambda o:(isinstance(o.get('path'),str) and f.append(o['path']),o)[1]);c=zlib.compressobj(9,zlib.DEFLATED,-15);d=c.compress(s)+c.flush();print('No link: the source names files, which a link cannot carry.' if f else 'https://missing-elements.github.io/h5p/build/#source='+base64.urlsafe_b64encode(d).decode().rstrip('='))"
 ```
 
 **A link is only what one of these commands printed here, handed over whole: no command run, no
@@ -166,14 +168,15 @@ link.** Never write a `#source=` link yourself, from memory or after an example,
 for one: its text is compressed, so it cannot be typed, and one wrong character leaves the page
 nothing to build.
 
-Where they print no link, with neither, or with no tool that runs anything at all (a chat's code
-tool can be unavailable for hours), give no link: the page sees only what the user pastes, so put the **whole source in
-your reply**, in one `json` code block, and tell them to paste it into the page. Never give the
-page's address without the source, in the link or beside it: it builds nothing. The page lists
-every problem by its path, with a button that copies them for the chat: fix them all and give a
-new link, or the whole source again. A source that names files of its own waits for the user to
-choose them there. Steps 4 and 5 are then the user's, on that page: the package is **unverified**
-until they have played it there, and they download it from there.
+Where nothing is built here and they print no link, with neither, or with no tool that runs
+anything at all (a chat's code tool can be unavailable for hours), give no link: the page sees
+only what the user pastes, so put the **whole source in your reply**, in one `json` code block,
+and tell them to paste it into the page at https://missing-elements.github.io/h5p/build/. Never
+give the page's address without the source, in the link or beside it: it builds nothing. The
+page lists every problem by its path, with a button that copies them for the chat: fix them all
+and give a new link, or the whole source again. A source that names files of its own waits for
+the user to choose them there. Steps 4 and 5 are then the user's, on that page: the package is
+**unverified** until they have played it there, and they download it from there.
 
 A source with a problem writes nothing: the build lists every problem by its path, so fix them
 all and run it again under the same name. Once a build has written its file it never writes
@@ -199,7 +202,9 @@ removing what fails. Without a browser, say the package is **unverified**.
 
 ## 5. Review and hand over
 
-Check answers and feedback against the material. Then let the user play it in their browser:
+Check answers and feedback against the material. Where nothing was built here, step 3's build
+page route is the whole hand-over: the link it printed, or the whole source and the page's
+address. Otherwise let the user play it in their browser:
 
 ```bash
 npx @missing-elements/h5p-verify@latest course.h5p --preview
@@ -207,31 +212,27 @@ npx @missing-elements/h5p-verify@latest course.h5p --preview
 
 Run it in the background; it ends once its tab has closed. Ask the user to work through all of
 it, wrong answers included; its Download button saves a copy. Where the command does not run on
-the user's computer, hand over the file and the command. If you already have a browser tool,
-add `--no-open` and play the address it prints with that tool. Do not write a browser script to
-do it: the person's own play is the check, and a script of your own costs more than the build.
+the user's computer, hand over the file, and the command where step 3 printed no link. If you
+already have a browser tool, add `--no-open` and play the address it prints with that tool. Do
+not write a browser script to do it: the person's own play is the check, and a script of your
+own costs more than the build.
 
 Deliver:
 
 - the `.h5p`, and its source as a file beside it, under the package's name with `.source.json`
   (`course.source.json`), copied as the package was; the build page opens it too. Name the files
   it names, if any: a build reads them beside it;
-- what one of step 3's two commands printed here for this source, handed over whole: the build
-  page's link that carries it, where the user plays the package in any browser, changes the source
-  and builds it again (none for a source that names files, which a link cannot carry), and in
-  every case the line where they can say how it went. A link is only what one of them printed;
-  where neither runs, there is none;
-- `report.json`, `screenshot.png` and the report's full `revision`, from the run that passed;
-  where it could not run, no report and call the package **unverified**; where it ran but failed,
-  give its report and reasons and say the package **failed verification**;
-- the preview command, and the build's notes;
+- the link one of step 3's two commands printed here for this source, handed over whole: the
+  build page, where the user plays the package in any browser, changes the source and builds it
+  again, and says how it went at the foot of the page. A link is only what one of them printed:
+  none for a source that names files, and none where neither runs. Give no other web address;
+- `screenshot.png` from the run that passed; where it could not run, call the package
+  **unverified**; where it ran but failed, give its reasons and say the package **failed
+  verification**;
+- the build's notes, and the preview command where there is no link;
 - what a pass means: it starts and draws, not that it is accurate, accessible or right for
   every LMS;
 - that it carries the editor libraries an H5P site's upload check asks for, so a Moodle with no
   library installed accepts it (the one site tried);
-- that it carries H5P's libraries, each under its own licence, most MIT, listed in the pack's
-  [`libraries.txt`](https://github.com/missing-elements/h5p-offline-player/blob/main/packages/libraries/libraries.txt),
-  so the user checks those terms before they distribute it;
-- where it goes next: the H5P Preview extension (`MissingElements.h5p-preview`) plays it in
-  VS Code, Cursor or VSCodium, `h5p-player-setup` puts it on a website, and `h5p-to-scorm`
-  makes it a SCORM zip for an LMS.
+- that it carries H5P's libraries, each under its own licence, most MIT, so the user checks
+  those terms before they distribute it.

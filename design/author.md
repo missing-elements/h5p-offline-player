@@ -212,7 +212,13 @@ to 3,000. Twenty-four things the code does not say by itself:
   conditions; interface texts and the fields a layout sets left out. The weekly pack refresh runs
   `sync:skill`; `apps/skills`' test fails on a file out of date, and builds and plays every
   example. 28 content types have files, and the parts other content holds (Text, Image, Video);
-  any other type's fields are one `h5p-author schema` away.
+  any other type's fields are one `h5p-author schema` away. Where npm cannot install, SKILL.md
+  names that command for the one-file tool with the type's bundle, `node h5p-author.mjs schema
+  <Type> --libraries parts` (2026-11-12): given only the npx form, Haiku reading the skill by its
+  link with no registry ran the tool without `--libraries` in 4 of 4 runs and met Node's "Cannot
+  find package '@missing-elements/h5p-libraries'", and one of them gave the tool up and wrote a
+  Crossword from memory; given the command, 4 of 4 had the fields at once and built a package
+  the verifier passed (Crossword and Find the Words, two runs each).
 - **The editor is pinned, and not watched** (2026-11-01, the owner's choice, as for the content
   check). Nothing the editor does decides whether a package plays: the libraries and the platforms'
   validator do, both pinned here too. A change in the editor makes a build differ from what the
@@ -583,45 +589,68 @@ to 3,000. Twenty-four things the code does not say by itself:
   gaps, the two checks report nothing; over the 524 distinct sources these tests stored, 199 of
   the two types with 765 gaps, only the 14 known to play wrong. Not tried: a text edited afterwards in H5P's own editor, whose rich-text
   widget may write an entity back as its character.
-- **The hand-over carries the source, its link to the build page and where to say how it went**
-  (2026-11-12, #190). The owner wants people to try the skill and to hear from them. The build
-  page asks how it went, by email first, since a teacher may have no GitHub account, or in a
-  GitHub discussion; but a chat that builds the package itself hands it over in the chat, and its
-  user never sees that page. The organisation's site counts no visits, and the repository's
-  discussions held no feedback. So step 5 hands over, beside the package, the source as a file
-  under the package's name with `.source.json`, which the page opens too, and both lines step 3's
-  command prints: the page's link that carries the source and, under it, where to say how it
-  went, `https://missing-elements.github.io/h5p/build/#feedback-heading`, the page's own section,
-  so where feedback goes stays the site's to change, in one place. That address is a contract
-  with every installed copy, as `#source=` is: the page keeps the id. A fragment with no `source`
-  builds nothing (`sourceFromFragment` reads `source` alone), and in Chromium, 1280 and 390 px
-  wide, the section is in view once the page has settled.
+- **The hand-over carries the source and one web address, the build page's link** (2026-11-12,
+  #190; cut to one address the same evening, the owner's call). The owner wants people to try
+  the skill and to hear from them. The build page asks how it went at its foot, by email first,
+  since a teacher may have no GitHub account, or in a GitHub discussion; but a chat that builds
+  the package itself hands it over in the chat, and its user sees that page only if the reply
+  sends them there. So step 5 hands over, beside the package, the source as a file under the
+  package's name with `.source.json`, which the page opens too, and the link step 3's command
+  prints, which carries the source: where the user plays the package in any browser, changes the
+  source and builds it again, and says how it went at the foot of the page. It is the reply's one
+  web address.
+
+  0.9.5 handed over a second line, printed by the same command under the link: `How did it go?
+  Say so by email or on GitHub: https://missing-elements.github.io/h5p/build/#feedback-heading`.
+  With it and the rest of step 5's list, a finished reply held two or three web addresses beside
+  the package's files, the link, that line and the pack's `libraries.txt` on GitHub, and with them
+  the preview command, three tools to go to next and, where the verifier ran, its report and
+  revision. The owner found that too many links and kept the link alone: the libraries' licences
+  stay a sentence, the preview command goes over only where there is no link, the screenshot
+  without the report. The page keeps the id `feedback-heading`, whose address installed copies of
+  0.9.5 print; that fragment has no `source`, so it builds nothing (`sourceFromFragment` reads
+  `source` alone).
 
   Measured on Haiku in Claude Code's place (the skill, a shell, npm, the verifier left out), a
   three-question Question Set with the author and licence given. With 0.9.4's text, 2 of 3 runs
-  handed the source over as a file, unasked, and none a link or where to say how it went. With
-  the new text, all 14 runs handed over the source file and a link that decodes to the source
-  byte for byte, 1,230 to 1,460 characters for three questions. Where to say how it went was the
-  hard part, since a weak model shortens step 5's list as it writes it out: as an item of the
-  list, last or third, it reached 3 of 6 replies; told to end the reply with it, 3 of 4; printed
-  by step 3's command under the link, 3 of 4, and the fourth sent the user to the link's page to
-  say how it went, where every other miss said nothing. The command is kept: what a command
-  printed is what a weak model hands over, and the line goes wherever the link goes, the bundle
-  route included. With step 5 saying the line goes in every case, it reached 5 of 5, two plain
-  sources and three with a picture.
+  handed the source over as a file, unasked, and none a link. With 0.9.5's, all 14 runs handed
+  over the source file and a link that decodes to the source byte for byte, 1,230 to 1,460
+  characters for three questions, and the feedback line, printed by the command, reached 5 of 5
+  replies once step 5 said it goes in every case; as an item of step 5's list it had reached 3 of
+  6, since a weak model shortens the list as it writes it out. With the one address, 3 of 3 runs
+  handed over the source file and the link, exact, as the reply's only web address, and none the
+  feedback line, the `libraries.txt` link, the next tools or the preview command; the replies ran
+  2,250 to 2,737 characters, against 3,146 and 3,724. None of the three said to tell how it went
+  at the page's foot: what step 5 asks a chat to write itself is what a weak model drops, so
+  feedback on a package built in a chat now rests on its user scrolling the page.
 
   A link carries the text of a source and not the files it names (cubic's review): the page asks
   for those by name once it has the source, and a picture at a web address reaches it only where
   its host lets another site fetch it. So for a source that names a file, by any `path`, the
-  commands print the feedback line alone, and in the build page's route such a source goes over
-  whole, to be pasted, its files chosen on the page. It is decided by the source and not by its
-  type: nearly every type takes media, Multiple Choice, Question Set, Column, a book and slides
-  among them, and most sources name none. The source file goes over as before, the files it names
-  said by name, since a build reads them beside it; they are not copied, a video being large.
-  When the commands printed a line saying why there was no link, above the feedback line, 3 of 3
-  runs with a picture passed on neither: they wrote the reason in their own words and left the
-  address out. With the feedback line printed alone, 3 of 3 passed it on, none gave a link, and 2
-  of 3 named the picture.
+  commands print why there is no link instead (`No link: the source names files, which a link
+  cannot carry.`), and in the build page's route such a source goes over whole, to be pasted, its
+  files chosen on the page. It is decided by the source and not by its type: nearly every type
+  takes media, Multiple Choice, Question Set, Column, a book and slides among them, and most
+  sources name none. The source file goes over as before, the files it names said by name, since a
+  build reads them beside it; they are not copied, a video being large. 0.9.5's commands printed
+  the feedback line alone for such a source, since a reason printed above that line had cost the
+  address in 3 of 3 runs; with no address left to lose, the reason is printed. With the
+  one-address text, 2 of 2 runs with a picture gave no web address, and handed over the source
+  file and the preview command, the one way left there to play it.
+
+  Where nothing is built in the chat, step 3's build page route is the whole hand-over (cubic's
+  review of #193): the link a command printed or, where none was, the whole source in a `json`
+  block and the page's address, then the reply's one web address. Step 5 opens by saying so, and
+  step 3's paragraph for that case names the address and holds only where nothing is built: read
+  alone, step 5's list, which gives no other web address and the preview command where there is
+  no link, would take the page's address from a chat that has only the source, and hand it a
+  command for a package that does not exist. Haiku as a chat with no tools, the skill's text and
+  the type's file pasted in, had done right before: 5 of 5 replies, three Question Sets and two
+  Multiple Choice questions naming the user's picture, gave the source in one `json` block beside
+  the page's address, no link and no preview command, and named the picture to choose on the
+  page; with the change, 5 of 5 again. It is for a model that reads step 5's list to the letter.
+  In Claude Code's place it changed nothing: 2 of 2 Question Sets handed over the exact link
+  alone, and the picture run no address and the preview command.
 - **The skill names no product** (2026-11-12, the owner's call). Its routes were told apart by
   the apps they were measured in; they now say what each needs: a shell that reaches the npm
   registry, Node and a download where npm cannot install, or nothing that runs or fetches. What a
