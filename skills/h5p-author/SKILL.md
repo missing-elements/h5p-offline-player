@@ -110,12 +110,11 @@ from what you know of the type: the build says, for each place that is wrong, wh
 
 Build the best way this environment allows, and tell the user which you take:
 
-- **Here, with npm**: a shell that reaches the npm registry (Claude Code, a terminal). The
-  command below.
-- **Here, from two files**: Node runs and files can be fetched, but npm cannot install, as in
-  ChatGPT. *If it cannot install here*, below.
-- **In the user's browser**: nothing here runs, or nothing fetches, as in Gemini or a chat with
-  no tools. *The build page*, below, with no attempt here first.
+- **Here, with npm**: a shell that reaches the npm registry, as in a terminal. The command below.
+- **Here, from two files**: Node runs and files can be fetched, but npm cannot install, as in a
+  chat's sandbox that reaches the web and no registry. *If it cannot install here*, below.
+- **In the user's browser**: nothing here runs, or nothing fetches, as in a chat with no tools
+  or one that cannot open a web address. *The build page*, below, with no attempt here first.
 
 Take the first that applies, and the next if it fails.
 
@@ -126,9 +125,10 @@ npx @missing-elements/h5p-author@latest build source.json course.h5p
 ```
 
 **If it cannot install here, build from files instead.** No network for npm (`EAI_AGAIN`,
-`ENOTFOUND`, a registry's 403, 404 or 503, as in ChatGPT): do not retry, try another way to
-install it, or end with commands for the user to run once npm works. Where Node runs and you can
-fetch a file (in ChatGPT, open each address with the browsing tool, then download it), fetch the
+`ENOTFOUND`, a registry's 403, 404 or 503): do not retry, try another way to install it, or end
+with commands for the user to run once npm works. Where Node runs and you can fetch a file (where
+the sandbox downloads only what a browsing tool has opened, open each address with that tool
+first, then download it), fetch the
 build tool and the bundle of the source's own `type`, the libraries a build of that type reads,
 at the addresses https://missing-elements.github.io/h5p/skill/ lists for them. In both addresses
 and commands below, `<type>` is that machine name, such as `H5P.Blanks`: another type's bundle
@@ -153,11 +153,12 @@ for the user to play it before using it.
 **Where nothing can be fetched or run, the build page builds it.** No shell, no Node, or no
 download: [the build page](https://missing-elements.github.io/h5p/build/) builds the same package in the user's
 browser from the source alone, with no install. Give them a link that carries the source, written
-with Node or Python, which need no network:
+with Node or Python, which need no network, and the line under it, where to say how it went. A
+source that names files gets that line alone: a link carries its text, not the files:
 
 ```bash
-node -e "console.log('https://missing-elements.github.io/h5p/build/#source=' + require('zlib').deflateRawSync(require('fs').readFileSync('source.json')).toString('base64url'))"
-python3 -c "import base64,zlib;c=zlib.compressobj(9,zlib.DEFLATED,-15);d=c.compress(open('source.json','rb').read())+c.flush();print('https://missing-elements.github.io/h5p/build/#source='+base64.urlsafe_b64encode(d).decode().rstrip('='))"
+node -e "const s=require('fs').readFileSync('source.json'),f=[];JSON.parse(s,(k,v)=>(k==='path'&&typeof v==='string'&&f.push(v),v));f.length||console.log('https://missing-elements.github.io/h5p/build/#source='+require('zlib').deflateRawSync(s).toString('base64url'));console.log('How did it go? Say so by email or on GitHub: https://missing-elements.github.io/h5p/build/#feedback-heading')"
+python3 -c "import base64,json,zlib;s=open('source.json','rb').read();f=[];json.loads(s,object_hook=lambda o:(isinstance(o.get('path'),str) and f.append(o['path']),o)[1]);c=zlib.compressobj(9,zlib.DEFLATED,-15);d=c.compress(s)+c.flush();f or print('https://missing-elements.github.io/h5p/build/#source='+base64.urlsafe_b64encode(d).decode().rstrip('='));print('How did it go? Say so by email or on GitHub: https://missing-elements.github.io/h5p/build/#feedback-heading')"
 ```
 
 **A link is only what one of these commands printed here, handed over whole: no command run, no
@@ -165,8 +166,8 @@ link.** Never write a `#source=` link yourself, from memory or after an example,
 for one: its text is compressed, so it cannot be typed, and one wrong character leaves the page
 nothing to build.
 
-With neither, or no tool that runs anything at all (in ChatGPT, data analysis can be unavailable
-for hours), give no link: the page sees only what the user pastes, so put the **whole source in
+Where they print no link, with neither, or with no tool that runs anything at all (a chat's code
+tool can be unavailable for hours), give no link: the page sees only what the user pastes, so put the **whole source in
 your reply**, in one `json` code block, and tell them to paste it into the page. Never give the
 page's address without the source, in the link or beside it: it builds nothing. The page lists
 every problem by its path, with a button that copies them for the chat: fix them all and give a
@@ -212,7 +213,14 @@ do it: the person's own play is the check, and a script of your own costs more t
 
 Deliver:
 
-- the `.h5p` and the source;
+- the `.h5p`, and its source as a file beside it, under the package's name with `.source.json`
+  (`course.source.json`), copied as the package was; the build page opens it too. Name the files
+  it names, if any: a build reads them beside it;
+- what one of step 3's two commands printed here for this source, handed over whole: the build
+  page's link that carries it, where the user plays the package in any browser, changes the source
+  and builds it again (none for a source that names files, which a link cannot carry), and in
+  every case the line where they can say how it went. A link is only what one of them printed;
+  where neither runs, there is none;
 - `report.json`, `screenshot.png` and the report's full `revision`, from the run that passed;
   where it could not run, no report and call the package **unverified**; where it ran but failed,
   give its report and reasons and say the package **failed verification**;
