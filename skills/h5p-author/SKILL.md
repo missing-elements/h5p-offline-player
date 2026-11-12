@@ -153,11 +153,11 @@ for the user to play it before using it.
 **Where nothing can be fetched or run, the build page builds it.** No shell, no Node, or no
 download: [the build page](https://missing-elements.github.io/h5p/build/) builds the same package in the user's
 browser from the source alone, with no install. Give them a link that carries the source, written
-with Node or Python, which need no network:
+with Node or Python, which need no network, and the line under it, where to say how it went:
 
 ```bash
-node -e "console.log('https://missing-elements.github.io/h5p/build/#source=' + require('zlib').deflateRawSync(require('fs').readFileSync('source.json')).toString('base64url'))"
-python3 -c "import base64,zlib;c=zlib.compressobj(9,zlib.DEFLATED,-15);d=c.compress(open('source.json','rb').read())+c.flush();print('https://missing-elements.github.io/h5p/build/#source='+base64.urlsafe_b64encode(d).decode().rstrip('='))"
+node -e "console.log('https://missing-elements.github.io/h5p/build/#source=' + require('zlib').deflateRawSync(require('fs').readFileSync('source.json')).toString('base64url'));console.log('How did it go? Say so by email or on GitHub: https://missing-elements.github.io/h5p/build/#feedback-heading')"
+python3 -c "import base64,zlib;c=zlib.compressobj(9,zlib.DEFLATED,-15);d=c.compress(open('source.json','rb').read())+c.flush();print('https://missing-elements.github.io/h5p/build/#source='+base64.urlsafe_b64encode(d).decode().rstrip('='));print('How did it go? Say so by email or on GitHub: https://missing-elements.github.io/h5p/build/#feedback-heading')"
 ```
 
 **A link is only what one of these commands printed here, handed over whole: no command run, no
@@ -212,7 +212,12 @@ do it: the person's own play is the check, and a script of your own costs more t
 
 Deliver:
 
-- the `.h5p` and the source;
+- the `.h5p`, and its source as a file beside it, under the package's name with `.source.json`
+  (`course.source.json`), copied as the package was; the build page opens it too;
+- both lines one of step 3's two commands printed here for this source, handed over whole: the
+  build page's link that carries it, where the user plays the package in any browser, changes the
+  source and builds it again, and where they can say how it went. A link is only what one of
+  them printed; where neither runs, there is none;
 - `report.json`, `screenshot.png` and the report's full `revision`, from the run that passed;
   where it could not run, no report and call the package **unverified**; where it ran but failed,
   give its report and reasons and say the package **failed verification**;

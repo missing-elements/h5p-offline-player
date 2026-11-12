@@ -15,7 +15,7 @@ already holds text to the content check's rules, from the pack an untrusted chec
 `apps/skills` plays every example untrusted too. Measured on a five-question quiz, at four
 characters a token: `content.json` was about 3,470 tokens to write by hand, after reading 3,900 to
 9,500 of a type's semantics; the source is 1,000 to 1,800 tokens, written from a type file of 200
-to 3,000. Nineteen things the code does not say by itself:
+to 3,000. Twenty-three things the code does not say by itself:
 
 - **One generator, three ways to run it.** The third, `saved`, checks content as H5P stores it
   (*Saved content is checked as the build checks what it writes*, below). `ContentGenerator` was the sweep's
@@ -583,6 +583,31 @@ to 3,000. Nineteen things the code does not say by itself:
   gaps, the two checks report nothing; over the 524 distinct sources these tests stored, 199 of
   the two types with 765 gaps, only the 14 known to play wrong. Not tried: a text edited afterwards in H5P's own editor, whose rich-text
   widget may write an entity back as its character.
+- **The hand-over carries the source, its link to the build page and where to say how it went**
+  (2026-11-12, #190). The owner wants people to try the skill and to hear from them. The build
+  page asks how it went, by email first, since a teacher may have no GitHub account, or in a
+  GitHub discussion; but a chat that builds the package itself hands it over in the chat, and its
+  user never sees that page. The organisation's site counts no visits, and the repository's
+  discussions held no feedback. So step 5 hands over, beside the package, the source as a file
+  under the package's name with `.source.json`, which the page opens too, and both lines step 3's
+  command prints: the page's link that carries the source and, under it, where to say how it
+  went, `https://missing-elements.github.io/h5p/build/#feedback-heading`, the page's own section,
+  so where feedback goes stays the site's to change, in one place. That address is a contract
+  with every installed copy, as `#source=` is: the page keeps the id. A fragment with no `source`
+  builds nothing (`sourceFromFragment` reads `source` alone), and in Chromium, 1280 and 390 px
+  wide, the section is in view once the page has settled.
+
+  Measured on Haiku in Claude Code's place (the skill, a shell, npm, the verifier left out), a
+  three-question Question Set with the author and licence given. With 0.9.4's text, 2 of 3 runs
+  handed the source over as a file, unasked, and none a link or where to say how it went. With
+  the new text, all 14 runs handed over the source file and a link that decodes to the source
+  byte for byte, 1,230 to 1,460 characters for three questions. Where to say how it went was the
+  hard part, since a weak model shortens step 5's list as it writes it out: as an item of the
+  list, last or third, it reached 3 of 6 replies; told to end the reply with it, 3 of 4; printed
+  by step 3's command under the link, 3 of 4, and the fourth sent the user to the link's page to
+  say how it went, where every other miss said nothing. The command is kept: what a command
+  printed is what a weak model hands over, and the line goes wherever the link goes, the bundle
+  route included.
 
 Not built: editing an existing package, which a tool beside it does with `checkContent` as its
 check; layout for Drag and Drop and Crossword; and any judgement of whether content is right, which
