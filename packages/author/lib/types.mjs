@@ -647,7 +647,9 @@ const imageHotspotQuestion = {
 /**
  * The gaps of one block of text, found as H5P.Blanks 1.14 finds them (`handleBlanks` in its
  * `js/blanks.js`): from an asterisk to the next, the tags between them taken out, an empty pair
- * passed over, and the character after a gap never read as the start of the next.
+ * passed over, and the character after a gap never read as the start of the next. The library
+ * takes the tags out in one pass; here they are taken out until none is left, which differs only
+ * for a tag written inside a tag (`<<em>em>`), and leaves no tag that one pass would have joined.
  * @param {string} question
  * @returns {{ raw: string, content: string }[]} each gap as written, asterisks included, and what the library reads of it
  */
@@ -657,7 +659,11 @@ function blanksGaps(question) {
   while (start !== -1) {
     const end = question.indexOf('*', start + 1)
     if (end === -1) break
-    const content = question.slice(start + 1, end).replaceAll(/<\/?[a-z]*\d?>/gi, '')
+    let content = question.slice(start + 1, end)
+    for (let before = ''; before !== content; ) {
+      before = content
+      content = content.replaceAll(/<\/?[a-z]*\d?>/gi, '')
+    }
     if (content.length) gaps.push({ raw: question.slice(start, end + 1), content })
     start = question.indexOf('*', content.length ? end + 2 : end + 1)
   }

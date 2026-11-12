@@ -575,8 +575,8 @@ to 3,000. Nineteen things the code does not say by itself:
   write the entities. A problem in the build's form saying which gap its author did not mean,
   as a page could copy once they had looked, had 4 of 4; that page is not built. Run over the
   94 real packages of the owner's corpus and the demo, 53 of these two types in them with 266
-  gaps, the two checks report nothing; over the 1,216 sources these tests stored, only the 17
-  known to play wrong. Not tried: a text edited afterwards in H5P's own editor, whose rich-text
+  gaps, the two checks report nothing; over the 524 distinct sources these tests stored, 199 of
+  the two types with 765 gaps, only the 14 known to play wrong. Not tried: a text edited afterwards in H5P's own editor, whose rich-text
   widget may write an entity back as its character.
 
 Not built: editing an existing package, which a tool beside it does with `checkContent` as its
