@@ -637,6 +637,20 @@ to 3,000. Twenty-four things the code does not say by itself:
   address in 3 of 3 runs; with no address left to lose, the reason is printed. With the
   one-address text, 2 of 2 runs with a picture gave no web address, and handed over the source
   file and the preview command, the one way left there to play it.
+
+  Where nothing is built in the chat, step 3's build page route is the whole hand-over (cubic's
+  review of #193): the link a command printed or, where none was, the whole source in a `json`
+  block and the page's address, then the reply's one web address. Step 5 opens by saying so, and
+  step 3's paragraph for that case names the address and holds only where nothing is built: read
+  alone, step 5's list, which gives no other web address and the preview command where there is
+  no link, would take the page's address from a chat that has only the source, and hand it a
+  command for a package that does not exist. Haiku as a chat with no tools, the skill's text and
+  the type's file pasted in, had done right before: 5 of 5 replies, three Question Sets and two
+  Multiple Choice questions naming the user's picture, gave the source in one `json` block beside
+  the page's address, no link and no preview command, and named the picture to choose on the
+  page; with the change, 5 of 5 again. It is for a model that reads step 5's list to the letter.
+  In Claude Code's place it changed nothing: 2 of 2 Question Sets handed over the exact link
+  alone, and the picture run no address and the preview command.
 - **The skill names no product** (2026-11-12, the owner's call). Its routes were told apart by
   the apps they were measured in; they now say what each needs: a shell that reaches the npm
   registry, Node and a download where npm cannot install, or nothing that runs or fetches. What a

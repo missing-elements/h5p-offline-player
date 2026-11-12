@@ -168,14 +168,15 @@ link.** Never write a `#source=` link yourself, from memory or after an example,
 for one: its text is compressed, so it cannot be typed, and one wrong character leaves the page
 nothing to build.
 
-Where they print no link, with neither, or with no tool that runs anything at all (a chat's code
-tool can be unavailable for hours), give no link: the page sees only what the user pastes, so put the **whole source in
-your reply**, in one `json` code block, and tell them to paste it into the page. Never give the
-page's address without the source, in the link or beside it: it builds nothing. The page lists
-every problem by its path, with a button that copies them for the chat: fix them all and give a
-new link, or the whole source again. A source that names files of its own waits for the user to
-choose them there. Steps 4 and 5 are then the user's, on that page: the package is **unverified**
-until they have played it there, and they download it from there.
+Where nothing is built here and they print no link, with neither, or with no tool that runs
+anything at all (a chat's code tool can be unavailable for hours), give no link: the page sees
+only what the user pastes, so put the **whole source in your reply**, in one `json` code block,
+and tell them to paste it into the page at https://missing-elements.github.io/h5p/build/. Never
+give the page's address without the source, in the link or beside it: it builds nothing. The
+page lists every problem by its path, with a button that copies them for the chat: fix them all
+and give a new link, or the whole source again. A source that names files of its own waits for
+the user to choose them there. Steps 4 and 5 are then the user's, on that page: the package is
+**unverified** until they have played it there, and they download it from there.
 
 A source with a problem writes nothing: the build lists every problem by its path, so fix them
 all and run it again under the same name. Once a build has written its file it never writes
@@ -201,7 +202,9 @@ removing what fails. Without a browser, say the package is **unverified**.
 
 ## 5. Review and hand over
 
-Check answers and feedback against the material. Then let the user play it in their browser:
+Check answers and feedback against the material. Where nothing was built here, step 3's build
+page route is the whole hand-over: the link it printed, or the whole source and the page's
+address. Otherwise let the user play it in their browser:
 
 ```bash
 npx @missing-elements/h5p-verify@latest course.h5p --preview
