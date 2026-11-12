@@ -395,7 +395,9 @@ docs/                     the README's longer sections, one file each: the eleme
                           install path in full, the same day, and since 2026-11-04 what Install and
                           Embed each give, when the README became a quick start, the Which setup
                           table, a feature list and links: the owner's choice of a short README
-                          that routes to these files), streaming video, libraries, the
+                          that routes to these files; since 2026-11-12 the Which setup table
+                          too, when the README put its features first and kept the table's
+                          answer in one line), streaming video, libraries, the
                           frame's CSP, packages you did not make (`untrusted` and the content check), the
                           revision on statements, resume, the verifier, cmi5, development,
                           troubleshooting, single-worker hosts and upgrades, compatibility (what a
