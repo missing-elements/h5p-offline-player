@@ -1,8 +1,19 @@
 # Setting up the player
 
-The README's [Which setup](../README.md#which-setup) chooses between installing the element on
-your site and embedding the player page from a separate domain. Installed, you get the whole API,
-and a package played as it is runs as your site. Embedded, a package never sees your site's
+## Which setup
+
+An H5P package is JavaScript, and the player runs it on the origin that serves the frame.
+
+| Your site | Setup |
+|---|---|
+| Needs the element's API (results to your backend, `resume="host"`, cmi5, a file picker) and plays packages you made | **Install** |
+| Plays packages you did not make | **Install** with `untrusted` on them, or **Embed** |
+| Has signed-in users | **Embed**, from a separate domain you run, or **Install** with every package `untrusted` |
+| Cannot host a file (page builder, hosted CMS, LMS page) | **Embed** |
+
+Installed, you get the whole API, and a package played as it is runs as your site. Embedded, the
+player page that [`@missing-elements/h5p-embed`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#readme)
+writes is framed from a domain that holds nothing else, so a package never sees your site's
 cookies, storage or page, and you get its results as relayed xAPI. `untrusted` plays a package as
 data, none of its own code running and its content checked, as an H5P plugin checks an author's
 upload: [Packages you did not make](untrusted.md).
@@ -24,7 +35,7 @@ caching and upgrades.
 
 ## Install with a bundler
 
-Vite, webpack 5, Rollup:
+Vite or webpack 5:
 
 ```bash
 npm install @missing-elements/h5p-offline-player @missing-elements/h5p-runtime
@@ -40,8 +51,9 @@ document.querySelector('h5p-player').runtime = runtime
 The bundler emits the Service Worker, the runtime and its fonts as assets; nothing to copy. The
 runtime is a separate package because it is GPL-3.0 (see the README's
 [Licence](../README.md#licence)). With a bundler that does not emit `new URL(…, import.meta.url)`
-assets, esbuild among them, serve both packages' `dist/` and set `sw` and `assets-base`, as under
-*Install without a build step*.
+assets, esbuild and Rollup among them, serve both packages' `dist/` and set `sw` and
+`assets-base`, as under *Install without a build step*. Rollup with
+`@web/rollup-plugin-import-meta-assets` stops at the element's default `frame-assets/` URL.
 
 For [`libraries="pack"`](libraries.md) served from your own site rather than jsDelivr, install
 `@missing-elements/h5p-libraries` too and hand over its `pack` export, which the bundler emits as

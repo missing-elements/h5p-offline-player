@@ -5,20 +5,51 @@
 
 Self-hosted [H5P](https://h5p.org) without an H5P server. One web component plays `.h5p` files
 from your own URLs or from disk, on static hosting you control: no Moodle, WordPress or Lumi, no
-backend, no third-party service between your learners and your content.
+backend, and no service of ours or H5P Group's between your learners and your content.
 
 **[Live player demo](https://h5p-offline-player.vercel.app/)** ·
-[Offline PWA app](https://h5p-offline-player.vercel.app/app/) ·
+[Offline app](https://h5p-offline-player.vercel.app/app/) ·
 [H5P to SCORM](https://h5p-offline-player.vercel.app/demo/scorm.html) ·
-[Emded H5P Lovable demo](https://embed-h5p-file.lovable.app/) ·
+[Lovable example](https://embed-h5p-file.lovable.app/) ·
 [VS Code extension](https://marketplace.visualstudio.com/items?itemName=MissingElements.h5p-preview)
 
-The library pack follows the H5P hub, and the Moodle's translations, **updates every week**. [Compatibility](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/compatibility.md) says what a version number
-promises.
+Version 1 since October 2026; [Compatibility](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/compatibility.md)
+says what a version number promises. **Every week** a job rebuilds the library pack from the H5P
+hub and the interface strings from Moodle's translations, opens a pull request when either
+changed, and plays every content type in the pack, trusted and untrusted.
+
+## Features
+
+- **Plays the packages people have.** Large ones stream, and exports without their libraries, as
+  h5p.com and h5p.org make them, play against a [library pack](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/libraries.md)
+  of the 53 content types the H5P hub serves.
+- **Plays packages you did not make** with [`untrusted`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/untrusted.md): none of their
+  code runs, and their content is checked by a port of H5P's own validator.
+- **Reports results you can audit:** xAPI statements that name the
+  [build of the package](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/revision.md) they came from, [cmi5](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/cmi5.md), [resume](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/resume.md), and a
+  [SCORM zip](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#a-scorm-package-for-an-lms): SCORM 1.2, checked in
+  Moodle, ILIAS, OpenOLAT, Chamilo, SCORM Cloud and Frappe LMS, or 2004, checked in Moodle and
+  SCORM Cloud.
+- **No tracking:** no account, cookies or telemetry, and nothing it stores leaves the learner's
+  browser. The library pack comes from jsDelivr unless you serve a copy
+  ([privacy](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/privacy.md)).
+- **Works offline, in the content's language:** an installable app, and H5P's own buttons in
+  English and 56 other languages.
+- **Tested in Chromium, Firefox and WebKit** on every change, and in Safari on macOS and iOS by
+  hand ([browsers](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/compatibility.md#browsers)).
+- **Comes with tools:** [`h5p-verify`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/verify.md) checks that a package plays,
+  [`h5p-normalize`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/streaming-video.md) makes its video stream, and
+  [`h5p-author`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/author#readme) builds one from a short JSON source, which a
+  Moodle site accepts as an upload too.
+
+It is a player, not an editor, and it stores no results: its events go wherever your page sends
+them. Coming from [h5p-standalone](https://github.com/tunapanda/h5p-standalone)? This player
+reads the `.h5p` itself, with nothing to unzip, and
+[takes its options by the same names](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/h5p-standalone.md).
 
 ## Quick start
 
-With a bundler (Vite, webpack 5, Rollup):
+With Vite or webpack 5; both packages ship TypeScript declarations:
 
 ```bash
 npm install @missing-elements/h5p-offline-player @missing-elements/h5p-runtime
@@ -38,59 +69,17 @@ player.addEventListener('xapi', (e) => console.log(e.detail.statement))
 ```
 
 The bundler emits the Service Worker and the runtime (the H5P core, a package of its own because
-it is GPL-3.0) as assets, so there is nothing to copy. The page must be on `https://` or
-`localhost`, and a package from another origin needs CORS headers on its host. For exports
-without their libraries, as h5p.com makes them, add `libraries="pack"`: the
-[library pack](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/libraries.md), from jsDelivr or a copy on your
-site. 
-[Setting up the player](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/setup.md) covers a site without
-a bundler and the Embed setup; [the element's API](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/api.md)
-lists every attribute, property and event.
+it is GPL-3.0) as files, so there is nothing to copy. The page must be on `https://` or
+`localhost`, and a package from another origin needs CORS headers on its host. A package that
+carries its libraries plays as it is; one exported without them, as h5p.com exports, needs
+`libraries="pack"`.
 
-On Lovable, one prompt is enough:
-`Embed an H5P file using https://github.com/missing-elements/h5p-offline-player`, with the `.h5p`
-file uploaded in the chat. [This example](https://embed-h5p-file.lovable.app/) was built that way.
-
-## Which setup
-
-An H5P package is JavaScript, and the player runs it on the origin that serves the frame.
-
-| Your site | Setup |
-|---|---|
-| Needs the element's API (results to your backend, `resume="host"`, cmi5, a file picker) and plays packages you made | **Install** |
-| Plays packages you did not make | **Install** with `untrusted` on them, or **Embed** |
-| Has signed-in users | **Embed**, from a separate domain you run, or **Install** with every package `untrusted` |
-| Cannot host a file (page builder, hosted CMS, LMS page) | **Embed** |
-
-**Install** is the quick start above; `untrusted` on the element plays a package as data, none of
-its own code running. **Embed** frames the player page that
-[`@missing-elements/h5p-embed`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#readme)
-writes, from a domain that holds nothing else, so a package never sees your site's cookies,
-storage or page.
-
-## Features
-
-- **Plays the packages people have.** Large ones stream, and exports without their libraries, as
-  h5p.com and h5p.org make them, play against a [library pack](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/libraries.md) of every
-  content type the H5P hub serves.
-- **Plays packages you did not make** with [`untrusted`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/untrusted.md): none of their
-  code runs, and their content is checked by a port of H5P's own validator.
-- **Reports results you can audit:** xAPI statements that name the
-  [build of the package](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/revision.md) they came from, [cmi5](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/cmi5.md), [resume](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/resume.md), and a
-  [SCORM 1.2 package](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#a-scorm-package-for-an-lms) for Moodle, ILIAS, OpenOLAT,
-  Chamilo, SCORM Cloud or Frappe LMS.
-- **No tracking:** no account, cookies or telemetry, and nothing it stores leaves the learner's
-  browser ([privacy](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/privacy.md)).
-- **Works offline, in the content's language:** an installable app, and H5P's own buttons in any
-  of more than fifty languages.
-- **Comes with tools:** [`h5p-verify`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/verify.md) checks that a package plays,
-  [`h5p-normalize`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/streaming-video.md) makes its video stream, and
-  [`h5p-author`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/author#readme) builds one from a short JSON source.
-
-It is a player, not an editor, and it stores no results: its events go wherever your page sends
-them. Coming from [h5p-standalone](https://github.com/tunapanda/h5p-standalone)? This player
-reads the `.h5p` itself, with nothing to unzip, and
-[takes its options by the same names](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/h5p-standalone.md).
+Packages you did not make, or a site with signed-in users: play every package `untrusted`, or
+embed the player from a domain of its own, as
+[Which setup](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/setup.md#which-setup) explains.
+[Setting up the player](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/setup.md) also covers a page without a bundler, Rollup and
+esbuild, and the one-prompt install on Lovable;
+[the element's API](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/api.md) lists every attribute, property and event.
 
 ## Documentation
 
