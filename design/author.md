@@ -542,19 +542,24 @@ to 3,000. Nineteen things the code does not say by itself:
   4 of 4, and "10" was wrong. In Drag the Words a word written `7&#58;45` is drawn 7:45 and
   scores, and feedback with `&#58;` shows a colon; the key in its xAPI statement keeps the
   entity as written. In Mark the Words neither character is a mark. So:
-  - `SKILL.md` says a Creative Commons licence's version is a field of its own, and says of a
+  - `SKILL.md` says a CC BY licence's version is a field of its own, `CC0 1.0` being one code
+    as it stands (cubic's review), and says of a
     gap's `/` and `:` what they are and how an answer holds one; the two type files say it
     with their own examples. The version is in the sentence and not in the example: with it in
     the example, 3 of 7 replies gave a licence the user had named without a version one of 4.0,
     and without, none of 5.
-  - A licence written with its version is a problem that names the licence it read and where the
-    version goes (`sourceOf`), the SPDX spelling too.
+  - A CC BY licence written with its version is a problem that names the licence it read and
+    where the version goes (`sourceOf`), the SPDX spelling too.
   - A backslash before a slash or a colon in a gap's answers is a problem, the gap written out
     as the library takes it (`LAYOUTS['H5P.Blanks']`). An answer that is a backslash and no
     more is left alone.
   - A gap of Drag the Words whose tip or feedback pattern matches twice is a problem, with the
     word as the library would leave it (`LAYOUTS['H5P.DragText']`). A colon in the tip is
-    none: the tip runs on over it.
+    none: the tip runs on over it. Nor is one after `\+` or `\-` with no tip before it,
+    though it cuts the feedback there (cubic's review): `*habla\+Bien.:tercera persona*`
+    plays with the feedback "Bien." and the tip "tercera persona", a tip written after the
+    feedback, and a build cannot tell that from a colon meant for the feedback. The type file
+    says feedback holds no colon.
 
   With them, of the first replies that wrote a source, in the same position: Fill in the Blanks
   took the three answers as asked in 23 of 23, with the type file or without; Drag the Words

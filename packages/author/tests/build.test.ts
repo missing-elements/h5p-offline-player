@@ -341,6 +341,12 @@ describe('any content type in the pack', () => {
       'licenseVersion: use one of 4.0, 3.0, 2.5, 2.0, 1.0'
     ])
     expect((await build({ ...META, ...blanks, license: 'CC BY', licenseVersion: '4.0' })).manifest).toMatchObject({ license: 'CC BY', licenseVersion: '4.0' })
+    // CC0 1.0 is one code, version and all, and no versioned CC BY.
+    expect((await build({ ...META, ...blanks, license: 'CC0 1.0' })).manifest).toMatchObject({ license: 'CC0 1.0' })
+    expect(await problems({ ...META, ...blanks, license: 'CC0', licenseVersion: '1.0' })).toEqual([
+      expect.stringMatching(/^license: use one of "U", "CC BY", .*"CC0 1\.0"/),
+      'licenseVersion: is for a Creative Commons BY licence only'
+    ])
     expect(await problems({
       ...META,
       type: 'H5P.TrueFalse',

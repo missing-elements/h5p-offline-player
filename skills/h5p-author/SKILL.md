@@ -89,8 +89,9 @@ from what you know of the type: the build says, for each place that is wrong, wh
 
 - Every source names its own `title`, `language`, `license` and `authors` beside `type` and
   `params`, as above, whatever a type file's example leaves out; the author and licence are the
-  ones step 1 settled. A Creative Commons licence's version is a field of its own, written
-  where the user gave one: "CC BY 4.0" is `"license": "CC BY", "licenseVersion": "4.0"`.
+  ones step 1 settled. A CC BY licence's version, CC BY-SA's and the others' too, is a field of
+  its own, written where the user gave one: "CC BY 4.0" is
+  `"license": "CC BY", "licenseVersion": "4.0"`. `CC0 1.0` is one code, as it stands.
 - `params` holds only fields that differ from their defaults. Never interface texts (Check,
   Retry…): they come from the libraries' translations for `language`.
 - Text is plain, or markup with only the tags a field marked `html` lists.

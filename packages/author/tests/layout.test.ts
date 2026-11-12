@@ -259,8 +259,10 @@ describe('Drag the Words', () => {
     ])
   })
 
-  it('takes a tip that holds a colon, feedback without one, and a colon written as an entity', async () => {
-    const textField = 'Yo *hablo:primera persona: yo\\+Correcto, termina en -o.\\-No, la forma es «hablo».* español.\nEl tren sale a las *7&#58;45\\+Correcto&#58; menos cuarto.* y va a 90 *km/h*.'
+  it('takes a tip that holds a colon, feedback without one, a tip after the feedback, and a colon written as an entity', async () => {
+    // A colon after \\+ with no tip before it is a tip written after the feedback, as the library
+    // plays it: the word is whole, and a build cannot tell it from a colon meant for the feedback.
+    const textField = 'Yo *hablo:primera persona: yo\\+Correcto, termina en -o.\\-No, la forma es «hablo».* español.\nEl tren sale a las *7&#58;45\\+Correcto&#58; menos cuarto.* y va a 90 *km/h*.\nElla *habla\\+Bien.:tercera persona* mucho.'
     expect((await build('H5P.DragText', { textField, distractors: '*hablas* *10:30:00*' })).textField).toBe(textField)
   })
 })
