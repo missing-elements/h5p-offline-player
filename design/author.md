@@ -338,7 +338,12 @@ to 3,000. Twenty-four things the code does not say by itself:
   that embed-my.github.io (embed-my/embed-my.github.io#14), whose `/bundles/` stays until the next
   pack release for copies of the skill installed earlier. The build tool beside them is the
   command line as one file, which the site's Vite bundles: 575 kB, and it builds from an unzipped
-  bundle with nothing installed.
+  bundle with nothing installed. Its `--version` read this package's `package.json` and the
+  pack's as files, neither of them beside it, and crashed (found by ChatGPT's plugin creator,
+  2026-11-13). Each version is now an import too, which the bundler writes into the file, about
+  9 kB; the files are read first where the packages are installed, since Node before 22.12 warns
+  on a JSON import, and a `package.json` above the one file that is not this package's is passed
+  over.
 - **A preview inside Claude is the desktop app's browser panel, not a card** (2026-11-10). A
   connector's card in Claude is an iframe under Claude's policy, measured that day in Claude
   Desktop 4.23118.1 with a probe server: it fetches from the hosts the server declares, grows to
