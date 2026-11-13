@@ -299,6 +299,14 @@ to 3,000. Twenty-four things the code does not say by itself:
   block and no link under the old text and the new (12 replies, half of them asked for a link to
   click), so the rule costs that position nothing, and what it changes in ChatGPT is not
   measured. No rule reaches a link copied wrong between the command's output and the reply.
+  An install that hangs is one that fails (2026-11-13): ChatGPT, asked why it had built nothing,
+  said its `npx` had timed out, and step 3's list named only errors. Haiku in a terminal whose
+  registry took each connection and never answered went on to the two files under the old text
+  and the new, 2 of 2 runs each, and built, so the words are for a model that reads the list to
+  the letter. An uploaded plugin is no way round the registry: a ChatGPT plugin that carried the
+  one-file tool and the whole pack, 15.6 MB, uploaded, and its code's `find /` found no file of
+  it, so the zips the organisation's site offers to install (missing-elements.github.io#40)
+  carry the skill's text and files only.
 - **A bundle per content type, where the pack cannot be installed** (2026-11-09, #166). The page
   leaves the last steps to the user, but ChatGPT's sandbox runs Node and fetches a file its
   browsing tool has opened: given the libraries as files, a chat builds and fixes its source
@@ -651,6 +659,28 @@ to 3,000. Twenty-four things the code does not say by itself:
   page; with the change, 5 of 5 again. It is for a model that reads step 5's list to the letter.
   In Claude Code's place it changed nothing: 2 of 2 Question Sets handed over the exact link
   alone, and the picture run no address and the preview command.
+
+  In that route the source goes over as a file too, where the chat can give one (2026-11-13).
+  ChatGPT with the skill as a plugin ran the link command and wrote its output out itself: 2 of
+  its 3 links broke, one with 43 characters of its own in place of 37 near its start, one at a
+  length base64 never has, while the `.source.json` it gave built at once on the page, which
+  since missing-elements.github.io#39 says a damaged link is damaged and offers to open that
+  file. Haiku in a sandbox told it had no network and could give files handed the file over
+  under the old text already, in 5 of 6 runs, as under the new; every link it gave was exact
+  and the reply's one web address.
+- **Only the build tool writes the `.h5p`** (2026-11-13). ChatGPT, asked to prove it could make
+  the file where it could not install the tool, zipped an `h5p.json` and a `content.json` it had
+  written: no library in it, and the content wrapped in a `params` key. The verifier fails it
+  for its missing libraries, and given the pack's it plays and draws "No question has been
+  added". Gemini, given the skill as an uploaded skill, said it held no steps to put a package
+  together. So the skill's opening says that only the tool writes one. With that sentence in a
+  test plugin, ChatGPT answered that it had written no `.h5p` and made none up: one run each
+  way. Haiku made none by hand under either text, 0 of 6 runs whose user asked for the file
+  itself, so the weak model shows no gain. It shows where the sentence leads: told its sandbox
+  had no network, 3 of 6 Haiku runs with it ran `npx` anyway, against 0 of 6 without, and built,
+  since this computer's npm answered. With npm cut off, 5 of 6 handed over the exact link and
+  the source file; the sixth, whose user wanted "not a link and not JSON", ended with the `npx`
+  command for the user, as one run of the old text had.
 - **The skill names no product** (2026-11-12, the owner's call). Its routes were told apart by
   the apps they were measured in; they now say what each needs: a shell that reaches the npm
   registry, Node and a download where npm cannot install, or nothing that runs or fetches. What a

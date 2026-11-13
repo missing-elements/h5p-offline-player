@@ -10,7 +10,8 @@ You write a short source: the content type and only what its defaults cannot kno
 `@missing-elements/h5p-author` fills in the rest from the libraries, copies them, and checks
 every field. Needs Node 22 and a shell; nothing to install. Where `npx` cannot install, it builds
 from two downloaded files, or a page in the user's browser builds it (step 3), so never end with
-commands for the user to run.
+commands for the user to run. Only it writes the `.h5p`: never put one together yourself from
+`h5p.json` and `content.json`, since one made by hand carries no libraries and nothing checks it.
 Keep [LICENSE](./LICENSE) with the skill.
 
 With this text alone and none of its files beside it, open https://missing-elements.github.io/h5p/skill/
@@ -127,8 +128,9 @@ npx @missing-elements/h5p-author@latest build source.json course.h5p
 ```
 
 **If it cannot install here, build from files instead.** No network for npm (`EAI_AGAIN`,
-`ENOTFOUND`, a registry's 403, 404 or 503): do not retry, try another way to install it, or end
-with commands for the user to run once npm works. Where Node runs and you can fetch a file (where
+`ENOTFOUND`, a registry's 403, 404 or 503, or an install that hangs until the command times out):
+do not retry, try another way to install it, or end with commands for the user to run once npm
+works. Where Node runs and you can fetch a file (where
 the sandbox downloads only what a browsing tool has opened, open each address with that tool
 first, then download it), fetch the
 build tool and the bundle of the source's own `type`, the libraries a build of that type reads,
@@ -166,7 +168,9 @@ python3 -c "import base64,json,zlib;s=open('source.json','rb').read();f=[];json.
 **A link is only what one of these commands printed here, handed over whole: no command run, no
 link.** Never write a `#source=` link yourself, from memory or after an example, even when asked
 for one: its text is compressed, so it cannot be typed, and one wrong character leaves the page
-nothing to build.
+nothing to build. Where you can give the user a file, give them the source too, beside the link,
+under the activity's name with `.source.json` (`course.source.json`): the page opens it, and a
+link copied wrong into your reply builds nothing.
 
 Where nothing is built here and they print no link, with neither, or with no tool that runs
 anything at all (a chat's code tool can be unavailable for hours), give no link: the page sees
@@ -203,8 +207,9 @@ removing what fails. Without a browser, say the package is **unverified**.
 ## 5. Review and hand over
 
 Check answers and feedback against the material. Where nothing was built here, step 3's build
-page route is the whole hand-over: the link it printed, or the whole source and the page's
-address. Otherwise let the user play it in their browser:
+page route is the whole hand-over: the link it printed, with the source as a file where you can
+give one, or the whole source and the page's address. Otherwise let the user play it in their
+browser:
 
 ```bash
 npx @missing-elements/h5p-verify@latest course.h5p --preview
