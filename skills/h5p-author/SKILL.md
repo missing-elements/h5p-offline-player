@@ -9,10 +9,10 @@ license: MIT
 You write a short source: the content type and only what its defaults cannot know.
 `@missing-elements/h5p-author` fills in the rest from the libraries, copies them, and checks
 every field. Needs Node 22 and a shell; nothing to install. Where `npx` cannot install, it builds
-from two downloaded files, or a page in the user's browser builds it (step 3), so never end with
-commands for the user to run. Only it writes the `.h5p`: never put one together yourself from
-`h5p.json` and `content.json`, since one made by hand carries no libraries and nothing checks it.
-Keep [LICENSE](./LICENSE) with the skill.
+from the build archive the user attaches, or from two downloaded files, or a page in the user's
+browser builds it (step 3), so never end with commands for the user to run. Only it writes the
+`.h5p`: never put one together yourself from `h5p.json` and `content.json`, since one made by
+hand carries no libraries and nothing checks it. Keep [LICENSE](./LICENSE) with the skill.
 
 Work in this order, one question at a time: the content type, chosen with the user; then the
 author and licence, which they give or skip; then the source; then the build, the best way this
@@ -106,11 +106,14 @@ content holds have files too: H5P.AdvancedText, H5P.Image, H5P.Video, H5P.Text.
 
 Build the best way this environment allows, and tell the user which you take:
 
+- **Here, from the build archive**: Node runs and the user attached `h5p-author-build.tar.gz`,
+  the build tool and every type's libraries in one file. *From the build archive*, below.
 - **Here, with npm**: a shell that reaches the npm registry, as in a terminal. The command below.
 - **Here, from two files**: Node runs and files can be fetched, but npm cannot install, as in a
   chat's sandbox that reaches the web and no registry. *If it cannot install here*, below.
 - **In the user's browser**: nothing here runs, or nothing fetches, as in a chat with no tools
-  or one that cannot open a web address. *The build page*, below, with no attempt here first.
+  or one that cannot open a web address. *The build page*, below, with no attempt here first;
+  where Node runs, with its line on the build archive.
 
 Take the first that applies, and the next if it fails.
 
@@ -119,6 +122,20 @@ Build in a working folder of your own, not in the folder the user named:
 ```bash
 npx @missing-elements/h5p-author@latest build source.json course.h5p
 ```
+
+**From the build archive.** Find the file the user attached, in the folder the chat keeps
+attachments in (`find / -name 'h5p-author-build*.tar.gz' 2>/dev/null`), unpack it in your working
+folder and build from it: nothing to install or fetch, for any type.
+
+```bash
+tar -xzf <archive>   # or: python3 -m tarfile -e <archive> .
+node h5p-author.mjs build source.json course.h5p --libraries parts
+```
+
+With no network, a file's `path` must name a file here, such as one the user attached: a web
+address is downloaded as it builds. Where npm cannot install, the verifier cannot run either:
+hand the package over **unverified**, with the build page's link below for the user to play it
+before using it.
 
 **If it cannot install here, build from files instead.** No network for npm (`EAI_AGAIN`,
 `ENOTFOUND`, a registry's 403, 404 or 503, or an install that hangs until the command times out):
@@ -165,6 +182,14 @@ nothing to build. Where you can give the user a file, give them the source too, 
 under the activity's name with `.source.json` (`course.source.json`): the page opens it, and a
 link copied wrong into your reply builds nothing.
 
+Where Node runs here and nothing could be installed or downloaded, put this line in that reply,
+right after the link, or after the source where no link was printed, as it is: attached to a
+message, the archive builds the `.h5p` here.
+
+```
+To get the .h5p file here instead: download https://missing-elements.github.io/h5p/bundles/h5p-author-build.tar.gz (15 MB) and attach it to your next message.
+```
+
 Where nothing is built here and they print no link, with neither, or with no tool that runs
 anything at all (a chat's code tool can be unavailable for hours), give no link: the page sees
 only what the user pastes, so put the **whole source in your reply**, in one `json` code block,
@@ -201,8 +226,8 @@ removing what fails. Without a browser, say the package is **unverified**.
 
 Check answers and feedback against the material. Where nothing was built here, step 3's build
 page route is the whole hand-over: the link it printed, with the source as a file where you can
-give one, or the whole source and the page's address. Otherwise let the user play it in their
-browser:
+give one, or the whole source and the page's address; and the line on the build archive, where
+step 3 gives it. Otherwise let the user play it in their browser:
 
 ```bash
 npx @missing-elements/h5p-verify@latest course.h5p --preview

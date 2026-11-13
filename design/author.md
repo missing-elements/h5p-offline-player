@@ -708,6 +708,52 @@ to 3,000. Twenty-four things the code does not say by itself:
   since this computer's npm answered. With npm cut off, 5 of 6 handed over the exact link and
   the source file; the sixth, whose user wanted "not a link and not JSON", ended with the `npx`
   command for the user, as one run of the old text had.
+- **Where nothing downloads, the person attaches the build archive** (2026-11-13, #200). ChatGPT's
+  sandbox runs Node 22.16, but nothing reaches it from outside. npm goes through OpenAI's mirror,
+  which fails or hangs. Its download tool saved none of eleven files on the owner's free account
+  that day, from the organisation's site or any other. An installed plugin's files never reach
+  its code. A file the person attaches does: the owner attached the one-file tool and a Question
+  Set's libraries as a `.tar.gz`, with a prompt that named the commands, and ChatGPT built a
+  Question Set that the verifier passes. The owner played it, and Claude and Grok built from the
+  same archive. The same files as a `.zip` were refused, read as a plugin to install ("Plugin
+  archive must contain …").
+
+  So the organisation's site writes one archive for every type,
+  `/h5p/bundles/h5p-author-build.tar.gz` (missing-elements.github.io#47), from the release it
+  pins: the tool, every part of the pack with its index, and `libraries.txt`, laid out as a
+  build from a bundle reads them. With pack 1.1.0 it is 14.9 MB, and the same bytes on every
+  rebuild. Every type goes in one file, rather than the tool in each type's bundle, because the
+  person downloads it before a type is chosen. A tool that still crashed on `--version` (#198)
+  could send a model that checks it first off to the link, so the archive starts with 0.9.8.
+  Nothing passes through a server of the organisation's this way either: the archive is the
+  tool and the libraries, public already, and the chat's provider holds no more than the chat
+  already gave it. That, with no MCP server, is what the guide and the plugin lead with, in the
+  owner's words, privacy first.
+
+  Step 3 builds from an attached archive first. Where Node runs and nothing installs or
+  downloads, the build page's route carries one fixed line offering the archive. Measured on
+  Haiku in a sandbox with no network:
+  - **The archive attached:** 3 of 3 runs built from it under the old text and 3 of 3 under the
+    new, and all six packages pass the verifier. So the route's words are for a model that needs
+    the step written out, as ChatGPT's prompt wrote it out.
+  - **No archive, the offer as a sentence:** 1 of 3 runs offered it with the exact address, as a
+    last note that promised to verify too. One named the file without an address, and one said
+    nothing.
+  - **No archive, the offer as a line to copy as it is, right after the link:** 2 of 3 runs did
+    so. The third left it out.
+  - **Across both no-archive arms:** all six links were exact, and all six gave the source file.
+
+  As with the feedback line before it, a weak model drops some of what it is asked to write. So
+  the skill does not rest on the offer: the organisation's guide, not the skill, tells people
+  using ChatGPT to attach the archive to the message where they ask
+  (missing-elements.github.io#47).
+
+  A source with media needs the network for them all the same: a `path` at a web address is
+  downloaded as the package builds, which a sandbox that fetches nothing cannot do. So the archive
+  route says that there a `path` names a file in the sandbox, such as one the person attached
+  (cubic's review). A source that names files gets no link, so the offer's line follows the source
+  where no link was printed. Neither change was run on Haiku: the six no-archive runs above named
+  no file.
 - **The skill names no product** (2026-11-12, the owner's call). Its routes were told apart by
   the apps they were measured in; they now say what each needs: a shell that reaches the npm
   registry, Node and a download where npm cannot install, or nothing that runs or fetches. What a
