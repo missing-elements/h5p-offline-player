@@ -306,16 +306,24 @@ to 3,000. Twenty-four things the code does not say by itself:
   the letter. An uploaded plugin is no way round the registry: a ChatGPT plugin that carried the
   one-file tool and the whole pack, 15.6 MB, uploaded, and its code's `find /` found no file of
   it, so the zips the organisation's site offers to install (missing-elements.github.io#40)
-  carry the skill's text and files only.
+  carry the skill's text and files only. Nor is ChatGPT's own download tool, on the owner's free
+  account the same day, asked step by step: its web tool opened the site's text, JSON and
+  Markdown, `SKILL.md` whole, and refused the build tool, a bundle and a `.h5p` by their content
+  type (`text/javascript`, `application/x-zip-compressed`, `application/octet-stream`), and its
+  `container.download` saved none of eleven files, four from other sites among them, Simon
+  Willison's own test file too, which he had downloaded with it in January 2026. So in ChatGPT
+  the build page is the route, whatever type the site serves a file as.
 - **A bundle per content type, where the pack cannot be installed** (2026-11-09, #166). The page
   leaves the last steps to the user, but ChatGPT's sandbox runs Node and fetches a file its
   browsing tool has opened: given the libraries as files, a chat builds and fixes its source
-  itself. The skill chooses the content type first, so the unit is the type. `bundleLibraries` is
-  the build's own rules over the most a source of the type can name: the type and every library
-  its library fields offer or give as their default, theirs in turn; `planPack` over all of them
-  as roots, as `closure` in `build.mjs` plans one package; `installClosure` over what that plans.
-  Both only ever add for more roots, so one source's libraries are within its type's bundle.
-  `writeBundle` zips them as `parts/`, with `libraries.txt`, without which the parts are not handed
+  itself. Grok's sandbox did so on 2026-11-13; ChatGPT's, on the owner's account that day, did not
+  (*Where `npx` cannot install, a page builds*). The skill chooses the content type first, so the
+  unit is the type. `bundleLibraries` is the build's own rules over the most a source of the type
+  can name: the type and every library its library fields offer or give as their default, theirs in
+  turn; `planPack` over all of them as roots, as `closure` in `build.mjs` plans one package;
+  `installClosure` over what that plans. Both only ever add for more roots, so one source's
+  libraries are within its type's bundle. `writeBundle` zips them as `parts/`, with
+  `libraries.txt`, without which the parts are not handed
   on. The bundle carries the pack's whole index, not its own entries: a build from it plans as it
   would from the pack, so it writes the same package (the skill's 32 examples were built both ways
   and matched, but for the ids a build draws) or stops and names the part it lacks, where a cut-down
@@ -399,10 +407,10 @@ to 3,000. Twenty-four things the code does not say by itself:
   organisation's site serves the skill from the release its build page pins, at
   `https://missing-elements.github.io/h5p/skill/`, a page that writes out each file's full address,
   since a chat's fetch tool may open only addresses it has seen whole and `SKILL.md`'s relative
-  links are not (missing-elements.github.io#15). The skill sends a chat to that page for every
-  address (*A chat with the skill's text alone takes every address from the skill's page*, below),
-  not to raw.githubusercontent.com. Installing the skill stays the way: nothing is fetched while
-  the chat works.
+  links are not (missing-elements.github.io#15). Step 3 takes the build tool's and the bundles'
+  addresses from that page (*The skill is installed, and its page lists what step 3 fetches*,
+  below), not from raw.githubusercontent.com. Installing the skill is the way: nothing is fetched
+  while the chat works.
 
   The same test on the 23 other content types the skill lists says how far each thing reaches:
   two runs each, 46 first replies, each built package checked against what its task asked for.
@@ -471,9 +479,9 @@ to 3,000. Twenty-four things the code does not say by itself:
   as written, does not. `sourceType(source, names)` is the build's reading of a source's type,
   exported for it (#176), so that the page hands over the type the build took and keeps no copy
   of the rule: on the 328 stored sources it names what `sourceOf` does in every one.
-- **A chat with the skill's text alone takes every address from the skill's page** (2026-11-10,
-  #180). An outside review of the skill, by a model given its link, found that `SKILL.md` gave such
-  a chat addresses to put together: the brief as a relative link, a type's file as
+- **The skill is installed, and its page lists what step 3 fetches** (2026-11-10, #180;
+  2026-11-13). An outside review of the skill, by a model given its link, found that `SKILL.md`
+  gave such a chat addresses to put together: the brief as a relative link, a type's file as
   `…/h5p/build/types/<Type>.md`, a bundle as `…/h5p/bundles/<type>.zip`; its own fetch tool refused
   `…/bundles/H5P.Blanks.zip` put together from the last. `/h5p/skill/` wrote out the skill's files
   whole for this (*The package carries the skill's type files*, above), but `SKILL.md` never named
@@ -490,6 +498,20 @@ to 3,000. Twenty-four things the code does not say by itself:
   play, and the third reached npm and built with it. The first three had the tool swapped for a
   stand-in that logged its runs, and each refused to run it, as it should: a test serves the file
   as it is.
+  On 2026-11-13 the owner dropped reading the skill by its link as a way to give it to a chat, and
+  the organisation's site stopped offering it (missing-elements.github.io#42): no app tested
+  needed it. Claude and ChatGPT take the skill as a zip, and Grok takes Claude's, under Skills,
+  then Import; Gemini opens no address, and a chat whose only web tool is a search gets snippets.
+  So `SKILL.md` no longer tells a chat with its text alone to open the page first. The page stays,
+  and step 3 still takes the build tool's and the bundles' addresses from it: installed copies of
+  the skill name it, and Grok, its `npx` timed out, built from those two files that day, the
+  first app seen to. Measured on Haiku in the chat stand-in above, the user's message giving the
+  page's address as the old prompt did, three runs each way: under either text all six opened the
+  page, the brief and the type files, fetched the tool and the bundle, and built a package the
+  verifier plays, since the page itself says to read `SKILL.md` first and lists every address.
+  With the skill installed and npm cut off, both runs handed over the link and the source file,
+  and one dropped two characters of the link while writing its reply, as ChatGPT had: the first
+  time on Haiku, and the source file still builds.
 - **A source's own fields are written where a chat reads, and the author is asked for**
   (2026-11-11, #182). The owner's run in ChatGPT on 0.9.1 wrote a quiz with no `authors`. Each
   of the 28 content types the skill lists refuses a source without `title`, `language`,

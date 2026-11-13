@@ -14,10 +14,6 @@ commands for the user to run. Only it writes the `.h5p`: never put one together 
 `h5p.json` and `content.json`, since one made by hand carries no libraries and nothing checks it.
 Keep [LICENSE](./LICENSE) with the skill.
 
-With this text alone and none of its files beside it, open https://missing-elements.github.io/h5p/skill/
-first and take every address from it: it writes out in full each file this text names and each
-file step 3 fetches, and a fetch tool may refuse an address put together from a name.
-
 Work in this order, one question at a time: the content type, chosen with the user; then the
 author and licence, which they give or skip; then the source; then the build, the best way this
 environment allows.
@@ -77,10 +73,7 @@ the same package.
 ## 2. Write the source
 
 Read the type's file, `references/types/<Type>.md`: notes, an example, its fields. Parts other
-content holds have files too: H5P.AdvancedText, H5P.Image, H5P.Video, H5P.Text. With this text
-alone and no file beside it, open the type's file at the address
-https://missing-elements.github.io/h5p/skill/ lists for it; where nothing opens, write the source
-from what you know of the type: the build says, for each place that is wrong, what to write there.
+content holds have files too: H5P.AdvancedText, H5P.Image, H5P.Video, H5P.Text.
 
 ```json
 {
