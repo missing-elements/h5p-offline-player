@@ -716,8 +716,17 @@ to 3,000. Twenty-four things the code does not say by itself:
     so. The third left it out.
   - **Across both no-archive arms:** all six links were exact, and all six gave the source file.
 
-  As with the feedback line before it, a weak model drops some of what it is asked to write.
-  The guide therefore tells people to attach the archive with their first message.
+  As with the feedback line before it, a weak model drops some of what it is asked to write. So
+  the skill does not rest on the offer: the organisation's guide, not the skill, tells people
+  using ChatGPT to attach the archive to the message where they ask
+  (missing-elements.github.io#47).
+
+  A source with media needs the network for them all the same: a `path` at a web address is
+  downloaded as the package builds, which a sandbox that fetches nothing cannot do. So the archive
+  route says that there a `path` names a file in the sandbox, such as one the person attached
+  (cubic's review). A source that names files gets no link, so the offer's line follows the source
+  where no link was printed. Neither change was run on Haiku: the six no-archive runs above named
+  no file.
 - **The skill names no product** (2026-11-12, the owner's call). Its routes were told apart by
   the apps they were measured in; they now say what each needs: a shell that reaches the npm
   registry, Node and a download where npm cannot install, or nothing that runs or fetches. What a

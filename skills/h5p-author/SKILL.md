@@ -139,8 +139,10 @@ tar -xzf <archive>   # or: python3 -m tarfile -e <archive> .
 node h5p-author.mjs build source.json course.h5p --libraries parts
 ```
 
-Where npm cannot install, the verifier cannot run either: hand the package over **unverified**,
-with the build page's link below for the user to play it before using it.
+With no network, a file's `path` must name a file here, such as one the user attached: a web
+address is downloaded as it builds. Where npm cannot install, the verifier cannot run either:
+hand the package over **unverified**, with the build page's link below for the user to play it
+before using it.
 
 **If it cannot install here, build from files instead.** No network for npm (`EAI_AGAIN`,
 `ENOTFOUND`, a registry's 403, 404 or 503, or an install that hangs until the command times out):
@@ -188,7 +190,8 @@ under the activity's name with `.source.json` (`course.source.json`): the page o
 link copied wrong into your reply builds nothing.
 
 Where Node runs here and nothing could be installed or downloaded, put this line in that reply,
-right after the link, as it is: attached to a message, the archive builds the `.h5p` here.
+right after the link, or after the source where no link was printed, as it is: attached to a
+message, the archive builds the `.h5p` here.
 
 ```
 To get the .h5p file here instead: download https://missing-elements.github.io/h5p/bundles/h5p-author-build.tar.gz (15 MB) and attach it to your next message.
