@@ -31,6 +31,22 @@ npx @missing-elements/h5p-verify@latest before handing it over.`
 const sized = (bytes) => (bytes < 1_000_000 ? `${Math.max(1, Math.round(bytes / 1000))} kB` : `${(bytes / 1_000_000).toFixed(1)} MB`)
 
 /**
+ * This package's version, from its package.json where the package is installed. The command line
+ * as one file, which the organisation's site bundles, has no package.json of its own beside it, and
+ * the one above it may be another's: there it is the copy its bundler wrote in from the import.
+ * The file comes first, since Node before 22.12 warns on a JSON import.
+ */
+async function ownVersion() {
+  try {
+    const own = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
+    if (own.name === '@missing-elements/h5p-author') return String(own.version)
+  } catch {
+    // No package.json beside it: the command line as one file.
+  }
+  return (await import('../package.json', { with: { type: 'json' } })).default.version
+}
+
+/**
  * The command line as the verifier's and embed's read theirs: `--libraries dir` or
  * `--libraries=dir`, and `-h`, `-v`. Which flags a command takes is checked after.
  * @param {string[]} argv
@@ -57,8 +73,7 @@ try {
   const { positional, flags } = parse(process.argv.slice(2))
   const [command, ...rest] = positional
   if (flags.version) {
-    const own = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')).version
-    console.log(`@missing-elements/h5p-author ${own}, library pack ${await packVersion()}`)
+    console.log(`@missing-elements/h5p-author ${await ownVersion()}, library pack ${await packVersion()}`)
   } else if (flags.help || !command) {
     console.log(USAGE)
     if (!command && !flags.help) process.exitCode = 1

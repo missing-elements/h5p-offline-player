@@ -76,10 +76,19 @@ export async function openPack(folder) {
   }, 'reinstall the pack')
 }
 
-/** The pinned pack's version, for messages and reports. */
+/**
+ * The pinned pack's version, for messages and reports, from the libraries package's package.json
+ * where it is installed beside this one. The command line as one file, which the organisation's
+ * site bundles, has no package beside it: there it is the copy its bundler wrote in from the
+ * import. The file comes first, since Node before 22.12 warns on a JSON import.
+ */
 export async function packVersion() {
-  const url = import.meta.resolve('@missing-elements/h5p-libraries/package.json')
-  return JSON.parse(await readFile(fileURLToPath(url), 'utf8')).version
+  try {
+    const url = import.meta.resolve('@missing-elements/h5p-libraries/package.json')
+    return String(JSON.parse(await readFile(fileURLToPath(url), 'utf8')).version)
+  } catch {
+    return (await import('@missing-elements/h5p-libraries/package.json', { with: { type: 'json' } })).default.version
+  }
 }
 
 /**
