@@ -64,11 +64,11 @@ a name made up for them.
 
 Media come from the user; never invent them. For a type not listed, run
 `npx @missing-elements/h5p-author@latest schema <Type>` and say it has no notes here. Where npx
-cannot install, fetch the build tool and that type's bundle as step 3 says, unzip the bundle, and
-run `node h5p-author.mjs schema <Type> --libraries parts` instead. Never
-read a library's semantics or code yourself: the type file and `schema` say what a source may
-write, and an agent that works it out from the library spends two to three times as much for
-the same package.
+cannot install, fetch the build tool and that type's bundle as
+[the two files' route](./references/build/two-files.md) says, unzip the bundle, and run
+`node h5p-author.mjs schema <Type> --libraries parts` instead. Never read a library's semantics
+or code yourself: the type file and `schema` say what a source may write, and an agent that works
+it out from the library spends two to three times as much for the same package.
 
 ## 2. Write the source
 
@@ -101,203 +101,24 @@ content holds have files too: H5P.AdvancedText, H5P.Image, H5P.Video, H5P.Text.
   Where it sits is the type file's to say, a level deeper than a guess puts it: an item of
   H5P.Column's `content` is `{ "content": <sub-content> }`, a slide's element
   `{ "action": <sub-content> }` in `presentation.slides[].elements`, a book's chapter an H5P.Column.
+- Check answers and feedback against the material before you build.
 
-## 3. Build
+## 3. Build, by the first route whose check holds
 
-Build the best way this environment allows, and tell the user which you take:
+Go down these checks in order and take the first that holds. Read only that route's file and
+follow it to its end: it says how to build and what to hand over. Where its build fails, as its
+file says, take the next route. Tell the user which you take. Where you cannot run a command
+here, only the last check holds: take it with no attempt here first.
 
-- **Here, from the build archive**: Node runs and the user attached `h5p-author-build.tar.gz`,
-  the build tool and every type's libraries in one file. *From the build archive*, below.
-- **Here, with npm**: a shell that reaches the npm registry, as in a terminal. The command below.
-- **Here, from two files**: Node runs and files can be fetched, but npm cannot install, as in a
-  chat's sandbox that reaches the web and no registry. *If it cannot install here*, below.
-- **In the user's browser**: nothing here runs, or nothing fetches, as in a chat with no tools
-  or one that cannot open a web address. *The build page*, below, with no attempt here first;
-  where Node runs, with its line on the build archive.
+1. **The user attached the build archive, `h5p-author-build.tar.gz`, to a message or to this
+   chat's files, and Node runs here.** Where they did not, look for nothing.
+   → [From the build archive](./references/build/archive.md)
+2. **npm reaches its registry here.** This prints a version within ten seconds:
+   `npm view @missing-elements/h5p-author version --fetch-timeout=10000 --fetch-retries=0`.
+   → [With npm](./references/build/npm.md)
+3. **Node runs here and can fetch a file from the web.**
+   → [From two files](./references/build/two-files.md)
+4. **Anything else**: nothing runs here, nothing can be fetched, or no route above built.
+   → [In the user's browser](./references/build/browser.md)
 
-Take the first that applies, and the next if it fails.
-
-Build in a working folder of your own, not in the folder the user named:
-
-```bash
-npx @missing-elements/h5p-author@latest build source.json course.h5p
-```
-
-**From the build archive.** Find the file the user attached, in the folder the chat keeps
-attachments in (`find / -name 'h5p-author-build*.tar.gz' 2>/dev/null`), unpack it in your working
-folder and build from it: nothing to install or fetch, for any type.
-
-```bash
-tar -xzf <archive>   # or: python3 -m tarfile -e <archive> .
-node h5p-author.mjs build source.json course.h5p --libraries parts
-```
-
-With no network, a file's `path` must name a file here, such as one the user attached: a web
-address is downloaded as it builds. Where npm cannot install, the verifier cannot run either,
-which step 4's command finds out in ten seconds: hand the package over **unverified**, with the
-build page's link below for the user to play it before using it.
-
-**If it cannot install here, build from files instead.** No network for npm (`EAI_AGAIN`,
-`ENOTFOUND`, a registry's 403, 404 or 503, or an install that hangs until the command times out):
-do not retry, try another way to install it, or end with commands for the user to run once npm
-works. Where Node runs and you can fetch a file (where
-the sandbox downloads only what a browsing tool has opened, open each address with that tool
-first, then download it), fetch the
-build tool and the bundle of the source's own `type`, the libraries a build of that type reads,
-at the addresses https://missing-elements.github.io/h5p/skill/ lists for them. In both addresses
-and commands below, `<type>` is that machine name, such as `H5P.Blanks`: another type's bundle
-lacks what this one needs.
-
-```
-https://missing-elements.github.io/h5p/bundles/h5p-author.mjs
-https://missing-elements.github.io/h5p/bundles/<type>.zip
-```
-
-```bash
-unzip -q <type>.zip   # or: python3 -m zipfile -e <type>.zip .
-node h5p-author.mjs build source.json course.h5p --libraries parts
-```
-
-A build that stops at a part `parts/` lacks names it (an addon: H5P.MathDisplay, where the text
-holds math): fetch that part into `parts/`, such as
-`https://missing-elements.github.io/h5p/bundles/parts/H5P.MathDisplay-1.0.h5p`, and build again. The verifier
-cannot run there either: hand the package over **unverified**, with the build page's link below
-for the user to play it before using it.
-
-**Where nothing can be fetched or run, the build page builds it.** No shell, no Node, or no
-download: [the build page](https://missing-elements.github.io/h5p/build/) builds the same package in the user's
-browser from the source alone, with no install.
-
-**Where no package was built here and your reply is read in a chat, hand the source over in a
-page that makes the link**, whether or not a command runs here (a chat's code tool can be
-unavailable for hours), and whether or not you can tell how the chat shows it. A package built
-here is handed over as step 5 says, with the link a command prints and no page. Write the page
-below in one `html` code block, with the whole source in place of the line `SOURCE`, and every
-other line copied as it is: change nothing in its script. The user's browser makes the link from
-the source, so nothing compressed is typed or copied; a link copied into a reply from a command's
-output can arrive damaged, and with no package built there is nothing else to fall back on, so
-run no command for one. Tell the user, in a line or two and in this order: first, to open the
-block as a page with the chat's Preview and click *Build and play it*, which the chat may ask
-them to allow; only then, as the way where their chat shows no Preview, to save the block as a
-file ending in `.html` and open it. Give the source nowhere else in that reply, and no `#source=`
-link beside it. A source that names files gets no page.
-
-```html
-<!doctype html>
-<meta charset="utf-8">
-<title>Build and play</title>
-<p><a id="link" target="_blank" rel="noopener">Making the link…</a></p>
-<noscript id="source">
-SOURCE
-</noscript>
-<script>
-const source = document.getElementById('source').textContent.trim()
-const link = document.getElementById('link')
-new Response(new Blob([source]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer().then((buffer) => {
-  let text = ''
-  for (const byte of new Uint8Array(buffer)) text += String.fromCharCode(byte)
-  link.href = 'https://missing-elements.github.io/h5p/build/#source=' + btoa(text).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-  link.textContent = 'Build and play it'
-}, (error) => { link.textContent = 'No link could be made here (' + error + '). Copy the source from the code block into https://missing-elements.github.io/h5p/build/' })
-</script>
-```
-
-**A link that carries the source is written by a command**, with Node or Python, which need no
-network. Give one in place of the page where your reply is not read in a chat, as in a terminal;
-and give one with a package built here, as step 5 says. A source that names files gets none: a
-link carries its text, not the files:
-
-```bash
-node -e "const s=require('fs').readFileSync('source.json'),f=[];JSON.parse(s,(k,v)=>(k==='path'&&typeof v==='string'&&f.push(v),v));console.log(f.length?'No link: the source names files, which a link cannot carry.':'https://missing-elements.github.io/h5p/build/#source='+require('zlib').deflateRawSync(s).toString('base64url'))"
-python3 -c "import base64,json,zlib;s=open('source.json','rb').read();f=[];json.loads(s,object_hook=lambda o:(isinstance(o.get('path'),str) and f.append(o['path']),o)[1]);c=zlib.compressobj(9,zlib.DEFLATED,-15);d=c.compress(s)+c.flush();print('No link: the source names files, which a link cannot carry.' if f else 'https://missing-elements.github.io/h5p/build/#source='+base64.urlsafe_b64encode(d).decode().rstrip('='))"
-```
-
-**A link is only what one of these commands printed here, handed over whole: no command run, no
-link.** Never write a `#source=` link yourself, from memory or after an example, even when asked
-for one: its text is compressed, so it cannot be typed, and one wrong character leaves the page
-nothing to build. Where you can give the user a file, give them the source too, beside the link,
-under the activity's name with `.source.json` (`course.source.json`): the page opens it, and a
-link copied wrong into your reply builds nothing.
-
-Where Node runs here and nothing could be installed or downloaded, put this line in that reply,
-right after the page or the link, or after the source where neither was given, as it is:
-attached to a message, the archive builds the `.h5p` here.
-
-```
-To get the .h5p file here instead: download https://missing-elements.github.io/h5p/bundles/h5p-author-build.tar.gz (15 MB) and attach it to your next message.
-```
-
-Where neither a page nor a link can carry the source, as one that names files, or where outside
-a chat neither command runs, give neither: the build page sees only what the user pastes, so put
-the **whole source in your reply**, in one `json` code block, and tell them to paste it into the
-page at https://missing-elements.github.io/h5p/build/. Never give the page's address without the
-source, in a page, in the link or beside it: it builds nothing. The page lists every problem by
-its path, with a button that copies them for the chat: fix them all and give a new page, a new
-link, or the whole source again. A source that names files of its own waits for the user to
-choose them there. Steps 4 and 5 are then the user's, on that page: the package is **unverified**
-until they have played it there, and they download it from there.
-
-A source with a problem writes nothing: the build lists every problem by its path, so fix them
-all and run it again under the same name. Once a build has written its file it never writes
-over it, so a later build takes a new name (`course-2.h5p`). Copy the one you hand over to the
-name the user asked for without writing over a file already there (`cp -n`). If that name is
-taken, ask, or where you cannot ask, take a new name and say so. Never delete or overwrite a file
-to free a name. Pass the build's notes on to the user: texts left in English, a slide that holds
-too much.
-
-## 4. Verify
-
-```bash
-npm view @missing-elements/h5p-verify version --fetch-timeout=10000 --fetch-retries=0 && npx @missing-elements/h5p-verify@latest course.h5p
-```
-
-Run it as one line. Its first half asks npm for the verifier's version and gives up after ten
-seconds, so that an npm that cannot install here, as after a build from the archive or from two
-files, is found out at once and not waited for: where it prints no version, the verifier did not
-run and cannot, so do not run it by itself or again, and say the package is **unverified**.
-
-It writes `course.verify/report.json` and `course.verify/screenshot.png` beside the package
-(`--out <folder>` puts them elsewhere). Read the report's `verdict`, `reasons`, `errors` and
-`warnings`: a run that fails may say why only in `reasons`, such as content that never reached
-ready or drew nothing. Look at the screenshot too: layout mistakes raise no error. One run is
-enough: the build already writes what an H5P site's content check keeps, so `--untrusted` finds
-nothing more. Follow the `h5p-verify` skill's loop if it is installed. Fix the source, never by
-removing what fails. Without a browser, say the package is **unverified**.
-
-## 5. Review and hand over
-
-Check answers and feedback against the material. Where nothing was built here, step 3's build
-page route is the whole hand-over: in a chat, the page that makes the link; outside one, the link
-it printed, with the source as a file where you can give one; or the whole source and the page's
-address; and the line on the build archive, where step 3 gives it. Otherwise let the user play it in their browser:
-
-```bash
-npx @missing-elements/h5p-verify@latest course.h5p --preview
-```
-
-Run it in the background; it ends once its tab has closed. Ask the user to work through all of
-it, wrong answers included; its Download button saves a copy. Where the command does not run on
-the user's computer, hand over the file, and the command where step 3 printed no link. If you
-already have a browser tool, add `--no-open` and play the address it prints with that tool. Do
-not write a browser script to do it: the person's own play is the check, and a script of your
-own costs more than the build.
-
-Deliver:
-
-- the `.h5p`, and its source as a file beside it, under the package's name with `.source.json`
-  (`course.source.json`), copied as the package was; the build page opens it too. Name the files
-  it names, if any: a build reads them beside it;
-- the link one of step 3's two commands printed here for this source, handed over whole: the
-  build page, where the user plays the package in any browser, changes the source and builds it
-  again, and says how it went at the foot of the page. A link is only what one of them printed:
-  none for a source that names files, and none where neither runs. Give no other web address;
-- `screenshot.png` from the run that passed; where it could not run, call the package
-  **unverified**; where it ran but failed, give its reasons and say the package **failed
-  verification**;
-- the build's notes, and the preview command where there is no link;
-- what a pass means: it starts and draws, not that it is accurate, accessible or right for
-  every LMS;
-- that it carries the editor libraries an H5P site's upload check asks for, so a Moodle with no
-  library installed accepts it (the one site tried);
-- that it carries H5P's libraries, each under its own licence, most MIT, so the user checks
-  those terms before they distribute it.
+Build in a working folder of your own, not in the folder the user named.

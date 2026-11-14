@@ -15,7 +15,7 @@ already holds text to the content check's rules, from the pack an untrusted chec
 `apps/skills` plays every example untrusted too. Measured on a five-question quiz, at four
 characters a token: `content.json` was about 3,470 tokens to write by hand, after reading 3,900 to
 9,500 of a type's semantics; the source is 1,000 to 1,800 tokens, written from a type file of 200
-to 3,000. Twenty-seven things the code does not say by itself:
+to 3,000. Twenty-eight things the code does not say by itself:
 
 - **One generator, three ways to run it.** The third, `saved`, checks content as H5P stores it
   (*Saved content is checked as the build checks what it writes*, below). `ContentGenerator` was the sweep's
@@ -860,6 +860,42 @@ to 3,000. Twenty-seven things the code does not say by itself:
   are followed, and what ChatGPT does with them is the owner's runs. Not measured: whether ChatGPT
   keeps the script as given for a long source (one run, whose link worked), and any other chat
   app's preview.
+- **Each build route is a file of its own, picked by checks in `SKILL.md`** (2026-11-14, #204,
+  the owner's call). `SKILL.md` held the four ways to build and the steps after a build, 18.9 KB
+  that every chat read whole to take one of them, and words written for one route had leaked into
+  another (*In a chat that built nothing, a page the chat writes makes the link*, above). As the
+  type files do for content types, `SKILL.md` keeps steps 1 and 2 and a step 3 of four checks taken
+  in order, each naming one file of `references/build/`: the user attached the build archive
+  (`archive.md`); `npm view … --fetch-timeout=10000 --fetch-retries=0` prints a version
+  (`npm.md`); Node runs and fetches a file (`two-files.md`); anything else (`browser.md`). The
+  three that build here end in `built-here.md`: the build's problems and the file's name, the
+  verifier, the link and the hand-over. A route a chat cannot take costs it nothing to carry, so a
+  chat that gains a tool finds its route written. The code blocks moved byte for byte, copied by a
+  script, and the words with them but for the pointers between files. `prepack` copies all of
+  `references/`, and `build.test.ts` holds the copy to the skill file for file.
+
+  What a chat reads of the skill's own text, `SKILL.md` and its route's files: 13.0 KB in the
+  user's browser, 13.7 with npm, 14.2 from the archive and 14.7 from two files, where every route
+  read 18.9 before, 22 to 31% less. The brief and the type files are read as before.
+
+  The first check at first named `find / -name 'h5p-author-build*.tar.gz'`, run wherever Node runs.
+  On a computer's whole disk it ran past the code tool's 110 seconds, and Haiku with npm working
+  took npm for broken, read the browser's route, and built with npm only when it tried again.
+  Before the split, `find` ran only once the archive was attached. So that check is the
+  conversation's, whether the user attached it, and `find` is in `archive.md`.
+
+  Measured on Haiku, a five-question Question Set, reading the skill through a stand-in for a chat's
+  skill reader that logs each file it serves: 7 of 7 handed over what their route says. With no
+  tools, `SKILL.md` and `browser.md` and nothing more, and the page made a link to a package the
+  verifier passes. A code tool with no network went from `two-files.md` to `browser.md`, with the
+  same page, and saved the source as a file too, which the page's route does not ask for. The
+  archive attached and a registry that hangs: `archive.md` and `built-here.md`, one ten-second
+  check, the package handed over unverified with a link to its source file, a package the verifier
+  passes here. Two files and a registry that hangs, two runs: both built from the tool and the
+  Question Set bundle, said the package was not verified, and gave a link to the source file
+  delivered, packages the verifier passes here. npm working, two runs: one under the first check
+  1, as above; with the check as it is, `npm.md` and `built-here.md`, a pass and the command's
+  link. Haiku sometimes read the next route's file before running its check, at most 1.5 KB more.
 - **The skill names no product** (2026-11-12, the owner's call). Its routes were told apart by
   the apps they were measured in; they now say what each needs: a shell that reaches the npm
   registry, Node and a download where npm cannot install, or nothing that runs or fetches. What a

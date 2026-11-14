@@ -136,11 +136,12 @@ The package carries those type files too, as the release has them:
 `@missing-elements/h5p-author/references/types/H5P.TrueFalse.md` is the type's notes, an example and
 these fields. A page that builds for a chat with no skill beside it hands them over with a source's
 problems, as the [build page](https://missing-elements.github.io/h5p/build/) does. The skill's text
-travels with them, `@missing-elements/h5p-author/SKILL.md` and its brief,
-`references/authoring.md`, so a site can serve the skill from the release it pins:
+travels with them, `@missing-elements/h5p-author/SKILL.md`, its brief,
+`references/authoring.md`, and its build routes, `references/build/<route>.md`, so a site can
+serve the skill from the release it pins:
 [missing-elements.github.io](https://missing-elements.github.io/h5p/create-with-ai/#install)
 packs them as the zips chat apps install, and lists the build tool and each bundle that the
-skill's step 3 fetches at
+skill's route from two files fetches at
 [missing-elements.github.io/h5p/skill/](https://missing-elements.github.io/h5p/skill/).
 
 ## A content type's bundle
