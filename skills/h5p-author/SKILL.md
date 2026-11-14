@@ -133,9 +133,9 @@ node h5p-author.mjs build source.json course.h5p --libraries parts
 ```
 
 With no network, a file's `path` must name a file here, such as one the user attached: a web
-address is downloaded as it builds. Where npm cannot install, the verifier cannot run either:
-hand the package over **unverified**, with the build page's link below for the user to play it
-before using it.
+address is downloaded as it builds. Where npm cannot install, the verifier cannot run either,
+which step 4's command finds out in ten seconds: hand the package over **unverified**, with the
+build page's link below for the user to play it before using it.
 
 **If it cannot install here, build from files instead.** No network for npm (`EAI_AGAIN`,
 `ENOTFOUND`, a registry's 403, 404 or 503, or an install that hangs until the command times out):
@@ -166,9 +166,46 @@ for the user to play it before using it.
 
 **Where nothing can be fetched or run, the build page builds it.** No shell, no Node, or no
 download: [the build page](https://missing-elements.github.io/h5p/build/) builds the same package in the user's
-browser from the source alone, with no install. Give them a link that carries the source, written
-with Node or Python, which need no network. A source that names files gets none: a link carries
-its text, not the files:
+browser from the source alone, with no install.
+
+**Where no package was built here and your reply is read in a chat, hand the source over in a
+page that makes the link**, whether or not a command runs here (a chat's code tool can be
+unavailable for hours), and whether or not you can tell how the chat shows it. A package built
+here is handed over as step 5 says, with the link a command prints and no page. Write the page
+below in one `html` code block, with the whole source in place of the line `SOURCE`, and every
+other line copied as it is: change nothing in its script. The user's browser makes the link from
+the source, so nothing compressed is typed or copied; a link copied into a reply from a command's
+output can arrive damaged, and with no package built there is nothing else to fall back on, so
+run no command for one. Tell the user, in a line or two and in this order: first, to open the
+block as a page with the chat's Preview and click *Build and play it*, which the chat may ask
+them to allow; only then, as the way where their chat shows no Preview, to save the block as a
+file ending in `.html` and open it. Give the source nowhere else in that reply, and no `#source=`
+link beside it. A source that names files gets no page.
+
+```html
+<!doctype html>
+<meta charset="utf-8">
+<title>Build and play</title>
+<p><a id="link" target="_blank" rel="noopener">Making the link…</a></p>
+<script type="application/json" id="source">
+SOURCE
+</script>
+<script>
+const source = document.getElementById('source').textContent.trim()
+const link = document.getElementById('link')
+new Response(new Blob([source]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer().then((buffer) => {
+  let text = ''
+  for (const byte of new Uint8Array(buffer)) text += String.fromCharCode(byte)
+  link.href = 'https://missing-elements.github.io/h5p/build/#source=' + btoa(text).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  link.textContent = 'Build and play it'
+}, (error) => { link.textContent = 'No link could be made here (' + error + '). Copy the source from the code block into https://missing-elements.github.io/h5p/build/' })
+</script>
+```
+
+**A link that carries the source is written by a command**, with Node or Python, which need no
+network. Give one in place of the page where your reply is not read in a chat, as in a terminal;
+and give one with a package built here, as step 5 says. A source that names files gets none: a
+link carries its text, not the files:
 
 ```bash
 node -e "const s=require('fs').readFileSync('source.json'),f=[];JSON.parse(s,(k,v)=>(k==='path'&&typeof v==='string'&&f.push(v),v));console.log(f.length?'No link: the source names files, which a link cannot carry.':'https://missing-elements.github.io/h5p/build/#source='+require('zlib').deflateRawSync(s).toString('base64url'))"
@@ -183,22 +220,22 @@ under the activity's name with `.source.json` (`course.source.json`): the page o
 link copied wrong into your reply builds nothing.
 
 Where Node runs here and nothing could be installed or downloaded, put this line in that reply,
-right after the link, or after the source where no link was printed, as it is: attached to a
-message, the archive builds the `.h5p` here.
+right after the page or the link, or after the source where neither was given, as it is:
+attached to a message, the archive builds the `.h5p` here.
 
 ```
 To get the .h5p file here instead: download https://missing-elements.github.io/h5p/bundles/h5p-author-build.tar.gz (15 MB) and attach it to your next message.
 ```
 
-Where nothing is built here and they print no link, with neither, or with no tool that runs
-anything at all (a chat's code tool can be unavailable for hours), give no link: the page sees
-only what the user pastes, so put the **whole source in your reply**, in one `json` code block,
-and tell them to paste it into the page at https://missing-elements.github.io/h5p/build/. Never
-give the page's address without the source, in the link or beside it: it builds nothing. The
-page lists every problem by its path, with a button that copies them for the chat: fix them all
-and give a new link, or the whole source again. A source that names files of its own waits for
-the user to choose them there. Steps 4 and 5 are then the user's, on that page: the package is
-**unverified** until they have played it there, and they download it from there.
+Where neither a page nor a link can carry the source, as one that names files, or where outside
+a chat neither command runs, give neither: the build page sees only what the user pastes, so put
+the **whole source in your reply**, in one `json` code block, and tell them to paste it into the
+page at https://missing-elements.github.io/h5p/build/. Never give the page's address without the
+source, in a page, in the link or beside it: it builds nothing. The page lists every problem by
+its path, with a button that copies them for the chat: fix them all and give a new page, a new
+link, or the whole source again. A source that names files of its own waits for the user to
+choose them there. Steps 4 and 5 are then the user's, on that page: the package is **unverified**
+until they have played it there, and they download it from there.
 
 A source with a problem writes nothing: the build lists every problem by its path, so fix them
 all and run it again under the same name. Once a build has written its file it never writes
@@ -211,8 +248,13 @@ too much.
 ## 4. Verify
 
 ```bash
-npx @missing-elements/h5p-verify@latest course.h5p
+npm view @missing-elements/h5p-verify version --fetch-timeout=10000 --fetch-retries=0 && npx @missing-elements/h5p-verify@latest course.h5p
 ```
+
+Run it as one line. Its first half asks npm for the verifier's version and gives up after ten
+seconds, so that an npm that cannot install here, as after a build from the archive or from two
+files, is found out at once and not waited for: where it prints no version, the verifier did not
+run and cannot, so do not run it by itself or again, and say the package is **unverified**.
 
 It writes `course.verify/report.json` and `course.verify/screenshot.png` beside the package
 (`--out <folder>` puts them elsewhere). Read the report's `verdict`, `reasons`, `errors` and
@@ -225,9 +267,9 @@ removing what fails. Without a browser, say the package is **unverified**.
 ## 5. Review and hand over
 
 Check answers and feedback against the material. Where nothing was built here, step 3's build
-page route is the whole hand-over: the link it printed, with the source as a file where you can
-give one, or the whole source and the page's address; and the line on the build archive, where
-step 3 gives it. Otherwise let the user play it in their browser:
+page route is the whole hand-over: in a chat, the page that makes the link; outside one, the link
+it printed, with the source as a file where you can give one; or the whole source and the page's
+address; and the line on the build archive, where step 3 gives it. Otherwise let the user play it in their browser:
 
 ```bash
 npx @missing-elements/h5p-verify@latest course.h5p --preview

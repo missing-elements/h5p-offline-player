@@ -15,7 +15,7 @@ already holds text to the content check's rules, from the pack an untrusted chec
 `apps/skills` plays every example untrusted too. Measured on a five-question quiz, at four
 characters a token: `content.json` was about 3,470 tokens to write by hand, after reading 3,900 to
 9,500 of a type's semantics; the source is 1,000 to 1,800 tokens, written from a type file of 200
-to 3,000. Twenty-four things the code does not say by itself:
+to 3,000. Twenty-seven things the code does not say by itself:
 
 - **One generator, three ways to run it.** The third, `saved`, checks content as H5P stores it
   (*Saved content is checked as the build checks what it writes*, below). `ContentGenerator` was the sweep's
@@ -290,7 +290,10 @@ to 3,000. Twenty-four things the code does not say by itself:
   the author package pins, so the page plays with the pack it built from. A chat with no tool to
   run at all, as ChatGPT on a free account once its data-analysis quota is spent (for hours, the
   owner's test of 2026-11-09), cannot write the link: the skill has it put the whole source in its
-  reply, since that test's chat gave the page's bare address, which builds nothing.
+  reply, since that test's chat gave the page's bare address, which builds nothing. Since
+  2026-11-14 a chat writes a page that makes the link, with or without a tool (*In a chat that
+  built nothing, a page the chat writes makes the link*, below), and a source goes over in a
+  `json` block only where it names files.
   A link is only what a command printed (2026-11-11). A link ChatGPT gave the owner carried 3,167
   characters that were no deflate stream, its table broken at byte 82 of 2,375: the chat had
   typed them itself, made up or copied wrong, and the page built nothing. So the skill says it
@@ -695,6 +698,10 @@ to 3,000. Twenty-four things the code does not say by itself:
   file. Haiku in a sandbox told it had no network and could give files handed the file over
   under the old text already, in 5 of 6 runs, as under the new; every link it gave was exact
   and the reply's one web address.
+
+  Since 2026-11-14 a chat that built nothing hands the source over in a page that makes the
+  link, and the link a command prints is for a reply read outside a chat and for a package built
+  here (*In a chat that built nothing, a page the chat writes makes the link*, below).
 - **Only the build tool writes the `.h5p`** (2026-11-13). ChatGPT, asked to prove it could make
   the file where it could not install the tool, zipped an `h5p.json` and a `content.json` it had
   written: no library in it, and the content wrapped in a `params` key. The verifier fails it
@@ -754,6 +761,89 @@ to 3,000. Twenty-four things the code does not say by itself:
   (cubic's review). A source that names files gets no link, so the offer's line follows the source
   where no link was printed. Neither change was run on Haiku: the six no-archive runs above named
   no file.
+
+  **The archive kept in a ChatGPT Project builds too** (2026-11-14, the owner's free account). The
+  owner put the archive into a Project and asked in a chat of it ("works in the gpt project, i
+  attached tar file, file was created"): ChatGPT built a Question Set from it, 1.3 MB, which the
+  verifier passes with no warning, run here on the file. So the organisation's guide tells people
+  using ChatGPT to keep the archive in a Project and ask there (missing-elements.github.io#49), in
+  place of an upload with every message, of which a free account has few a day. One run: a second
+  chat of the same project was not tried. Python's index is closed there as npm's is: `pip download
+  six` answered "from versions: none", so the archive as a PyPI package is no way in.
+
+  **The verifier is asked for, not waited for** (the same run, #202). After that build ChatGPT ran
+  step 4's `npx`, which cannot install there, waited until its tool gave up, and wrote "Unverified.
+  The separate verification tool timed out". A build from the archive never tries npm, so nothing
+  had told it that npm does not answer. Step 4's command now asks npm for the verifier's version
+  first, `npm view … --fetch-timeout=10000 --fetch-retries=0 &&`, and runs the verifier only where
+  it answers: against a registry that takes a connection and never answers, as that mirror does, it
+  gives up after 10.5 seconds, measured. Haiku with the archive attached and such a registry, 2 of
+  2: built from the archive, made one connection to the registry, and handed the package over
+  unverified, with its files and the link its command printed. With npm working, 1 of 1 ran the
+  verifier as before and handed over its pass.
+- **In a chat that built nothing, a page the chat writes makes the link** (2026-11-14, #202). The
+  link to the build page was the weak point of a chat that cannot build: compressed text that a
+  command prints and the model copies into its reply. ChatGPT broke 2 of 3 on 2026-11-13 (*The
+  hand-over carries the source and one web address*, above), and with its code tool unavailable, as
+  on a free account for hours, no command runs and there is none. ChatGPT shows an `html` code
+  block of a reply as a page, under Preview, on a free account too, at an address of its own
+  (`https://codex-inline-visualization-<16 hex>.web-sandbox.oaiusercontent.com`). The owner opened
+  two probe pages there, which ChatGPT was asked to give back as they were. A script in the page
+  runs; `CompressionStream('deflate-raw')` deflates a source; a link the page writes opens the
+  build page in a tab, with the right source, once ChatGPT has asked the user to allow it; a
+  download from a `blob:` address saves. A module from jsDelivr loads, but `connect-src` refuses a
+  fetch to the organisation's site and to jsDelivr, and `frame-src` refuses a frame on the build
+  page. So such a page can make the link, and can neither build nor play: that would take the pack
+  as scripts and a player without its worker.
+
+  So where no package was built and the reply is read in a chat, step 3 has the chat write a page:
+  the source in a `script` of type `application/json`, and a short fixed script that deflates it
+  and writes the address into a link, *Build and play it*. Nothing compressed is typed or copied,
+  no code tool is used, and the source is in the reply once. The reply tells the user to open the
+  block with Preview and click the link, and, where their chat shows no Preview, to save the block
+  as a file ending in `.html` and open it: the page makes the link from a `file:` address too,
+  which is how the runs below opened it. A source that names files gets no page, as it gets no
+  link: it goes over whole in a `json` block, its files chosen on the build page. The script calls
+  its link `link`, since the preview's own scripts are reported to redefine `window.open` (Check
+  Point Research, 2026-11-05).
+
+  The words took six tries. Each was run on Haiku, two of them in ChatGPT on the owner's free
+  account, and what each cost is why they read as they do:
+
+  - **"Where no command runs here, a page you write makes the link, if the chat shows an `html`
+    code block of yours as a page":** Haiku with no tools, 6 of 6. It left a chat whose code tool
+    works printing the link by command, which is the chat that damages links.
+  - **"Where the chat shows an `html` code block of yours as a page the user opens (a preview), a
+    page you write makes the link, whether or not a command runs here":** Haiku with no tools, 3 of
+    3. ChatGPT with it as a plugin gave a link a command had printed, a sound one that time, and
+    asked afterwards, quoted the sentence back. A condition a model must judge about its own chat
+    is one it passes over.
+  - **"In a chat, hand the source over in a page that makes the link … Only where your reply is not
+    read in a chat, as in a terminal, give a link instead":** no tools, 5 of 5, two of them told
+    nothing of a Preview; a code tool with no network, 2 of 2. With npm working, the one run built
+    and verified the package and then added the page to its reply, the source a second time.
+  - **"Where no package was built here and your reply is read in a chat":** with npm working, the
+    one run built with no page, and with no link either, and gave the preview command: the sentence
+    that kept the link for a terminal had taken it from a package built in a chat.
+  - **"A package built here is handed over as step 5 says, with the link a command prints and no
+    page", and the link's sentence naming both its places:** no tools 1 of 1, a code tool with no
+    network 1 of 1, and with npm working 1 of 1 with the package, the verifier's pass and the
+    command's link, which decodes to the source file it delivered. ChatGPT with this text as a
+    plugin tried npm and the two files, wrote the page, and Preview showed the link, which opened
+    the build page with the right source. Its reply said to save the block as a file first and
+    named Preview second.
+  - **So the order is in the words, "first … only then":** no tools 2 of 2 and a code tool with no
+    network 1 of 1, Preview first in each; and 2 of 2 sources naming the user's picture went over
+    in a `json` block with the page's address and the picture named, with no page.
+
+  Across the 31 Haiku replies, 24 wrote a page, and in all 24 the script was the one given, the
+  link carried the page's source, and that source built a package the verifier passes with no
+  warning: Question Sets in English and Ukrainian and Accordions with markup, links of 701 to 1,973
+  characters. The other seven rightly wrote none: three built with npm, two from the archive, two
+  named a picture. Haiku is a floor here, since it never damages a link: it shows that the words
+  are followed, and what ChatGPT does with them is the owner's runs. Not measured: whether ChatGPT
+  keeps the script as given for a long source (one run, whose link worked), and any other chat
+  app's preview.
 - **The skill names no product** (2026-11-12, the owner's call). Its routes were told apart by
   the apps they were measured in; they now say what each needs: a shell that reaches the npm
   registry, Node and a download where npm cannot install, or nothing that runs or fetches. What a
