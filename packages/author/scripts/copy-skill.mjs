@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url'
 
 const skill = new URL('../../../skills/h5p-author/', import.meta.url)
 const references = fileURLToPath(new URL('references/', skill))
+/** The `.md` files of one folder of the skill's `references/`, which may not be empty. @param {string} folder */
 const count = async (folder) => {
   const names = (await readdir(`${references}${folder}/`)).filter((name) => name.endsWith('.md'))
   if (!names.length) throw new Error(`No ${folder} files in ${references}${folder}/`)
