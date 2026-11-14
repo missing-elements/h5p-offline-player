@@ -1,28 +1,21 @@
 # The brief, and good content
 
-## What to settle with the user
+## What you take, and what you choose
 
-Use what the user already gave. Ask for what is missing and matters:
+Take what the user gave and choose the rest, and say in your reply what you chose, so they can
+change it:
 
-- **The material**: the text, the lesson, the facts. Never invent factual material, and never
-  claim an expert reviewed it.
-- **Who it is for, and what they should be able to do after**: one objective per activity.
-- **The content type**, chosen together (SKILL.md, step 1), and its size: how many questions,
-  cards, slides, chapters.
-- **The language**, a BCP 47 tag such as `en` or `de-AT`. It sets the libraries' interface
-  texts too, from their own translations, which are often incomplete.
-- **Media**, for a type that needs them: files the user has, or web addresses they may use,
-  with who made them and under which licence.
-- **Author and licence**, asked once the type is chosen: the author's name, which every source
-  needs, and the licence for the whole, an H5P code: `U`
-  (undisclosed, when unknown), `CC BY`, `CC BY-SA`, `CC BY-ND`, `CC BY-NC`, `CC BY-NC-SA`,
-  `CC BY-NC-ND`, `CC0 1.0`, `CC PDM`, `GNU GPL`, `PD`, `ODC PDDL` or `C`; `licenseVersion`
-  `4.0` for a CC BY one. The user may skip either: a name they skip is the one you know them
-  by, or "Unknown", and a licence they skip is `U`. What they gave stays. Never make up a name,
-  or choose a licence the user has not.
-- **A pass mark**, for scored content an LMS records, and what a learner who passes or fails
-  is told.
-- **Where it goes**: an LMS, a website, a file to hand out.
+- **The material**: the user's text, lesson or facts, or, for a general topic, what is well
+  established. Never invent factual material, and never claim an expert reviewed it.
+- **Who it is for, and what they should be able to do after**: from the request, one objective
+  per activity.
+- **The size**: how many questions, cards, slides or chapters, as asked, or what the material
+  fills.
+- **The language**, a BCP 47 tag such as `en` or `de-AT`: the request's, unless it names another.
+  It sets the libraries' interface texts too, from their own translations, which are often
+  incomplete.
+- **The author and the licence**, as the type's file says.
+- **Media**, for a type that needs them, as below.
 
 ## Writing it well
 

@@ -555,7 +555,9 @@ to 3,000. Twenty-eight things the code does not say by itself:
   for, so that no reader has to guess: on the new text five of five runs (those three, both
   skipped, both given) wrote what was given and the default for what was skipped, and the run
   with the author named in the request asked for the licence alone. Those eight packages play
-  too.
+  too. On 2026-11-14 the owner dropped the question (*Each build route is a file of its own, every
+  fact is written once, and one question at most is asked*, below): the author and the licence are
+  taken as given, or the defaults above, and never asked.
 - **A text's own marks are said where a chat reads, and what a library cannot take apart is a
   problem** (2026-11-12, #187). Haiku with a shell and the skill built each of the 32 content
   types that need no media twice: 64 packages, all built, all passing the verifier with no
@@ -860,42 +862,66 @@ to 3,000. Twenty-eight things the code does not say by itself:
   are followed, and what ChatGPT does with them is the owner's runs. Not measured: whether ChatGPT
   keeps the script as given for a long source (one run, whose link worked), and any other chat
   app's preview.
-- **Each build route is a file of its own, picked by checks in `SKILL.md`** (2026-11-14, #204,
-  the owner's call). `SKILL.md` held the four ways to build and the steps after a build, 18.9 KB
-  that every chat read whole to take one of them, and words written for one route had leaked into
-  another (*In a chat that built nothing, a page the chat writes makes the link*, above). As the
-  type files do for content types, `SKILL.md` keeps steps 1 and 2 and a step 3 of four checks taken
-  in order, each naming one file of `references/build/`: the user attached the build archive
-  (`archive.md`); `npm view … --fetch-timeout=10000 --fetch-retries=0` prints a version
-  (`npm.md`); Node runs and fetches a file (`two-files.md`); anything else (`browser.md`). The
-  three that build here end in `built-here.md`: the build's problems and the file's name, the
-  verifier, the link and the hand-over. A route a chat cannot take costs it nothing to carry, so a
-  chat that gains a tool finds its route written. The code blocks moved byte for byte, copied by a
-  script, and the words with them but for the pointers between files. `prepack` copies all of
+- **Each build route is a file of its own, every fact is written once, and one question at most
+  is asked** (2026-11-14, #204, the owner's calls: "each build method should be in the separate md
+  file", "make whole conversation faster", "SKILL file should not have repeatable parts, checks and
+  refs"). `SKILL.md` held the four ways to build and the steps after a build, 18.9 KB that every
+  chat read whole to take one of them, words written for one route had leaked into another (*In a
+  chat that built nothing, a page the chat writes makes the link*, above), and its parts said some
+  things two and three times. Now:
+
+  - `SKILL.md` is the flow: the content type, the one question the user is asked; the source; step
+    3, two answers and four routes; step 4, one pointer. The author and the licence are not asked:
+    what the user gave stays, a name not given is the one the model knows them by or "Unknown", a
+    licence not given is `U`, and the reply says which, so the user can change them. That rule and
+    the licence codes are written once, in `SOURCE_FIELDS`, under every content type's fields, since
+    every chat reads its type's file before it writes a source, the build page's included. The
+    brief keeps what the model chooses and says it chose (the material, who it is for, the size,
+    the language) and how to write well; it asks nothing.
+  - Step 3 finds two answers once, and both the route and the verifier use them. **Internet**: none
+    with no code tool, or where the chat's own tools say its sandbox has none, and then nothing is
+    run to check; otherwise taken as there. **npm**: none without internet; otherwise
+    `npm view … --fetch-timeout=10000 --fetch-retries=0`, run beside the first file reads, as it
+    waits on nothing. Then the first route that holds: the build archive attached (route 1,
+    `references/build/archive.md`), npm (route 2, `npm.md`), Node with internet (route 3,
+    `two-files.md`), anything else (route 4, `browser.md`). Routes 1 to 3 hand over by
+    `built-here.md`: the build's problems and the file's name, the verifier, run only where npm
+    answered, the link, written in the verifier's command line, and the hand-over.
+  - Route 4 writes the page; outside a chat, it writes the page to an `.html` file, which makes the
+    link from a `file:` address as well, where it used to give a link a command printed, so that the
+    link's commands are written once, in `built-here.md`.
+
+  What a chat reads of the skill's own text, `SKILL.md` and its route's files: 9.8 KB in the
+  user's browser, 11.3 with npm, 11.5 from the archive and 12.0 from two files, where every route
+  read 18.9 before, 37 to 48% less. The brief went from 2.9 to 2.2 KB, and a type file grew by
+  0.3 KB. The code blocks moved byte for byte, copied by a script. `prepack` copies all of
   `references/`, and `build.test.ts` holds the copy to the skill file for file.
 
-  What a chat reads of the skill's own text, `SKILL.md` and its route's files: 13.0 KB in the
-  user's browser, 13.7 with npm, 14.2 from the archive and 14.7 from two files, where every route
-  read 18.9 before, 22 to 31% less. The brief and the type files are read as before.
+  Measured on Haiku with a stand-in for a chat's skill reader that logs each file it serves, a
+  five-question Question Set, the request naming neither author nor licence. None asked for them:
+  each wrote "Unknown" and `U` and said so, and every package built passes the verifier here.
+  Asked for "a quiz", the reply was one question, which type, after `SKILL.md` and the brief and
+  nothing more. With npm working: one check, then the build, the verifier and the link in one
+  command line, and a copy, two and three calls to the code tool in two runs. The archive
+  attached: built, no verifier, a link to the source file delivered. Two files and a registry
+  that hangs: one check, both files fetched, built, unverified, a link to the source file. What the wording cost:
 
-  The first check at first named `find / -name 'h5p-author-build*.tar.gz'`, run wherever Node runs.
-  On a computer's whole disk it ran past the code tool's 110 seconds, and Haiku with npm working
-  took npm for broken, read the browser's route, and built with npm only when it tried again.
-  Before the split, `find` ran only once the archive was attached. So that check is the
-  conversation's, whether the user attached it, and `find` is in `archive.md`.
-
-  Measured on Haiku, a five-question Question Set, reading the skill through a stand-in for a chat's
-  skill reader that logs each file it serves: 7 of 7 handed over what their route says. With no
-  tools, `SKILL.md` and `browser.md` and nothing more, and the page made a link to a package the
-  verifier passes. A code tool with no network went from `two-files.md` to `browser.md`, with the
-  same page, and saved the source as a file too, which the page's route does not ask for. The
-  archive attached and a registry that hangs: `archive.md` and `built-here.md`, one ten-second
-  check, the package handed over unverified with a link to its source file, a package the verifier
-  passes here. Two files and a registry that hangs, two runs: both built from the tool and the
-  Question Set bundle, said the package was not verified, and gave a link to the source file
-  delivered, packages the verifier passes here. npm working, two runs: one under the first check
-  1, as above; with the check as it is, `npm.md` and `built-here.md`, a pass and the command's
-  link. Haiku sometimes read the next route's file before running its check, at most 1.5 KB more.
+  - Check 1 at first ran `find / -name 'h5p-author-build*.tar.gz'` wherever Node ran. On a
+    computer's whole disk it ran past the code tool's 110 seconds, and the run with npm working took
+    npm for broken. It now asks whether the user attached the archive, and `find` is route 1's.
+  - A code tool that says its sandbox has no internet should cost no check. Under three wordings
+    ("answer it from what you know for certain"; "take their word and run nothing"; the two
+    bullets, the first ending "run nothing to check") Haiku ran the npm check anyway in 4 of 6
+    such runs, 1 of 2 under the last. The check is held to ten seconds and leads to the same
+    route, so a run that ignores the bullet loses those seconds and nothing else; a model that
+    keeps to it, as stronger ones are expected to, loses none. Not measured outside Haiku.
+  - Route 3 read "Node runs here and can fetch a file from the web": a run told it had "no web tool"
+    took that for no internet and wrote the page without trying the two files. It reads "Node
+    runs here, with internet", the answer found once, and the run after it fetched both files and
+    built.
+  - A run called the Skill tool and got the skill installed on this computer, an older text: the
+    lab's prompts now say the reader is the skill. Haiku also read a route's file before its check
+    now and then, at most 1.5 KB more.
 - **The skill names no product** (2026-11-12, the owner's call). Its routes were told apart by
   the apps they were measured in; they now say what each needs: a shell that reaches the npm
   registry, Node and a download where npm cannot install, or nothing that runs or fetches. What a

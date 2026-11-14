@@ -38,7 +38,7 @@ A video with questions, text and links appearing over it at set times, a bookmar
 
 ## Fields of H5P.InteractiveVideo 1.28
 
-The example is `type` and `params` alone, and `params` holds the fields below. A source also names its own `title`, `language`, `license` and `authors`, all four required: the build refuses a source that leaves out any of them. The author's name and the licence are the user's: ask for what they have not given. For a name they skip, write the one you know them by, or "Unknown"; for a licence they skip, `U`.
+The example is `type` and `params` alone, and `params` holds the fields below. A source also names its own `title`, `language`, `license` and `authors`, all four required: the build refuses a source that leaves out any of them. Write the author and the licence the user gave, as given, and ask for neither: an author not given is the name you know the user by, or "Unknown", and a licence not given is `U`; never make up a name. A licence is an H5P code, `U`, `CC BY`, `CC BY-SA`, `CC BY-ND`, `CC BY-NC`, `CC BY-NC-SA`, `CC BY-NC-ND`, `CC0 1.0`, `CC PDM`, `GNU GPL`, `PD`, `ODC PDDL` or `C`, with any version apart: "CC BY 4.0" is `"license": "CC BY", "licenseVersion": "4.0"`.
 
 - `interactiveVideo` group — Interactive Video Editor
   - `video` group — Upload/embed video
