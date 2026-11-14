@@ -32,7 +32,7 @@ A book of chapters with a table of contents, each chapter a page of text, media 
 
 ## Fields of H5P.InteractiveBook 1.15
 
-The example is `type` and `params` alone, and `params` holds the fields below. A source also names its own `title`, `language`, `license` and `authors`, all four required: the build refuses a source that leaves out any of them. Write the author and the licence the user gave, as given, and ask for neither: an author not given is the name you know the user by, or "Unknown", and a licence not given is `U`; never make up a name. A licence is an H5P code, `U`, `CC BY`, `CC BY-SA`, `CC BY-ND`, `CC BY-NC`, `CC BY-NC-SA`, `CC BY-NC-ND`, `CC0 1.0`, `CC PDM`, `GNU GPL`, `PD`, `ODC PDDL` or `C`, with any version apart: "CC BY 4.0" is `"license": "CC BY", "licenseVersion": "4.0"`.
+The example is `type` and `params` alone, and `params` holds the fields below. A source also names its own `title`, `language`, `license` and `authors`, all four required: the build refuses a source that leaves out any of them. Write the author and the licence the user gave, as given, and ask for neither: an author not given is the name you know the user by, or "Unknown"; a licence not given, or one no code below stands for, is `U`; never make up a name. A licence is one of these H5P codes: `U`, `CC BY`, `CC BY-SA`, `CC BY-ND`, `CC BY-NC`, `CC BY-NC-SA`, `CC BY-NC-ND`, `CC0 1.0`, `CC PDM`, `GNU GPL`, `PD`, `ODC PDDL`, `C`. Only the six CC BY codes take a version, written apart, one of 4.0, 3.0, 2.5, 2.0 or 1.0: "CC BY 4.0" is `"license": "CC BY", "licenseVersion": "4.0"`. `CC0 1.0` is one code, as it stands.
 
 - `showCoverPage` boolean = false — Enable book cover
 - `bookCover` group; only when showCoverPage is true — Cover Page

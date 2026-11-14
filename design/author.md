@@ -870,12 +870,15 @@ to 3,000. Twenty-eight things the code does not say by itself:
   chat that built nothing, a page the chat writes makes the link*, above), and its parts said some
   things two and three times. Now:
 
-  - `SKILL.md` is the flow: the content type, the one question the user is asked; the source; step
+  - `SKILL.md` is the flow: the content type, the one question the user is asked (a file name
+    already taken is not asked about: a new name is taken, and said); the source; step
     3, two answers and four routes; step 4, one pointer. The author and the licence are not asked:
     what the user gave stays, a name not given is the one the model knows them by or "Unknown", a
     licence not given is `U`, and the reply says which, so the user can change them. That rule and
     the licence codes are written once, in `SOURCE_FIELDS`, under every content type's fields, since
-    every chat reads its type's file before it writes a source, the build page's included. The
+    every chat reads its type's file before it writes a source, the build page's included. Only the
+    six CC BY codes take a version, as the build checks, `CC0 1.0` is one code, and a licence no
+    code stands for, such as MIT, is `U` (cubic's review): Haiku 3 of 3, each built. The
     brief keeps what the model chooses and says it chose (the material, who it is for, the size,
     the language) and how to write well; it asks nothing.
   - Step 3 finds two answers once, and both the route and the verifier use them. **Internet**: none

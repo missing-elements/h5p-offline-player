@@ -53,9 +53,9 @@ choose, and wait: "a quiz" or "flash cards" says what they want, not which type.
 | H5P.Audio | an audio player (a recording) |
 | H5P.GameMap | stages on a map, each with exercises (a map) |
 
-For a type not listed, run `npx @missing-elements/h5p-author@latest schema <Type>` and say it has
-no notes here; where npm cannot install, fetch the build tool and that type's bundle as
-[route 3](./references/build/two-files.md) says, and run
+For a type not listed, say it has no notes here, and read its fields with the build tool:
+`npx @missing-elements/h5p-author@latest schema <Type>` where npm reaches its registry; otherwise,
+beside the tool and its libraries as route 1 or 3 of step 3 gets them,
 `node h5p-author.mjs schema <Type> --libraries parts`. Never read a library's semantics or code
 yourself: the type file and `schema` say what a source may write, and an agent that works it out
 from the library spends two to three times as much for the same package.

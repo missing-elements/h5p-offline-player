@@ -6,7 +6,7 @@ A source with a problem writes nothing: the build lists every problem by its pat
 all and run it again under the same name. Once a build has written its file it never writes
 over it, so a later build takes a new name (`course-2.h5p`). Copy the one you hand over to the
 name the user asked for without writing over a file already there (`cp -n`). If that name is
-taken, ask, or where you cannot ask, take a new name and say so. Never delete or overwrite a file
+taken, take a new name and say so. Never delete or overwrite a file
 to free a name. Pass the build's notes on to the user: texts left in English, a slide that holds
 too much.
 

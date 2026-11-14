@@ -141,7 +141,7 @@ travels with them, `@missing-elements/h5p-author/SKILL.md`, its brief,
 serve the skill from the release it pins:
 [missing-elements.github.io](https://missing-elements.github.io/h5p/create-with-ai/#install)
 packs them as the zips chat apps install, and lists the build tool and each bundle that the
-skill's route from two files fetches at
+skill's route 3, from two files, fetches at
 [missing-elements.github.io/h5p/skill/](https://missing-elements.github.io/h5p/skill/).
 
 ## A content type's bundle
