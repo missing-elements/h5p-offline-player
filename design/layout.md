@@ -207,9 +207,9 @@ packages/author/          @missing-elements/h5p-author — a playable .h5p of an
                             pack (`pnpm --filter @missing-elements/h5p-author sync:skill`);
                             check-pack-published.mjs, the publish guard for the pinned pack and player,
                             and the normalizer's `./crc32`; copy-skill.mjs, `prepack`'s copy of
-                            the skill's text and type files, `SKILL.md`, `references/authoring.md`
-                            and `references/types/`, which the package carries and git does not
-                            (#172, #178)
+                            the skill's text, build routes and type files, `SKILL.md` and all of
+                            `references/` (`authoring.md`, `build/`, `types/`), which the package
+                            carries and git does not (#172, #178)
   tests/                    node tests: the generator, text and translations, layouts and schema, the
                             loader, builds with media from disk and a local server, the command, the
                             quiz format, the check of saved content, the demo's packages among it, and
@@ -419,8 +419,10 @@ skills/                   agent skills, one directory per skill, at the root bec
                           type chosen with the user first, a source of only what differs from the
                           defaults, written from references/types/<Type>.md — notes, a tested
                           example and the fields, their section generated from the pack — built
-                          with `npx @missing-elements/h5p-author`, then the verifier's check, its
-                          screenshot and its preview for the user; tested from apps/skills)
+                          by the first of four routes whose check holds, each a file of
+                          references/build/ (the archive, npm, two files, the user's browser), then
+                          the verifier's check, its screenshot and its preview for the user; tested
+                          from apps/skills)
 
 api/no-range.js           the Vercel function that stands in for a host without Range on the demo
 vercel.json               the deployment: build command, the /no-range rewrite, caching and security headers

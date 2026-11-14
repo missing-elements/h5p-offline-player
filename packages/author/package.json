@@ -33,6 +33,7 @@
       "default": "./lib/browser.mjs"
     },
     "./references/types/*.md": "./references/types/*.md",
+    "./references/build/*.md": "./references/build/*.md",
     "./references/authoring.md": "./references/authoring.md",
     "./SKILL.md": "./SKILL.md",
     "./package.json": "./package.json"
