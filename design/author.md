@@ -15,7 +15,7 @@ already holds text to the content check's rules, from the pack an untrusted chec
 `apps/skills` plays every example untrusted too. Measured on a five-question quiz, at four
 characters a token: `content.json` was about 3,470 tokens to write by hand, after reading 3,900 to
 9,500 of a type's semantics; the source is 1,000 to 1,800 tokens, written from a type file of 200
-to 3,000. Twenty-eight things the code does not say by itself:
+to 3,000. Twenty-nine things the code does not say by itself:
 
 - **One generator, three ways to run it.** The third, `saved`, checks content as H5P stores it
   (*Saved content is checked as the build checks what it writes*, below). `ContentGenerator` was the sweep's
@@ -783,7 +783,9 @@ to 3,000. Twenty-eight things the code does not say by itself:
   2: built from the archive, made one connection to the registry, and handed the package over
   unverified, with its files and the link its command printed. With npm working, 1 of 1 ran the
   verifier as before and handed over its pass.
-- **In a chat that built nothing, a page the chat writes makes the link** (2026-11-14, #202). The
+- **In a chat that built nothing, a page the chat writes makes the link** (2026-11-14, #202;
+  replaced on 2026-11-15 by *In route 4 the model writes the link, the source in it as JSON*,
+  below). The
   link to the build page was the weak point of a chat that cannot build: compressed text that a
   command prints and the model copies into its reply. ChatGPT broke 2 of 3 on 2026-11-13 (*The
   hand-over carries the source and one web address*, above), and with its code tool unavailable, as
@@ -890,7 +892,9 @@ to 3,000. Twenty-eight things the code does not say by itself:
     `two-files.md`), anything else (route 4, `browser.md`). Routes 1 to 3 hand over by
     `built-here.md`: the build's problems and the file's name, the verifier, run only where npm
     answered, the link, written in the verifier's command line, and the hand-over.
-  - Route 4 writes the page; outside a chat, it writes the page to an `.html` file, which makes the
+  - Route 4 writes the page (a link since 2026-11-15, *In route 4 the model writes the link, the
+    source in it as JSON*, below); outside a chat, it writes the page to an `.html` file, which
+    makes the
     link from a `file:` address as well, where it used to give a link a command printed, so that the
     link's commands are written once, in `built-here.md`.
 
@@ -925,6 +929,49 @@ to 3,000. Twenty-eight things the code does not say by itself:
   - A run called the Skill tool and got the skill installed on this computer, an older text: the
     lab's prompts now say the reader is the skill. Haiku also read a route's file before its check
     now and then, at most 1.5 KB more.
+- **In route 4 the model writes the link, the source in it as JSON** (2026-11-15, #206, the
+  owner's call: "i dont want a code snippet at all here"). The page of *In a chat that built
+  nothing, a page the chat writes makes the link*, above, worked in ChatGPT on a free account (the
+  owner, 2026-11-15), but the person saw a block of HTML, opened it with Preview, waited, and clicked
+  a small link. A model cannot compress a source, but it writes its own JSON, so the build page
+  reads `#source={…}` too (missing-elements.github.io#54), and route 4 is one Markdown link the model
+  writes: the source on one line, eight characters escaped (space, `%`, `&`, `\`, `(`, `)`, `<`,
+  `>`), the rest as it is, letters of any language too. No code block, no command, no Preview. A
+  source that names files gets the link too, since the page asks for the files before it builds.
+  Outside a chat the source also goes to a `.source.json` file, since a terminal may not open such
+  a link. Routes 1 to 3 keep the compressed link their command prints.
+
+  The page reads the readable form leniently, because a weak model's JSON slips (the owner found a
+  free account's Gemini 3.5 Flash-Lite poor at plain JSON). Each run of escapes is decoded where it
+  is UTF-8, a bare `%` is kept, a link run on into its sentence is read up to its last `}`, up to
+  three braces or brackets left open at the end are closed, and text that is still no JSON goes in
+  the box with where it breaks, for the chat to fix. Only a compressed link that cannot be read is
+  called damaged. Eleven kinds of link, rendered by markdown-it as a chat renders one and opened in
+  Chromium, Firefox and WebKit: 33 of 33 as expected.
+
+  Measured on Haiku with a logging skill reader: each reply rendered by markdown-it, its link read
+  by Node's URL as a browser reads it, decoded as the page decodes it, built, and verified.
+
+  - **Seven escapes, the reply's parts in prose:** 5 of 7 built and passed: Question Sets in
+    English and Ukrainian, a Drag the Words with `%` and parentheses, a three-chapter Interactive
+    Book, and a Question Set from a code tool with no network. A True/False left one closing `}`
+    out. An Accordion on HTML tags wrote `&lt;`, which Markdown turns into `<`, a raw `\`, and no
+    `)` to close the link, so Markdown made no link of it.
+  - **So `&` is escaped too, the text says the link ends with a `)` after the last `}`, and the
+    page closes what is left open:** the True/False then built. With that text, 12 of 12 built
+    and passed, none needing a closer: three Accordions on HTML tags, three True/False questions
+    naming `cat.jpg`, five Question Sets (one in Ukrainian, three from a code tool with no
+    network), and a Drag the Words. No reply held a code block or the source a second time.
+  - **The archive line,** offered where a code tool runs: "where Node runs here and nothing could be
+    installed or downloaded" went to 1 of 6 runs with no code tool, wrongly; "where a command you
+    ran here found Node", to 0 of 1 run with one; "where you have a code tool", as the last
+    paragraph, to 1 of 2. As an item in a list of what the reply holds, 2 of 2 runs with a code
+    tool gave it and the run without one did not.
+
+  Links ran from 0.5 to 6.9 KB as written, and a Ukrainian one to 16.6 KB once a renderer escapes
+  its letters. A route-4 chat read 13 to 35 KB of the skill, most of it type files: the route's file is
+  2.1 KB, where the page's was 3.1. Haiku is a floor here: it shows the words are followed, not what a
+  chat app's renderer does with a link of several KB. That is the owner's run in ChatGPT.
 - **The skill names no product** (2026-11-12, the owner's call). Its routes were told apart by
   the apps they were measured in; they now say what each needs: a shell that reaches the npm
   registry, Node and a download where npm cannot install, or nothing that runs or fetches. What a
