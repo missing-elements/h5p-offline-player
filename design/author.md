@@ -797,7 +797,7 @@ to 3,000. Twenty-seven things the code does not say by itself:
   as scripts and a player without its worker.
 
   So where no package was built and the reply is read in a chat, step 3 has the chat write a page:
-  the source in a `script` of type `application/json`, and a short fixed script that deflates it
+  the source in a `noscript`, and a short fixed script that deflates it
   and writes the address into a link, *Build and play it*. Nothing compressed is typed or copied,
   no code tool is used, and the source is in the reply once. The reply tells the user to open the
   block with Preview and click the link, and, where their chat shows no Preview, to save the block
@@ -806,6 +806,20 @@ to 3,000. Twenty-seven things the code does not say by itself:
   link: it goes over whole in a `json` block, its files chosen on the build page. The script calls
   its link `link`, since the preview's own scripts are reported to redefine `window.open` (Check
   Point Research, 2026-11-05).
+
+  The source is held in a `noscript`, not in a `script` of type `application/json`, as it first
+  was (cubic's review of PR #203). A `script` ends at the first `</script` in its text, and after
+  a `<!--` parses that text another way, so a source that shows the tags, as a lesson on HTML does,
+  cut the page short: a Drag the Words with `<script>`, `</script>` and `<!--` in its sentences gave
+  a link to half the source, or no link at all. A sentence asking for their `<` to be written as
+  JSON's escape for it was not followed, Haiku 0 of 2: both Drag the Words wrote the tags as they
+  are, and an Accordion, whose markup shows them as `&lt;`, needed nothing. Where scripts run, a
+  `noscript` holds raw text that ends only at `</noscript`, keeps an `&lt;` as it is written, and
+  is not shown, so nothing in a source is asked of the model. Five sources moved into it, the
+  two broken ones among them, made links that carry them byte for byte and built packages the
+  verifier passes; Haiku with the page so written, 3 of 3: the page copied as given, and both Drag
+  the Words, with three and four tags in their source, built and passed. Not run yet in ChatGPT's
+  Preview, which ran the page in its first form.
 
   The words took six tries. Each was run on Haiku, two of them in ChatGPT on the owner's free
   account, and what each cost is why they read as they do:
@@ -822,9 +836,10 @@ to 3,000. Twenty-seven things the code does not say by itself:
     read in a chat, as in a terminal, give a link instead":** no tools, 5 of 5, two of them told
     nothing of a Preview; a code tool with no network, 2 of 2. With npm working, the one run built
     and verified the package and then added the page to its reply, the source a second time.
-  - **"Where no package was built here and your reply is read in a chat":** with npm working, the
-    one run built with no page, and with no link either, and gave the preview command: the sentence
-    that kept the link for a terminal had taken it from a package built in a chat.
+  - **"Where no package was built here and your reply is read in a chat":** no tools 1 of 1 and a
+    code tool with no network 1 of 1 wrote the page. With npm working, the one run built with no
+    page, and with no link either, and gave the preview command: the sentence that kept the link for
+    a terminal had taken it from a package built in a chat.
   - **"A package built here is handed over as step 5 says, with the link a command prints and no
     page", and the link's sentence naming both its places:** no tools 1 of 1, a code tool with no
     network 1 of 1, and with npm working 1 of 1 with the package, the verifier's pass and the
@@ -834,7 +849,8 @@ to 3,000. Twenty-seven things the code does not say by itself:
     named Preview second.
   - **So the order is in the words, "first … only then":** no tools 2 of 2 and a code tool with no
     network 1 of 1, Preview first in each; and 2 of 2 sources naming the user's picture went over
-    in a `json` block with the page's address and the picture named, with no page.
+    in a `json` block with the page's address and the picture named, with no page. Its three runs
+    that built, one with npm working and two from the archive, are the verifier's paragraph above.
 
   Across the 31 Haiku replies, 24 wrote a page, and in all 24 the script was the one given, the
   link carried the page's source, and that source built a package the verifier passes with no

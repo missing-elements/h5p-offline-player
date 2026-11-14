@@ -187,9 +187,9 @@ link beside it. A source that names files gets no page.
 <meta charset="utf-8">
 <title>Build and play</title>
 <p><a id="link" target="_blank" rel="noopener">Making the link…</a></p>
-<script type="application/json" id="source">
+<noscript id="source">
 SOURCE
-</script>
+</noscript>
 <script>
 const source = document.getElementById('source').textContent.trim()
 const link = document.getElementById('link')
