@@ -888,13 +888,13 @@ to 3,000. Twenty-nine things the code does not say by itself:
     code stands for, such as MIT, is `U` (cubic's review): Haiku 3 of 3, each built. The
     brief keeps what the model chooses and says it chose (the material, who it is for, the size,
     the language) and how to write well; it asks nothing.
-  - Step 3 finds two answers once, and both the route and the verifier use them. **Internet**: none
-    with no code tool, or where the chat's own tools say its sandbox has none, and then nothing is
-    run to check; otherwise taken as there. **npm**: none without internet; otherwise
-    `npm view … --fetch-timeout=10000 --fetch-retries=0`, run beside the first file reads, as it
-    waits on nothing. Then the first route that holds: the build archive attached (route 1,
-    `references/build/archive.md`), npm (route 2, `npm.md`), Node with internet (route 3,
-    `two-files.md`), anything else (route 4, `browser.md`). Routes 1 to 3 hand over by
+  - Step 3 finds one answer once, and both the route and the verifier use it: whether npm reaches
+    its registry. With no code tool it does not; otherwise `npm view … --fetch-timeout=10000
+    --fetch-retries=0` answers, run beside the first file reads, as it waits on nothing. Then the
+    first route that holds: the build archive attached (route 1, `references/build/archive.md`),
+    npm (route 2, `npm.md`), Node (route 3, `two-files.md`, tried even where the chat's tools say
+    its sandbox has no internet or npm gave up: *A code tool that says it has no internet still
+    tries the two files*, below), anything else (route 4, `browser.md`). Routes 1 to 3 hand over by
     `built-here.md`: the build's problems and the file's name, the verifier, run only where npm
     answered, the link, written in the verifier's command line, and the hand-over.
   - Route 4 runs no link command: the link's commands are written once, in `built-here.md`. It
@@ -921,16 +921,15 @@ to 3,000. Twenty-nine things the code does not say by itself:
   - Check 1 at first ran `find / -name 'h5p-author-build*.tar.gz'` wherever Node ran. On a
     computer's whole disk it ran past the code tool's 110 seconds, and the run with npm working took
     npm for broken. It now asks whether the user attached the archive, and `find` is route 1's.
-  - A code tool that says its sandbox has no internet should cost no check. Under three wordings
-    ("answer it from what you know for certain"; "take their word and run nothing"; the two
-    bullets, the first ending "run nothing to check") Haiku ran the npm check anyway in 4 of 6
-    such runs, 1 of 2 under the last. The check is held to ten seconds and leads to the same
-    route, so a run that ignores the bullet loses those seconds and nothing else; a model that
-    keeps to it, as stronger ones are expected to, loses none. Not measured outside Haiku.
+  - A code tool that said its sandbox had no internet cost no check until 0.10.3. Under three
+    wordings ("answer it from what you know for certain"; "take their word and run nothing"; the
+    two bullets, the first ending "run nothing to check") Haiku ran the npm check anyway in 4 of 6
+    such runs, 1 of 2 under the last. A model that kept to it skipped route 3 as well, which
+    Grok did: *A code tool that says it has no internet still tries the two files*, below.
   - Route 3 read "Node runs here and can fetch a file from the web": a run told it had "no web tool"
-    took that for no internet and wrote the page without trying the two files. It reads "Node
+    took that for no internet and wrote the page without trying the two files. It read "Node
     runs here, with internet", the answer found once, and the run after it fetched both files and
-    built.
+    built. Since 0.10.3 it reads "Node runs here", and says to try it whatever the tools say.
   - A run called the Skill tool and got the skill installed on this computer, an older text: the
     lab's prompts now say the reader is the skill. Haiku also read a route's file before its check
     now and then, at most 1.5 KB more.
@@ -1001,6 +1000,27 @@ to 3,000. Twenty-nine things the code does not say by itself:
   `.source.json` file, equal to the block, and the archive line, and none of the four without one
   did. The route's file is 1.5 KB. The build page still reads `#source={…}`, which costs nothing,
   and routes 1 to 3 keep the compressed link their command prints.
+- **A code tool that says it has no internet still tries the two files** (2026-11-15, #211). From
+  0.10.0, step 3 took "no internet" from the chat's own tools and then skipped route 3. Grok on the
+  web (the owner, a free account) then gave the `json` block unless the build archive was attached,
+  though on 2026-11-13 under 0.9.6 it had fetched the two files and built. Its code tool reaches
+  the organisation's site: asked to run `node -v` and `curl` on the build tool's address, it
+  answered `v24.15.0` and `200`. xAI documents that tool as having no access to external networks.
+  So nothing decides "no internet" now but having no code tool: npm is checked wherever one runs,
+  and route 3 holds wherever Node runs, tried even where the tools say otherwise or npm gave up. A
+  sandbox that truly reaches nothing loses the ten-second check and a failed fetch, about a
+  second here. On Haiku, each run told that its code tool's sandbox has no internet:
+  - npm hanging, the web reachable (as Grok): 3 of 3 took route 3, fetched both files, built
+    packages that pass the verifier here, and said they were unverified. One of them also tried
+    the verifier's `npx` first, which hung for the code tool's 110 seconds: the hand-over's rule
+    runs it only where npm answered.
+  - Nothing reachable: 2 of 2 gave the `json` block, which built and passed, the `.source.json`
+    file equal to it and the archive line.
+
+  The lab's npm must be cut for real: a run root with a `package.json`, a `.npmrc` naming a dead or
+  hanging registry and a cache of its own. Without the cache, npm answered from this computer's
+  cache with no network ("cache stale", exit 0); without the `package.json`, a run working in a
+  subfolder reached the real registry. Four runs spoiled that way were not counted.
 - **The skill names no product** (2026-11-12, the owner's call). Its routes were told apart by
   the apps they were measured in; they now say what each needs: a shell that reaches the npm
   registry, Node and a download where npm cannot install, or nothing that runs or fetches. What a

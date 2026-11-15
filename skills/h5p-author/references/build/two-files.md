@@ -2,7 +2,8 @@
 
 Fetch the build tool and the bundle of the source's own `type`, the libraries a build of that type
 reads, at the addresses https://missing-elements.github.io/h5p/skill/ lists. Where the sandbox
-downloads only what a browsing tool has opened, open each address with that tool first. Below,
+downloads only what a browsing tool has opened, open each address with that tool first. Where
+neither file arrives, this route has failed. Below,
 `<type>` is that machine name, such as `H5P.Blanks`: another type's bundle lacks what this one
 needs.
 

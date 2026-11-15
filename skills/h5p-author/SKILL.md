@@ -91,14 +91,9 @@ H5P.Video, H5P.Text.
 ## 3. Build
 
 Where a command runs here, work in a folder of your own, not the one the user named, with the
-source as `source.json`. Two answers pick the route, and later whether the verifier runs. Find
-each once:
-
-- **Internet**: none where you have no code tool, or your tools say this sandbox has none; run
-  nothing to check. Otherwise take it that there is.
-- **npm**: it cannot reach its registry where there is no internet. Otherwise run this, early,
-  beside the files you read, since it waits on nothing. It prints a version, or gives up within
-  ten seconds.
+source as `source.json`. Whether npm reaches its registry picks the route, and later whether the
+verifier runs. With no code tool it does not. Otherwise run this once, early, beside the files you
+read, since it waits on nothing. It prints a version, or gives up within ten seconds.
 
 ```bash
 npm view @missing-elements/h5p-author version --fetch-timeout=10000 --fetch-retries=0
@@ -110,7 +105,9 @@ next. Tell the user which you take.
 1. The user attached the build archive, `h5p-author-build.tar.gz`, to a message or to this chat's
    files, and Node runs here: [route 1](./references/build/archive.md).
 2. npm reaches its registry: [route 2](./references/build/npm.md).
-3. Node runs here, with internet: [route 3](./references/build/two-files.md).
+3. Node runs here: [route 3](./references/build/two-files.md), which fetches two files from the
+   web. Try it even where your tools say this sandbox has no internet, or npm gave up: such a
+   sandbox has fetched them.
 4. Anything else: [route 4](./references/build/browser.md), the user's browser.
 
 ## 4. Verify and hand over
