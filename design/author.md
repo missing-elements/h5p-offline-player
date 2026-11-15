@@ -290,10 +290,11 @@ to 3,000. Twenty-nine things the code does not say by itself:
   the author package pins, so the page plays with the pack it built from. A chat with no tool to
   run at all, as ChatGPT on a free account once its data-analysis quota is spent (for hours, the
   owner's test of 2026-11-09), cannot write the link: the skill has it put the whole source in its
-  reply, since that test's chat gave the page's bare address, which builds nothing. Since
-  2026-11-14 a chat writes a page that makes the link, with or without a tool (*In a chat that
-  built nothing, a page the chat writes makes the link*, below), and a source goes over in a
-  `json` block only where it names files.
+  reply, since that test's chat gave the page's bare address, which builds nothing. From
+  2026-11-14 a chat wrote a page that made the link (*In a chat that built nothing, a page the chat
+  writes makes the link*, below), and a source went over in a `json` block only where it named
+  files. Since 2026-11-15 it writes the link itself, the source in it as JSON, for a source that
+  names files too (*In route 4 the model writes the link, the source in it as JSON*, below).
   A link is only what a command printed (2026-11-11). A link ChatGPT gave the owner carried 3,167
   characters that were no deflate stream, its table broken at byte 82 of 2,375: the chat had
   typed them itself, made up or copied wrong, and the page built nothing. So the skill says it
@@ -302,6 +303,9 @@ to 3,000. Twenty-nine things the code does not say by itself:
   block and no link under the old text and the new (12 replies, half of them asked for a link to
   click), so the rule costs that position nothing, and what it changes in ChatGPT is not
   measured. No rule reaches a link copied wrong between the command's output and the reply.
+  This holds for the compressed link of routes 1 to 3. Since 2026-11-15 route 4's link carries
+  the source as readable JSON, which the model writes as its own text and the build page reads
+  leniently (*In route 4 the model writes the link, the source in it as JSON*, below).
   An install that hangs is one that fails (2026-11-13): ChatGPT, asked why it had built nothing,
   said its `npx` had timed out, and step 3's list named only errors. Haiku in a terminal whose
   registry took each connection and never answered went on to the two files under the old text
@@ -892,11 +896,11 @@ to 3,000. Twenty-nine things the code does not say by itself:
     `two-files.md`), anything else (route 4, `browser.md`). Routes 1 to 3 hand over by
     `built-here.md`: the build's problems and the file's name, the verifier, run only where npm
     answered, the link, written in the verifier's command line, and the hand-over.
-  - Route 4 writes the page (a link since 2026-11-15, *In route 4 the model writes the link, the
-    source in it as JSON*, below); outside a chat, it writes the page to an `.html` file, which
-    makes the
-    link from a `file:` address as well, where it used to give a link a command printed, so that the
-    link's commands are written once, in `built-here.md`.
+  - Route 4 runs no link command: the link's commands are written once, in `built-here.md`. It
+    wrote the page, and outside a chat the page to an `.html` file, until 2026-11-15. It now hands
+    over a link the model writes, and outside a chat also saves the source as `.source.json`, which
+    the build page opens under *Or open a file* (*In route 4 the model writes the link, the source
+    in it as JSON*, below).
 
   What a chat reads of the skill's own text, `SKILL.md` and its route's files: 9.8 KB in the
   user's browser, 11.3 with npm, 11.5 from the archive and 12.0 from two files, where every route
