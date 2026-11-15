@@ -1020,7 +1020,11 @@ to 3,000. Twenty-nine things the code does not say by itself:
   The lab's npm must be cut for real: a run root with a `package.json`, a `.npmrc` naming a dead or
   hanging registry and a cache of its own. Without the cache, npm answered from this computer's
   cache with no network ("cache stale", exit 0); without the `package.json`, a run working in a
-  subfolder reached the real registry. Four runs spoiled that way were not counted.
+  subfolder reached the real registry. Four runs spoiled that way were not counted. The skill's
+  check still takes an answer from npm's cache (cubic's review on #212): with no network, route 2
+  then builds from that same cache, as one of those runs did after about 70 seconds of npm's retries.
+  `--prefer-online` still falls back to the stale cache, and `npm ping` would say nothing of the
+  package.
 - **The skill names no product** (2026-11-12, the owner's call). Its routes were told apart by
   the apps they were measured in; they now say what each needs: a shell that reaches the npm
   registry, Node and a download where npm cannot install, or nothing that runs or fetches. What a
