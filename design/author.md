@@ -293,8 +293,9 @@ to 3,000. Twenty-nine things the code does not say by itself:
   reply, since that test's chat gave the page's bare address, which builds nothing. From
   2026-11-14 a chat wrote a page that made the link (*In a chat that built nothing, a page the chat
   writes makes the link*, below), and a source went over in a `json` block only where it named
-  files. Since 2026-11-15 it writes the link itself, the source in it as JSON, for a source that
-  names files too (*In route 4 the model writes the link, the source in it as JSON*, below).
+  files. Since 2026-11-15 every source goes over so, in a `json` block or a file, with the build
+  page's plain address and no link that carries it (*Route 4 hands over the source as a `json`
+  block or a file, with the build page's plain address*, below).
   A link is only what a command printed (2026-11-11). A link ChatGPT gave the owner carried 3,167
   characters that were no deflate stream, its table broken at byte 82 of 2,375: the chat had
   typed them itself, made up or copied wrong, and the page built nothing. So the skill says it
@@ -303,9 +304,9 @@ to 3,000. Twenty-nine things the code does not say by itself:
   block and no link under the old text and the new (12 replies, half of them asked for a link to
   click), so the rule costs that position nothing, and what it changes in ChatGPT is not
   measured. No rule reaches a link copied wrong between the command's output and the reply.
-  This holds for the compressed link of routes 1 to 3. Since 2026-11-15 route 4's link carries
-  the source as readable JSON, which the model writes as its own text and the build page reads
-  leniently (*In route 4 the model writes the link, the source in it as JSON*, below).
+  This holds for the compressed link of routes 1 to 3. Route 4 gives no link that carries the
+  source (*Route 4 hands over the source as a `json` block or a file, with the build page's plain
+  address*, below).
   An install that hangs is one that fails (2026-11-13): ChatGPT, asked why it had built nothing,
   said its `npx` had timed out, and step 3's list named only errors. Haiku in a terminal whose
   registry took each connection and never answered went on to the two files under the old text
@@ -788,8 +789,8 @@ to 3,000. Twenty-nine things the code does not say by itself:
   unverified, with its files and the link its command printed. With npm working, 1 of 1 ran the
   verifier as before and handed over its pass.
 - **In a chat that built nothing, a page the chat writes makes the link** (2026-11-14, #202;
-  replaced on 2026-11-15 by *In route 4 the model writes the link, the source in it as JSON*,
-  below). The
+  replaced on 2026-11-15 by *Route 4 hands over the source as a `json` block or a file, with the
+  build page's plain address*, below). The
   link to the build page was the weak point of a chat that cannot build: compressed text that a
   command prints and the model copies into its reply. ChatGPT broke 2 of 3 on 2026-11-13 (*The
   hand-over carries the source and one web address*, above), and with its code tool unavailable, as
@@ -898,9 +899,9 @@ to 3,000. Twenty-nine things the code does not say by itself:
     answered, the link, written in the verifier's command line, and the hand-over.
   - Route 4 runs no link command: the link's commands are written once, in `built-here.md`. It
     wrote the page, and outside a chat the page to an `.html` file, until 2026-11-15. It now hands
-    over a link the model writes, and outside a chat also saves the source as `.source.json`, which
-    the build page opens under *Or open a file* (*In route 4 the model writes the link, the source
-    in it as JSON*, below).
+    over the source as a `json` block, and as a `.source.json` file where a code tool runs or
+    outside a chat, which the build page opens under *Or open a file* (*Route 4 hands over the
+    source as a `json` block or a file, with the build page's plain address*, below).
 
   What a chat reads of the skill's own text, `SKILL.md` and its route's files: 9.8 KB in the
   user's browser, 11.3 with npm, 11.5 from the archive and 12.0 from two files, where every route
@@ -933,11 +934,20 @@ to 3,000. Twenty-nine things the code does not say by itself:
   - A run called the Skill tool and got the skill installed on this computer, an older text: the
     lab's prompts now say the reader is the skill. Haiku also read a route's file before its check
     now and then, at most 1.5 KB more.
-- **In route 4 the model writes the link, the source in it as JSON** (2026-11-15, #206, the
-  owner's call: "i dont want a code snippet at all here"). The page of *In a chat that built
-  nothing, a page the chat writes makes the link*, above, worked in ChatGPT on a free account (the
-  owner, 2026-11-15), but the person saw a block of HTML, opened it with Preview, waited, and clicked
-  a small link. A model cannot compress a source, but it writes its own JSON, so the build page
+- **Route 4 hands over the source as a `json` block or a file, with the build page's plain
+  address** (2026-11-15, #206, #208, the owner's calls). Its reply holds the whole source once, in
+  one `json` code block, which the chat's copy button copies exactly; the line that says to paste
+  it on https://missing-elements.github.io/h5p/build/ in place of the sample's and press *Build*,
+  the page asking for any files the source names; and where a code tool runs, the source as a
+  `.source.json` file too and the line offering the build archive. Outside a chat the file stands
+  in for the block. No link carries the source, since one wrong character of it leaves the page
+  nothing to build, and every way a chat app's model writes one was measured to break:
+
+  The page of *In a chat that built nothing, a page the chat writes makes the link*, above, worked
+  in ChatGPT on a free account (the owner, 2026-11-15), but the person saw a block of HTML, opened
+  it with Preview, waited, and clicked a small link. The owner wanted no code block ("i dont want
+  a code snippet at all here"), so 0.10.1 tried a link the model writes (#206), described from here
+  to the ChatGPT run. A model cannot compress a source, but it writes its own JSON, so the build page
   reads `#source={…}` too (missing-elements.github.io#54), and route 4 is one Markdown link the model
   writes: the source on one line, eight characters escaped (space, `%`, `&`, `\`, `(`, `)`, `<`,
   `>`), the rest as it is, letters of any language too. No code block, no command, no Preview. A
@@ -975,7 +985,21 @@ to 3,000. Twenty-nine things the code does not say by itself:
   Links ran from 0.5 to 6.9 KB as written, and a Ukrainian one to 16.6 KB once a renderer escapes
   its letters. A route-4 chat read 13 to 35 KB of the skill, most of it type files: the route's file is
   2.1 KB, where the page's was 3.1. Haiku is a floor here: it shows the words are followed, not what a
-  chat app's renderer does with a link of several KB. That is the owner's run in ChatGPT.
+  chat app's renderer does with a link of several KB.
+
+  In ChatGPT on a free account the link broke (the owner, 2026-11-15, #208). Its model escaped what
+  it did not need to, `{` as `%7B` and `"` as `%22`, but after the title it wrote spaces raw:
+  `"question":"What happens during evaporation?"`. A Markdown link holds no raw space, so ChatGPT
+  showed the address as text, and the link it made stopped at the first space: 283 characters of
+  the source. The address in angle brackets, `[…](<…>)`, which lets a link hold spaces in
+  standard Markdown and which markdown-it and the page took whole, came out of ChatGPT as `[Build
+  and play it](`: its renderer drops the `<…>`. So the owner chose the `json` block and the plain address,
+  over writing spaces as `+` (untested) and over the page of 0.10.0. On Haiku, with no code tool or
+  a code tool with no network: 6 of 6 replies held one `json` block that built and passed, the
+  plain address and no link carrying the source; both runs with a code tool gave the
+  `.source.json` file, equal to the block, and the archive line, and none of the four without one
+  did. The route's file is 1.5 KB. The build page still reads `#source={…}`, which costs nothing,
+  and routes 1 to 3 keep the compressed link their command prints.
 - **The skill names no product** (2026-11-12, the owner's call). Its routes were told apart by
   the apps they were measured in; they now say what each needs: a shell that reaches the npm
   registry, Node and a download where npm cannot install, or nothing that runs or fetches. What a
