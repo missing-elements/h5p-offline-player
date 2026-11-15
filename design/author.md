@@ -941,7 +941,8 @@ to 3,000. Twenty-nine things the code does not say by itself:
   the page asking for any files the source names; and where a code tool runs, the source as a
   `.source.json` file too and the line offering the build archive. Outside a chat the file stands
   in for the block. No link carries the source, since one wrong character of it leaves the page
-  nothing to build, and every way a chat app's model writes one was measured to break:
+  nothing to build. Haiku wrote working ones, but both forms measured in ChatGPT, the app route 4
+  is chiefly for, broke there:
 
   The page of *In a chat that built nothing, a page the chat writes makes the link*, above, worked
   in ChatGPT on a free account (the owner, 2026-11-15), but the person saw a block of HTML, opened
