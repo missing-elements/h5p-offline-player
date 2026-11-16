@@ -418,14 +418,18 @@ to 3,000. Thirty things the code does not say by itself:
   not in git, and `build.test.ts` holds it to the skill's files, file for file. Since #178 the
   skill's text travels with them, `SKILL.md` and `references/authoring.md`, each an export too:
   the Claude app, given a link to the skill on GitHub, answered that GitHub's rate limit kept it
-  out, since GitHub limits anonymous requests per address and a chat app's are shared. The
-  organisation's site serves the skill from the release its build page pins, at
-  `https://missing-elements.github.io/h5p/skill/`, a page that writes out each file's full address,
-  since a chat's fetch tool may open only addresses it has seen whole and `SKILL.md`'s relative
-  links are not (missing-elements.github.io#15). Step 3 takes the build tool's and the bundles'
-  addresses from that page (*The skill is installed, and its page lists what step 3 fetches*,
-  below), not from raw.githubusercontent.com. Installing the skill is the way: nothing is fetched
-  while the chat works.
+  out, since GitHub limits anonymous requests per address and a chat app's are shared. Until
+  the 0.10.0 pin the organisation's site served the skill's files one by one, from the release
+  its build page pins, at `https://missing-elements.github.io/h5p/skill/`, a page that wrote out
+  each file's full address, since a chat's fetch tool may open only addresses it has seen whole
+  and `SKILL.md`'s relative links are not (missing-elements.github.io#15). Since that pin it
+  serves the skill only as zips (missing-elements.github.io#52, the owner's call, 2026-11-15):
+  every chat the skill is offered to takes a zip, installed in Claude and ChatGPT and attached to
+  a message in Grok, which has no place to install one, and the zips carry its text. The page stays,
+  and step 3 takes the build tool's and the bundles' addresses from it (*The skill is installed,
+  and its page lists what step 3 fetches*, below), not from raw.githubusercontent.com. With the
+  zip installed or attached, none of the skill's text is fetched while the chat works: what
+  route 3 fetches is the build tool and a bundle.
 
   The same test on the 23 other content types the skill lists says how far each thing reaches:
   two runs each, 46 first replies, each built package checked against what its task asked for.
@@ -528,6 +532,17 @@ to 3,000. Thirty things the code does not say by itself:
   With the skill installed and npm cut off, both runs handed over the link and the source file,
   and one dropped two characters of the link while writing its reply, as ChatGPT had: the first
   time on Haiku, and the source file still builds.
+
+  Since the 0.10.0 pin the site serves the skill only as zips (missing-elements.github.io#52, the
+  owner's call, 2026-11-15, #205): `/h5p/skill/` holds its page and the zips, and none of the
+  skill's text files. The page stays, and lists the build tool and every bundle at its full
+  address, because route 3 needs it. `references/build/two-files.md` fetches "at the addresses
+  https://missing-elements.github.io/h5p/skill/ lists" on purpose: a fetch tool that opens only
+  addresses it has seen whole refused a bundle's address put together from a pattern, as the
+  review above found. So the route keeps naming the page, and the page must keep the bundles.
+  What the change breaks: a copy of the skill at 0.9.7 or older, in a chat that has its text
+  alone, was told to read `SKILL.md` and the type files at `/h5p/skill/`, and so were prompts
+  copied before 2026-11-13. They find no such file there now. Installed copies build as before.
 - **A source's own fields are written where a chat reads, and the author is asked for**
   (2026-11-11, #182). The owner's run in ChatGPT on 0.9.1 wrote a quiz with no `authors`. Each
   of the 28 content types the skill lists refuses a source without `title`, `language`,
