@@ -15,7 +15,7 @@ already holds text to the content check's rules, from the pack an untrusted chec
 `apps/skills` plays every example untrusted too. Measured on a five-question quiz, at four
 characters a token: `content.json` was about 3,470 tokens to write by hand, after reading 3,900 to
 9,500 of a type's semantics; the source is 1,000 to 1,800 tokens, written from a type file of 200
-to 3,000. Twenty-nine things the code does not say by itself:
+to 3,000. Thirty things the code does not say by itself:
 
 - **One generator, three ways to run it.** The third, `saved`, checks content as H5P stores it
   (*Saved content is checked as the build checks what it writes*, below). `ContentGenerator` was the sweep's
@@ -513,8 +513,9 @@ to 3,000. Twenty-nine things the code does not say by itself:
   as it is.
   On 2026-11-13 the owner dropped reading the skill by its link as a way to give it to a chat, and
   the organisation's site stopped offering it (missing-elements.github.io#42): no app tested
-  needed it. Claude and ChatGPT take the skill as a zip, and Grok takes Claude's, under Skills,
-  then Import; Gemini opens no address, and a chat whose only web tool is a search gets snippets.
+  needed it. Claude and ChatGPT take the skill as a zip, and Grok takes Claude's, recorded that
+  day as under Skills, then Import (on 2026-11-15 the owner found Grok has no place to install a
+  skill: it reads the zip attached to a message); Gemini opens no address, and a chat whose only web tool is a search gets snippets.
   So `SKILL.md` no longer tells a chat with its text alone to open the page first. The page stays,
   and step 3 still takes the build tool's and the bundles' addresses from it: installed copies of
   the skill name it, and Grok, its `npx` timed out, built from those two files that day, the
@@ -1008,19 +1009,27 @@ to 3,000. Twenty-nine things the code does not say by itself:
   answered `v24.15.0` and `200`. xAI documents that tool as having no access to external networks.
   So nothing decides "no internet" now but having no code tool: npm is checked wherever one runs,
   and route 3 holds wherever Node runs, tried even where the tools say otherwise or npm gave up. A
-  sandbox that truly reaches nothing loses the ten-second check and a failed fetch, about a
-  second here. On Haiku, each run told that its code tool's sandbox has no internet:
+  sandbox that truly reaches nothing loses the ten-second check and a failed fetch before route 4.
+  Where the network refuses, as in the lab, the fetch fails at once. Where it hangs, the fetch
+  waits for the limit the model gives it, 10 to 90 seconds in these runs' commands. Not measured:
+  a network that hangs, and ChatGPT itself, where route 4 now comes after both. On Haiku, each run
+  told that its code tool's sandbox has no internet:
   - npm hanging, the web reachable (as Grok): 3 of 3 took route 3, fetched both files, built
-    packages that pass the verifier here, and said they were unverified. One of them also tried
-    the verifier's `npx` first, which hung for the code tool's 110 seconds: the hand-over's rule
-    runs it only where npm answered.
-  - Nothing reachable: 2 of 2 gave the `json` block, which built and passed, the `.source.json`
-    file equal to it and the archive line.
+    packages that pass the verifier here, and said they were unverified. One of them first ran
+    route 1's `find /` for an archive nobody had attached, which ran to the code tool's 110
+    seconds on this computer's disk.
+  - Nothing reachable: 2 of 2 tried the two files, which failed at once, and gave the `json`
+    block, which built and passed, the `.source.json` file equal to it and the archive line. One
+    of them ran no npm check.
+
+  The route's file first read "Where neither file arrives, this route has failed", which left out
+  one file arriving without the other. It reads "Where a file does not arrive" (#213), and one
+  more run each way did as the others: built and passed, and the `json` block.
 
   The lab's npm must be cut for real: a run root with a `package.json`, a `.npmrc` naming a dead or
   hanging registry and a cache of its own. Without the cache, npm answered from this computer's
   cache with no network ("cache stale", exit 0); without the `package.json`, a run working in a
-  subfolder reached the real registry. Four runs spoiled that way were not counted. The skill's
+  subfolder reached the real registry. Three runs spoiled that way were not counted. The skill's
   check still takes an answer from npm's cache (cubic's review on #212): with no network, route 2
   then builds from that same cache, as one of those runs did after about 70 seconds of npm's retries.
   `--prefer-online` still falls back to the stale cache, and `npm ping` would say nothing of the

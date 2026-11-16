@@ -136,10 +136,10 @@ npx skills add missing-elements/h5p-offline-player
 | [`h5p-player-setup`](https://github.com/missing-elements/h5p-offline-player/tree/main/skills/h5p-player-setup) | Puts H5P on a website, from the player on the site itself or framed from a domain of your own |
 | [`h5p-normalize`](https://github.com/missing-elements/h5p-offline-player/tree/main/skills/h5p-normalize) | Rewrites a package whose video will not stream |
 
-In a chat app, `h5p-author` installs from a zip: Claude and Grok take one, ChatGPT's Plugins
-another, both at
+A chat app takes `h5p-author` as a zip that you upload or attach. Download it from
 [missing-elements.github.io/h5p/create-with-ai/#install](https://missing-elements.github.io/h5p/create-with-ai/#install),
-from the release the build page runs.
+which says where it goes in each app. The zip holds the same h5p-author release as the site's
+build page runs.
 
 ## Contributing
 
