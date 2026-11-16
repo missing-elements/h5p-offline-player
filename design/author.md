@@ -424,7 +424,8 @@ to 3,000. Thirty things the code does not say by itself:
   each file's full address, since a chat's fetch tool may open only addresses it has seen whole
   and `SKILL.md`'s relative links are not (missing-elements.github.io#15). Since that pin it
   serves the skill only as zips (missing-elements.github.io#52, the owner's call, 2026-11-15):
-  every chat the skill is offered to installs it, and the zips carry its text. The page stays,
+  every chat the skill is offered to takes a zip, installed in Claude and ChatGPT and attached to
+  a message in Grok, which has no place to install one, and the zips carry its text. The page stays,
   and step 3 takes the build tool's and the bundles' addresses from it (*The skill is installed,
   and its page lists what step 3 fetches*, below), not from raw.githubusercontent.com.
   Installing the skill is the way: nothing is fetched while the chat works.
