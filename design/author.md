@@ -427,8 +427,9 @@ to 3,000. Thirty things the code does not say by itself:
   every chat the skill is offered to takes a zip, installed in Claude and ChatGPT and attached to
   a message in Grok, which has no place to install one, and the zips carry its text. The page stays,
   and step 3 takes the build tool's and the bundles' addresses from it (*The skill is installed,
-  and its page lists what step 3 fetches*, below), not from raw.githubusercontent.com.
-  Installing the skill is the way: nothing is fetched while the chat works.
+  and its page lists what step 3 fetches*, below), not from raw.githubusercontent.com. With the
+  zip installed or attached, none of the skill's text is fetched while the chat works: what
+  route 3 fetches is the build tool and a bundle.
 
   The same test on the 23 other content types the skill lists says how far each thing reaches:
   two runs each, 46 first replies, each built package checked against what its task asked for.
