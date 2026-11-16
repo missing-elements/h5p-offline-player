@@ -304,9 +304,10 @@ to 3,000. Thirty things the code does not say by itself:
   block and no link under the old text and the new (12 replies, half of them asked for a link to
   click), so the rule costs that position nothing, and what it changes in ChatGPT is not
   measured. No rule reaches a link copied wrong between the command's output and the reply.
-  This holds for the compressed link of routes 1 to 3. Route 4 gives no link that carries the
-  source (*Route 4 hands over the source as a `json` block or a file, with the build page's plain
-  address*, below).
+  This held for the compressed link of routes 1 to 3 until 0.10.3 dropped it (*The hand-over
+  carries the source and one web address, the build page's plain one*, below). Route 4 gives no
+  link that carries the source either (*Route 4 hands over the source as a `json` block or a
+  file, with the build page's plain address*, below).
   An install that hangs is one that fails (2026-11-13): ChatGPT, asked why it had built nothing,
   said its `npx` had timed out, and step 3's list named only errors. Haiku in a terminal whose
   registry took each connection and never answered went on to the two files under the old text
@@ -635,8 +636,9 @@ to 3,000. Thirty things the code does not say by itself:
   gaps, the two checks report nothing; over the 524 distinct sources these tests stored, 199 of
   the two types with 765 gaps, only the 14 known to play wrong. Not tried: a text edited afterwards in H5P's own editor, whose rich-text
   widget may write an entity back as its character.
-- **The hand-over carries the source and one web address, the build page's link** (2026-11-12,
-  #190; cut to one address the same evening, the owner's call). The owner wants people to try
+- **The hand-over carries the source and one web address, the build page's plain one**
+  (2026-11-12, #190; cut to one address the same evening; the link dropped 2026-11-16, #215;
+  each the owner's call). The owner wants people to try
   the skill and to hear from them. The build page asks how it went at its foot, by email first,
   since a teacher may have no GitHub account, or in a GitHub discussion; but a chat that builds
   the package itself hands it over in the chat, and its user sees that page only if the reply
@@ -645,6 +647,26 @@ to 3,000. Thirty things the code does not say by itself:
   prints, which carries the source: where the user plays the package in any browser, changes the
   source and builds it again, and says how it went at the foot of the page. It is the reply's one
   web address.
+
+  Until 0.10.3 that address carried the source, as a link a command printed. The model copied it
+  into its reply, and no rule reaches a character lost there. On 2026-11-16 Grok on the web, on a
+  free account, built a six-slide Course Presentation and handed over the file, the source and
+  the link, and the build page answered that the source the link carried could not be read.
+  ChatGPT had lost characters the same way on 2026-11-11, and a Haiku run on 2026-11-13. The
+  owner dropped the link: "makes too much problems for us". Routes 1 to 3 now hand over what
+  route 4 does, the source file and the page's plain address, in one fixed line that says to open
+  the file there under "Or open a file" and press Build. A source that names files is asked for
+  them on the page, so the preview command no longer goes over in a link's place.
+  `built-here.md` lost its two link commands and their rule, 4.3 KB to 3.4. The build page still
+  reads `#source=`: copies of the skill already installed print it, and the page's own address
+  follows the source.
+
+  Measured on Haiku in three places: npm working, with the verifier; npm hanging and the two
+  files; the archive attached and nothing reachable. Every package built passes the verifier
+  here. With the line as an item of the hand-over's list, 3 of 3 replies held no link and the
+  page's plain address, but one gave the address without saying to open the source file there.
+  As a fixed line to copy, 3 of 3 gave it whole, with the file's name, as the reply's one web
+  address.
 
   0.9.5 handed over a second line, printed by the same command under the link: `How did it go?
   Say so by email or on GitHub: https://missing-elements.github.io/h5p/build/#feedback-heading`.
@@ -897,8 +919,9 @@ to 3,000. Thirty things the code does not say by itself:
     its sandbox has no internet or npm gave up: *A code tool that says it has no internet still
     tries the two files*, below), anything else (route 4, `browser.md`). Routes 1 to 3 hand over by
     `built-here.md`: the build's problems and the file's name, the verifier, run only where npm
-    answered, the link, written in the verifier's command line, and the hand-over.
-  - Route 4 runs no link command: the link's commands are written once, in `built-here.md`. It
+    answered, and the hand-over. Until 0.10.3 it held the link too, written in the verifier's
+    command line.
+  - Route 4 ran no link command: the link's commands were written once, in `built-here.md`. It
     wrote the page, and outside a chat the page to an `.html` file, until 2026-11-15. It now hands
     over the source as a `json` block, and as a `.source.json` file where a code tool runs or
     outside a chat, which the build page opens under *Or open a file* (*Route 4 hands over the
@@ -1000,7 +1023,7 @@ to 3,000. Thirty things the code does not say by itself:
   plain address and no link carrying the source; both runs with a code tool gave the
   `.source.json` file, equal to the block, and the archive line, and none of the four without one
   did. The route's file is 1.5 KB. The build page still reads `#source={…}`, which costs nothing,
-  and routes 1 to 3 keep the compressed link their command prints.
+  and routes 1 to 3 kept the compressed link their command printed until 0.10.3.
 - **A code tool that says it has no internet still tries the two files** (2026-11-15, #211). From
   0.10.0, step 3 took "no internet" from the chat's own tools and then skipped route 3. Grok on the
   web (the owner, a free account) then gave the `json` block unless the build archive was attached,
@@ -1011,9 +1034,12 @@ to 3,000. Thirty things the code does not say by itself:
   and route 3 holds wherever Node runs, tried even where the tools say otherwise or npm gave up. A
   sandbox that truly reaches nothing loses the ten-second check and a failed fetch before route 4.
   Where the network refuses, as in the lab, the fetch fails at once. Where it hangs, the fetch
-  waits for the limit the model gives it, 10 to 90 seconds in these runs' commands. Not measured:
-  a network that hangs, and ChatGPT itself, where route 4 now comes after both. On Haiku, each run
-  told that its code tool's sandbox has no internet:
+  waits for the limit the model gives it, 10 to 90 seconds in these runs' commands. A network
+  that hangs is not measured. In the apps themselves, with this text (the owner, 2026-11-16, free
+  accounts, a six-slide Course Presentation): Grok, the skill's zip attached and no archive,
+  built the package in 3 to 4 minutes, where 0.10.2 gave the `json` block; ChatGPT gave the
+  source in 1 to 2 minutes, and with the archive attached built in about 10 seconds. On Haiku,
+  each run told that its code tool's sandbox has no internet:
   - npm hanging, the web reachable (as Grok): 3 of 3 took route 3, fetched both files, built
     packages that pass the verifier here, and said they were unverified. One of them first ran
     route 1's `find /` for an archive nobody had attached, which ran to the code tool's 110
