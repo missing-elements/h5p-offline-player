@@ -276,10 +276,11 @@ to 3,000. Thirty things the code does not say by itself:
   only through OpenAI's own mirror, reported refusing every install from July 2026 (503, then
   404), and the public registry not at all. Nothing in the skill can fix that, and a backend the
   model calls would need a custom GPT or connector, which a free account cannot add. So the skill
-  hands over the source and a link to a build page, `https://missing-elements.github.io/h5p/build/`,
+  hands over the source for a build page, `https://missing-elements.github.io/h5p/build/`,
   where the user's browser runs the page build (*A page builds too*), plays the package and
   downloads it.
-  The link carries the source in its fragment, raw-deflated and base64url, which no server sees.
+  Until 0.10.3 it handed over a link to that page too, which carried the source in its fragment,
+  raw-deflated and base64url, which no server sees; the page still reads such a link.
   The page lives on the organisation's own site, missing-elements/missing-elements.github.io, not
   in this repository's demo, and in that site's look. It was first on embed-my.github.io, since
   the owner wanted an authoring tool's domain without "H5P" in it, and moved on 2026-11-10, where
@@ -296,17 +297,18 @@ to 3,000. Thirty things the code does not say by itself:
   files. Since 2026-11-15 every source goes over so, in a `json` block or a file, with the build
   page's plain address and no link that carries it (*Route 4 hands over the source as a `json`
   block or a file, with the build page's plain address*, below).
-  A link is only what a command printed (2026-11-11). A link ChatGPT gave the owner carried 3,167
+  A link was only what a command printed (2026-11-11). A link ChatGPT gave the owner carried 3,167
   characters that were no deflate stream, its table broken at byte 82 of 2,375: the chat had
-  typed them itself, made up or copied wrong, and the page built nothing. So the skill says it
+  typed them itself, made up or copied wrong, and the page built nothing. So the skill said it
   outright: a link is what one of its two commands printed there, handed over whole, and where no
   command ran there is none. Haiku with the skill's text and no tool gave the source as a `json`
   block and no link under the old text and the new (12 replies, half of them asked for a link to
-  click), so the rule costs that position nothing, and what it changes in ChatGPT is not
+  click), so the rule cost that position nothing, and what it changed in ChatGPT was not
   measured. No rule reaches a link copied wrong between the command's output and the reply.
-  This holds for the compressed link of routes 1 to 3. Route 4 gives no link that carries the
-  source (*Route 4 hands over the source as a `json` block or a file, with the build page's plain
-  address*, below).
+  This held for the compressed link of routes 1 to 3 until 0.10.3 dropped it (*The hand-over
+  carries the source and one web address, the build page's plain one*, below). Route 4 gives no
+  link that carries the source either (*Route 4 hands over the source as a `json` block or a
+  file, with the build page's plain address*, below).
   An install that hangs is one that fails (2026-11-13): ChatGPT, asked why it had built nothing,
   said its `npx` had timed out, and step 3's list named only errors. Haiku in a terminal whose
   registry took each connection and never answered went on to the two files under the old text
@@ -635,16 +637,39 @@ to 3,000. Thirty things the code does not say by itself:
   gaps, the two checks report nothing; over the 524 distinct sources these tests stored, 199 of
   the two types with 765 gaps, only the 14 known to play wrong. Not tried: a text edited afterwards in H5P's own editor, whose rich-text
   widget may write an entity back as its character.
-- **The hand-over carries the source and one web address, the build page's link** (2026-11-12,
-  #190; cut to one address the same evening, the owner's call). The owner wants people to try
+- **The hand-over carries the source and one web address, the build page's plain one**
+  (2026-11-12, #190; cut to one address the same evening; the link dropped 2026-11-16, #215;
+  each the owner's call). The owner wants people to try
   the skill and to hear from them. The build page asks how it went at its foot, by email first,
   since a teacher may have no GitHub account, or in a GitHub discussion; but a chat that builds
   the package itself hands it over in the chat, and its user sees that page only if the reply
-  sends them there. So step 5 hands over, beside the package, the source as a file under the
-  package's name with `.source.json`, which the page opens too, and the link step 3's command
-  prints, which carries the source: where the user plays the package in any browser, changes the
-  source and builds it again, and says how it went at the foot of the page. It is the reply's one
-  web address.
+  sends them there. So the hand-over gives, beside the package, the source as a file under the
+  package's name with `.source.json`, and one fixed line that says to open that file on the
+  build page under "Or open a file" and press Build: there the user plays the package in any
+  browser, changes the source and builds it again, and says how it went at the foot of the page.
+  The page's plain address in that line is the reply's one web address. A source that names
+  files is asked for them on the page.
+
+  Until 0.10.3 that address carried the source, as a link a command printed. The model copied it
+  into its reply, and no rule reaches a character lost there. On 2026-11-16 Grok on the web, on a
+  free account, built a six-slide Course Presentation and handed over the file, the source and
+  the link, and the build page answered that the source the link carried could not be read.
+  ChatGPT had lost characters the same way on 2026-11-11, and a Haiku run on 2026-11-13. The
+  owner dropped the link: "makes too much problems for us". So routes 1 to 3 hand over what
+  route 4 does, and the preview command no longer goes over in a link's place.
+  `built-here.md` lost its two link commands and their rule, 4.3 KB to 3.4. The build page still
+  reads `#source=`: copies of the skill already installed print it, and the page's own address
+  follows the source.
+
+  Measured on Haiku in three places: npm working, with the verifier; npm hanging and the two
+  files; the archive attached and nothing reachable. Every package built passes the verifier
+  here. With the line as an item of the hand-over's list, 3 of 3 replies held no link and the
+  page's plain address, but one gave the address without saying to open the source file there.
+  As a fixed line to copy, 3 of 3 gave it whole, with the file's name, as the reply's one web
+  address.
+
+  The rest of this rule is the link's record, from 0.9.5 to 0.10.2, kept for what it measured.
+  "Step 5" was the hand-over's step in the skill of that time.
 
   0.9.5 handed over a second line, printed by the same command under the link: `How did it go?
   Say so by email or on GitHub: https://missing-elements.github.io/h5p/build/#feedback-heading`.
@@ -652,8 +677,8 @@ to 3,000. Thirty things the code does not say by itself:
   the package's files, the link, that line and the pack's `libraries.txt` on GitHub, and with them
   the preview command, three tools to go to next and, where the verifier ran, its report and
   revision. The owner found that too many links and kept the link alone: the libraries' licences
-  stay a sentence, the preview command goes over only where there is no link, the screenshot
-  without the report. The page keeps the id `feedback-heading`, whose address installed copies of
+  became a sentence and the screenshot went over without the report, as they still do, and the
+  preview command went over only where there was no link. The page keeps the id `feedback-heading`, whose address installed copies of
   0.9.5 print; that fragment has no `source`, so it builds nothing (`sourceFromFragment` reads
   `source` alone).
 
@@ -670,31 +695,32 @@ to 3,000. Thirty things the code does not say by itself:
   at the page's foot: what step 5 asks a chat to write itself is what a weak model drops, so
   feedback on a package built in a chat now rests on its user scrolling the page.
 
-  A link carries the text of a source and not the files it names (cubic's review): the page asks
+  A link carried the text of a source and not the files it names (cubic's review): the page asks
   for those by name once it has the source, and a picture at a web address reaches it only where
-  its host lets another site fetch it. So for a source that names a file, by any `path`, the
-  commands print why there is no link instead (`No link: the source names files, which a link
-  cannot carry.`), and in the build page's route such a source goes over whole, to be pasted, its
-  files chosen on the page. It is decided by the source and not by its type: nearly every type
+  its host lets another site fetch it. So for a source that named a file, by any `path`, the
+  commands printed why there was no link instead (`No link: the source names files, which a link
+  cannot carry.`), and in the build page's route such a source went over whole, to be pasted, its
+  files chosen on the page. It was decided by the source and not by its type: nearly every type
   takes media, Multiple Choice, Question Set, Column, a book and slides among them, and most
-  sources name none. The source file goes over as before, the files it names said by name, since a
-  build reads them beside it; they are not copied, a video being large. 0.9.5's commands printed
-  the feedback line alone for such a source, since a reason printed above that line had cost the
-  address in 3 of 3 runs; with no address left to lose, the reason is printed. With the
-  one-address text, 2 of 2 runs with a picture gave no web address, and handed over the source
-  file and the preview command, the one way left there to play it.
+  sources name none. The source file went over as it still does, the files it names said by
+  name, since a build reads them beside it; they are not copied, a video being large. 0.9.5's
+  commands had printed the feedback line alone for such a source, since a reason printed above
+  that line had cost the address in 3 of 3 runs; with no address left to lose, the reason was
+  printed. With the one-address text, 2 of 2 runs with a picture gave no web address, and handed
+  over the source file and the preview command, then the one way left there to play it.
 
-  Where nothing is built in the chat, step 3's build page route is the whole hand-over (cubic's
-  review of #193): the link a command printed or, where none was, the whole source in a `json`
-  block and the page's address, then the reply's one web address. Step 5 opens by saying so, and
-  step 3's paragraph for that case names the address and holds only where nothing is built: read
-  alone, step 5's list, which gives no other web address and the preview command where there is
-  no link, would take the page's address from a chat that has only the source, and hand it a
-  command for a package that does not exist. Haiku as a chat with no tools, the skill's text and
+  Where nothing is built in the chat, the build page's route is the whole hand-over (cubic's
+  review of #193), which `SKILL.md`'s step 4 now says in a sentence. Then it was the link a
+  command printed or, where none was, the whole source in a `json` block and the page's address,
+  as the reply's one web address. Step 5 opened by saying so, and step 3's paragraph for that
+  case named the address and held only where nothing was built: read alone, step 5's list, which
+  gave no other web address and the preview command where there was no link, would have taken
+  the page's address from a chat that had only the source, and handed it a command for a package
+  that did not exist. Haiku as a chat with no tools, the skill's text and
   the type's file pasted in, had done right before: 5 of 5 replies, three Question Sets and two
   Multiple Choice questions naming the user's picture, gave the source in one `json` block beside
   the page's address, no link and no preview command, and named the picture to choose on the
-  page; with the change, 5 of 5 again. It is for a model that reads step 5's list to the letter.
+  page; with the change, 5 of 5 again. It was for a model that read step 5's list to the letter.
   In Claude Code's place it changed nothing: 2 of 2 Question Sets handed over the exact link
   alone, and the picture run no address and the preview command.
 
@@ -707,9 +733,10 @@ to 3,000. Thirty things the code does not say by itself:
   under the old text already, in 5 of 6 runs, as under the new; every link it gave was exact
   and the reply's one web address.
 
-  Since 2026-11-14 a chat that built nothing hands the source over in a page that makes the
-  link, and the link a command prints is for a reply read outside a chat and for a package built
-  here (*In a chat that built nothing, a page the chat writes makes the link*, below).
+  From 2026-11-14 a chat that built nothing handed the source over in a page that made the
+  link, and the link a command printed was for a reply read outside a chat and for a package
+  built here (*In a chat that built nothing, a page the chat writes makes the link*, below).
+  Route 4 dropped its link on 2026-11-15, and routes 1 to 3 theirs on 2026-11-16.
 - **Only the build tool writes the `.h5p`** (2026-11-13). ChatGPT, asked to prove it could make
   the file where it could not install the tool, zipped an `h5p.json` and a `content.json` it had
   written: no library in it, and the content wrapped in a `params` key. The verifier fails it
@@ -897,8 +924,9 @@ to 3,000. Thirty things the code does not say by itself:
     its sandbox has no internet or npm gave up: *A code tool that says it has no internet still
     tries the two files*, below), anything else (route 4, `browser.md`). Routes 1 to 3 hand over by
     `built-here.md`: the build's problems and the file's name, the verifier, run only where npm
-    answered, the link, written in the verifier's command line, and the hand-over.
-  - Route 4 runs no link command: the link's commands are written once, in `built-here.md`. It
+    answered, and the hand-over. Until 0.10.3 it held the link too, written in the verifier's
+    command line.
+  - Route 4 ran no link command: the link's commands were written once, in `built-here.md`. It
     wrote the page, and outside a chat the page to an `.html` file, until 2026-11-15. It now hands
     over the source as a `json` block, and as a `.source.json` file where a code tool runs or
     outside a chat, which the build page opens under *Or open a file* (*Route 4 hands over the
@@ -1000,7 +1028,7 @@ to 3,000. Thirty things the code does not say by itself:
   plain address and no link carrying the source; both runs with a code tool gave the
   `.source.json` file, equal to the block, and the archive line, and none of the four without one
   did. The route's file is 1.5 KB. The build page still reads `#source={…}`, which costs nothing,
-  and routes 1 to 3 keep the compressed link their command prints.
+  and routes 1 to 3 kept the compressed link their command printed until 0.10.3.
 - **A code tool that says it has no internet still tries the two files** (2026-11-15, #211). From
   0.10.0, step 3 took "no internet" from the chat's own tools and then skipped route 3. Grok on the
   web (the owner, a free account) then gave the `json` block unless the build archive was attached,
@@ -1011,9 +1039,12 @@ to 3,000. Thirty things the code does not say by itself:
   and route 3 holds wherever Node runs, tried even where the tools say otherwise or npm gave up. A
   sandbox that truly reaches nothing loses the ten-second check and a failed fetch before route 4.
   Where the network refuses, as in the lab, the fetch fails at once. Where it hangs, the fetch
-  waits for the limit the model gives it, 10 to 90 seconds in these runs' commands. Not measured:
-  a network that hangs, and ChatGPT itself, where route 4 now comes after both. On Haiku, each run
-  told that its code tool's sandbox has no internet:
+  waits for the limit the model gives it, 10 to 90 seconds in these runs' commands. A network
+  that hangs is not measured. In the apps themselves, with this text (the owner, 2026-11-16, free
+  accounts, a six-slide Course Presentation): Grok, the skill's zip attached and no archive,
+  built the package in 3 to 4 minutes, where 0.10.2 gave the `json` block; ChatGPT gave the
+  source in 1 to 2 minutes, and with the archive attached built in about 10 seconds. On Haiku,
+  each run told that its code tool's sandbox has no internet:
   - npm hanging, the web reachable (as Grok): 3 of 3 took route 3, fetched both files, built
     packages that pass the verifier here, and said they were unverified. One of them first ran
     route 1's `find /` for an archive nobody had attached, which ran to the code tool's 110

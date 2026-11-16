@@ -19,7 +19,7 @@ npx @missing-elements/h5p-verify@latest course.h5p
 ```
 
 Where it does not, or no browser runs here, the verifier cannot run: the package is
-**unverified**, and the user plays it from the link below before using it.
+**unverified**, and the user plays it on the build page, as *Hand over* says, before using it.
 
 It writes `course.verify/report.json` and `course.verify/screenshot.png` beside the package
 (`--out <folder>` puts them elsewhere). Read the report's `verdict`, `reasons`, `errors` and
@@ -28,22 +28,6 @@ ready or drew nothing. Look at the screenshot too: layout mistakes raise no erro
 enough: the build already writes what an H5P site's content check keeps, so `--untrusted` finds
 nothing more. Where it fails, follow the `h5p-verify` skill's loop if it is installed, and fix the
 source, never by removing what fails.
-
-## The link
-
-This writes the link to the build page, where the user plays the package in any browser, changes
-the source and builds it again. It needs Node or Python and no network: run it in the same command
-line as the verifier.
-
-```bash
-node -e "const s=require('fs').readFileSync('source.json'),f=[];JSON.parse(s,(k,v)=>(k==='path'&&typeof v==='string'&&f.push(v),v));console.log(f.length?'No link: the source names files, which a link cannot carry.':'https://missing-elements.github.io/h5p/build/#source='+require('zlib').deflateRawSync(s).toString('base64url'))"
-python3 -c "import base64,json,zlib;s=open('source.json','rb').read();f=[];json.loads(s,object_hook=lambda o:(isinstance(o.get('path'),str) and f.append(o['path']),o)[1]);c=zlib.compressobj(9,zlib.DEFLATED,-15);d=c.compress(s)+c.flush();print('No link: the source names files, which a link cannot carry.' if f else 'https://missing-elements.github.io/h5p/build/#source='+base64.urlsafe_b64encode(d).decode().rstrip('='))"
-```
-
-A link is only what this printed here, handed over whole. Never write a `#source=` link yourself,
-from memory or after an example, even when asked for one: its text is compressed, so it cannot be
-typed, and one wrong character leaves the page nothing to build. A source that names files gets
-none: a link carries its text, not the files.
 
 ## Hand over
 
@@ -61,12 +45,19 @@ do it: the person's own play is the check, and a script of your own costs more t
 Deliver:
 
 - the `.h5p`, and its source beside it, under the package's name with `.source.json`
-  (`course.source.json`), copied as the package was; the build page opens it too. Name the files
-  it names, if any: a build reads them beside it;
-- the link, the only web address you give;
+  (`course.source.json`), copied as the package was. Name the files it names, if any: a build
+  reads them beside it;
+- this line, as it is but for the source file's name, the only web address you give:
+
+  ```text
+  To play it, change it or build it again: open https://missing-elements.github.io/h5p/build/, choose course.source.json under "Or open a file", and press Build.
+  ```
+
+  Where the source names files, add that the page asks for them. Give the address with nothing
+  after it: a link that carries the source breaks where a chat copies one character of it wrong;
 - `screenshot.png` from the run that passed; or that the package is **unverified**; or, where
   it ran and failed, its reasons, and that the package **failed verification**;
-- the build's notes, and the preview command where no link was printed;
+- the build's notes;
 - what a pass means: it starts and draws, not that it is accurate, accessible or right for every
   LMS;
 - that it carries the editor libraries an H5P site's upload check asks for, so a Moodle with no
