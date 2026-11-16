@@ -373,5 +373,10 @@ SPA-fallback trap described above cannot happen there.
   plays, carried for the editor; since #148 the plan reads and refreshes only what the content
   reaches, and leaves it as it is. Provenance: the libraries are MIT, the text is
   ours under CC0, and the clip is Big Buck Bunny, © Blender Foundation, CC BY 3.0, credited in the
-  package metadata and on the player page. The `/no-range/` route serves this content on the site,
+  package metadata and on the player page. The clip has sound since 2026-11-16: the manifest had
+  fetched test-videos.co.uk's ten-second cut, which has no audio track, so it is now seconds 10 to
+  20 of Blender's own `BigBuckBunny_640x360.m4v` (the opening music; the first nine seconds are
+  near silent), trimmed without re-encoding (`avconvert -p PresetPassthrough --start 10
+  --duration 10`, built into macOS) and kept beside the source, 2.1 MB where the old one was 1.0.
+  The `/no-range/` route serves this content on the site,
   and this content or a fixture locally, which is what the browser tests need.
