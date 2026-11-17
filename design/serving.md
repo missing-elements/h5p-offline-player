@@ -6,8 +6,11 @@ How a package's bytes reach the H5P runtime: the Service Worker's virtual file s
 
 - **The Service Worker is stateless by assumption.** Any handler may be the first one after a
   restart, so it rebuilds readers from the `packages` table on demand. When it needs something only
-  a page can do, it messages the frame client (`event.clientId`), the frame relays to its parent
-  element, and the element acts. That relay is why `frame-document.ts` has a `message` listener.
+  a page can do, it posts to the frame client (`event.clientId`, `postToClient` in `src/sw/mount.ts`),
+  the frame's boot script relays that to its parent element (`packages/runtime/src/frame-boot.ts`),
+  and the element acts (`handleWorkerRequest`). With no client to answer, as for `need-file` after a
+  restart, it posts to every window it controls, and only the element whose package it names acts.
+  The element also hears the worker directly where the page itself is controlled.
 - **`SourceReader` overrides `createReadable`.** It hands the span to `streamSpan`, which is also
   what the Jobs worker reads an entry through. Without it zip.js falls back to walking an entry
   through `readUint8Array` in 64 kB steps. Over a picked `File` each step is a free `slice()`;
