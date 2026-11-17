@@ -114,13 +114,24 @@ to 3,000. Thirty things the code does not say by itself:
 - **A build that acts on what a model wrote can be confined** (2026-11-17, #220, for the local MCP
   server of #219). The command line reads any path a source names and fetches any address, which is
   right for a person's own command. `buildPackage` takes `within`, the folders the output and every
-  file a source names must be inside, judged on real paths, so `..` and a link out are refused; and
-  `check`, to build and write nothing (`build --check`). `publicFetch` is a `fetch` that refuses
-  loopback, private, link-local and carrier-grade addresses on every hop; it resolves the name and
-  then asks, so it guards against a model's mistake or a planted address, not a hostile network.
-  `outlineOf(content)` is the content as plain lines for a review, generic over every type: it
-  reads no type's shape, so it may show a setting's text where a type keeps words under an unusual
-  key. None changes a build run without them.
+  local file a source names must be inside, judged on real paths, so `..` and a link out are
+  refused; and `check`, to build and write nothing (`build --check`), which runs the same check as
+  a build, `checkContent` being `composePackage`'s. `publicFetch` refuses every network that is not
+  the public internet, on every hop, through `net.BlockList`, which matches an IPv4 address however
+  IPv6 writes it: the first cut checked dotted text, and a URL writes `[::ffff:127.0.0.1]` as
+  `[::ffff:7f00:1]`, which reached a server on loopback (found in the PR's review). It resolves a
+  name and then asks, so it guards against a model's mistake or a planted address, not a hostile
+  network; a build uses it only where it is passed as `fetch`. Every result has `outline`, the
+  content as plain lines for a review (`outlineOf`), read through the libraries' semantics: text
+  fields a learner reads that hold more than their default, which in loaded semantics is the content
+  language's, so interface texts drop out in any language; settings left out; a ✓ on a `correct`
+  item and on the first of a list a type takes as right (Single Choice Set, Summary, whose semantics
+  say so in words alone); a `correct` select's answer. The first cut read keys, not semantics, and
+  dropped every number ("1969" as an answer), hid True/False's answer, and gave a Question Set 29
+  lines of which 23 were interface texts. The tags a text holds are taken out by `stripTags`, now
+  one function in `text.mjs` for the generator, the layouts, `schema` and the outline: each tag a
+  space, never nothing, which is what CodeQL asks of a tag remover (alert #46 on the first cut). None
+  of this changes a build run without the options.
 - **The pack is pinned.** The dependency is `workspace:*`, published as the exact version
   packages/libraries has, so a release builds with the libraries it was tested with and one command
   needs no project set up; `--libraries` names another `parts/` folder. Each part is checked

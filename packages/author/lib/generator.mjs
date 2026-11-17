@@ -1,7 +1,7 @@
 import { checkMetadata } from './metadata.mjs'
 import { machineNameOf, namingKey } from './names.mjs'
 import { isInterfaceText } from './schema.mjs'
-import { allowedTags, markupText, plainText, takesMarkup } from './text.mjs'
+import { allowedTags, markupText, plainText, stripTags, takesMarkup } from './text.mjs'
 
 /**
  * Content for a content type, made from its own `semantics.json` as H5P's editor saves a form:
@@ -1136,11 +1136,6 @@ function names(fields) {
 function fieldNames(fields) {
   const written = fields.filter((field) => !isInterfaceText(field))
   return written.length && written.length < fields.length ? `${names(written)}, and the interface texts` : names(fields)
-}
-
-/** @param {string} html */
-function stripTags(html) {
-  return html.replace(/<[^<>]*>/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 /** @param {any} object @param {string[]} keys */

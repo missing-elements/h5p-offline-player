@@ -2,8 +2,8 @@ import { constants, createReadStream, createWriteStream } from 'node:fs'
 import { copyFile, lstat, mkdir, mkdtemp, open, readFile, realpath, rm, stat } from 'node:fs/promises'
 import { lookup } from 'node:dns/promises'
 import { tmpdir } from 'node:os'
-import { isIP } from 'node:net'
-import { basename, dirname, join, relative, resolve, isAbsolute } from 'node:path'
+import { BlockList, isIP } from 'node:net'
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { Readable, Writable } from 'node:stream'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { Uint8ArrayReader, ZipWriter } from '@zip.js/zip.js'
@@ -26,9 +26,10 @@ import { SourceError } from './source-error.mjs'
  * @typedef {import('./translate.mjs').TranslationReport} TranslationReport
  * @typedef {{
  *   output: string, manifest: Record<string, unknown>, content: Record<string, unknown>,
- *   libraries: string[], install: string[], translations: TranslationReport[], notes: Problem[], media: string[]
+ *   libraries: string[], install: string[], translations: TranslationReport[], notes: Problem[], media: string[], outline: string
  * }} BuildResult what was written, and what is worth telling about it: `libraries`, the folders the
- *   package plays with; `install`, those carried for an H5P site's upload check
+ *   package plays with; `install`, those carried for an H5P site's upload check; `outline`, the
+ *   content as text for a review (`outlineOf`)
  * @typedef {{ libraries?: string, base?: string, fetch?: typeof fetch, within?: string[], check?: boolean }} BuildOptions
  *   `libraries`, a library pack's parts folder in place of the pinned pack; `base`, the folder a
  *   source's file paths are read from; `fetch`, for media named by web address; `within`, the
@@ -161,57 +162,89 @@ export async function inside(path, folders) {
   for (const folder of folders) {
     const root = await realpath(resolve(folder)).catch(() => resolve(folder))
     const from = relative(root, real)
-    if (from === '' || (!from.startsWith('..') && !isAbsolute(from))) return true
+    // `..notes.png` is a name in the folder; only `..` itself, or a path through it, leaves it.
+    if (!isAbsolute(from) && from !== '..' && !from.startsWith(`..${sep}`)) return true
   }
   return false
 }
 
 /**
- * Whether an IP address is on no public network: loopback, private, link-local, unique-local,
- * carrier-grade NAT, the unspecified address, or an IPv4 address written inside an IPv6 one.
+ * Every network that is not the public internet, as `BlockList` reads it, which matches an IPv4
+ * address however it is written: `::ffff:127.0.0.1` and `::ffff:7f00:1` are 127.0.0.1, and a URL
+ * writes the first as the second. IPv4: this network, private, carrier-grade NAT, loopback,
+ * link-local, IETF protocol assignments, benchmarking, multicast and reserved. IPv6: the
+ * unspecified and loopback addresses with the IPv4-compatible ones (`::/96`), unique-local,
+ * link-local, site-local and multicast. NAT64's prefix is left open: on an IPv6-only network it
+ * carries public IPv4 addresses, and RFC 6052 bars it from carrying any other.
+ */
+const LOCAL_NETWORKS = new BlockList()
+for (const [address, prefix] of /** @type {[string, number][]} */ ([
+  ['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16], ['172.16.0.0', 12],
+  ['192.0.0.0', 24], ['192.168.0.0', 16], ['198.18.0.0', 15], ['224.0.0.0', 3]
+])) LOCAL_NETWORKS.addSubnet(address, prefix, 'ipv4')
+for (const [address, prefix] of /** @type {[string, number][]} */ ([['::', 96], ['fc00::', 7], ['fe80::', 10], ['fec0::', 10], ['ff00::', 8]])) {
+  LOCAL_NETWORKS.addSubnet(address, prefix, 'ipv6')
+}
+
+/**
+ * Whether an IP address is on no public network (`LOCAL_NETWORKS`). Text that is no address is
+ * taken as one, so a check it cannot read refuses.
  * @param {string} address
  */
 export function isPrivateAddress(address) {
-  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(address)
-  if (mapped) address = mapped[1]
-  if (isIP(address) === 4) {
-    const [a, b] = address.split('.').map(Number)
-    return a === 0 || a === 10 || a === 127 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) ||
-      (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || a >= 224
+  const family = isIP(address)
+  return family === 0 || LOCAL_NETWORKS.check(address, family === 6 ? 'ipv6' : 'ipv4')
+}
+
+/**
+ * @typedef {(input: string | URL | Request, init?: RequestInit) => Promise<Response>} Fetch
+ * @typedef {(host: string, options: { all: true }) => Promise<{ address: string }[]>} Lookup
+ */
+
+/**
+ * A `fetch` that refuses an address on a local network (`isPrivateAddress`), on every redirect it
+ * follows, over the resolver and `fetch` given: the tests' seam. `publicFetch` is this over the
+ * system's.
+ * @param {{ lookup?: Lookup, fetch?: Fetch }} [over]
+ * @returns {Fetch}
+ * @internal
+ */
+export function guardedFetch({ lookup: resolveHost = lookup, fetch: send = (input, init) => fetch(input, init) } = {}) {
+  return async function guarded(input, init = {}) {
+    const request = input instanceof Request ? input : undefined
+    let url = new URL(request ? request.url : String(input))
+    const method = (init.method ?? request?.method ?? 'GET').toUpperCase()
+    if (method !== 'GET' && method !== 'HEAD') throw new TypeError(`fetches media, by GET or HEAD, not by ${method}`)
+    const mode = init.redirect ?? request?.redirect ?? 'follow'
+    const options = { ...init, method, headers: init.headers ?? request?.headers, signal: init.signal ?? request?.signal, redirect: /** @type {const} */ ('manual') }
+    for (let hops = 0; hops <= 10; hops++) {
+      if (!/^https?:$/.test(url.protocol)) throw new TypeError(`${url.protocol} addresses are not fetched`)
+      const host = url.hostname.replace(/^\[|\]$/g, '')
+      const addresses = isIP(host) ? [{ address: host }] : await resolveHost(host, { all: true })
+      if (!addresses.length || addresses.some(({ address }) => isPrivateAddress(address))) throw new TypeError(`${url.hostname} is on a local network, which a build here does not fetch from`)
+      const response = await send(url, options)
+      const next = response.headers.get('location')
+      if (response.status < 300 || response.status >= 400 || !next || mode === 'manual') {
+        Object.defineProperty(response, 'url', { value: url.href })
+        return response
+      }
+      await response.body?.cancel()
+      if (mode === 'error') throw new TypeError(`${url.href} redirects, and redirects were refused`)
+      url = new URL(next, url)
+    }
+    throw new TypeError('more than 10 redirects')
   }
-  const lower = address.toLowerCase()
-  return lower === '::' || lower === '::1' || /^f[cd]/.test(lower) || /^fe[89ab]/.test(lower) || /^ff/.test(lower)
 }
 
 /**
  * A `fetch` for media that refuses an address on a local network, on every redirect it follows:
  * for a build that acts on what a model wrote, where the command line's own may reach any host.
- * It looks the name up and then asks, so a host that answers differently the second time is not
- * covered; it is a guard against a model's mistake or a planted address, not against a hostile
- * network.
- * @param {string | URL | Request} input
- * @param {RequestInit} [init]
- * @returns {Promise<Response>}
+ * A build uses it only where it is passed as `fetch`. It looks a name up and then asks, so a host
+ * that answers differently the second time is not covered: it is a guard against a model's
+ * mistake or a planted address, not against a hostile network. GET and HEAD only, as media is
+ * fetched.
  */
-export async function publicFetch(input, init = {}) {
-  let url = new URL(input instanceof Request ? input.url : String(input))
-  for (let hops = 0; hops < 10; hops++) {
-    if (!/^https?:$/.test(url.protocol)) throw new Error(`${url.protocol} addresses are not fetched`)
-    const host = url.hostname.replace(/^\[|\]$/g, '')
-    const addresses = isIP(host) ? [{ address: host }] : await lookup(host, { all: true })
-    if (!addresses.length || addresses.some(({ address }) => isPrivateAddress(address))) throw new Error(`${url.hostname} is on a local network, which a build here does not fetch from`)
-    const response = await fetch(url, { ...init, redirect: 'manual' })
-    const next = response.headers.get('location')
-    if (response.status >= 300 && response.status < 400 && next) {
-      await response.body?.cancel()
-      url = new URL(next, url)
-      continue
-    }
-    Object.defineProperty(response, 'url', { value: url.href })
-    return response
-  }
-  throw new Error('too many redirects')
-}
+export const publicFetch = guardedFetch()
 
 /**
  * The refusal of an output that exists, with the file system's code, so a caller tells it from
@@ -256,7 +289,8 @@ export async function buildPackage(input, output, options = {}) {
         install: [...built.install.keys()],
         translations: built.translations,
         notes: built.notes,
-        media: media.files.map((item) => item.name)
+        media: media.files.map((item) => item.name),
+        outline: built.outline
       }
     }
     const staged = join(temporary, 'package.h5p')
@@ -292,7 +326,8 @@ export async function buildPackage(input, output, options = {}) {
       install: [...built.install.keys()],
       translations: built.translations,
       notes: built.notes,
-      media: media.files.map((item) => item.name)
+      media: media.files.map((item) => item.name),
+      outline: built.outline
     }
   } finally {
     await pack.close()

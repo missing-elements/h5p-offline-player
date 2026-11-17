@@ -176,16 +176,20 @@ Set's 2.6 MB, a container's up to 8.4 MB. `--all <folder>` writes one per conten
 ```js
 import { buildPackage, schemaOf, SourceError } from '@missing-elements/h5p-author'
 
-const { output, manifest, content, libraries, install, translations, notes, media } =
+const { output, manifest, content, libraries, install, translations, notes, media, outline } =
   await buildPackage(source, 'rivers.h5p', { base: process.cwd() })
 ```
 
-`buildPackage(source, output, { libraries, base, fetch, within, check })` refuses an existing output, and throws a
-`SourceError` whose `problems` are `{ path, message }`. `within` names the folders the output and
-every file the source names must be inside, on their real paths (for a build run on what a model
-wrote); `check` builds and writes nothing. `publicFetch` is a `fetch` for `fetch` that refuses
-addresses on a local network, redirects included, and `outlineOf(content)` the built content as
-plain lines for a review. `libraries` are the folders the package
+`buildPackage(source, output, { libraries, base, fetch, within, check })` refuses an existing output,
+and throws a `SourceError` whose `problems` are `{ path, message }`; with `check` it builds and
+writes nothing, and does not look at the output. For a build run on what a model wrote: `within`
+names the folders the output and every local file the source names must be inside, on their real
+paths. It does not cover a file named by web address, which is downloaded with the `fetch` given,
+the global one by default: pass `fetch: publicFetch`, a `fetch` that refuses addresses on a local
+network, redirects included. A result's `outline` is the content as plain lines for a review: what
+the author wrote, the right answers marked, interface texts and settings left out;
+`outlineOf(content, libraries)` makes one from a content and what `loadLibraries` loaded for it.
+`libraries` are the folders the package
 plays with, `install` those carried for an H5P site's upload check. `missingForInstall(libraries)`
 is that check, over a package's `library.json` files: what a site with no library installed would
 refuse it for, empty for a build. `schemaOf(machineName, { markdown, all,

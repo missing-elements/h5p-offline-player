@@ -1,4 +1,5 @@
 import { newId } from './generator.mjs'
+import { stripTags } from './text.mjs'
 
 /**
  * What a content type needs beyond its semantics. H5P's editor has a widget of its own for some
@@ -49,7 +50,7 @@ const machineName = (library) => (typeof library === 'string' ? library.trim().s
 
 /** Text without its tags and entities, for measuring. @param {string} html */
 function textOf(html) {
-  return html.replace(/<[^<>]*>/g, ' ').replace(/&[a-zA-Z#0-9]+;/g, '_').replace(/\s+/g, ' ').trim()
+  return stripTags(html).replace(/&[a-zA-Z#0-9]+;/g, '_')
 }
 
 /** A field's semantics, found by a path of names. @param {any[]} semantics @param {string[]} names */
