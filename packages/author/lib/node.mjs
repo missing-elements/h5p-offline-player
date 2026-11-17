@@ -35,8 +35,9 @@ import { SourceError } from './source-error.mjs'
  *   source's file paths are read from; `fetch`, for media named by web address; `within`, the
  *   folders the output and every local file a source names must be inside, on their real paths, a
  *   list even of one; `check`, to build and write no package: no output is needed or looked at, and
- *   the result's `output` is empty, but a file named by web address is still downloaded, to a
- *   temporary folder removed after, as the build checks it
+ *   the result's `output` is empty, but a media file named by web address is still downloaded, to a
+ *   temporary folder removed after, as the build checks it; a video on YouTube, Vimeo, Panopto or
+ *   Echo360 stays an address, as in a build
  * @typedef {{ output: string, type: string, parts: string[], size: number }} BundleResult
  *   `type`, the content type with the version bundled, `H5P.QuestionSet 1.21`; `parts`, the
  *   folders of the parts it holds; `size`, the zip's in bytes

@@ -123,8 +123,9 @@ to 3,000. Thirty-two things the code does not say by itself:
   read is a problem of the source's as well, found where the file is looked for, and not a failure
   halfway through that names its path. `check` builds and writes no package (`build --check`),
   running the same check as a build, `checkContent` being `composePackage`'s, and takes no output;
-  a file named by web address is still downloaded, to a temporary folder removed after, as the
-  check reads its bytes. `publicFetch`, passed as `fetch`, refuses every network that is not the
+  a media file named by web address is still downloaded, to a temporary folder removed after, as
+  the check reads its bytes, and a video on YouTube, Vimeo, Panopto or Echo360 stays an address, as
+  in a build. `publicFetch`, passed as `fetch`, refuses every network that is not the
   public internet on every hop, through `net.BlockList`, which matches an IPv4 address however IPv6
   writes it: the first cut checked dotted text, and a URL writes `[::ffff:127.0.0.1]` as
   `[::ffff:7f00:1]`, which reached a server on loopback. The local IPv4 ranges are refused behind
