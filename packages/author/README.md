@@ -194,7 +194,9 @@ plain lines for a review, made when it is first read: what the author wrote, the
 marked, slides, chapters and questions numbered, a scenario's links and a video's times written,
 interface texts and settings left out. `outlineOf(libraries, content, { limit })` makes one from
 what `loadLibraries` loaded for a content and the content, `{ type, params }`, as `checkContent`
-takes them, cut at `limit` lines where one is given.
+takes them, cut at `limit` lines where one is given. `inside(path, folders)` is the confinement
+`within` applies, for a tool beside the build that reads files of its own: whether a path, links
+followed, is in one of the folders.
 
 ```js
 import { readFile } from 'node:fs/promises'

@@ -1,0 +1,59 @@
+{
+  "name": "@missing-elements/h5p-mcp",
+  "version": "0.1.0",
+  "description": "H5P Author MCP by Missing Elements: a local MCP server that builds playable H5P packages of any content type from a short source, checks them in a real player and opens them in the person's browser. No H5P server needed.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/missing-elements/h5p-offline-player.git",
+    "directory": "packages/mcp"
+  },
+  "homepage": "https://github.com/missing-elements/h5p-offline-player/tree/main/packages/mcp#readme",
+  "bugs": {
+    "url": "https://github.com/missing-elements/h5p-offline-player/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "bin": {
+    "h5p-mcp": "./dist/h5p-mcp.mjs"
+  },
+  "exports": {
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "h5p",
+    "mcp",
+    "model-context-protocol",
+    "authoring",
+    "elearning",
+    "quiz",
+    "ai"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "pnpm --filter @missing-elements/h5p-offline-player build && pnpm --filter @missing-elements/h5p-author exec node scripts/copy-skill.mjs && pnpm build && vitest run",
+    "typecheck": "tsc -p tsconfig.json",
+    "prepack": "node -e \"require('node:fs').copyFileSync('../../LICENSE', 'LICENSE')\" && pnpm build",
+    "prepublishOnly": "node -e \"if (!/^pnpm\\//.test(process.env.npm_config_user_agent || '')) { console.error('Publish with pnpm publish: npm would ship the workspace:^ dependency ranges as they are, and the package would not install.'); process.exit(1) }\" && pnpm typecheck && pnpm test"
+  },
+  "dependencies": {
+    "@missing-elements/h5p-author": "workspace:^",
+    "@missing-elements/h5p-verify": "workspace:^"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@types/node": "^26.6.6",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0",
+    "zod": "^4.6.7"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -3,7 +3,7 @@
  * of its `exports`, from the declarations `pnpm types` generates from the JSDoc. Type-checked by
  * `pnpm typecheck`; nothing here runs.
  */
-import { VerifyError, summarize, verifyPackage, type VerifyReport } from '@missing-elements/h5p-verify'
+import { VerifyError, openBrowser, previewPackage, summarize, verifyPackage, type VerifyReport } from '@missing-elements/h5p-verify'
 // @ts-expect-error a helper the tests use, not part of the package's API (#60)
 import { contentChanges } from '@missing-elements/h5p-verify'
 
@@ -17,6 +17,12 @@ export async function asACallerWould(): Promise<string> {
   // @ts-expect-error an option the verifier does not take
   await verifyPackage({ file: 'course.h5p', timeout: 1_000 })
 
-  void [passed, missing, changed, refreshed, contentChanges, new VerifyError('could not run') instanceof Error]
+  // The preview, as a tool beside the verifier opens one: its address, and when it ended.
+  const preview = await previewPackage({ file: 'course.h5p', untrusted: true })
+  const opened: boolean = await openBrowser(`${preview.url}/`)
+  const ended: 'closed' | 'unopened' | 'stopped' = await preview.closed
+  preview.close()
+
+  void [passed, missing, changed, refreshed, opened, ended, contentChanges, new VerifyError('could not run') instanceof Error]
   return summarize(report)
 }

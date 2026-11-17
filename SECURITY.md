@@ -14,6 +14,8 @@ versions of the packages in this repository:
 | `@missing-elements/h5p-embed` | Latest release and `main` |
 | `@missing-elements/h5p-runtime` | Latest release and `main` |
 | `@missing-elements/h5p-libraries` | Latest release and `main` |
+| `@missing-elements/h5p-author` | Latest release and `main` |
+| `@missing-elements/h5p-mcp` | Latest release and `main` |
 | Demo and installable app | Deployment from `main` |
 
 Older releases may receive a fix when practical, but users should upgrade to a
