@@ -6,12 +6,12 @@ How the repository is tested: the engines, CI's browsers, the owner's rule on wh
 
 **CI tests what a change reaches.** A pull request's run tests the packages it changes and those
 that depend on them, as pnpm's `...[<commit>]` filter reads the change. A change under `skills/`
-adds the author package and `apps/skills`. A file anywhere else that is not docs (the lockfile, a
-workflow, the root's `package.json`) tests everything. Type checking covers every package
-whatever the change, since each package's check writes the types the next one reads. A push to
-main tests what it changed the same way. The weekly run and a run by hand test everything, and a
-change to `design/`, `docs/` or a root `.md` alone starts no run. The `scope` job in `ci.yml`
-decides.
+adds the author package and `apps/skills`. Any other file outside the packages (the lockfile, a
+workflow, the root's `package.json`) tests everything, unless it is one of the docs below. Every
+package that has a `typecheck` script runs it whatever the change, since each package's check
+writes the types the next one reads. A push to main tests what it changed the same way. The
+weekly run and a run by hand test everything, and a change to `design/`, `docs/`, a root `.md` or
+`LICENSE` alone starts no run. The `scope` job in `ci.yml` decides.
 
 **A pull request's run leaves out the player's browser files that wait out real time.** These are
 `stalling-host`, `worker-update` and `large-media`, named in the player's `vite.config.ts` and
@@ -19,12 +19,12 @@ dropped under `H5P_TEST_SKIP_SLOW`: about two minutes of test time in each engin
 the merge has them, so wait for it before publishing the player.
 
 The `browser` project runs in Chromium unless `H5P_TEST_BROWSER` names `firefox` or `webkit`.
-`pnpm test:engine` runs it, then the app's tests. In those two engines the `engines` job runs the
-suite when the player or the runtime changed, and the app's tests then or when the demo did. One engine
-per run, never a list: the dev server's switches (a host's outage, the worker version it serves)
-are shared, and two engines running one file at once flipped them under each other.
-`browser-emulated` stays on Chromium, since CDP is Chromium's. Playwright's WebKit is WebKit's
-desktop port, not iOS Safari.
+`pnpm test:engine` runs it, then the app's tests. The `engines` job runs in those two engines when
+the player, the runtime or the demo changed: the app's tests every time, and the player's suite only
+when the player or the runtime changed. One engine per run, never a list: the dev server's switches
+(a host's outage, the worker version it serves) are shared, and two engines running one file at once
+flipped them under each other. `browser-emulated` stays on Chromium, since CDP is Chromium's.
+Playwright's WebKit is WebKit's desktop port, not iOS Safari.
 
 CI installs Chromium and Firefox without their system packages. The runner image has what they
 link against, and `--with-deps` adds fonts, Xvfb and codecs that a headless suite does not use,
