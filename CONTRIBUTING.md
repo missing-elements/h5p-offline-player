@@ -49,8 +49,13 @@ pnpm build
 
 `pnpm test:browser` exercises the player in Chromium, including its Service
 Worker and Jobs worker. Run it for changes to playback, storage, worker,
-network, or browser-facing behavior. CI also runs the suite, and the demo's
-tests, in Firefox and WebKit; for a change to the Service Worker, the Jobs
+network, or browser-facing behavior. CI also runs the suite in Firefox and
+WebKit when the player or the runtime changes, and the demo's tests there when
+either of them or the demo changes. A pull request's run tests only the
+packages it changes and those that depend on them, and leaves out three slow
+browser files that main's run has; a change outside the packages, such as the
+lockfile or a workflow, tests everything. For a change to the Service Worker,
+the Jobs
 worker, storage or the demo's pages, run them there too, one engine at a time,
 after installing them with
 `pnpm --filter @missing-elements/h5p-offline-player exec playwright install firefox webkit`:

@@ -1,6 +1,7 @@
 /// <reference types="vitest/config" />
 import { resolve } from 'node:path'
 import { defineConfig } from 'vite'
+import { configDefaults } from 'vitest/config'
 import { playwright } from '@vitest/browser-playwright'
 import { devServiceWorkerPlugin, jobsWorkerPlugin, noRangeFixturesPlugin } from './vite.plugins'
 
@@ -8,6 +9,13 @@ import { devServiceWorkerPlugin, jobsWorkerPlugin, noRangeFixturesPlugin } from 
  * The library build and the test runner. The plugins live in `vite.plugins.ts` because the demo
  * app (`apps/demo/vite.config.ts`), which is the dev server, needs the same ones.
  */
+
+/**
+ * The browser files that wait out real time: a host silent past the stall bound, a worker
+ * update's deadlines, 20 MB archives. `H5P_TEST_SKIP_SLOW` leaves them out, as a pull request's
+ * run does; a run on main has them.
+ */
+const SLOW = ['tests/browser/stalling-host.test.ts', 'tests/browser/worker-update.test.ts', 'tests/browser/large-media.test.ts']
 
 export default defineConfig({
   plugins: [jobsWorkerPlugin(), devServiceWorkerPlugin(), noRangeFixturesPlugin()],
@@ -42,6 +50,7 @@ export default defineConfig({
         test: {
           name: 'browser',
           include: ['tests/browser/**/*.test.ts'],
+          exclude: process.env.H5P_TEST_SKIP_SLOW ? [...configDefaults.exclude, ...SLOW] : configDefaults.exclude,
           browser: browserProject(engine())
         }
       },
