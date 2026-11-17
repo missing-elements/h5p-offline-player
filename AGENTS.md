@@ -40,8 +40,8 @@ by assumption, and asks a page for what only a page can do through the frame:
 
 ## Where things are, and whose rules
 
-A pnpm workspace of nine packages and two apps. [`design/layout.md`](design/layout.md) maps every
-file; in `design/`, `src/…` and `scripts/…` mean the player's unless a file says otherwise.
+A pnpm workspace of nine packages and two apps. [`design/layout.md`](design/layout.md) maps the
+folders; in `design/`, `src/…` and `scripts/…` mean the player's unless a file says otherwise.
 
 | Part | What it is | Rules |
 |---|---|---|
