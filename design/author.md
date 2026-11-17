@@ -146,8 +146,9 @@ to 3,000. Thirty things the code does not say by itself:
   `text.mjs` for the generator, the layouts, `schema` and the outline: each tag a space, never
   nothing, which is what CodeQL asks of a tag remover (alert #46 on the first cut). It reads a tag
   as a browser does, so a `>` inside a quoted attribute no longer ends it, which is the one change
-  to a build run without the options: the generator's check for an empty field and the layouts'
-  measures read such a text right, where they had read part of its tag as text. The outline splits
+  to what a build writes without the options, its result having `outline` besides: the generator's
+  check for an empty field and the layouts' measures read such a text right, where they had read
+  part of its tag as text. The outline splits
   rich text at its tags (`tagsIn`) and plain text at its line breaks before it reads entities, so
   no text, an encoded one included, can pass for a break.
 - **The pack is pinned.** The dependency is `workspace:*`, published as the exact version
