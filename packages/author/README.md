@@ -193,13 +193,17 @@ numbered, a scenario's links and a video's times written, interface texts and se
 `outlineOf(content, libraries)` makes one from a content and what `loadLibraries` loaded for it.
 
 ```js
-import { join } from 'node:path'
+import { readFile } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
 import { buildPackage, publicFetch } from '@missing-elements/h5p-author'
 
 // A build run on what a model wrote: files only from `folder`, nothing from a local network.
+const folder = resolve('work')
+const source = JSON.parse(await readFile(join(folder, 'rivers.json'), 'utf8'))
 const { outline } = await buildPackage(source, join(folder, 'rivers.h5p'), { base: folder, within: [folder], fetch: publicFetch })
 ```
-`libraries` are the folders the package
+
+A result's `libraries` are the folders the package
 plays with, `install` those carried for an H5P site's upload check. `missingForInstall(libraries)`
 is that check, over a package's `library.json` files: what a site with no library installed would
 refuse it for, empty for a build. `schemaOf(machineName, { markdown, all,
