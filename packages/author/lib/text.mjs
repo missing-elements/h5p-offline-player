@@ -106,6 +106,29 @@ function stylePatterns(field) {
  */
 const PIECE = /(<(?=[^a-zA-Z!/])|<!--[\s\S]*?(?:-->|$)|<[^>]*(>|$)|>)/g
 const ATTRIBUTE = /([a-zA-Z_:][-a-zA-Z0-9_:.]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g
+
+/**
+ * One attribute as a browser reads it in a tag: a name, which may begin with `=` and holds no
+ * space, `/` or `=`; then, after an `=`, its value, quoted whole, bare to the next space, or a quote
+ * that opens and does not close, captured.
+ */
+const ATTRIBUTE_READ = /[\s/]*=?[^\s/=]*\s*(?:=\s*(?:"[^"]*"|'[^']*'|(["'])|\S*))?/y
+
+/**
+ * Whether a tag's attributes, as the content check cut them at the tag's first `>`, leave a quoted
+ * value open, read in the order a browser reads them: a quote opens a value only where one begins,
+ * after an attribute's `=`, so in `title=x='y` it is part of a bare value.
+ * @param {string} attributes
+ */
+function quoteLeftOpen(attributes) {
+  ATTRIBUTE_READ.lastIndex = 0
+  while (ATTRIBUTE_READ.lastIndex < attributes.length) {
+    const read = ATTRIBUTE_READ.exec(attributes)
+    if (!read?.[0]) return false
+    if (read[1]) return true
+  }
+  return false
+}
 const SAFE_URL = /^(?:https?:|mailto:|ftp:|[^:]*$)/i
 
 /**
@@ -168,7 +191,7 @@ export function markupText(value, field, report, { saved = false } = {}) {
       // check splits markup, or the quote was never closed. A browser reads the value whole and the
       // tag on to a later `>`, so the text in between is lost and what follows is drawn inside the
       // tag's element (#222).
-      if (/=\s*["']/.test(attributes.replace(/=\s*(?:"[^"]*"|'[^']*')/g, '='))) {
+      if (quoteLeftOpen(attributes)) {
         once(`has <${tag}> with a quote it does not close: a > inside an attribute ends the tag there, so write &gt; for it`)
       }
       for (const [, name, double, single, bare] of attributes.matchAll(ATTRIBUTE)) {

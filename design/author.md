@@ -40,8 +40,8 @@ to 3,000. Thirty things the code does not say by itself:
   field the editor gives its rich-text widget (`widget: "html"`, or a ShowWhen that draws one) takes
   markup with the tags the content check keeps for it (its own, `div`, `span`, `p`, `br`, and what
   they imply), checked here rather than filtered later: any other tag, an event handler, a style
-  the field does not allow, a script address, a comment, or a quote a tag leaves open is a problem
-  by name. The last is what a `>` inside an attribute makes: the content check ends the tag there,
+  the field does not allow, a script address, a comment, or a quote a tag leaves open, read as a
+  browser reads its attributes, is a problem by name. The last is what a `>` inside an attribute makes: the content check ends the tag there,
   while a browser reads on past it and loses the text in between (#222). Plain text written
   into such a field is wrapped as that widget wraps typing: in `<p>` where the field's `enterMode`
   is `p` or its tags offer headings, `pre`, `p` or `div`, in `<div>` otherwise. Every plain default
