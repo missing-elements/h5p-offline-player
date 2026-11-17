@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { mkdir, mkdtemp, readdir, rm, symlink, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -35,7 +35,7 @@ afterAll(async () => { await rm(dir, { recursive: true, force: true }) })
 
 /** A source's outline, from a build that writes nothing. */
 async function outline(source: Record<string, unknown>) {
-  return (await buildPackage({ ...META, ...source }, join(allowed, 'never.h5p'), { check: true })).outline
+  return (await buildPackage({ ...META, ...source }, undefined, { check: true })).outline
 }
 
 describe('within', () => {
@@ -67,15 +67,34 @@ describe('within', () => {
     expect(await inside(join(allowed, '..', 'outside', 'out.png'), [allowed])).toBe(false)
     expect(await inside(`${allowed}-other/x.h5p`, [allowed])).toBe(false)
   })
+
+  it('takes a list of folders, and refuses one folder given alone, which would confine nothing', async () => {
+    await expect(buildPackage(withImage('in.png'), join(allowed, 'h.h5p'), { base: allowed, within: allowed as unknown as string[] })).rejects.toThrow(/within takes a list of folders/)
+    expect(await readdir(allowed)).not.toContain('h.h5p')
+  })
+
+  it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)('says a file it cannot read is a problem of the source, in a check too, and names no path', async () => {
+    await writeFile(join(allowed, 'locked.mp4'), mp4(true))
+    await chmod(join(allowed, 'locked.mp4'), 0o000)
+    try {
+      const video = { ...META, type: 'H5P.Column', params: { content: [{ content: { library: 'H5P.Video', params: { sources: [{ path: 'locked.mp4' }] } } }] } }
+      for (const output of [undefined, join(allowed, 'i.h5p')]) {
+        const error = await buildPackage(video, output, { base: allowed, within: [allowed], check: !output }).catch((caught) => caught)
+        expect(error.problems, String(output)).toEqual([{ path: 'params.content[0].content.params.sources[0].path', message: 'locked.mp4: cannot be read' }])
+      }
+    } finally {
+      await chmod(join(allowed, 'locked.mp4'), 0o644)
+    }
+  })
 })
 
 describe('check', () => {
-  it('writes nothing, and reports the problems of a wrong source as a build does', async () => {
-    const result = await buildPackage(question, join(allowed, 'never.h5p'), { check: true })
+  it('takes no output and writes no package, and reports the problems of a wrong source as a build does', async () => {
+    const result = await buildPackage(question, undefined, { check: true })
     expect(result.output).toBe('')
     expect(result.manifest.mainLibrary).toBe('H5P.MultiChoice')
-    expect(await readdir(allowed)).not.toContain('never.h5p')
-    await expect(buildPackage({ ...question, title: undefined }, join(allowed, 'never.h5p'), { check: true })).rejects.toThrow(SourceError)
+    await expect(buildPackage({ ...question, title: undefined }, undefined, { check: true })).rejects.toThrow(SourceError)
+    await expect(buildPackage(question, undefined)).rejects.toThrow(/takes the path to write its package to/)
   })
 
   it('looks at no output: a folder that is not there, outside the folders, is no matter to a check', async () => {
@@ -85,9 +104,10 @@ describe('check', () => {
   it('is build --check on the command line, with one argument and no file written', async () => {
     const source = join(allowed, 'q.json')
     await writeFile(source, JSON.stringify(question))
+    const before = await readdir(allowed)
     const { stdout } = await exec('node', [bin, 'build', '--check', source])
-    expect(stdout).toMatch(/Checked, nothing written: H5P.MultiChoice/)
-    expect(await readdir(allowed)).not.toContain('check.h5p')
+    expect(stdout).toMatch(/Checked, no package written: H5P.MultiChoice/)
+    expect(await readdir(allowed)).toEqual(before)
     await expect(exec('node', [bin, 'build', '--check', source, 'x.h5p'])).rejects.toThrow(/build --check takes a source/)
   })
 })
@@ -108,7 +128,7 @@ describe('publicFetch', () => {
 
   it('refuses a local address however it is written, a URL writing ::ffff:127.0.0.1 as ::ffff:7f00:1, and asks nothing of it', async () => {
     for (const host of ['127.0.0.1', 'localhost', '[::1]', '[::ffff:127.0.0.1]', '[::ffff:7f00:1]', '[::127.0.0.1]', '2130706433', '0x7f.1']) {
-      await expect(publicFetch(`http://${host}:${port}/`), host).rejects.toThrow(/local network/)
+      await expect(publicFetch(`http://${host}:${port}/`), host).rejects.toThrow(/not on the public internet/)
     }
     await expect(publicFetch('file:///etc/passwd')).rejects.toThrow(/not fetched/)
     await expect(publicFetch('https://example.com/', { method: 'POST' })).rejects.toThrow(/GET or HEAD/)
@@ -120,10 +140,11 @@ describe('publicFetch', () => {
       '::', '::1', '0:0:0:0:0:0:0:1', '::7f00:1', 'fd00::1', 'fe80::1', 'fec0::1', 'ff02::1', '::ffff:10.0.0.1', '::ffff:a00:1', '::ffff:7f00:1',
       '64:ff9b::7f00:1', '64:ff9b::a00:5', '64:ff9b::a9fe:a9fe', '64:ff9b::c0a8:101', '64:ff9b:1::808:808', '2002:a00:1::1', '2002:7f00:1::',
       '192.0.2.1', '198.51.100.7', '203.0.113.9', '2001:db8::1',
-      '64:ff9b::c000:201', '2002:c000:201::', '64:ff9b::c633:6407', '2002:c633:6407::', '64:ff9b::cb00:7109', '2002:cb00:7109::', 'not an address']) {
+      '64:ff9b::c000:201', '2002:c000:201::', '64:ff9b::c633:6407', '2002:c633:6407::', '64:ff9b::cb00:7109', '2002:cb00:7109::',
+      '::ffff:0:7f00:1', '::ffff:0:127.0.0.1', '100::1', '2001:0:4136:e378:8000:63bf:3fff:fdd2', '2001:2::1', '3fff::1', '5f00::1', 'not an address']) {
       expect(isPrivateAddress(address), address).toBe(true)
     }
-    for (const address of ['8.8.8.8', '172.32.0.1', '100.128.0.1', '2606:4700::1111', '::ffff:808:808', '::ffff:8.8.8.8', '64:ff9b::808:808', '2002:808:808::1']) {
+    for (const address of ['8.8.8.8', '172.32.0.1', '100.128.0.1', '2606:4700::1111', '2001:4860:4860::8888', '::ffff:808:808', '::ffff:8.8.8.8', '64:ff9b::808:808', '2002:808:808::1']) {
       expect(isPrivateAddress(address), address).toBe(false)
     }
   })
@@ -146,9 +167,22 @@ describe('publicFetch', () => {
   it('refuses a redirect to a local address, by name and by number, without asking it', async () => {
     for (const location of ['http://inside.test/secret', 'http://[::ffff:127.0.0.1]/secret', 'http://169.254.169.254/latest']) {
       const { fetch, asked } = web((url) => (url.pathname === '/hop' ? redirect(location) : new Response('reached')))
-      await expect(fetch('https://public.test/hop'), location).rejects.toThrow(/local network/)
+      await expect(fetch('https://public.test/hop'), location).rejects.toThrow(/not on the public internet/)
       expect(asked).toEqual(['https://public.test/hop'])
     }
+  })
+
+  it('refuses a name that does not resolve in the words it refuses a local one, so a refusal names no local host', async () => {
+    const fetch = guardedFetch({
+      lookup: async (host) => {
+        if (host === 'inside.test') return [{ address: '10.1.2.3' }]
+        throw Object.assign(new Error(`getaddrinfo ENOTFOUND ${host}`), { code: 'ENOTFOUND' })
+      },
+      fetch: async () => new Response('')
+    })
+    const said = (host: string) => fetch(`https://${host}/`).then(() => 'fetched', (error) => error.message.replace(host, 'HOST'))
+    expect(await said('inside.test')).toBe('HOST is not on the public internet, the only place a build here fetches from')
+    expect(await said('missing.test')).toBe(await said('inside.test'))
   })
 
   it('follows a redirect between public hosts, keeps the request\'s headers, and names the address it ended at', async () => {
@@ -201,7 +235,7 @@ describe('publicFetch', () => {
     const before = requests
     const error = await buildPackage(withImage(`http://127.0.0.1:${port}/river.png`), join(allowed, 'g.h5p'), { base: allowed, within: [allowed], fetch: publicFetch }).catch((caught) => caught)
     expect(error).toBeInstanceOf(SourceError)
-    expect(error.message).toMatch(/could not be downloaded: 127\.0\.0\.1 is on a local network/)
+    expect(error.message).toMatch(/could not be downloaded: 127\.0\.0\.1 is not on the public internet/)
     expect(requests).toBe(before)
   })
 
@@ -230,15 +264,23 @@ describe('outline', () => {
       .toBe('    ✓ Rivers flow downhill.\n    Rivers flow uphill.')
   })
 
-  it('leaves out interface texts and settings in any language, numbers questions, and writes the score ranges of a RangeList', async () => {
+  it('leaves out interface texts, settings and the titles the build gives in any language, numbers questions, and writes the score ranges of a RangeList', async () => {
     const quiz = {
       type: 'H5P.QuestionSet',
       params: {
-        questions: [{ library: 'H5P.TrueFalse', params: { question: 'Water is wet.', correct: 'true' }, metadata: { title: 'Water' } }],
+        questions: [
+          { library: 'H5P.TrueFalse', params: { question: 'Water is wet.', correct: 'true' }, metadata: { title: 'Water' } },
+          // Titled by the build, "Question 2" or "Frage 2": the set's own label, and not written.
+          { library: 'H5P.TrueFalse', params: { question: 'Ice is cold.', correct: 'true' } }
+        ],
         endGame: { overallFeedback: [{ from: 0, to: 49, feedback: 'Try again.' }, { from: 50, to: 100, feedback: 'Passed.' }] }
       }
     }
-    const expected = '  Question 1\n    Title: Water\n    Water is wet.\n    Correct answer: True\n  0–49%: Try again.\n  50–100%: Passed.'
+    const expected = [
+      '  Question 1', '    Title: Water', '    Water is wet.', '    Correct answer: True',
+      '  Question 2', '    Ice is cold.', '    Correct answer: True',
+      '  0–49%: Try again.', '  50–100%: Passed.'
+    ].join('\n')
     expect(await outline(quiz)).toBe(expected)
     expect(await outline({ ...quiz, language: 'de' })).toBe(expected)
   })
@@ -254,7 +296,7 @@ describe('outline', () => {
     })).toBe('  Slide 1\n      Rivers / The Volga is the longest.\n      Keyword: Rivers\n  Slide 2\n      Line one / Line two / Danube / Rhine')
   })
 
-  it('writes when a video shows each interaction and bookmark, and names the video', async () => {
+  it('writes when a video shows each interaction and bookmark, names a bookmark as one, and names the video', async () => {
     expect((await buildPackage({
       ...META,
       type: 'H5P.InteractiveVideo',
@@ -262,7 +304,7 @@ describe('outline', () => {
         video: { files: [{ path: 'clip.mp4' }] },
         assets: { interactions: [{ duration: { from: 2.5, to: 66 }, label: 'Where does it go?', action: { library: 'H5P.Text', params: { text: 'To the sea.' } } }], bookmarks: [{ time: 7, label: 'Question' }] }
       } }
-    }, join(allowed, 'never.h5p'), { check: true, base: allowed })).outline).toBe('Video: videos/clip.mp4\n  0:02.5–1:06 Label: Where does it go?\n  To the sea.\n  0:07 Question')
+    }, undefined, { check: true, base: allowed })).outline).toBe('Video: videos/clip.mp4\n  0:02.5–1:06 Label: Where does it go?\n  To the sea.\n  0:07 Bookmark: Question')
   })
 
   it('writes where each choice and content of a scenario leads, but not a question\'s own link, and the scores an author gave', async () => {
@@ -291,26 +333,51 @@ describe('outline', () => {
       type: 'H5P.InteractiveBook',
       params: { chapters: [{ library: 'H5P.Column', metadata: { title: 'Sources' }, params: { content: [{ content: { library: 'H5P.AdvancedText', params: { text: 'A river begins at a spring.' }, metadata: { title: 'Text' } } }] } }] }
     })).toBe('  Chapter 1\n    Title: Sources\n      A river begins at a spring.')
-    expect((await buildPackage(withImage('in.png'), join(allowed, 'never.h5p'), { check: true, base: allowed })).outline).toBe('  Image: images/in.png\n  Alternative text: A river')
+    expect((await buildPackage(withImage('in.png'), undefined, { check: true, base: allowed })).outline).toBe('  Image: images/in.png\n  Alternative text: A river')
   })
 
-  it('reads text as a learner does: every line break, an encoded character as itself, a label as plain text, a tag whole', () => {
-    const main = {
-      library: { machineName: 'Test.Type', majorVersion: 1, minorVersion: 0 },
-      semantics: [{ name: 'note', type: 'text', label: 'Tom &amp; Jerry' }, { name: 'body', type: 'text', widget: 'html', tags: ['p', 'a'] }]
+  /** A content type of the test's own, with these fields. */
+  const own = (semantics: unknown[]) => ({ entries: new Map(), main: { library: { machineName: 'Test.Type', majorVersion: 1, minorVersion: 0 }, semantics } })
+
+  it('reads text as a learner does: every line break and block, a tag inside a word taken out whole, an encoded character as itself, a label as plain text', () => {
+    const libraries = own([{ name: 'note', type: 'text', label: 'Tom &amp; Jerry' }, { name: 'text', type: 'text', widget: 'html', tags: ['p', 'a', 'em', 'sub'] }])
+    const params = {
+      note: 'one\rtwo\r\nthree\nfour',
+      text: '<p>a&#xE000;b</p><p>H<sub>2</sub>O and <a title="it\'s" href=it\'s>a link</a>, <em>said</em>.</p>text<p>para'
     }
-    const content = { note: 'one\rtwo\r\nthree\nfour', body: '<p>a&#xE000;b</p><p><a title="x</p>y" href="#">link</a> after</p>' }
-    expect(outlineOf(content, { entries: new Map(), main })).toBe('Tom & Jerry: one / two / three / four\na\uE000b / link after')
+    expect(outlineOf(libraries, { params })).toBe('Tom & Jerry: one / two / three / four\nab / H2O and a link, said. / text / para')
   })
 
-  it('is outlineOf over a content and the libraries loaded for it, made only when a result\'s outline is read, and counts what a limit cuts off', async () => {
-    const result = await buildPackage(question, join(allowed, 'never.h5p'), { check: true })
+  it('leaves out what the editor does not draw and a text no label names, and writes a label without a colon of its own', () => {
+    const libraries = own([
+      // Game Map's stage positions, Find the Hotspot's figure: set by a widget of the type's own.
+      { name: 'telemetry', type: 'group', widget: 'none', fields: [{ name: 'x', type: 'text' }, { name: 'y', type: 'text' }] },
+      { name: 'figure', type: 'text' },
+      { name: 'empty', type: 'text', label: 'Feedback if the user selects an empty spot:' },
+      { name: 'items', type: 'list', field: { name: 'item', type: 'text' } }
+    ])
+    expect(outlineOf(libraries, { params: { telemetry: { x: '15', y: '20' }, figure: 'circle', empty: 'Look again.', items: ['one', 'two'] } }))
+      .toBe('Feedback if the user selects an empty spot: Look again.\n  one\n  two')
+  })
+
+  it('writes every line where no limit is given, and counts what a limit cuts off', () => {
+    const libraries = own([{ name: 'items', type: 'list', field: { name: 'item', type: 'text' } }])
+    const params = { items: Array.from({ length: 450 }, (_, index) => `Item ${index + 1}`) }
+    expect(outlineOf(libraries, { params }).split('\n')).toHaveLength(450)
+    expect(outlineOf(libraries, { params }, { limit: 2 })).toBe('  Item 1\n  Item 2\n… 448 more lines')
+  })
+
+  it('is outlineOf over what loadLibraries loaded and the content, as checkContent takes them, made only when a result\'s outline is read', async () => {
+    const result = await buildPackage(question, undefined, { check: true })
     expect(typeof Object.getOwnPropertyDescriptor(result, 'outline')?.get).toBe('function')
     const pack = await openPack()
     try {
-      const libraries = await loadLibraries(pack, { type: 'H5P.MultiChoice', language: 'en', params: question.params })
-      expect(outlineOf(result.content, libraries)).toBe(result.outline)
-      expect(outlineOf(result.content, libraries, { limit: 1 })).toBe('Capital of France?\n… 2 more lines')
+      const content = { type: 'H5P.MultiChoice', language: 'en', params: question.params }
+      const libraries = await loadLibraries(pack, content)
+      expect(outlineOf(libraries, { ...content, params: result.content })).toBe(result.outline)
+      // The other way round, or the parameters alone, is refused, not an empty outline.
+      expect(() => outlineOf(result.content as never, libraries as never)).toThrow(/as checkContent does/)
+      expect(() => outlineOf(libraries, result.content as never)).toThrow(/as checkContent does/)
     } finally {
       await pack.close()
     }

@@ -20,27 +20,30 @@ export function escapeText(value) {
 }
 
 /**
- * A tag, read as a browser reads one: a `>` inside a quoted attribute does not end it. Each is
- * replaced by a space, never by nothing, so taking a tag out cannot join what was around it into
- * another tag.
+ * A tag, a comment, or a lone `<` or `>`: the pieces the content check reads markup in. A tag runs
+ * from a `<` before a letter, `/` or `!` to the first `>`. A comment left open runs to the end, as a
+ * browser reads it, so its end is looked for once and not again from every `<!--` after it.
  */
-const TAG = /<(?:[^<>"']|"[^"]*"|'[^']*')*>/g
+const PIECE = /(<(?=[^a-zA-Z!/])|<!--[\s\S]*?(?:-->|$)|<[^>]*(>|$)|>)/g
 
 /**
- * Text without its tags: each tag a space, every run of space one, trimmed. Entities are left as
- * they are (`decodeEntities` reads them).
+ * Text without its tags and comments, read as the content check splits markup (`PIECE`): each a
+ * space, never nothing, so taking one out cannot join what was around it into another; a lone `<`
+ * or `>` kept as text; every run of space one, trimmed. Entities are left as they are
+ * (`decodeEntities` reads them).
  * @param {string} html
  */
 export function stripTags(html) {
-  return html.replace(TAG, ' ').replace(/\s+/g, ' ').trim()
+  return html.replace(PIECE, (piece) => (piece.length > 1 ? ' ' : piece)).replace(/\s+/g, ' ').trim()
 }
 
 /**
- * The tags in a markup text, as `stripTags` reads them, each with its `index`.
+ * The tags and comments in a markup text, as `stripTags` reads them, each with its `index`.
  * @param {string} html
+ * @returns {Generator<RegExpMatchArray>}
  */
-export function tagsIn(html) {
-  return html.matchAll(TAG)
+export function* tagsIn(html) {
+  for (const piece of html.matchAll(PIECE)) if (piece[0].length > 1) yield piece
 }
 
 /** The named entities stored text holds: those `escapeText` writes, and a few an author types. */
@@ -143,12 +146,6 @@ function stylePatterns(field) {
   return patterns.map((pattern) => new RegExp(pattern, 'i'))
 }
 
-/**
- * A tag, a comment, or a lone `<` or `>`: the pieces the content check reads markup in. A comment
- * left open runs to the end, as a browser reads it, so its end is looked for once and not again
- * from every `<!--` after it.
- */
-const PIECE = /(<(?=[^a-zA-Z!/])|<!--[\s\S]*?(?:-->|$)|<[^>]*(>|$)|>)/g
 const ATTRIBUTE = /([a-zA-Z_:][-a-zA-Z0-9_:.]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g
 const SAFE_URL = /^(?:https?:|mailto:|ftp:|[^:]*$)/i
 

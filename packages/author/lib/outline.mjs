@@ -1,5 +1,6 @@
 import { isInterfaceText } from './schema.mjs'
 import { decodeEntities, editorWidget, tagsIn, takesMarkup } from './text.mjs'
+import { questionTitle } from './types.mjs'
 
 /**
  * A built content as plain text, for a review before a package is handed over: what an author
@@ -7,12 +8,14 @@ import { decodeEntities, editorWidget, tagsIn, takesMarkup } from './text.mjs'
  * Only text a learner reads is written: a text field the editor draws as a text box, a textarea or
  * rich text, which is not an interface text (`isInterfaceText`) and holds more than its default,
  * which in loaded semantics is the content language's. Where a text breaks, a paragraph, a line, a
- * list item, ` / ` keeps the parts apart. Settings (selects, numbers, booleans, colours, hidden
- * fields) are left out, but for what says which answer is right: a ✓ before an item whose
- * `correct` is true, and the answer a `correct` select names; and a score range before its
- * feedback, in a list the editor draws as H5P's RangeList. Sub-content gets its own library's
- * semantics and its title where an author gave one; media are named by kind and path. What a few
- * types say only by position or by number is written out as `TYPES` says.
+ * list item, ` / ` keeps the parts apart. Settings are left out: selects, numbers, booleans,
+ * colours, what the editor does not draw (`widget: 'none'`), and a text with no label that is not
+ * an item's own, which a widget of the type's own sets, a figure or a position. What says which
+ * answer is right is written: a ✓ before an item whose `correct` is true, and the answer a
+ * `correct` select names; and a score range before its feedback, in a list the editor draws as
+ * H5P's RangeList. Sub-content gets its own library's semantics and its title where an author gave
+ * one; media are named by kind and path. What a few types say only by position or by number is
+ * written out as `TYPES` says.
  */
 
 /** @param {unknown} value @returns {value is Record<string, any>} */
@@ -32,38 +35,50 @@ const UNLABELLED = new Set(['text', 'question'])
  *   statement is correct" (Summary).
  * - `items`: lists whose items get a numbered header, as their editors show them one at a time:
  *   slides, chapters, questions, a scenario's content, which its links name by that number.
+ * - `titles`: lists whose items the build titles where an author did not (`questionTitle`): such a
+ *   title is the build's, and not written.
  * - `times`: lists whose items start with the time the video shows them: an interaction's
  *   `duration`, a bookmark's or an end screen's `time`.
  * - `links`: a scenario's `nextContentId`, the index of the content a choice or a content leads
  *   to, negative for the end; and `endScreenScore`, the score an end gives.
  * - `labels`: a label for a field whose semantics give none.
- * @type {Record<string, { right?: string[], items?: Record<string, string>, times?: Record<string, 'duration' | 'time'>, links?: boolean, labels?: Record<string, string> }>}
+ * @type {Record<string, {
+ *   right?: string[], items?: Record<string, string>, titles?: Record<string, (semantics: any[], index: number) => string>,
+ *   times?: Record<string, 'duration' | 'time'>, links?: boolean, labels?: Record<string, string>
+ * }>}
  */
 const TYPES = {
   'H5P.SingleChoiceSet': { right: ['choices[].answers'] },
   'H5P.Summary': { right: ['summaries[].summary'] },
-  'H5P.QuestionSet': { items: { questions: 'Question' } },
+  'H5P.QuestionSet': { items: { questions: 'Question' }, titles: { questions: questionTitle } },
   'H5P.InteractiveBook': { items: { chapters: 'Chapter' } },
   'H5P.CoursePresentation': { items: { 'presentation.slides': 'Slide' }, labels: { 'presentation.slides[].keywords[].main': 'Keyword' } },
   'H5P.BranchingScenario': { items: { 'branchingScenario.content': 'Content', 'branchingScenario.endScreens': 'End screen' }, links: true },
   'H5P.BranchingQuestion': { links: true },
   'H5P.InteractiveVideo': {
-    times: { 'interactiveVideo.assets.interactions': 'duration', 'interactiveVideo.assets.bookmarks': 'time', 'interactiveVideo.assets.endscreens': 'time' }
+    times: { 'interactiveVideo.assets.interactions': 'duration', 'interactiveVideo.assets.bookmarks': 'time', 'interactiveVideo.assets.endscreens': 'time' },
+    labels: { 'interactiveVideo.assets.bookmarks[].label': 'Bookmark', 'interactiveVideo.assets.endscreens[].label': 'End screen' }
   }
 }
 
 /** The kinds of file field, as a line names them. */
 const MEDIA = /** @type {Record<string, string>} */ ({ image: 'Image', video: 'Video', audio: 'Audio', file: 'File' })
 
-/** A tag where rich text breaks: a line break, and the end of a paragraph, a heading, a list item or a cell. */
-const BREAK = /^<\s*br\b|^<\/\s*(?:p|div|h[1-6]|li|pre|blockquote|tr|td|th|dt|dd|figcaption)\s*>$/i
+/**
+ * A tag where rich text breaks: a line break, a rule, and the start or end of a block, a paragraph,
+ * a heading, a list or its item, a table's row or cell.
+ */
+const BREAK = /^<\/?\s*(?:p|div|h[1-6]|ul|ol|li|dl|dt|dd|pre|blockquote|table|thead|tbody|tfoot|tr|td|th|caption|figure|figcaption|section|article|header|footer|aside|nav|br|hr)\b/i
+
+/** A tag that sits in a line without parting the text around it: `H<sub>2</sub>O` is one word. */
+const INLINE = /^<\/?\s*(?:a|abbr|b|bdi|bdo|cite|code|data|del|dfn|em|font|i|ins|kbd|mark|q|s|samp|small|span|strike|strong|sub|sup|time|tt|u|var)\b/i
 
 /**
- * Stored text as a learner reads it, its parts ` / ` apart: rich text's split where a tag breaks
- * it, each tag a space, tags read as `stripTags` reads them, so a `>` or a `</p>` inside a quoted
- * attribute is part of its tag; plain text's split at its line breaks, `\r` alone among them.
- * Entities are read in each part after the split, so no text, an encoded one included, can pass
- * for a break.
+ * Stored text as a learner reads it, its parts ` / ` apart. Rich text is split where a block starts
+ * or ends or a line breaks; a tag inside a line is taken out with nothing in its place, any other
+ * with a space; tags are read as `stripTags` reads them. Plain text is split at its line breaks,
+ * `\r` alone among them. Entities are read in each part after the split, so no text, an encoded
+ * one included, can pass for a break.
  * @param {string} stored
  * @param {boolean} markup whether the field holds markup
  */
@@ -75,7 +90,7 @@ function readable(stored, markup) {
     let at = 0
     for (const tag of tagsIn(stored)) {
       const index = tag.index ?? 0
-      parts[parts.length - 1] += `${stored.slice(at, index)} `
+      parts[parts.length - 1] += `${stored.slice(at, index)}${INLINE.test(tag[0]) ? '' : ' '}`
       at = index + tag[0].length
       if (BREAK.test(tag[0])) parts.push('')
     }
@@ -98,18 +113,29 @@ function clock(seconds) {
  */
 
 /**
- * @param {unknown} content a built package's `content.json`
- * @param {{ entries: Map<string, OutlineEntry>, main: OutlineEntry }} libraries the semantics, as
- *   `loadLibraries` gives them: the content type's, and each sub-content's by its library
- * @param {{ limit?: number }} [options] `limit`, the most lines written (default 400); the rest are counted
+ * The content as plain lines, in the order `checkContent` takes its arguments.
+ * @param {{ entries: Map<string, OutlineEntry>, main: OutlineEntry }} libraries what `loadLibraries`
+ *   loaded for the content: the content type's semantics, and each sub-content's by its library
+ * @param {{ params: unknown }} content the content as `checkContent` takes it, `{ type, params }`:
+ *   its `params`, a package's `content.json`, are read
+ * @param {{ limit?: number }} [options] `limit`, the most lines written, the rest counted in a last
+ *   line; all of them where none is given
  * @returns {string}
  */
-export function outlineOf(content, { entries, main }, { limit = 400 } = {}) {
+export function outlineOf(libraries, content, { limit = Infinity } = {}) {
+  if (!isObject(libraries) || !(libraries.entries instanceof Map) || !isObject(libraries.main) || !isObject(content) || !('params' in content)) {
+    throw new TypeError('outlineOf takes what loadLibraries loaded and the content, { type, params }, as checkContent does')
+  }
+  const { entries, main } = libraries
   /** @type {string[]} */
   const lines = []
   let more = 0
   // A mark for the next line: ✓, a score range, or a time.
   let pending = ''
+  // The title the build gave the next sub-content, where its type titles one an author did not.
+  let given = ''
+  /** Each library's semantics as the walk reaches it, which `TYPES`' titles are read from. @type {Map<string, any[]>} */
+  const semanticsOf = new Map()
 
   /** @param {number} depth @param {string} text */
   const emit = (depth, text) => {
@@ -137,11 +163,12 @@ export function outlineOf(content, { entries, main }, { limit = 400 } = {}) {
    * @param {unknown} params
    * @param {number} depth
    * @param {string} type the library the fields are of
-   * @param {string} path where they sit in its parameters, as `a.b[].c`
+   * @param {string} path where they sit in its parameters, as `a.b[].c`; empty for a library's own
    * @param {boolean} [bare] their text written without labels: a score range's feedback
    */
   const walkFields = (fields, params, depth, type, path, bare = false) => {
     if (!isObject(params)) return
+    if (!path) semanticsOf.set(type, fields)
     for (const field of fields) walk(field, params[field.name], depth, type, path ? `${path}.${field.name}` : field.name, bare, params)
   }
 
@@ -170,14 +197,21 @@ export function outlineOf(content, { entries, main }, { limit = 400 } = {}) {
    */
   const walk = (field, value, depth, type, path, bare, holder) => {
     if (value === undefined || value === null || isInterfaceText(field)) return
+    // A group or a list the editor does not draw holds settings, whatever they are: Game Map's
+    // stage positions. A number it does not draw can still be read, as a scenario's links are.
+    if (field.widget === 'none' && (field.type === 'group' || field.type === 'list')) return
     switch (field.type) {
       case 'text': {
         if (typeof value !== 'string' || !PROSE.has(editorWidget(field))) return
+        // A label as plain text too, where a library writes one with an entity or a tag, and
+        // without a colon of its own, as a line puts one after it.
+        const label = (TYPES[type]?.labels?.[path] ?? (typeof field.label === 'string' ? readable(field.label, true) : '')).replace(/\s*:\s*$/, '')
+        // A text with no label that is not an item's own is set by a widget of the type's own:
+        // Find the Hotspot's figure, Virtual Tour's positions.
+        if (!label && !bare && !UNLABELLED.has(field.name)) return
         const markup = takesMarkup(field)
         const text = readable(value, markup)
         if (!text || (typeof field.default === 'string' && text === readable(field.default, markup))) return
-        // A label as plain text too, where a library writes one with an entity or a tag.
-        const label = TYPES[type]?.labels?.[path] ?? (typeof field.label === 'string' ? readable(field.label, true) : '')
         emit(depth, bare || UNLABELLED.has(field.name) || !label ? text : `${label}: ${text}`)
         return
       }
@@ -213,6 +247,7 @@ export function outlineOf(content, { entries, main }, { limit = 400 } = {}) {
       case 'list': {
         if (!Array.isArray(value) || !field.field) return
         const header = TYPES[type]?.items?.[path]
+        const titled = TYPES[type]?.titles?.[path]
         const ranges = (field.widgets ?? []).some((/** @type {any} */ widget) => widget?.name === 'RangeList') && field.field.type === 'group'
         value.forEach((item, index) => {
           let at = depth + 1
@@ -226,18 +261,24 @@ export function outlineOf(content, { entries, main }, { limit = 400 } = {}) {
             walkFields(field.field.fields ?? [], item, at, type, `${path}[]`, true)
           } else {
             pending = markOf(type, path, item, index)
+            given = titled ? readable(titled(semanticsOf.get(type) ?? [], index), false) : ''
             walk(field.field, item, at, type, `${path}[]`, true)
           }
           pending = ''
+          given = ''
         })
         return
       }
       case 'library': {
+        // Taken by the sub-content it was given for, so none inside it reads it.
+        const builds = given
+        given = ''
         if (!isObject(value) || typeof value.library !== 'string') return
-        // Its title, where an author gave one: not the content type's name, which a build gives.
+        // Its title, where an author gave one: not the content type's name, nor a title the build
+        // gave it.
         const title = typeof value.metadata?.title === 'string' ? readable(value.metadata.title, false) : ''
         const typeName = typeof value.metadata?.contentType === 'string' ? readable(value.metadata.contentType, false) : ''
-        if (title && title !== typeName) emit(depth, `Title: ${title}`)
+        if (title && title !== typeName && title !== builds) emit(depth, `Title: ${title}`)
         const entry = libraryOf(value.library)
         if (entry?.semantics) walkFields(entry.semantics, value.params, depth, entry.library.machineName, '')
         return
@@ -252,7 +293,7 @@ export function outlineOf(content, { entries, main }, { limit = 400 } = {}) {
     }
   }
 
-  if (main.semantics) walkFields(main.semantics, content, 0, main.library.machineName, '')
+  if (main.semantics) walkFields(main.semantics, content.params, 0, main.library.machineName, '')
   if (more) lines.push(`… ${more} more line${more === 1 ? '' : 's'}`)
   return lines.join('\n')
 }

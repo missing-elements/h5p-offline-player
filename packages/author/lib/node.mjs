@@ -33,9 +33,10 @@ import { SourceError } from './source-error.mjs'
  * @typedef {{ libraries?: string, base?: string, fetch?: typeof fetch, within?: string[], check?: boolean }} BuildOptions
  *   `libraries`, a library pack's parts folder in place of the pinned pack; `base`, the folder a
  *   source's file paths are read from; `fetch`, for media named by web address; `within`, the
- *   folders the output and every local file a source names must be inside, on their real paths;
- *   `check`, to build and write nothing: the output is not looked at, and the result's `output` is
- *   empty
+ *   folders the output and every local file a source names must be inside, on their real paths, a
+ *   list even of one; `check`, to build and write no package: no output is needed or looked at, and
+ *   the result's `output` is empty, but a file named by web address is still downloaded, to a
+ *   temporary folder removed after, as the build checks it
  * @typedef {{ output: string, type: string, parts: string[], size: number }} BundleResult
  *   `type`, the content type with the version bundled, `H5P.QuestionSet 1.21`; `parts`, the
  *   folders of the parts it holds; `size`, the zip's in bytes
@@ -115,10 +116,16 @@ export function nodeMedia({ base, temporary, within }) {
       // Judged before the file is looked for, so a path outside is answered the same whether
       // or not something is there, and a confined build names no path but the one written.
       if (within && !(await inside(from, within))) return { missing: 'is outside the folders this build may read' }
+      const found = await stat(from).catch(() => null)
+      if (!found?.isFile()) return { missing: within ? 'no such file in the folders this build may read' : `no such file beside the source (${from})` }
+      // Opened once here, so a file the build cannot read is a problem of the source's, said with
+      // the rest, and not a failure halfway through the build that names its whole path.
       try {
-        if ((await stat(from)).isFile()) return { file: from }
-      } catch {}
-      return { missing: within ? 'no such file in the folders this build may read' : `no such file beside the source (${from})` }
+        await (await open(from, 'r')).close()
+      } catch {
+        return { missing: within ? 'cannot be read' : `cannot be read (${from})` }
+      }
+      return { file: from }
     },
     async keep(body, extension) {
       downloads += 1
@@ -176,9 +183,11 @@ export async function inside(path, folders) {
  * link-local, IETF protocol assignments, documentation (TEST-NET-1 to 3), benchmarking, multicast
  * and reserved; and each of those as IPv6 carries it to an IPv4 network, behind NAT64's well-known
  * prefix (`64:ff9b::/96`, RFC 6052), which a NAT64 gateway translates, and in 6to4 (`2002::/16`).
- * IPv6: the unspecified and loopback addresses with the IPv4-compatible ones (`::/96`), NAT64's
- * local-use prefix (`64:ff9b:1::/48`, RFC 8215), documentation (`2001:db8::/32`), unique-local,
- * link-local, site-local and multicast.
+ * IPv6: the unspecified and loopback addresses with the IPv4-compatible ones (`::/96`), the
+ * IPv4-translated ones (`::ffff:0:0:0/96`, RFC 2765), NAT64's local-use prefix (`64:ff9b:1::/48`,
+ * RFC 8215), discard-only (`100::/64`), Teredo (`2001::/32`), which carries an IPv4 address,
+ * benchmarking (`2001:2::/48`), documentation (`2001:db8::/32`, `3fff::/20`), segment routing's
+ * (`5f00::/16`), unique-local, link-local, site-local and multicast.
  */
 const LOCAL_NETWORKS = new BlockList()
 for (const [address, prefix] of /** @type {[string, number][]} */ ([
@@ -193,7 +202,10 @@ for (const [address, prefix] of /** @type {[string, number][]} */ ([
   LOCAL_NETWORKS.addSubnet(`64:ff9b::${high}:${low}`, 96 + prefix, 'ipv6')
   LOCAL_NETWORKS.addSubnet(`2002:${high}:${low}::`, 16 + prefix, 'ipv6')
 }
-for (const [address, prefix] of /** @type {[string, number][]} */ ([['::', 96], ['64:ff9b:1::', 48], ['2001:db8::', 32], ['fc00::', 7], ['fe80::', 10], ['fec0::', 10], ['ff00::', 8]])) {
+for (const [address, prefix] of /** @type {[string, number][]} */ ([
+  ['::', 96], ['::ffff:0:0:0', 96], ['64:ff9b:1::', 48], ['100::', 64], ['2001::', 32], ['2001:2::', 48], ['2001:db8::', 32], ['3fff::', 20],
+  ['5f00::', 16], ['fc00::', 7], ['fe80::', 10], ['fec0::', 10], ['ff00::', 8]
+])) {
   LOCAL_NETWORKS.addSubnet(address, prefix, 'ipv6')
 }
 
@@ -258,8 +270,19 @@ export function guardedFetch({ lookup: resolveHost = lookup, fetch: send = (inpu
       const host = url.hostname.replace(/^\[|\]$/g, '')
       // An aborted request asks no resolver.
       signal?.throwIfAborted()
-      const addresses = isIP(host) ? [{ address: host }] : await abortable(resolveHost(host, { all: true }), signal)
-      if (!addresses.length || addresses.some(({ address }) => isPrivateAddress(address))) throw new TypeError(`${url.hostname} is on a local network, which a build here does not fetch from`)
+      /** @type {{ address: string }[]} */
+      let addresses = []
+      if (isIP(host)) addresses = [{ address: host }]
+      else {
+        try {
+          addresses = await abortable(resolveHost(host, { all: true }), signal)
+        } catch (error) {
+          if (signal?.aborted) throw error
+        }
+      }
+      // A name that does not resolve is answered as a local one is, so a refusal does not tell
+      // which names a local network has.
+      if (!addresses.length || addresses.some(({ address }) => isPrivateAddress(address))) throw new TypeError(`${url.hostname} is not on the public internet, the only place a build here fetches from`)
       const response = await send(url, options)
       const next = response.headers.get('location')
       if (response.status < 300 || response.status >= 400 || !next || mode === 'manual') {
@@ -281,8 +304,9 @@ export function guardedFetch({ lookup: resolveHost = lookup, fetch: send = (inpu
  * for a build that acts on what a model wrote, where the command line's own may reach any host.
  * A build uses it only where it is passed as `fetch`. It looks a name up and then asks, so a host
  * that answers differently the second time is not covered: it is a guard against a model's
- * mistake or a planted address, not against a hostile network. GET and HEAD only, as media is
- * fetched.
+ * mistake or a planted address, not against a hostile network. A name that does not resolve is
+ * refused in the words a local one is, so what it refuses does not tell which names exist on a
+ * local network. GET and HEAD only, as media is fetched.
  */
 export const publicFetch = guardedFetch()
 
@@ -297,21 +321,38 @@ function exists(output, what = 'a build') {
 }
 
 /**
- * Builds a package from a source and writes it to `output`, which must not exist yet.
+ * `within` as given, checked: a list of folders, or none. One folder given alone, as a string,
+ * would be read as a list of its characters, `/` among them, which confines nothing.
+ * @param {unknown} within
+ * @returns {string[] | undefined}
+ */
+function foldersOf(within) {
+  if (within === undefined) return undefined
+  if (!Array.isArray(within) || !within.every((folder) => typeof folder === 'string' && folder.trim())) {
+    throw new TypeError('within takes a list of folders: [folder]')
+  }
+  return within
+}
+
+/**
+ * Builds a package from a source and writes it to `output`, which must not exist yet; with
+ * `check`, builds it and writes none, and takes no `output`.
  * @param {unknown} input the source: `{ type, title, language, license, authors, params }`, or a quiz in the published quiz format
- * @param {string} output
+ * @param {string | undefined} output the package's path; `undefined` with `check`
  * @param {BuildOptions} [options]
  * @returns {Promise<BuildResult>}
  */
 export async function buildPackage(input, output, options = {}) {
-  output = resolve(output)
-  const { within, check = false } = options
-  // A check writes nothing, so where the package would go is not looked at.
+  const { check = false } = options
+  const within = foldersOf(options.within)
+  if (!check && (typeof output !== 'string' || !output.trim())) throw new TypeError('a build takes the path to write its package to, and a check (check: true) none')
+  // A check writes nothing, so where a package would go is not looked at.
+  const target = check ? '' : resolve(/** @type {string} */ (output))
   if (!check) {
-    if (within && !(await inside(output, within))) throw new Error(`${output} is outside the folders this build may write in`)
+    if (within && !(await inside(target, within))) throw new Error(`${target} is outside the folders this build may write in`)
     // Before any work, and again as the package lands, for a file that appears in between.
-    if (await lstat(output).then(() => true, () => false)) throw exists(output)
-    if (!(await stat(dirname(output)).catch(() => null))?.isDirectory()) throw new Error(`${dirname(output)} is not a folder to write the package in`)
+    if (await lstat(target).then(() => true, () => false)) throw exists(target)
+    if (!(await stat(dirname(target)).catch(() => null))?.isDirectory()) throw new Error(`${dirname(target)} is not a folder to write the package in`)
   }
   const pack = await openPack(options.libraries)
   let temporary
@@ -320,7 +361,7 @@ export async function buildPackage(input, output, options = {}) {
     // source whose own fields have problems is checked in the same round (#174).
     const read = sourceOf(input, typeNames(pack))
     if (!read.typed) throw new SourceError(read.problems)
-    temporary = await mkdtemp(join(check ? tmpdir() : dirname(output), '.h5p-author-'))
+    temporary = await mkdtemp(join(check ? tmpdir() : dirname(target), '.h5p-author-'))
     const media = new MediaStore(nodeMedia({ base: options.base ?? process.cwd(), temporary, within }), { fetch: options.fetch })
     const built = await composePackage(read.source, pack, media, read.problems)
     if (check) {
@@ -358,11 +399,11 @@ export async function buildPackage(input, output, options = {}) {
       await normalizeArchive({ input: staged, output: final, last: [...built.install.keys()] })
     }
     // Unlike a hard link, an exclusive copy also works on FAT/exFAT destinations.
-    await copyFile(final, output, constants.COPYFILE_EXCL).catch((error) => {
-      throw error?.code === 'EEXIST' ? exists(output) : error
+    await copyFile(final, target, constants.COPYFILE_EXCL).catch((error) => {
+      throw error?.code === 'EEXIST' ? exists(target) : error
     })
     return {
-      output,
+      output: target,
       manifest: built.manifest,
       content: built.content,
       libraries: [...built.selected.keys()],

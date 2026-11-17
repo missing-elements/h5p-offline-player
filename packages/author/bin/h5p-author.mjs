@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readFile } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { buildPackage, schemaOf, SourceError, writeBundle, writeBundles } from '../lib/author.mjs'
 import { packVersion } from '../lib/node.mjs'
@@ -15,7 +15,7 @@ const USAGE = `Usage:
 build   Makes a playable .h5p from a source: { "type", "title", "language", "license",
         "authors", "params" }, or a quiz in the h5p-author skill's quiz format. Writes only
         when the whole source is right, and never over an existing file; --check lists the
-        problems and notes and writes nothing.
+        problems and notes and writes no package.
 schema  Prints a content type's fields as a source writes them: --markdown as a skill's
         type file carries them, --all with the interface texts.
 bundle  Writes the libraries a build of one content type reads, as a zip of a parts/
@@ -95,10 +95,10 @@ try {
     } catch (error) {
       throw new Error(`${rest[0]} is not a readable JSON file: ${error instanceof Error ? error.message : error}`)
     }
-    const result = await buildPackage(source, check ? join(dirname(sourcePath), 'check.h5p') : rest[1], { base: dirname(sourcePath), libraries: /** @type {string | undefined} */ (flags.libraries), check })
+    const result = await buildPackage(source, check ? undefined : rest[1], { base: dirname(sourcePath), libraries: /** @type {string | undefined} */ (flags.libraries), check })
     const from = flags.libraries ? `the pack in ${flags.libraries}` : `the library pack ${await packVersion()}`
     const install = result.install.length ? `, ${result.install.length} more for installing on an H5P site` : ''
-    console.log(`${check ? 'Checked, nothing written' : `Built ${result.output}`}: ${result.manifest.mainLibrary}, ${result.libraries.length} libraries from ${from}${install}${result.media.length ? `, ${result.media.length} media file${result.media.length === 1 ? '' : 's'}` : ''}.`)
+    console.log(`${check ? 'Checked, no package written' : `Built ${result.output}`}: ${result.manifest.mainLibrary}, ${result.libraries.length} libraries from ${from}${install}${result.media.length ? `, ${result.media.length} media file${result.media.length === 1 ? '' : 's'}` : ''}.`)
     const language = String(result.manifest.language)
     if (!/^en(?:-|$)/i.test(language)) {
       for (const { library, translation, strings, english } of result.translations) {

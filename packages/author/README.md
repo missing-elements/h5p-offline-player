@@ -182,15 +182,18 @@ const { output, manifest, content, libraries, install, translations, notes, medi
 
 `buildPackage(source, output, { libraries, base, fetch, within, check })` refuses an existing output,
 and throws a `SourceError` whose `problems` are `{ path, message }`; with `check` it builds and
-writes nothing, and does not look at the output. For a build run on what a model wrote: `within`
-names the folders the output and every local file the source names must be inside, on their real
-paths, and its problems then name no path but the one the source wrote. It does not cover a file
-named by web address, which is downloaded with the `fetch` given, the global one by default: pass
-`fetch: publicFetch`, a `fetch` that refuses an address on a local network however it is written,
-redirects included. A result's `outline` is the content as plain lines for a review, made when it
-is first read: what the author wrote, the right answers marked, slides, chapters and questions
-numbered, a scenario's links and a video's times written, interface texts and settings left out;
-`outlineOf(content, libraries)` makes one from a content and what `loadLibraries` loaded for it.
+writes no package and takes no output (`buildPackage(source, undefined, { check: true })`), though a
+file named by web address is still downloaded, to a temporary folder removed after. For a build run
+on what a model wrote: `within` is a list of the folders the output and every local file the source
+names must be inside, on their real paths, and its problems then name no path but the one the
+source wrote. It does not cover a file named by web address, which is downloaded with the `fetch`
+given, the global one by default: pass `fetch: publicFetch`, a `fetch` that refuses an address on a
+local network however it is written, redirects included. A result's `outline` is the content as
+plain lines for a review, made when it is first read: what the author wrote, the right answers
+marked, slides, chapters and questions numbered, a scenario's links and a video's times written,
+interface texts and settings left out. `outlineOf(libraries, content, { limit })` makes one from
+what `loadLibraries` loaded for a content and the content, `{ type, params }`, as `checkContent`
+takes them, cut at `limit` lines where one is given.
 
 ```js
 import { readFile } from 'node:fs/promises'

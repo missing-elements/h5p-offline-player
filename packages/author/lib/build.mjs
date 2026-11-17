@@ -369,7 +369,7 @@ export async function composePackage(source, pack, media, said = []) {
     manifest, content, selected, install, translations, notes,
     // Made when it is first read: it is for a review, which only some callers make, and a build
     // that never reads it never runs it.
-    get outline() { return (outline ??= outlineOf(content, { entries, main: mainLibrary })) }
+    get outline() { return (outline ??= outlineOf({ entries, main: mainLibrary }, { params: content })) }
   }
 }
 

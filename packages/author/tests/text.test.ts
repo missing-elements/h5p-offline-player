@@ -3,10 +3,12 @@ import { allowedTags, blockTag, decodeEntities, editorWidget, escapeText, markup
 import { translateDefaults, translationFiles } from '../lib/translate.mjs'
 
 describe('text as H5P stores it', () => {
-  it('takes tags out as a browser reads them, each a space, so what was around one never joins into a tag', () => {
+  it('takes tags and comments out as the content check splits markup, each a space, so what was around one never joins into a tag', () => {
     expect(stripTags('<p>One</p><p>two  <b>three</b></p>')).toBe('One two three')
-    expect(stripTags('<a title="a>b" href=\'x>y\'>link</a> after')).toBe('link after')
-    expect(stripTags('<scr<script>ipt>alert(1)')).toBe('<scr ipt>alert(1)')
+    // An apostrophe in an attribute, quoted or not, is no matter: a tag ends at its first `>`.
+    expect(stripTags('<a href=https://example.org/it\'s>one</a> and <a title="it\'s">two</a>')).toBe('one and two')
+    expect(stripTags('<a title="x<y">link</a> 5 < 6 > 4 a<!-- note > -->b')).toBe('link 5 < 6 > 4 a b')
+    expect(stripTags('<scr<script>ipt>alert(1)')).toBe('ipt>alert(1)')
   })
 
   it('reads entities in one pass: numeric, the named ones stored text holds, and leaves others as written', () => {

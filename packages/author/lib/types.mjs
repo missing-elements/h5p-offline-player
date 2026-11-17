@@ -69,15 +69,25 @@ function fieldAt(semantics, names) {
 /* ---------------------------------------------------------------- Question Set */
 
 /**
+ * The title a Question Set gives a question that has none: the set's own label for a question, in
+ * the content's language, and its number. The outline leaves it out, as the build's and not an
+ * author's.
+ * @param {any[]} semantics the set's, as loaded for the content
+ * @param {number} index
+ */
+export function questionTitle(semantics, index) {
+  return `${fieldAt(semantics, ['texts', 'questionLabel'])?.default ?? 'Question'} ${index + 1}`
+}
+
+/**
  * A question with no title is named as the set labels it itself, in the content's language: its
  * result screen lists each question by this title.
  * @type {Layout}
  */
 const questionSet = {
   after(params, path, context) {
-    const label = fieldAt(context.semantics, ['texts', 'questionLabel'])?.default ?? 'Question'
     ;(params.questions ?? []).forEach((/** @type {any} */ question, /** @type {number} */ i) => {
-      if (isObject(question?.metadata) && question.metadata.title === undefined) question.metadata.title = `${label} ${i + 1}`
+      if (isObject(question?.metadata) && question.metadata.title === undefined) question.metadata.title = questionTitle(context.semantics, i)
     })
   }
 }
