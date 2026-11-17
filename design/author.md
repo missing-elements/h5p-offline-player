@@ -127,7 +127,9 @@ to 3,000. Thirty things the code does not say by itself:
   a gateway carries to an IPv4 network. A redirect to another origin drops `Authorization`,
   `Proxy-Authorization` and `Cookie`, as `fetch` does, and the signal stops a lookup, which takes
   none of its own. It resolves a name and then asks, so it guards against a model's mistake or a
-  planted address, not a hostile network.
+  planted address, not a hostile network. Nor is `within` a guard against another process racing on
+  the folders, swapping a path for a link between its check and its use: one that can write there
+  already acts as the user, and Node has no directory handles to hold a path while it is used.
 - **The outline is the content for a review, read through the semantics** (2026-11-17, #220). Every
   result has `outline` (`outlineOf`), made when it is first read, so a build that never reads it
   never runs it: text fields a learner reads that hold more than their default, which in loaded
@@ -142,8 +144,12 @@ to 3,000. Thirty things the code does not say by itself:
   a Question Set 29 lines of which 23 were interface texts, ran a heading into its paragraph, and
   showed no slide, link or time. The tags a text holds are taken out by `stripTags`, one function in
   `text.mjs` for the generator, the layouts, `schema` and the outline: each tag a space, never
-  nothing, which is what CodeQL asks of a tag remover (alert #46 on the first cut). None of this
-  changes a build run without the options.
+  nothing, which is what CodeQL asks of a tag remover (alert #46 on the first cut). It reads a tag
+  as a browser does, so a `>` inside a quoted attribute no longer ends it, which is the one change
+  to a build run without the options: the generator's check for an empty field and the layouts'
+  measures read such a text right, where they had read part of its tag as text. The outline splits
+  rich text at its tags (`tagsIn`) and plain text at its line breaks before it reads entities, so
+  no text, an encoded one included, can pass for a break.
 - **The pack is pinned.** The dependency is `workspace:*`, published as the exact version
   packages/libraries has, so a release builds with the libraries it was tested with and one command
   needs no project set up; `--libraries` names another `parts/` folder. Each part is checked

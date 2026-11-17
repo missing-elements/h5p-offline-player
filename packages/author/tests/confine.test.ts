@@ -118,7 +118,8 @@ describe('publicFetch', () => {
   it('knows the local ranges, in IPv4 and IPv6, and an IPv4 address written as IPv6', () => {
     for (const address of ['10.0.0.1', '172.16.5.5', '172.31.0.1', '192.168.1.1', '169.254.169.254', '127.0.0.1', '100.64.0.1', '0.0.0.0', '192.0.0.1', '198.18.0.1', '224.0.0.1', '255.255.255.255',
       '::', '::1', '0:0:0:0:0:0:0:1', '::7f00:1', 'fd00::1', 'fe80::1', 'fec0::1', 'ff02::1', '::ffff:10.0.0.1', '::ffff:a00:1', '::ffff:7f00:1',
-      '64:ff9b::7f00:1', '64:ff9b::a00:5', '64:ff9b::a9fe:a9fe', '64:ff9b::c0a8:101', '64:ff9b:1::808:808', '2002:a00:1::1', '2002:7f00:1::', 'not an address']) {
+      '64:ff9b::7f00:1', '64:ff9b::a00:5', '64:ff9b::a9fe:a9fe', '64:ff9b::c0a8:101', '64:ff9b:1::808:808', '2002:a00:1::1', '2002:7f00:1::',
+      '192.0.2.1', '198.51.100.7', '203.0.113.9', '2001:db8::1', '64:ff9b::c000:201', 'not an address']) {
       expect(isPrivateAddress(address), address).toBe(true)
     }
     for (const address of ['8.8.8.8', '172.32.0.1', '100.128.0.1', '2606:4700::1111', '::ffff:808:808', '::ffff:8.8.8.8', '64:ff9b::808:808', '2002:808:808::1']) {
@@ -178,6 +179,13 @@ describe('publicFetch', () => {
       ['https://first.test/b', 'Bearer x', 'k=v', 'video/*'],
       ['https://other.test/c', null, null, 'video/*']
     ])
+  })
+
+  it('asks no resolver for a request that is already aborted', async () => {
+    let asked = false
+    const fetch = guardedFetch({ lookup: async () => { asked = true; return [{ address: '93.184.216.34' }] }, fetch: async () => new Response('') })
+    await expect(fetch('https://slow.test/', { signal: AbortSignal.abort(new Error('stopped')) })).rejects.toThrow('stopped')
+    expect(asked).toBe(false)
   })
 
   it('stops waiting for a name when the signal aborts, as a download\'s idle limit does', async () => {
@@ -283,6 +291,15 @@ describe('outline', () => {
       params: { chapters: [{ library: 'H5P.Column', metadata: { title: 'Sources' }, params: { content: [{ content: { library: 'H5P.AdvancedText', params: { text: 'A river begins at a spring.' }, metadata: { title: 'Text' } } }] } }] }
     })).toBe('  Chapter 1\n    Title: Sources\n      A river begins at a spring.')
     expect((await buildPackage(withImage('in.png'), join(allowed, 'never.h5p'), { check: true, base: allowed })).outline).toBe('  Image: images/in.png\n  Alternative text: A river')
+  })
+
+  it('reads text as a learner does: every line break, an encoded character as itself, a label as plain text, a tag whole', () => {
+    const main = {
+      library: { machineName: 'Test.Type', majorVersion: 1, minorVersion: 0 },
+      semantics: [{ name: 'note', type: 'text', label: 'Tom &amp; Jerry' }, { name: 'body', type: 'text', widget: 'html', tags: ['p', 'a'] }]
+    }
+    const content = { note: 'one\rtwo\r\nthree\nfour', body: '<p>a&#xE000;b</p><p><a title="x</p>y" href="#">link</a> after</p>' }
+    expect(outlineOf(content, { entries: new Map(), main })).toBe('Tom & Jerry: one / two / three / four\na\uE000b / link after')
   })
 
   it('is outlineOf over a content and the libraries loaded for it, made only when a result\'s outline is read, and counts what a limit cuts off', async () => {

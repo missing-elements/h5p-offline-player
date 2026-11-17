@@ -1,5 +1,5 @@
 import { isInterfaceText } from './schema.mjs'
-import { decodeEntities, editorWidget, stripTags, takesMarkup } from './text.mjs'
+import { decodeEntities, editorWidget, tagsIn, takesMarkup } from './text.mjs'
 
 /**
  * A built content as plain text, for a review before a package is handed over: what an author
@@ -55,20 +55,35 @@ const TYPES = {
 /** The kinds of file field, as a line names them. */
 const MEDIA = /** @type {Record<string, string>} */ ({ image: 'Image', video: 'Video', audio: 'Audio', file: 'File' })
 
-/** Where rich text breaks: a line break, and the end of a paragraph, a heading, a list item or a cell. */
-const BREAK = /<\s*br\b[^<>]*>|<\/\s*(?:p|div|h[1-6]|li|pre|blockquote|tr|td|th|dt|dd|figcaption)\s*>/gi
-
-/** A break's mark while tags are taken out: a character of private use, which no space rule collapses. */
-const MARK = ''
+/** A tag where rich text breaks: a line break, and the end of a paragraph, a heading, a list item or a cell. */
+const BREAK = /^<\s*br\b|^<\/\s*(?:p|div|h[1-6]|li|pre|blockquote|tr|td|th|dt|dd|figcaption)\s*>$/i
 
 /**
- * Stored text as a learner reads it, its parts ` / ` apart.
+ * Stored text as a learner reads it, its parts ` / ` apart: rich text's split where a tag breaks
+ * it, each tag a space, tags read as `stripTags` reads them, so a `>` or a `</p>` inside a quoted
+ * attribute is part of its tag; plain text's split at its line breaks, `\r` alone among them.
+ * Entities are read in each part after the split, so no text, an encoded one included, can pass
+ * for a break.
  * @param {string} stored
- * @param {boolean} markup whether the field holds markup, whose tags are taken out first
+ * @param {boolean} markup whether the field holds markup
  */
 function readable(stored, markup) {
-  const marked = markup ? stripTags(stored.replace(BREAK, MARK)) : stored.replace(/\r?\n/g, MARK)
-  return decodeEntities(marked).split(MARK).map((part) => part.replace(/\s+/g, ' ').trim()).filter(Boolean).join(' / ')
+  /** @type {string[]} */
+  let parts
+  if (markup) {
+    parts = ['']
+    let at = 0
+    for (const tag of tagsIn(stored)) {
+      const index = tag.index ?? 0
+      parts[parts.length - 1] += `${stored.slice(at, index)} `
+      at = index + tag[0].length
+      if (BREAK.test(tag[0])) parts.push('')
+    }
+    parts[parts.length - 1] += stored.slice(at)
+  } else {
+    parts = stored.split(/\r\n?|\n/)
+  }
+  return parts.map((part) => decodeEntities(part).replace(/\s+/g, ' ').trim()).filter(Boolean).join(' / ')
 }
 
 /** A time in a video, `m:ss`, with tenths where it has them. @param {number} seconds */
@@ -161,7 +176,8 @@ export function outlineOf(content, { entries, main }, { limit = 400 } = {}) {
         const markup = takesMarkup(field)
         const text = readable(value, markup)
         if (!text || (typeof field.default === 'string' && text === readable(field.default, markup))) return
-        const label = TYPES[type]?.labels?.[path] ?? field.label
+        // A label as plain text too, where a library writes one with an entity or a tag.
+        const label = TYPES[type]?.labels?.[path] ?? (typeof field.label === 'string' ? readable(field.label, true) : '')
         emit(depth, bare || UNLABELLED.has(field.name) || !label ? text : `${label}: ${text}`)
         return
       }

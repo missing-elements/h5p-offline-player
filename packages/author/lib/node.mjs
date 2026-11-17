@@ -173,16 +173,18 @@ export async function inside(path, folders) {
  * Every network that is not the public internet, as `BlockList` reads it, which matches an IPv4
  * address however it is written: `::ffff:127.0.0.1` and `::ffff:7f00:1` are 127.0.0.1, and a URL
  * writes the first as the second. IPv4: this network, private, carrier-grade NAT, loopback,
- * link-local, IETF protocol assignments, benchmarking, multicast and reserved; and each of those
- * as IPv6 carries it to an IPv4 network, behind NAT64's well-known prefix (`64:ff9b::/96`, RFC
- * 6052), which a NAT64 gateway translates, and in 6to4 (`2002::/16`). IPv6: the unspecified and
- * loopback addresses with the IPv4-compatible ones (`::/96`), NAT64's local-use prefix
- * (`64:ff9b:1::/48`, RFC 8215), unique-local, link-local, site-local and multicast.
+ * link-local, IETF protocol assignments, documentation (TEST-NET-1 to 3), benchmarking, multicast
+ * and reserved; and each of those as IPv6 carries it to an IPv4 network, behind NAT64's well-known
+ * prefix (`64:ff9b::/96`, RFC 6052), which a NAT64 gateway translates, and in 6to4 (`2002::/16`).
+ * IPv6: the unspecified and loopback addresses with the IPv4-compatible ones (`::/96`), NAT64's
+ * local-use prefix (`64:ff9b:1::/48`, RFC 8215), documentation (`2001:db8::/32`), unique-local,
+ * link-local, site-local and multicast.
  */
 const LOCAL_NETWORKS = new BlockList()
 for (const [address, prefix] of /** @type {[string, number][]} */ ([
   ['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16], ['172.16.0.0', 12],
-  ['192.0.0.0', 24], ['192.168.0.0', 16], ['198.18.0.0', 15], ['224.0.0.0', 3]
+  ['192.0.0.0', 24], ['192.0.2.0', 24], ['192.168.0.0', 16], ['198.18.0.0', 15], ['198.51.100.0', 24], ['203.0.113.0', 24],
+  ['224.0.0.0', 3]
 ])) {
   LOCAL_NETWORKS.addSubnet(address, prefix, 'ipv4')
   const [a, b, c, d] = address.split('.').map(Number)
@@ -191,7 +193,7 @@ for (const [address, prefix] of /** @type {[string, number][]} */ ([
   LOCAL_NETWORKS.addSubnet(`64:ff9b::${high}:${low}`, 96 + prefix, 'ipv6')
   LOCAL_NETWORKS.addSubnet(`2002:${high}:${low}::`, 16 + prefix, 'ipv6')
 }
-for (const [address, prefix] of /** @type {[string, number][]} */ ([['::', 96], ['64:ff9b:1::', 48], ['fc00::', 7], ['fe80::', 10], ['fec0::', 10], ['ff00::', 8]])) {
+for (const [address, prefix] of /** @type {[string, number][]} */ ([['::', 96], ['64:ff9b:1::', 48], ['2001:db8::', 32], ['fc00::', 7], ['fe80::', 10], ['fec0::', 10], ['ff00::', 8]])) {
   LOCAL_NETWORKS.addSubnet(address, prefix, 'ipv6')
 }
 
@@ -254,6 +256,8 @@ export function guardedFetch({ lookup: resolveHost = lookup, fetch: send = (inpu
     for (let hops = 0; hops <= 10; hops++) {
       if (!/^https?:$/.test(url.protocol)) throw new TypeError(`${url.protocol} addresses are not fetched`)
       const host = url.hostname.replace(/^\[|\]$/g, '')
+      // An aborted request asks no resolver.
+      signal?.throwIfAborted()
       const addresses = isIP(host) ? [{ address: host }] : await abortable(resolveHost(host, { all: true }), signal)
       if (!addresses.length || addresses.some(({ address }) => isPrivateAddress(address))) throw new TypeError(`${url.hostname} is on a local network, which a build here does not fetch from`)
       const response = await send(url, options)

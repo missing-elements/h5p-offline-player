@@ -35,6 +35,14 @@ export function stripTags(html) {
   return html.replace(TAG, ' ').replace(/\s+/g, ' ').trim()
 }
 
+/**
+ * The tags in a markup text, as `stripTags` reads them, each with its `index`.
+ * @param {string} html
+ */
+export function tagsIn(html) {
+  return html.matchAll(TAG)
+}
+
 /** The named entities stored text holds: those `escapeText` writes, and a few an author types. */
 const NAMED = /** @type {Record<string, string>} */ ({
   amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', shy: '­', ndash: '–', mdash: '—', hellip: '…',
