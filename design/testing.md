@@ -4,31 +4,34 @@ How the repository is tested: the engines, CI's browsers, the owner's rule on wh
 
 ## Engines, CI and what is tested
 
-The `browser` project runs in Chromium unless `H5P_TEST_BROWSER` names `firefox` or `webkit`, and
-`pnpm test:engine` runs it alone, which is what CI does for those two (the `engines` job, one
-engine per job; the `test` job covers Chromium). One engine per run, never a list: the dev
-server's switches — a host's outage, the worker version it serves — are shared, and two engines
-running one file at once flipped them under each other. `browser-emulated` stays on Chromium,
-since CDP is Chromium's. Added on 2026-10-13, after Safari had only ever been checked by hand;
-the first runs found the three engine differences under *A body that streams holds its fetch
-event open*, *An untrusted package plays as data* (the worker's own script in its policy) and *A
-downloaded archive is read back before it is reported done*. Playwright's WebKit is WebKit's
-desktop port and not iOS Safari: the app's menu filled an iPhone's screen in Safari on 2026-10-13
-and drew correctly in Playwright's WebKit at every phone size.
+**CI tests what a change reaches.** A pull request's run tests the packages it changes and those
+that depend on them, as pnpm's `...[<commit>]` filter reads the change. A change under `skills/`
+adds the author package and `apps/skills`. A file anywhere else that is not docs (the lockfile, a
+workflow, the root's `package.json`) tests everything. Type checking covers every package
+whatever the change, since each package's check writes the types the next one reads. A push to
+main tests what it changed the same way. The weekly run and a run by hand test everything, and a
+change to `design/`, `docs/` or a root `.md` alone starts no run. The `scope` job in `ci.yml`
+decides.
 
-CI installs Chromium and Firefox without their system packages (#73, 2026-10-23): the runner image
-ships both browsers, so the libraries they link against are there, and what `--with-deps` adds —
-fonts, Xvfb, FFmpeg's codecs — a headless suite that decodes no video does not use. WebKit needs
-its packages, GStreamer and GTK 4 among them, 117 MB from Ubuntu's mirror, and the `engines` job
-keeps them in the Actions cache (#77): `/var/cache/apt/archives`, keyed by ISO week with any
-earlier week as the fallback, and `apt-get autoclean` after the install so one version of each
-package stays. Measured that morning: `azure.archive.ubuntu.com` served the package lists at
-12 MB/s and the packages at 40 kB/s — 115 MB in 47 minutes, in three runs of three, against 30 to
-60 seconds in the eight `main` runs before. The image's apt failover (actions/runner-images#14594)
-fires on a stall, not on a trickle, which is actions/runner-images#14823, open; the cache restores
-from GitHub's storage instead, 111 MB in 3 seconds, and the install then took 26 seconds. A cache
-saved by a pull request's run is that pull request's: `main`'s first run after the merge fills the
-one every later pull request reads.
+**A pull request's run leaves out the player's browser files that wait out real time.** These are
+`stalling-host`, `worker-update` and `large-media`, named in the player's `vite.config.ts` and
+dropped under `H5P_TEST_SKIP_SLOW`: about two minutes of test time in each engine. Main's run after
+the merge has them, so wait for it before publishing the player.
+
+The `browser` project runs in Chromium unless `H5P_TEST_BROWSER` names `firefox` or `webkit`.
+`pnpm test:engine` runs it, then the app's tests. In those two engines the `engines` job runs the
+suite when the player or the runtime changed, and the app's tests then or when the demo did. One engine
+per run, never a list: the dev server's switches (a host's outage, the worker version it serves)
+are shared, and two engines running one file at once flipped them under each other.
+`browser-emulated` stays on Chromium, since CDP is Chromium's. Playwright's WebKit is WebKit's
+desktop port, not iOS Safari.
+
+CI installs Chromium and Firefox without their system packages. The runner image has what they
+link against, and `--with-deps` adds fonts, Xvfb and codecs that a headless suite does not use,
+from a mirror some runners reach at 40 kB/s (#73). WebKit needs its 117 MB of packages, which the
+`engines` job keeps in the Actions cache, keyed by ISO week, running `apt-get autoclean` after the
+install (#77). A pull request's cache is its own; main's runs, the weekly one among them, fill the
+one pull requests read.
 
 **What is tested, by the owner's rule of 2026-10-17: the packages and their source, and of the
 demo app only the installable app.** The demo's pages — the player page, the examples, `/embed`,
