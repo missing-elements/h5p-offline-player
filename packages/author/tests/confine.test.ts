@@ -8,7 +8,7 @@ import { promisify } from 'node:util'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { buildPackage, loadLibraries, openPack, outlineOf, publicFetch, SourceError } from '../lib/author.mjs'
 import { guardedFetch, inside, isPrivateAddress } from '../lib/node.mjs'
-import { png } from './helpers/media'
+import { mp4, png } from './helpers/media'
 
 const exec = promisify(execFile)
 const bin = resolve(import.meta.dirname, '../bin/h5p-author.mjs')
@@ -27,6 +27,7 @@ beforeAll(async () => {
   await mkdir(outside)
   await writeFile(join(allowed, 'in.png'), png(8, 8))
   await writeFile(join(allowed, '..notes.png'), png(8, 8))
+  await writeFile(join(allowed, 'clip.mp4'), mp4(true))
   await writeFile(join(outside, 'out.png'), png(8, 8))
   await symlink(join(outside, 'out.png'), join(allowed, 'link.png'))
 })
@@ -50,6 +51,16 @@ describe('within', () => {
     expect(await readdir(outside)).toEqual(['out.png'])
   })
 
+  it('answers a path outside the folders the same whether or not a file is there, and names no absolute path', async () => {
+    const at = 'params.content[0].content.params.file.path'
+    for (const path of ['../outside/out.png', '../outside/missing.png']) {
+      const error = await buildPackage(withImage(path), join(allowed, 'e.h5p'), { base: allowed, within: [allowed] }).catch((caught) => caught)
+      expect(error.problems).toEqual([{ path: at, message: `${path}: is outside the folders this build may read` }])
+    }
+    const error = await buildPackage(withImage('nothing.png'), join(allowed, 'e.h5p'), { base: allowed, within: [allowed] }).catch((caught) => caught)
+    expect(error.problems).toEqual([{ path: at, message: 'nothing.png: no such file in the folders this build may read' }])
+  })
+
   it('judges a path that does not exist yet by its nearest folder, and a folder is not its sibling of the same prefix', async () => {
     expect(await inside(join(allowed, 'new', 'x.h5p'), [allowed])).toBe(true)
     expect(await inside(join(allowed, '..notes.png'), [allowed])).toBe(true)
@@ -65,6 +76,10 @@ describe('check', () => {
     expect(result.manifest.mainLibrary).toBe('H5P.MultiChoice')
     expect(await readdir(allowed)).not.toContain('never.h5p')
     await expect(buildPackage({ ...question, title: undefined }, join(allowed, 'never.h5p'), { check: true })).rejects.toThrow(SourceError)
+  })
+
+  it('looks at no output: a folder that is not there, outside the folders, is no matter to a check', async () => {
+    expect((await buildPackage(question, join(outside, 'no', 'such', 'x.h5p'), { check: true, within: [allowed] })).output).toBe('')
   })
 
   it('is build --check on the command line, with one argument and no file written', async () => {
@@ -102,10 +117,13 @@ describe('publicFetch', () => {
 
   it('knows the local ranges, in IPv4 and IPv6, and an IPv4 address written as IPv6', () => {
     for (const address of ['10.0.0.1', '172.16.5.5', '172.31.0.1', '192.168.1.1', '169.254.169.254', '127.0.0.1', '100.64.0.1', '0.0.0.0', '192.0.0.1', '198.18.0.1', '224.0.0.1', '255.255.255.255',
-      '::', '::1', '0:0:0:0:0:0:0:1', '::7f00:1', 'fd00::1', 'fe80::1', 'fec0::1', 'ff02::1', '::ffff:10.0.0.1', '::ffff:a00:1', '::ffff:7f00:1', 'not an address']) {
+      '::', '::1', '0:0:0:0:0:0:0:1', '::7f00:1', 'fd00::1', 'fe80::1', 'fec0::1', 'ff02::1', '::ffff:10.0.0.1', '::ffff:a00:1', '::ffff:7f00:1',
+      '64:ff9b::7f00:1', '64:ff9b::a00:5', '64:ff9b::a9fe:a9fe', '64:ff9b::c0a8:101', '64:ff9b:1::808:808', '2002:a00:1::1', '2002:7f00:1::', 'not an address']) {
       expect(isPrivateAddress(address), address).toBe(true)
     }
-    for (const address of ['8.8.8.8', '172.32.0.1', '100.128.0.1', '2606:4700::1111', '::ffff:808:808', '::ffff:8.8.8.8', '64:ff9b::808:808']) expect(isPrivateAddress(address), address).toBe(false)
+    for (const address of ['8.8.8.8', '172.32.0.1', '100.128.0.1', '2606:4700::1111', '::ffff:808:808', '::ffff:8.8.8.8', '64:ff9b::808:808', '2002:808:808::1']) {
+      expect(isPrivateAddress(address), address).toBe(false)
+    }
   })
 
   /** A web of hosts: `public.test` and `cdn.test` resolve to public addresses, `inside.test` to a local one. */
@@ -143,6 +161,41 @@ describe('publicFetch', () => {
     expect(header).toBe('kept')
   })
 
+  it('drops what a request carries for its own site on a redirect to another, and keeps it on its own', async () => {
+    const seen: [string, string | null, string | null, string | null][] = []
+    const fetch = guardedFetch({
+      lookup: async () => [{ address: '93.184.216.34' }],
+      fetch: async (input, init) => {
+        const url = new URL(String(input))
+        const headers = new Headers(init?.headers)
+        seen.push([url.href, headers.get('authorization'), headers.get('cookie'), headers.get('accept')])
+        return url.pathname === '/a' ? redirect('/b') : url.pathname === '/b' ? redirect('https://other.test/c') : new Response('ok')
+      }
+    })
+    await fetch('https://first.test/a', { headers: { authorization: 'Bearer x', cookie: 'k=v', accept: 'video/*' } })
+    expect(seen).toEqual([
+      ['https://first.test/a', 'Bearer x', 'k=v', 'video/*'],
+      ['https://first.test/b', 'Bearer x', 'k=v', 'video/*'],
+      ['https://other.test/c', null, null, 'video/*']
+    ])
+  })
+
+  it('stops waiting for a name when the signal aborts, as a download\'s idle limit does', async () => {
+    const hanging = guardedFetch({ lookup: () => new Promise(() => {}), fetch: async () => new Response('') })
+    const controller = new AbortController()
+    const fetching = hanging('https://slow.test/', { signal: controller.signal })
+    controller.abort(new Error('nothing arrived for 60 s'))
+    await expect(fetching).rejects.toThrow('nothing arrived for 60 s')
+  })
+
+  it('keeps a build it is given to off a local network, and asks nothing there', async () => {
+    const before = requests
+    const error = await buildPackage(withImage(`http://127.0.0.1:${port}/river.png`), join(allowed, 'g.h5p'), { base: allowed, within: [allowed], fetch: publicFetch }).catch((caught) => caught)
+    expect(error).toBeInstanceOf(SourceError)
+    expect(error.message).toMatch(/could not be downloaded: 127\.0\.0\.1 is on a local network/)
+    expect(requests).toBe(before)
+  })
+
   it('answers a redirect as asked: manual returns it, error refuses it, and more than ten are refused', async () => {
     const { fetch } = web(() => redirect('https://cdn.test/next'))
     expect((await fetch('https://public.test/', { redirect: 'manual' })).status).toBe(302)
@@ -168,7 +221,7 @@ describe('outline', () => {
       .toBe('    ✓ Rivers flow downhill.\n    Rivers flow uphill.')
   })
 
-  it('leaves out interface texts and settings, in any language, and writes sub-content with its title and the score ranges', async () => {
+  it('leaves out interface texts and settings in any language, numbers questions, and writes the score ranges of a RangeList', async () => {
     const quiz = {
       type: 'H5P.QuestionSet',
       params: {
@@ -176,18 +229,70 @@ describe('outline', () => {
         endGame: { overallFeedback: [{ from: 0, to: 49, feedback: 'Try again.' }, { from: 50, to: 100, feedback: 'Passed.' }] }
       }
     }
-    const expected = '  Title: Water\n  Water is wet.\n  Correct answer: True\n  0–49%: Try again.\n  50–100%: Passed.'
+    const expected = '  Question 1\n    Title: Water\n    Water is wet.\n    Correct answer: True\n  0–49%: Try again.\n  50–100%: Passed.'
     expect(await outline(quiz)).toBe(expected)
     expect(await outline({ ...quiz, language: 'de' })).toBe(expected)
   })
 
-  it('is outlineOf over a content and the libraries loaded for it, and counts what a limit cuts off', async () => {
-    const { content, outline: built } = await buildPackage(question, join(allowed, 'never.h5p'), { check: true })
+  it('keeps a text\'s paragraphs, lines and list items apart, and numbers slides, with each slide\'s keyword', async () => {
+    const text = (html: string) => ({ action: { library: 'H5P.AdvancedText', params: { text: html } } })
+    expect(await outline({
+      type: 'H5P.CoursePresentation',
+      params: { presentation: { slides: [
+        { elements: [text('<h2>Rivers</h2><p>The Volga is the longest.</p>')], keywords: [{ main: 'Rivers' }] },
+        { elements: [text('<p>Line one<br>Line two</p><ul><li>Danube</li><li>Rhine</li></ul>')] }
+      ] } }
+    })).toBe('  Slide 1\n      Rivers / The Volga is the longest.\n      Keyword: Rivers\n  Slide 2\n      Line one / Line two / Danube / Rhine')
+  })
+
+  it('writes when a video shows each interaction and bookmark, and names the video', async () => {
+    expect((await buildPackage({
+      ...META,
+      type: 'H5P.InteractiveVideo',
+      params: { interactiveVideo: {
+        video: { files: [{ path: 'clip.mp4' }] },
+        assets: { interactions: [{ duration: { from: 2.5, to: 66 }, label: 'Where does it go?', action: { library: 'H5P.Text', params: { text: 'To the sea.' } } }], bookmarks: [{ time: 7, label: 'Question' }] }
+      } }
+    }, join(allowed, 'never.h5p'), { check: true, base: allowed })).outline).toBe('Video: videos/clip.mp4\n  0:02.5–1:06 Label: Where does it go?\n  To the sea.\n  0:07 Question')
+  })
+
+  it('writes where each choice and content of a scenario leads, but not a question\'s own link, and the scores an author gave', async () => {
+    const scenario = await outline({
+      type: 'H5P.BranchingScenario',
+      params: { branchingScenario: {
+        title: 'River',
+        startScreen: { startScreenTitle: 'River', startScreenSubtitle: 'Choose.' },
+        content: [
+          { type: { library: 'H5P.BranchingQuestion', params: { branchingQuestion: { question: 'Cross how?', alternatives: [{ text: 'Wade', nextContentId: 1 }, { text: 'Bridge', nextContentId: -1 }] } } } },
+          { type: { library: 'H5P.AdvancedText', params: { text: 'Swept away.' } }, nextContentId: -1, feedback: { title: 'Wet', endScreenScore: 0 } }
+        ],
+        endScreens: [{ endScreenTitle: 'The end' }]
+      } }
+    })
+    // One block, line after line: no link of the question's own between its last choice and the next content.
+    expect(scenario).toContain([
+      '  Content 1', '    Cross how?', '      Wade', '      Next: Content 2', '      Bridge', '      Next: the end',
+      '  Content 2', '    Swept away.', '    Next: the end', '    Feedback title: Wet', '    Score: 0'
+    ].join('\n'))
+    expect(scenario.endsWith('    Score: 0')).toBe(true)
+  })
+
+  it('numbers chapters, writes an author\'s title but not the content type\'s, and names a picture with its alternative text', async () => {
+    expect(await outline({
+      type: 'H5P.InteractiveBook',
+      params: { chapters: [{ library: 'H5P.Column', metadata: { title: 'Sources' }, params: { content: [{ content: { library: 'H5P.AdvancedText', params: { text: 'A river begins at a spring.' }, metadata: { title: 'Text' } } }] } }] }
+    })).toBe('  Chapter 1\n    Title: Sources\n      A river begins at a spring.')
+    expect((await buildPackage(withImage('in.png'), join(allowed, 'never.h5p'), { check: true, base: allowed })).outline).toBe('  Image: images/in.png\n  Alternative text: A river')
+  })
+
+  it('is outlineOf over a content and the libraries loaded for it, made only when a result\'s outline is read, and counts what a limit cuts off', async () => {
+    const result = await buildPackage(question, join(allowed, 'never.h5p'), { check: true })
+    expect(typeof Object.getOwnPropertyDescriptor(result, 'outline')?.get).toBe('function')
     const pack = await openPack()
     try {
       const libraries = await loadLibraries(pack, { type: 'H5P.MultiChoice', language: 'en', params: question.params })
-      expect(outlineOf(content, libraries)).toBe(built)
-      expect(outlineOf(content, libraries, { limit: 1 })).toBe('Capital of France?\n… 2 more lines')
+      expect(outlineOf(result.content, libraries)).toBe(result.outline)
+      expect(outlineOf(result.content, libraries, { limit: 1 })).toBe('Capital of France?\n… 2 more lines')
     } finally {
       await pack.close()
     }

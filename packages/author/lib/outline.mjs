@@ -6,12 +6,13 @@ import { decodeEntities, editorWidget, stripTags, takesMarkup } from './text.mjs
  * wrote, one line each, indented by the list it sits in, read through the libraries' semantics.
  * Only text a learner reads is written: a text field the editor draws as a text box, a textarea or
  * rich text, which is not an interface text (`isInterfaceText`) and holds more than its default,
- * which in loaded semantics is the content language's. Settings (selects, numbers, booleans,
- * colours, hidden fields) are left out, but for what says which answer is right: a ✓ before an
- * item whose `correct` is true or that a type takes as the right one, and the answer a `correct`
- * select names; a score range before its feedback. Sub-content gets its own library's semantics and
- * its title where an author gave one, which a book shows as a chapter's; media are named by kind
- * and path.
+ * which in loaded semantics is the content language's. Where a text breaks, a paragraph, a line, a
+ * list item, ` / ` keeps the parts apart. Settings (selects, numbers, booleans, colours, hidden
+ * fields) are left out, but for what says which answer is right: a ✓ before an item whose
+ * `correct` is true, and the answer a `correct` select names; and a score range before its
+ * feedback, in a list the editor draws as H5P's RangeList. Sub-content gets its own library's
+ * semantics and its title where an author gave one; media are named by kind and path. What a few
+ * types say only by position or by number is written out as `TYPES` says.
  */
 
 /** @param {unknown} value @returns {value is Record<string, any>} */
@@ -24,25 +25,57 @@ const PROSE = new Set(['text', 'textarea', 'html'])
 const UNLABELLED = new Set(['text', 'question'])
 
 /**
- * Lists whose first item is the right one, by type and by where the list sits in its parameters.
- * Each type's semantics say so in words alone: "Alternatives - first alternative is the correct
- * one" (Single Choice Set), "the first statement is correct" (Summary).
+ * What a few types say only by position or by number, written out. Paths are where a list or a
+ * field sits in the type's parameters, as `a.b[].c`.
+ * - `right`: lists whose first item is the right one, which each type's semantics say in words
+ *   alone: "Alternatives - first alternative is the correct one" (Single Choice Set), "the first
+ *   statement is correct" (Summary).
+ * - `items`: lists whose items get a numbered header, as their editors show them one at a time:
+ *   slides, chapters, questions, a scenario's content, which its links name by that number.
+ * - `times`: lists whose items start with the time the video shows them: an interaction's
+ *   `duration`, a bookmark's or an end screen's `time`.
+ * - `links`: a scenario's `nextContentId`, the index of the content a choice or a content leads
+ *   to, negative for the end; and `endScreenScore`, the score an end gives.
+ * - `labels`: a label for a field whose semantics give none.
+ * @type {Record<string, { right?: string[], items?: Record<string, string>, times?: Record<string, 'duration' | 'time'>, links?: boolean, labels?: Record<string, string> }>}
  */
-const FIRST_RIGHT = /** @type {Record<string, string>} */ ({
-  'H5P.SingleChoiceSet': 'choices[].answers',
-  'H5P.Summary': 'summaries[].summary'
-})
+const TYPES = {
+  'H5P.SingleChoiceSet': { right: ['choices[].answers'] },
+  'H5P.Summary': { right: ['summaries[].summary'] },
+  'H5P.QuestionSet': { items: { questions: 'Question' } },
+  'H5P.InteractiveBook': { items: { chapters: 'Chapter' } },
+  'H5P.CoursePresentation': { items: { 'presentation.slides': 'Slide' }, labels: { 'presentation.slides[].keywords[].main': 'Keyword' } },
+  'H5P.BranchingScenario': { items: { 'branchingScenario.content': 'Content', 'branchingScenario.endScreens': 'End screen' }, links: true },
+  'H5P.BranchingQuestion': { links: true },
+  'H5P.InteractiveVideo': {
+    times: { 'interactiveVideo.assets.interactions': 'duration', 'interactiveVideo.assets.bookmarks': 'time', 'interactiveVideo.assets.endscreens': 'time' }
+  }
+}
 
 /** The kinds of file field, as a line names them. */
 const MEDIA = /** @type {Record<string, string>} */ ({ image: 'Image', video: 'Video', audio: 'Audio', file: 'File' })
 
+/** Where rich text breaks: a line break, and the end of a paragraph, a heading, a list item or a cell. */
+const BREAK = /<\s*br\b[^<>]*>|<\/\s*(?:p|div|h[1-6]|li|pre|blockquote|tr|td|th|dt|dd|figcaption)\s*>/gi
+
+/** A break's mark while tags are taken out: a character of private use, which no space rule collapses. */
+const MARK = ''
+
 /**
- * Stored text as a learner reads it.
+ * Stored text as a learner reads it, its parts ` / ` apart.
  * @param {string} stored
  * @param {boolean} markup whether the field holds markup, whose tags are taken out first
  */
 function readable(stored, markup) {
-  return decodeEntities(markup ? stripTags(stored) : stored).replace(/\s+/g, ' ').trim()
+  const marked = markup ? stripTags(stored.replace(BREAK, MARK)) : stored.replace(/\r?\n/g, MARK)
+  return decodeEntities(marked).split(MARK).map((part) => part.replace(/\s+/g, ' ').trim()).filter(Boolean).join(' / ')
+}
+
+/** A time in a video, `m:ss`, with tenths where it has them. @param {number} seconds */
+function clock(seconds) {
+  const tenths = Math.round(seconds * 10)
+  const whole = Math.floor(tenths / 10)
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}${tenths % 10 ? `.${tenths % 10}` : ''}`
 }
 
 /**
@@ -60,7 +93,7 @@ export function outlineOf(content, { entries, main }, { limit = 400 } = {}) {
   /** @type {string[]} */
   const lines = []
   let more = 0
-  // A mark for the next line: ✓, or the score range of an overall feedback.
+  // A mark for the next line: ✓, a score range, or a time.
   let pending = ''
 
   /** @param {number} depth @param {string} text */
@@ -94,7 +127,21 @@ export function outlineOf(content, { entries, main }, { limit = 400 } = {}) {
    */
   const walkFields = (fields, params, depth, type, path, bare = false) => {
     if (!isObject(params)) return
-    for (const field of fields) walk(field, params[field.name], depth, type, path ? `${path}.${field.name}` : field.name, bare)
+    for (const field of fields) walk(field, params[field.name], depth, type, path ? `${path}.${field.name}` : field.name, bare, params)
+  }
+
+  /**
+   * The mark a list's item starts with: ✓ for the right one, or the time a video shows it.
+   * @param {string} type @param {string} path the list's @param {unknown} item @param {number} index
+   */
+  const markOf = (type, path, item, index) => {
+    const rules = TYPES[type]
+    if (index === 0 && rules?.right?.includes(path)) return '✓ '
+    const time = rules?.times?.[path]
+    if (!time || !isObject(item)) return ''
+    if (time === 'time') return typeof item.time === 'number' ? `${clock(item.time)} ` : ''
+    const { from, to } = isObject(item.duration) ? item.duration : {}
+    return typeof from === 'number' && typeof to === 'number' ? `${clock(from)}–${clock(to)} ` : ''
   }
 
   /**
@@ -104,8 +151,9 @@ export function outlineOf(content, { entries, main }, { limit = 400 } = {}) {
    * @param {string} type
    * @param {string} path
    * @param {boolean} bare whether its text is written without a label: a list's item, a score range's feedback
+   * @param {Record<string, unknown>} [holder] the parameters the value is one of
    */
-  const walk = (field, value, depth, type, path, bare) => {
+  const walk = (field, value, depth, type, path, bare, holder) => {
     if (value === undefined || value === null || isInterfaceText(field)) return
     switch (field.type) {
       case 'text': {
@@ -113,7 +161,8 @@ export function outlineOf(content, { entries, main }, { limit = 400 } = {}) {
         const markup = takesMarkup(field)
         const text = readable(value, markup)
         if (!text || (typeof field.default === 'string' && text === readable(field.default, markup))) return
-        emit(depth, bare || UNLABELLED.has(field.name) || !field.label ? text : `${field.label}: ${text}`)
+        const label = TYPES[type]?.labels?.[path] ?? field.label
+        emit(depth, bare || UNLABELLED.has(field.name) || !label ? text : `${label}: ${text}`)
         return
       }
       case 'select':
@@ -122,30 +171,48 @@ export function outlineOf(content, { entries, main }, { limit = 400 } = {}) {
           emit(depth, `Correct answer: ${option?.label ?? value}`)
         }
         return
+      case 'number':
+        if (!TYPES[type]?.links || typeof value !== 'number') return
+        // Where a scenario goes is its shape, default or not; a score only where an author gave one.
+        // A question leads where its alternatives do, and its content's own link is not read.
+        if (field.name === 'nextContentId') {
+          const library = isObject(holder?.type) && typeof holder.type.library === 'string' ? holder.type.library.trim().split(/\s+/)[0] : ''
+          if (library !== 'H5P.BranchingQuestion') emit(depth, value < 0 ? 'Next: the end' : `Next: Content ${value + 1}`)
+        }
+        else if (field.name === 'endScreenScore' && value !== field.default) emit(depth, `Score: ${value}`)
+        return
       case 'group': {
         const children = field.fields ?? []
         // A group of one field is stored as that field's value, as the editor stores it.
-        if (children.length === 1 && !field.isSubContent) return walk(children[0], value, depth, type, path, bare)
+        if (children.length === 1 && !field.isSubContent) return walk(children[0], value, depth, type, path, bare, holder)
         if (!isObject(value)) return
-        let mark = ''
-        const range = ['from', 'to'].every((name) => children.some((/** @type {any} */ child) => child.name === name && child.type === 'number')) &&
-          typeof value.from === 'number' && typeof value.to === 'number'
-        if (children.some((/** @type {any} */ child) => child.name === 'correct' && child.type === 'boolean') && value.correct === true) mark = '✓ '
-        else if (range) mark = `${value.from}–${value.to}%: `
-        if (mark) pending = mark
-        // A list's item that is a group writes its fields with their labels: only a score range's go bare.
-        walkFields(children, value, depth, type, path, range)
+        const marked = children.some((/** @type {any} */ child) => child.name === 'correct' && child.type === 'boolean') && value.correct === true
+        if (marked) pending = '✓ '
+        // A list's item that is a group writes its fields with their labels.
+        walkFields(children, value, depth, type, path)
         // A mark the group did not use is not passed on to the next line.
-        if (mark) pending = ''
+        if (marked) pending = ''
         return
       }
       case 'list': {
         if (!Array.isArray(value) || !field.field) return
-        const firstRight = FIRST_RIGHT[type] === path
-        value.forEach((each, index) => {
-          if (firstRight && index === 0) pending = '✓ '
-          walk(field.field, each, depth + 1, type, `${path}[]`, true)
-          if (firstRight && index === 0) pending = ''
+        const header = TYPES[type]?.items?.[path]
+        const ranges = (field.widgets ?? []).some((/** @type {any} */ widget) => widget?.name === 'RangeList') && field.field.type === 'group'
+        value.forEach((item, index) => {
+          let at = depth + 1
+          if (header) {
+            pending = ''
+            emit(at, `${header} ${index + 1}`)
+            at += 1
+          }
+          if (ranges && isObject(item) && typeof item.from === 'number' && typeof item.to === 'number') {
+            pending = `${item.from}–${item.to}%: `
+            walkFields(field.field.fields ?? [], item, at, type, `${path}[]`, true)
+          } else {
+            pending = markOf(type, path, item, index)
+            walk(field.field, item, at, type, `${path}[]`, true)
+          }
+          pending = ''
         })
         return
       }

@@ -33,8 +33,9 @@ import { SourceError } from './source-error.mjs'
  * @typedef {{ libraries?: string, base?: string, fetch?: typeof fetch, within?: string[], check?: boolean }} BuildOptions
  *   `libraries`, a library pack's parts folder in place of the pinned pack; `base`, the folder a
  *   source's file paths are read from; `fetch`, for media named by web address; `within`, the
- *   folders the output and every file a source names must be inside, on their real paths; `check`,
- *   to build and write nothing: the result's `output` is then empty
+ *   folders the output and every local file a source names must be inside, on their real paths;
+ *   `check`, to build and write nothing: the output is not looked at, and the result's `output` is
+ *   empty
  * @typedef {{ output: string, type: string, parts: string[], size: number }} BundleResult
  *   `type`, the content type with the version bundled, `H5P.QuestionSet 1.21`; `parts`, the
  *   folders of the parts it holds; `size`, the zip's in bytes
@@ -111,13 +112,13 @@ export function nodeMedia({ base, temporary, within }) {
     name: (source) => basename(resolve(base, source)),
     async local(source) {
       const from = resolve(base, source)
+      // Judged before the file is looked for, so a path outside is answered the same whether
+      // or not something is there, and a confined build names no path but the one written.
+      if (within && !(await inside(from, within))) return { missing: 'is outside the folders this build may read' }
       try {
-        if ((await stat(from)).isFile()) {
-          if (within && !(await inside(from, within))) return { missing: `${from} is outside the folders this build may read` }
-          return { file: from }
-        }
+        if ((await stat(from)).isFile()) return { file: from }
       } catch {}
-      return { missing: `no such file beside the source (${from})` }
+      return { missing: within ? 'no such file in the folders this build may read' : `no such file beside the source (${from})` }
     },
     async keep(body, extension) {
       downloads += 1
@@ -172,17 +173,25 @@ export async function inside(path, folders) {
  * Every network that is not the public internet, as `BlockList` reads it, which matches an IPv4
  * address however it is written: `::ffff:127.0.0.1` and `::ffff:7f00:1` are 127.0.0.1, and a URL
  * writes the first as the second. IPv4: this network, private, carrier-grade NAT, loopback,
- * link-local, IETF protocol assignments, benchmarking, multicast and reserved. IPv6: the
- * unspecified and loopback addresses with the IPv4-compatible ones (`::/96`), unique-local,
- * link-local, site-local and multicast. NAT64's prefix is left open: on an IPv6-only network it
- * carries public IPv4 addresses, and RFC 6052 bars it from carrying any other.
+ * link-local, IETF protocol assignments, benchmarking, multicast and reserved; and each of those
+ * as IPv6 carries it to an IPv4 network, behind NAT64's well-known prefix (`64:ff9b::/96`, RFC
+ * 6052), which a NAT64 gateway translates, and in 6to4 (`2002::/16`). IPv6: the unspecified and
+ * loopback addresses with the IPv4-compatible ones (`::/96`), NAT64's local-use prefix
+ * (`64:ff9b:1::/48`, RFC 8215), unique-local, link-local, site-local and multicast.
  */
 const LOCAL_NETWORKS = new BlockList()
 for (const [address, prefix] of /** @type {[string, number][]} */ ([
   ['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16], ['172.16.0.0', 12],
   ['192.0.0.0', 24], ['192.168.0.0', 16], ['198.18.0.0', 15], ['224.0.0.0', 3]
-])) LOCAL_NETWORKS.addSubnet(address, prefix, 'ipv4')
-for (const [address, prefix] of /** @type {[string, number][]} */ ([['::', 96], ['fc00::', 7], ['fe80::', 10], ['fec0::', 10], ['ff00::', 8]])) {
+])) {
+  LOCAL_NETWORKS.addSubnet(address, prefix, 'ipv4')
+  const [a, b, c, d] = address.split('.').map(Number)
+  const high = ((a << 8) | b).toString(16)
+  const low = ((c << 8) | d).toString(16)
+  LOCAL_NETWORKS.addSubnet(`64:ff9b::${high}:${low}`, 96 + prefix, 'ipv6')
+  LOCAL_NETWORKS.addSubnet(`2002:${high}:${low}::`, 16 + prefix, 'ipv6')
+}
+for (const [address, prefix] of /** @type {[string, number][]} */ ([['::', 96], ['64:ff9b:1::', 48], ['fc00::', 7], ['fe80::', 10], ['fec0::', 10], ['ff00::', 8]])) {
   LOCAL_NETWORKS.addSubnet(address, prefix, 'ipv6')
 }
 
@@ -201,10 +210,33 @@ export function isPrivateAddress(address) {
  * @typedef {(host: string, options: { all: true }) => Promise<{ address: string }[]>} Lookup
  */
 
+/** What a request carries for its own site, which a redirect to another does not, as `fetch` drops them. */
+const CREDENTIALS = ['authorization', 'proxy-authorization', 'cookie']
+
+/**
+ * A promise that settles as the one given does, or rejects with the signal's reason once it
+ * aborts: a lookup takes no signal of its own, so a resolver that hangs would hold a build past
+ * its download's idle limit.
+ * @template T
+ * @param {Promise<T>} promise
+ * @param {AbortSignal | null | undefined} signal
+ * @returns {Promise<T>}
+ */
+function abortable(promise, signal) {
+  if (!signal) return promise
+  if (signal.aborted) return Promise.reject(signal.reason)
+  return new Promise((resolvePromise, reject) => {
+    const abort = () => reject(signal.reason)
+    signal.addEventListener('abort', abort, { once: true })
+    promise.then(resolvePromise, reject).finally(() => signal.removeEventListener('abort', abort))
+  })
+}
+
 /**
  * A `fetch` that refuses an address on a local network (`isPrivateAddress`), on every redirect it
  * follows, over the resolver and `fetch` given: the tests' seam. `publicFetch` is this over the
- * system's.
+ * system's. As `fetch` does, a redirect to another origin drops what the request carried for its
+ * own: `Authorization`, `Proxy-Authorization` and `Cookie`.
  * @param {{ lookup?: Lookup, fetch?: Fetch }} [over]
  * @returns {Fetch}
  * @internal
@@ -216,11 +248,13 @@ export function guardedFetch({ lookup: resolveHost = lookup, fetch: send = (inpu
     const method = (init.method ?? request?.method ?? 'GET').toUpperCase()
     if (method !== 'GET' && method !== 'HEAD') throw new TypeError(`fetches media, by GET or HEAD, not by ${method}`)
     const mode = init.redirect ?? request?.redirect ?? 'follow'
-    const options = { ...init, method, headers: init.headers ?? request?.headers, signal: init.signal ?? request?.signal, redirect: /** @type {const} */ ('manual') }
+    const headers = new Headers(init.headers ?? request?.headers)
+    const signal = init.signal ?? request?.signal
+    const options = { ...init, method, headers, signal, redirect: /** @type {const} */ ('manual') }
     for (let hops = 0; hops <= 10; hops++) {
       if (!/^https?:$/.test(url.protocol)) throw new TypeError(`${url.protocol} addresses are not fetched`)
       const host = url.hostname.replace(/^\[|\]$/g, '')
-      const addresses = isIP(host) ? [{ address: host }] : await resolveHost(host, { all: true })
+      const addresses = isIP(host) ? [{ address: host }] : await abortable(resolveHost(host, { all: true }), signal)
       if (!addresses.length || addresses.some(({ address }) => isPrivateAddress(address))) throw new TypeError(`${url.hostname} is on a local network, which a build here does not fetch from`)
       const response = await send(url, options)
       const next = response.headers.get('location')
@@ -230,7 +264,9 @@ export function guardedFetch({ lookup: resolveHost = lookup, fetch: send = (inpu
       }
       await response.body?.cancel()
       if (mode === 'error') throw new TypeError(`${url.href} redirects, and redirects were refused`)
-      url = new URL(next, url)
+      const target = new URL(next, url)
+      if (target.origin !== url.origin) for (const name of CREDENTIALS) headers.delete(name)
+      url = target
     }
     throw new TypeError('more than 10 redirects')
   }
@@ -266,10 +302,13 @@ function exists(output, what = 'a build') {
 export async function buildPackage(input, output, options = {}) {
   output = resolve(output)
   const { within, check = false } = options
-  if (within && !(await inside(output, within))) throw new Error(`${output} is outside the folders this build may write in`)
-  // Before any work, and again as the package lands, for a file that appears in between.
-  if (!check && await lstat(output).then(() => true, () => false)) throw exists(output)
-  if (!(await stat(dirname(output)).catch(() => null))?.isDirectory()) throw new Error(`${dirname(output)} is not a folder to write the package in`)
+  // A check writes nothing, so where the package would go is not looked at.
+  if (!check) {
+    if (within && !(await inside(output, within))) throw new Error(`${output} is outside the folders this build may write in`)
+    // Before any work, and again as the package lands, for a file that appears in between.
+    if (await lstat(output).then(() => true, () => false)) throw exists(output)
+    if (!(await stat(dirname(output)).catch(() => null))?.isDirectory()) throw new Error(`${dirname(output)} is not a folder to write the package in`)
+  }
   const pack = await openPack(options.libraries)
   let temporary
   try {
@@ -290,7 +329,7 @@ export async function buildPackage(input, output, options = {}) {
         translations: built.translations,
         notes: built.notes,
         media: media.files.map((item) => item.name),
-        outline: built.outline
+        get outline() { return built.outline }
       }
     }
     const staged = join(temporary, 'package.h5p')
@@ -327,7 +366,7 @@ export async function buildPackage(input, output, options = {}) {
       translations: built.translations,
       notes: built.notes,
       media: media.files.map((item) => item.name),
-      outline: built.outline
+      get outline() { return built.outline }
     }
   } finally {
     await pack.close()

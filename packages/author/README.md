@@ -184,10 +184,12 @@ const { output, manifest, content, libraries, install, translations, notes, medi
 and throws a `SourceError` whose `problems` are `{ path, message }`; with `check` it builds and
 writes nothing, and does not look at the output. For a build run on what a model wrote: `within`
 names the folders the output and every local file the source names must be inside, on their real
-paths. It does not cover a file named by web address, which is downloaded with the `fetch` given,
-the global one by default: pass `fetch: publicFetch`, a `fetch` that refuses addresses on a local
-network, redirects included. A result's `outline` is the content as plain lines for a review: what
-the author wrote, the right answers marked, interface texts and settings left out;
+paths, and its problems then name no path but the one the source wrote. It does not cover a file
+named by web address, which is downloaded with the `fetch` given, the global one by default: pass
+`fetch: publicFetch`, a `fetch` that refuses an address on a local network however it is written,
+redirects included. A result's `outline` is the content as plain lines for a review, made when it
+is first read: what the author wrote, the right answers marked, slides, chapters and questions
+numbered, a scenario's links and a video's times written, interface texts and settings left out;
 `outlineOf(content, libraries)` makes one from a content and what `loadLibraries` loaded for it.
 `libraries` are the folders the package
 plays with, `install` those carried for an H5P site's upload check. `missingForInstall(libraries)`

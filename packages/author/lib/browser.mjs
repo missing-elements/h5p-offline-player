@@ -179,7 +179,7 @@ export async function buildPackage(input, options) {
       translations: built.translations,
       notes: built.notes,
       media: media.files.map((item) => item.name),
-      outline: built.outline
+      get outline() { return built.outline }
     }
   } finally {
     if (pack !== libraries) await pack.close()

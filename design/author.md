@@ -115,23 +115,35 @@ to 3,000. Thirty things the code does not say by itself:
   server of #219). The command line reads any path a source names and fetches any address, which is
   right for a person's own command. `buildPackage` takes `within`, the folders the output and every
   local file a source names must be inside, judged on real paths, so `..` and a link out are
-  refused; and `check`, to build and write nothing (`build --check`), which runs the same check as
-  a build, `checkContent` being `composePackage`'s. `publicFetch` refuses every network that is not
-  the public internet, on every hop, through `net.BlockList`, which matches an IPv4 address however
-  IPv6 writes it: the first cut checked dotted text, and a URL writes `[::ffff:127.0.0.1]` as
-  `[::ffff:7f00:1]`, which reached a server on loopback (found in the PR's review). It resolves a
-  name and then asks, so it guards against a model's mistake or a planted address, not a hostile
-  network; a build uses it only where it is passed as `fetch`. Every result has `outline`, the
-  content as plain lines for a review (`outlineOf`), read through the libraries' semantics: text
-  fields a learner reads that hold more than their default, which in loaded semantics is the content
-  language's, so interface texts drop out in any language; settings left out; a ✓ on a `correct`
-  item and on the first of a list a type takes as right (Single Choice Set, Summary, whose semantics
-  say so in words alone); a `correct` select's answer. The first cut read keys, not semantics, and
-  dropped every number ("1969" as an answer), hid True/False's answer, and gave a Question Set 29
-  lines of which 23 were interface texts. The tags a text holds are taken out by `stripTags`, now
-  one function in `text.mjs` for the generator, the layouts, `schema` and the outline: each tag a
-  space, never nothing, which is what CodeQL asks of a tag remover (alert #46 on the first cut). None
-  of this changes a build run without the options.
+  refused. It is judged before the file is looked for, and a confined build's problems name no path
+  but the one written: the first cut said "outside" of a file that was there and "no such file" of
+  one that was not, so a model could map the disk around the folders, and it named every absolute
+  path, the user's name with it. `check` builds and writes nothing (`build --check`), running the
+  same check as a build, `checkContent` being `composePackage`'s, and looks at no output.
+  `publicFetch`, passed as `fetch`, refuses every network that is not the public internet on every
+  hop, through `net.BlockList`, which matches an IPv4 address however IPv6 writes it: the first cut
+  checked dotted text, and a URL writes `[::ffff:127.0.0.1]` as `[::ffff:7f00:1]`, which reached a
+  server on loopback. The local IPv4 ranges are refused behind NAT64's prefix and in 6to4 too, which
+  a gateway carries to an IPv4 network. A redirect to another origin drops `Authorization`,
+  `Proxy-Authorization` and `Cookie`, as `fetch` does, and the signal stops a lookup, which takes
+  none of its own. It resolves a name and then asks, so it guards against a model's mistake or a
+  planted address, not a hostile network.
+- **The outline is the content for a review, read through the semantics** (2026-11-17, #220). Every
+  result has `outline` (`outlineOf`), made when it is first read, so a build that never reads it
+  never runs it: text fields a learner reads that hold more than their default, which in loaded
+  semantics is the content language's, so interface texts drop out in any language; a rich text's
+  breaks kept as ` / `; settings left out; a ✓ on a `correct` item, a `correct` select's answer, a
+  score range before its feedback in a RangeList. What a few types say only by position or number
+  is one table, `TYPES`: Single Choice Set's and Summary's first item is the right one, as their
+  semantics say in words alone; slides, chapters, questions and a scenario's content are numbered;
+  a scenario's links name those numbers, a question's own link left out, since its alternatives
+  lead; an Interactive Video's interactions and bookmarks start with their times. The first cut read
+  keys, not semantics: it dropped every number ("1969" as an answer), hid True/False's answer, gave
+  a Question Set 29 lines of which 23 were interface texts, ran a heading into its paragraph, and
+  showed no slide, link or time. The tags a text holds are taken out by `stripTags`, one function in
+  `text.mjs` for the generator, the layouts, `schema` and the outline: each tag a space, never
+  nothing, which is what CodeQL asks of a tag remover (alert #46 on the first cut). None of this
+  changes a build run without the options.
 - **The pack is pinned.** The dependency is `workspace:*`, published as the exact version
   packages/libraries has, so a release builds with the libraries it was tested with and one command
   needs no project set up; `--libraries` names another `parts/` folder. Each part is checked

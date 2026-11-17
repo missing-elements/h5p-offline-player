@@ -267,7 +267,7 @@ async function closure(pack, main, content) {
  *   first among the content's: all of them in one round (#174)
  * @returns {Promise<{ manifest: Record<string, unknown>, content: Record<string, unknown>, selected: Map<string, import('./pack.mjs').PartLibrary>, install: Map<string, import('./pack.mjs').PartLibrary>, translations: TranslationReport[], notes: Problem[], outline: string }>}
  *   `selected`, the libraries the package plays with; `install`, those an H5P site's upload check wants with them; `outline`, the
- *   content as text for a review (`outlineOf`)
+ *   content as text for a review (`outlineOf`), made when it is first read
  * @internal
  */
 export async function composePackage(source, pack, media, said = []) {
@@ -363,7 +363,14 @@ export async function composePackage(source, pack, media, said = []) {
       machineName: part.library.machineName, majorVersion: String(part.library.majorVersion), minorVersion: String(part.library.minorVersion)
     }))
   }
-  return { manifest, content, selected, install, translations, notes, outline: outlineOf(content, { entries, main: mainLibrary }) }
+  /** @type {string | undefined} */
+  let outline
+  return {
+    manifest, content, selected, install, translations, notes,
+    // Made when it is first read: it is for a review, which only some callers make, and a build
+    // that never reads it never runs it.
+    get outline() { return (outline ??= outlineOf(content, { entries, main: mainLibrary })) }
+  }
 }
 
 /**
