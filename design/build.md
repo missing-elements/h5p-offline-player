@@ -149,7 +149,9 @@ went; `typecheck` and `prepack` both run it. Three things learned writing them, 
 
 `pnpm publish` in `packages/player` runs `prepublishOnly` — typecheck, the unit suite and the
 build — so a broken tree cannot ship; the browser suite is left out because it needs an installed
-Chromium. Then `prepack` copies the root README and LICENSE into the package, which is where npm
+Chromium. Firefox, WebKit and the slow browser files run only in CI's weekly run and a run by hand,
+so before publishing the player, run CI by hand on main (`gh workflow run ci.yml`) and wait for
+green. Then `prepack` copies the root README and LICENSE into the package, which is where npm
 takes them from. Under npm this repository set `ignore-scripts=true` to get past
 h5p-standalone's `only-allow yarn` guard, and that also meant `npm publish` never ran
 `prepublishOnly` at all; pnpm 10 blocks dependency scripts by itself, so the setting is gone.

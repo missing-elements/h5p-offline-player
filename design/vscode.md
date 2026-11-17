@@ -167,13 +167,14 @@ and committed, as are the app's install screenshots (`pnpm demo:screenshots`), w
 
 Tests. `tests/*.test.ts` run in Node with the rest of `pnpm test`: the server against the built
 player, runtime and pack, with its run of ports and Restricted Mode, and the webview's and the
-page's scripts run against stand-ins. `tests/vscode/run.mjs` downloads VS Code into
-`.vscode-test/` and runs `suite.cjs` in its extension host. The suite opens the demo's packages and
-waits on the extension's `onDidChangeState`, the one thing `activate` exports: the quiz, the
-Interactive Video, a content-only export played from the pack, Reload, untrusted by setting and
-live, a package on a file system of the suite's own, copied again when it changes and kept when it
-cannot be read, and a file written again under a name with brackets and braces. CI runs it on Linux under `xvfb-run`, in the `vscode` job, which
-also uploads the `.vsix`. Started from a terminal inside VS Code, the downloaded editor ran as plain
-Node, because `ELECTRON_RUN_AS_NODE` is inherited; `run.mjs` deletes it. Not covered: Restricted
-Mode in a real editor (the suite opens a trusted folder; the server's side of it is a Node test),
-Open in Browser, a real remote, and Windows.
+page's scripts run against stand-ins. `tests/vscode/run.mjs` downloads VS Code into `.vscode-test/`
+and runs `suite.cjs` in its extension host. The suite opens the demo's packages and waits on the
+extension's `onDidChangeState`, the one thing `activate` exports: the quiz, the Interactive Video, a
+content-only export played from the pack, Reload, untrusted by setting and live, a package on a file
+system of the suite's own, copied again when it changes and kept when it cannot be read, and a file
+written again under a name with brackets and braces. CI runs it on Linux under `xvfb-run`, in the
+`vscode` job, weekly, by hand and when `packages/vscode` changes, which also uploads the `.vsix`.
+Started from a terminal inside VS Code, the downloaded editor ran as plain Node, because
+`ELECTRON_RUN_AS_NODE` is inherited; `run.mjs` deletes it. Not covered: Restricted Mode in a real
+editor (the suite opens a trusted folder; the server's side of it is a Node test), Open in Browser,
+a real remote, and Windows.

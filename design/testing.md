@@ -4,27 +4,30 @@ How the repository is tested: the engines, CI's browsers, the owner's rule on wh
 
 ## Engines, CI and what is tested
 
-**CI tests what a change reaches.** A pull request's run tests the packages it changes and those
-that depend on them, as pnpm's `...[<commit>]` filter reads the change. A change under `skills/`
-adds the author package and `apps/skills`. Any other file outside the packages (the lockfile, a
-workflow, the root's `package.json`) tests everything, unless it is one of the docs below. Every
-package that has a `typecheck` script runs it whatever the change, since each package's check
-writes the types the next one reads. A push to main tests what it changed the same way. The
-weekly run and a run by hand test everything, and a change to `design/`, `docs/`, a root `.md` or
-`LICENSE` alone starts no run. The `scope` job in `ci.yml` decides.
+**CI tests what a change reaches, in Chromium.** A pull request or a push to main tests the
+packages it changes and those that depend on them, as pnpm's `...[<commit>]` filter reads the
+change. A change under `skills/` adds the author package and `apps/skills`. Any other file outside
+the packages (the lockfile, a workflow, the root's `package.json`) tests every package, unless it
+is one of the docs below. The player, the verifier, the skills and the embed package take most of
+the time, so each tests in a job of its own, side by side, and the rest in one more. Every package
+that has a `typecheck` script runs it whatever the change, since each package's check writes the
+types the next one reads. A change to `design/`, `docs/`, a root `.md` or `LICENSE` alone starts
+no run. The `scope` job in `ci.yml` decides.
 
-**A pull request's run leaves out the player's browser files that wait out real time.** These are
-`stalling-host`, `worker-update` and `large-media`, named in the player's `vite.config.ts` and
-dropped under `H5P_TEST_SKIP_SLOW`: about two minutes of test time in each engine. Main's run after
-the merge has them, so wait for it before publishing the player.
+**The costly checks run weekly and by hand.** These are Firefox and WebKit, the player's browser
+files that wait out real time, the content-type sweep, and the VS Code extension in a real editor,
+which also runs when `packages/vscode` changes. The slow files are `stalling-host`,
+`worker-update` and `large-media`, named in the player's `vite.config.ts` and dropped under
+`H5P_TEST_SKIP_SLOW`. A bug that shows only there reaches main and is found on Monday, so before
+publishing the player, run CI by hand on main (`gh workflow run ci.yml`) and publish once it is
+green.
 
 The `browser` project runs in Chromium unless `H5P_TEST_BROWSER` names `firefox` or `webkit`.
-`pnpm test:engine` runs it, then the app's tests. The `engines` job runs in those two engines when
-the player, the runtime or the demo changed: the app's tests every time, and the player's suite only
-when the player or the runtime changed. One engine per run, never a list: the dev server's switches
-(a host's outage, the worker version it serves) are shared, and two engines running one file at once
-flipped them under each other. `browser-emulated` stays on Chromium, since CDP is Chromium's.
-Playwright's WebKit is WebKit's desktop port, not iOS Safari.
+`pnpm test:engine` runs it, then the app's tests, which is what the `engines` job does in those two.
+One engine per run, never a list: the dev server's switches (a host's outage, the worker version it
+serves) are shared, and two engines running one file at once flipped them under each other.
+`browser-emulated` stays on Chromium, since CDP is Chromium's. Playwright's WebKit is WebKit's
+desktop port, not iOS Safari.
 
 CI installs Chromium and Firefox without their system packages. The runner image has what they
 link against, and `--with-deps` adds fonts, Xvfb and codecs that a headless suite does not use,
@@ -178,10 +181,10 @@ three minutes locally, five on CI.
   the same day. The measurements it made once are under *`finished` is the content's result*.
 - **It plays in Chrome where it can**: Playwright's Chromium cannot decode the H.264 clip. One
   browser context, so the pack is downloaded once; four plays at a time.
-- **It runs in CI** (`.github/workflows/content-types.yml`) on a change to the player's source,
-  the runtime, the pack or the sweep, and every Monday, with the report as the run's summary and the
-  packages and screenshots as an artifact; and the pack's weekly refresh runs it against the new
-  pack and puts the report in its pull request, which CI does not start on.
+- **It runs in CI** (`.github/workflows/content-types.yml`) every Monday and by hand, with the
+  report as the run's summary and the packages and screenshots as an artifact; and the pack's
+  weekly refresh runs it against the new pack and puts the report in its pull request, which CI
+  does not start on.
 
 Not covered: any content a type can hold beyond the one generated or written, every engine but
 Chromium, and whether a type's result is right, which the report shows and nothing checks.

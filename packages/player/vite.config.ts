@@ -12,8 +12,8 @@ import { devServiceWorkerPlugin, jobsWorkerPlugin, noRangeFixturesPlugin } from 
 
 /**
  * The browser files that wait out real time: a host silent past the stall bound, a worker
- * update's deadlines, 20 MB archives. `H5P_TEST_SKIP_SLOW` leaves them out, as a pull request's
- * run does; a run on main has them.
+ * update's deadlines, 20 MB archives. `H5P_TEST_SKIP_SLOW` leaves them out, as CI does but for
+ * its weekly run and a run by hand.
  */
 const SLOW = ['tests/browser/stalling-host.test.ts', 'tests/browser/worker-update.test.ts', 'tests/browser/large-media.test.ts']
 

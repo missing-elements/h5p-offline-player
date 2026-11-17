@@ -1,9 +1,10 @@
 name: CI
 
-# A pull request tests what it changes: the packages it touches and those that depend on them,
-# Firefox and WebKit only when the player, the runtime or the demo changed, and without the
-# player's browser files that wait out real time. A push to main tests what it changed with every file; the
-# weekly run and a run by hand test everything. A change to the docs alone starts no run.
+# Every pull request and push to main tests, in Chromium, the packages it changes and those that
+# depend on them, the heaviest each in a job of its own so they run side by side. The weekly run,
+# and a run by hand before a release, test everything: every package, the player's slow browser
+# files, Firefox and WebKit, and the VS Code extension in a real editor. A change to the docs alone
+# starts no run.
 
 on:
   push:
@@ -30,18 +31,23 @@ on:
 permissions:
   contents: read
 
+env:
+  # The player's browser files that wait out real time run weekly and by hand only
+  # (packages/player/vite.config.ts).
+  H5P_TEST_SKIP_SLOW: ${{ (github.event_name != 'schedule' && github.event_name != 'workflow_dispatch') && '1' || '' }}
+
 jobs:
-  # What the run tests. `select` picks the packages for pnpm: `-r` for all of them, or by name the
-  # ones the change touches and those that depend on them, as pnpm's `...[<commit>]` reads it. A
-  # file outside packages/, apps/ and skills/ that is not docs (the lockfile, a workflow, the
-  # root's package.json) tests everything: what it reaches cannot be read off its path.
+  # What the run tests, as lanes: the player, the verifier, the skills and the embed package, most
+  # of the time, each in a job of its own, and the rest in one more. A pull request or a push picks
+  # the packages it changes and those that depend on them, as pnpm's `...[<commit>]` reads the
+  # change. A file outside packages/, apps/ and skills/ that is not docs (the lockfile, a workflow,
+  # the root's package.json) picks every package: what it reaches cannot be read off its path. The
+  # weekly run and a run by hand pick every package.
   scope:
     runs-on: ubuntu-latest
     outputs:
-      select: ${{ steps.scope.outputs.select }}
+      lanes: ${{ steps.scope.outputs.lanes }}
       demo: ${{ steps.scope.outputs.demo }}
-      engines: ${{ steps.scope.outputs.engines }}
-      player: ${{ steps.scope.outputs.player }}
       vscode: ${{ steps.scope.outputs.vscode }}
     steps:
       - uses: actions/checkout@v5
@@ -55,43 +61,48 @@ jobs:
           EVENT: ${{ github.event_name }}
           BEFORE: ${{ github.event.before }}
         run: |
-          everything() {
-            printf '%s\n' select=-r demo=true engines=true player=true vscode=true | tee -a "$GITHUB_OUTPUT"
-            exit 0
-          }
+          all=false; weekly=false; base=; changed=
           case "$EVENT" in
             # A pull request's run checks out the merge commit, whose first parent is main.
             pull_request) base=HEAD^1 ;;
             # Where main was before the push; a new or forced branch may have nothing to compare.
-            push) git fetch -q --depth=1 origin "$BEFORE" || everything; base=$BEFORE ;;
-            *) everything ;;
+            push) if git fetch -q --depth=1 origin "$BEFORE"; then base=$BEFORE; else all=true; fi ;;
+            *) all=true; weekly=true ;;
           esac
-          changed=$(git diff --name-only "$base" HEAD)
-          if grep -qvE '^(packages|apps|skills|design|docs)/|^[^/]+\.md$|^LICENSE$' <<< "$changed"; then everything; fi
-          # pnpm counts a file outside the packages as the root's, whose test script tests them all.
-          picked=$(pnpm --filter "...[$base]" ls --depth -1 --json | jq -r --arg root "$PWD" '.[] | select(.path != $root) | .name')
-          # The skills are tested from apps/skills, and h5p-author's ships in the author package.
-          if grep -q '^skills/' <<< "$changed"; then
-            picked=$(printf '%s\n' $picked @missing-elements/h5p-author @missing-elements/h5p-skills | sort -u)
+          if [ -n "$base" ]; then
+            changed=$(git diff --name-only "$base" HEAD)
+            if grep -qvE '^(packages|apps|skills|design|docs)/|^[^/]+\.md$|^LICENSE$' <<< "$changed"; then all=true; fi
           fi
-          has() { grep -qx "$1" <<< "$picked" && echo true || echo false; }
-          select=
-          for name in $picked; do select="$select --filter $name"; done
-          # Firefox and WebKit run the player's browser suite when the player changed, and the
-          # installable app's tests when either did.
-          engines=$(has @missing-elements/h5p-offline-player)
-          if grep -q '^apps/demo/' <<< "$changed"; then engines=true; fi
-          printf '%s\n' "select=$select" "demo=$(has @missing-elements/h5p-demo)" "engines=$engines" \
-            "player=$(has @missing-elements/h5p-offline-player)" "vscode=$(has h5p-preview)" | tee -a "$GITHUB_OUTPUT"
+          # pnpm counts a file outside the packages as the root's, whose test script tests them all.
+          names() { pnpm "$@" ls --depth -1 --json | jq -r --arg root "$PWD" '.[] | select(.path != $root) | .name'; }
+          if [ "$all" = true ]; then
+            picked=$(names -r)
+          else
+            picked=$(names --filter "...[$base]")
+            # The skills are tested from apps/skills, and h5p-author's ships in the author package.
+            if grep -q '^skills/' <<< "$changed"; then
+              picked=$(printf '%s\n' $picked @missing-elements/h5p-author @missing-elements/h5p-skills)
+            fi
+          fi
+          lanes=$(printf '%s\n' $picked | jq -Rsc '
+            (split("\n") | map(select(. != "")) | unique) as $picked
+            | ["@missing-elements/h5p-offline-player", "@missing-elements/h5p-verify",
+               "@missing-elements/h5p-skills", "@missing-elements/h5p-embed"] as $heavy
+            | [$heavy[] | select(IN($picked[])) | {name: sub("@missing-elements/h5p-(offline-)?"; ""), select: "--filter \(.)"}]
+              + ([$picked[] | select(IN($heavy[]) | not)]
+                 | if length > 0 then [{name: "other", select: (map("--filter \(.)") | join(" "))}] else [] end)')
+          demo=false
+          if grep -qx @missing-elements/h5p-demo <<< "$picked"; then demo=true; fi
+          vscode=$weekly
+          if grep -q '^packages/vscode/' <<< "$changed"; then vscode=true; fi
+          printf '%s\n' "lanes=$lanes" "demo=$demo" "vscode=$vscode" | tee -a "$GITHUB_OUTPUT"
 
-  test:
+  # What the packages share: the demo built as Vercel builds it, every type check, the player's
+  # build.
+  checks:
     needs: scope
-    if: needs.scope.outputs.select != ''
+    if: needs.scope.outputs.lanes != '[]'
     runs-on: ubuntu-latest
-    env:
-      SELECT: ${{ needs.scope.outputs.select }}
-      # The player's slow browser files stay out of a pull request's run (vite.config.ts).
-      H5P_TEST_SKIP_SLOW: ${{ github.event_name == 'pull_request' && '1' || '' }}
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v6
@@ -104,35 +115,54 @@ jobs:
       # build`, it found the player's dist/ there, and passed while the deploy of #123 failed.
       - if: needs.scope.outputs.demo == 'true'
         run: pnpm build:demo
+      # Every package that has a type check, whatever the change: each one's check writes the
+      # types the packages after it read.
+      - run: pnpm typecheck
+      - run: pnpm build
+
+  # The tests in Chromium, a lane per job. Each package's test script builds what it needs.
+  test:
+    name: test (${{ matrix.lane.name }})
+    needs: scope
+    if: needs.scope.outputs.lanes != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: ${{ fromJSON(needs.scope.outputs.lanes) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       # Without --with-deps: the runner image ships Chrome and Firefox, so the libraries they link
       # against are there, and what apt would add (fonts, Xvfb, FFmpeg's codecs) a headless suite that
       # decodes no video does not use. Some runners reach Ubuntu's mirror at 40 kB/s, where that took
       # up to 20 minutes (#73).
       - run: pnpm --filter @missing-elements/h5p-offline-player exec playwright install chromium
-      # Every package whatever the change, in seconds: each one's check writes the types the
-      # packages after it read.
-      - run: pnpm typecheck
       - run: pnpm $SELECT --workspace-concurrency=1 test
-      - run: pnpm build
+        env:
+          SELECT: ${{ matrix.lane.select }}
 
-  # The player's browser suite and the installable app's tests in the other two engines; the job above runs
-  # them in Chromium. One engine per job: the dev server's switches are shared, and two engines
-  # would flip them under each other. Firefox stops a worker that has no event for thirty seconds and checks the scripts
-  # the worker makes up by the worker's URL; WebKit drops the cache writes of a worker terminated
-  # just after them — each found here first.
+  # The player's browser suite and the installable app's tests in the other two engines, weekly and
+  # by hand. One engine per job: the dev server's switches are shared, and two engines would flip
+  # them under each other. Firefox stops a worker that has no event for thirty seconds and checks
+  # the scripts the worker makes up by the worker's URL; WebKit drops the cache writes of a worker
+  # terminated just after them — each found here first.
   engines:
     name: browser suite (${{ matrix.browser }})
-    needs: scope
-    if: needs.scope.outputs.engines == 'true'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     env:
       H5P_TEST_BROWSER: ${{ matrix.browser }}
-      H5P_TEST_SKIP_SLOW: ${{ github.event_name == 'pull_request' && '1' || '' }}
     strategy:
       fail-fast: false
       matrix:
         browser: [firefox, webkit]
-        # WebKit needs its system packages, GStreamer among them. Firefox, like Chromium above, has its
+        # WebKit needs its system packages, GStreamer among them. Firefox, like Chromium, has its
         # libraries from the runner image.
         include:
           - browser: webkit
@@ -176,12 +206,11 @@ jobs:
       # rather than every week's.
       - if: matrix.deps
         run: sudo apt-get autoclean
-      - if: needs.scope.outputs.player == 'true'
-        run: pnpm --filter @missing-elements/h5p-offline-player test:engine
-      - run: pnpm --filter @missing-elements/h5p-demo test
+      - run: pnpm test:engine
 
   # The VS Code extension in a real VS Code, on a display Xvfb gives it, and the .vsix the owner
-  # publishes, built from what the tests ran against. The unit tests run in the job above.
+  # publishes, built from what the tests ran against: weekly, by hand, and when packages/vscode
+  # changes. Its unit tests run with the other packages'.
   vscode:
     name: VS Code extension
     needs: scope
