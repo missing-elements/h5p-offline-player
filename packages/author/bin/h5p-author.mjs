@@ -1,19 +1,21 @@
 #!/usr/bin/env node
 import { readFile } from 'node:fs/promises'
-import { dirname, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { buildPackage, schemaOf, SourceError, writeBundle, writeBundles } from '../lib/author.mjs'
 import { packVersion } from '../lib/node.mjs'
 
 const USAGE = `Usage:
   h5p-author build <source.json> <output.h5p> [--libraries <parts folder>]
+  h5p-author build --check <source.json> [--libraries <parts folder>]
   h5p-author schema <machine name> [--markdown] [--all] [--libraries <parts folder>]
   h5p-author bundle <machine name> <output.zip> [--libraries <parts folder>]
   h5p-author bundle --all <folder> [--libraries <parts folder>]
 
 build   Makes a playable .h5p from a source: { "type", "title", "language", "license",
         "authors", "params" }, or a quiz in the h5p-author skill's quiz format. Writes only
-        when the whole source is right, and never over an existing file.
+        when the whole source is right, and never over an existing file; --check lists the
+        problems and notes and writes nothing.
 schema  Prints a content type's fields as a source writes them: --markdown as a skill's
         type file carries them, --all with the interface texts.
 bundle  Writes the libraries a build of one content type reads, as a zip of a parts/
@@ -57,6 +59,7 @@ function parse(argv) {
     allowPositionals: true,
     options: {
       libraries: { type: 'string' },
+      check: { type: 'boolean' },
       markdown: { type: 'boolean' },
       all: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
@@ -82,8 +85,9 @@ try {
     for (const flag of Object.keys(flags)) if (!['markdown', 'all', 'libraries'].includes(flag)) throw new Error(`schema does not take --${flag}`)
     console.log(await schemaOf(rest[0], { markdown: Boolean(flags.markdown), all: Boolean(flags.all), libraries: /** @type {string | undefined} */ (flags.libraries) }))
   } else if (command === 'build') {
-    if (rest.length !== 2) throw new Error('build takes a source and an output: h5p-author build quiz.json quiz.h5p')
-    for (const flag of Object.keys(flags)) if (flag !== 'libraries') throw new Error(`build does not take --${flag}`)
+    const check = Boolean(flags.check)
+    if (check ? rest.length !== 1 : rest.length !== 2) throw new Error(check ? 'build --check takes a source: h5p-author build --check quiz.json' : 'build takes a source and an output: h5p-author build quiz.json quiz.h5p')
+    for (const flag of Object.keys(flags)) if (flag !== 'libraries' && flag !== 'check') throw new Error(`build does not take --${flag}`)
     const sourcePath = resolve(rest[0])
     let source
     try {
@@ -91,10 +95,10 @@ try {
     } catch (error) {
       throw new Error(`${rest[0]} is not a readable JSON file: ${error instanceof Error ? error.message : error}`)
     }
-    const result = await buildPackage(source, rest[1], { base: dirname(sourcePath), libraries: /** @type {string | undefined} */ (flags.libraries) })
+    const result = await buildPackage(source, check ? join(dirname(sourcePath), 'check.h5p') : rest[1], { base: dirname(sourcePath), libraries: /** @type {string | undefined} */ (flags.libraries), check })
     const from = flags.libraries ? `the pack in ${flags.libraries}` : `the library pack ${await packVersion()}`
     const install = result.install.length ? `, ${result.install.length} more for installing on an H5P site` : ''
-    console.log(`Built ${result.output}: ${result.manifest.mainLibrary}, ${result.libraries.length} libraries from ${from}${install}${result.media.length ? `, ${result.media.length} media file${result.media.length === 1 ? '' : 's'}` : ''}.`)
+    console.log(`${check ? 'Checked, nothing written' : `Built ${result.output}`}: ${result.manifest.mainLibrary}, ${result.libraries.length} libraries from ${from}${install}${result.media.length ? `, ${result.media.length} media file${result.media.length === 1 ? '' : 's'}` : ''}.`)
     const language = String(result.manifest.language)
     if (!/^en(?:-|$)/i.test(language)) {
       for (const { library, translation, strings, english } of result.translations) {
@@ -107,7 +111,7 @@ try {
       }
     }
     for (const { path, message } of result.notes) console.warn(`Note: ${path} ${message}`)
-    console.log('Not verified: run npx @missing-elements/h5p-verify@latest on it and look at its screenshot before handing it over.')
+    if (!check) console.log('Not verified: run npx @missing-elements/h5p-verify@latest on it and look at its screenshot before handing it over.')
   } else if (command === 'bundle') {
     for (const flag of Object.keys(flags)) if (flag !== 'all' && flag !== 'libraries') throw new Error(`bundle does not take --${flag}`)
     const libraries = /** @type {string | undefined} */ (flags.libraries)

@@ -168,6 +168,7 @@ Set's 2.6 MB, a container's up to 8.4 MB. `--all <folder>` writes one per conten
 
 - `--libraries <folder>` or `--libraries=<folder>`: another copy of the pack's `parts/` folder, in
   place of the pinned one.
+- `build --check <source.json>`: the problems and notes of a source, with no package written.
 - `-h`, `--help`; `-v`, `--version`: this package's version and the pack's.
 
 ## API
@@ -179,8 +180,12 @@ const { output, manifest, content, libraries, install, translations, notes, medi
   await buildPackage(source, 'rivers.h5p', { base: process.cwd() })
 ```
 
-`buildPackage(source, output, { libraries, base, fetch })` refuses an existing output, and throws a
-`SourceError` whose `problems` are `{ path, message }`; `libraries` are the folders the package
+`buildPackage(source, output, { libraries, base, fetch, within, check })` refuses an existing output, and throws a
+`SourceError` whose `problems` are `{ path, message }`. `within` names the folders the output and
+every file the source names must be inside, on their real paths (for a build run on what a model
+wrote); `check` builds and writes nothing. `publicFetch` is a `fetch` for `fetch` that refuses
+addresses on a local network, redirects included, and `outlineOf(content)` the built content as
+plain lines for a review. `libraries` are the folders the package
 plays with, `install` those carried for an H5P site's upload check. `missingForInstall(libraries)`
 is that check, over a package's `library.json` files: what a site with no library installed would
 refuse it for, empty for a build. `schemaOf(machineName, { markdown, all,

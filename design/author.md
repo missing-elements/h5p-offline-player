@@ -111,6 +111,16 @@ to 3,000. Thirty things the code does not say by itself:
   normalizer's `normalizeArchive`, so it is stored and laid out to stream, an mp4's index first.
   An addon whose pattern the text matches, H5P.MathDisplay for LaTeX, is carried as a site with
   it installed exports it.
+- **A build that acts on what a model wrote can be confined** (2026-11-17, #220, for the local MCP
+  server of #219). The command line reads any path a source names and fetches any address, which is
+  right for a person's own command. `buildPackage` takes `within`, the folders the output and every
+  file a source names must be inside, judged on real paths, so `..` and a link out are refused; and
+  `check`, to build and write nothing (`build --check`). `publicFetch` is a `fetch` that refuses
+  loopback, private, link-local and carrier-grade addresses on every hop; it resolves the name and
+  then asks, so it guards against a model's mistake or a planted address, not a hostile network.
+  `outlineOf(content)` is the content as plain lines for a review, generic over every type: it
+  reads no type's shape, so it may show a setting's text where a type keeps words under an unusual
+  key. None changes a build run without them.
 - **The pack is pinned.** The dependency is `workspace:*`, published as the exact version
   packages/libraries has, so a release builds with the libraries it was tested with and one command
   needs no project set up; `--libraries` names another `parts/` folder. Each part is checked
