@@ -16,7 +16,7 @@ import { schemaLines, schemaMarkdown } from './schema.mjs'
 import { LAYOUTS } from './types.mjs'
 
 export * from './core.mjs'
-export { buildPackage, openPack, writeBundle, writeBundles } from './node.mjs'
+export { buildPackage, openPack, publicFetch, writeBundle, writeBundles } from './node.mjs'
 
 /**
  * @typedef {import('./node.mjs').BuildResult} BuildResult

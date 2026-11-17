@@ -1,4 +1,4 @@
-import { editorWidget, takesMarkup } from './text.mjs'
+import { decodeEntities, editorWidget, stripTags, takesMarkup } from './text.mjs'
 
 /**
  * A content type's fields as an author writes them, from its `semantics.json`: names, kinds,
@@ -29,7 +29,7 @@ export function isInterfaceText(field) {
 
 /** @param {string} html */
 function plain(html) {
-  return html.replace(/<\/li>/g, '. ').replace(/<[^<>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&#39;|&#039;/g, "'").replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&').replace(/\s+/g, ' ').replace(/\.\s*\./g, '.').trim()
+  return decodeEntities(stripTags(html.replace(/<\/li>/g, '. '))).replace(/\s+/g, ' ').replace(/\.\s*\./g, '.').trim()
 }
 
 /** @param {unknown} value */

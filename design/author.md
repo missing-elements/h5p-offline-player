@@ -15,7 +15,7 @@ already holds text to the content check's rules, from the pack an untrusted chec
 `apps/skills` plays every example untrusted too. Measured on a five-question quiz, at four
 characters a token: `content.json` was about 3,470 tokens to write by hand, after reading 3,900 to
 9,500 of a type's semantics; the source is 1,000 to 1,800 tokens, written from a type file of 200
-to 3,000. Thirty things the code does not say by itself:
+to 3,000. Thirty-two things the code does not say by itself:
 
 - **One generator, three ways to run it.** The third, `saved`, checks content as H5P stores it
   (*Saved content is checked as the build checks what it writes*, below). `ContentGenerator` was the sweep's
@@ -111,6 +111,66 @@ to 3,000. Thirty things the code does not say by itself:
   normalizer's `normalizeArchive`, so it is stored and laid out to stream, an mp4's index first.
   An addon whose pattern the text matches, H5P.MathDisplay for LaTeX, is carried as a site with
   it installed exports it.
+- **A build that acts on what a model wrote can be confined** (2026-11-17, #220, for the local MCP
+  server of #219). The command line reads any path a source names and fetches any address, which is
+  right for a person's own command. `buildPackage` takes `within`, a list of the folders the output
+  and every local file a source names must be inside, judged on real paths, so `..` and a link out
+  are refused; one folder given alone, as a string, is refused, since it would be read letter by
+  letter, `/` among them, and confine nothing. It is judged before the file is looked for, and a
+  confined build's problems name no path but the one written: the first cut said "outside" of a
+  file that was there and "no such file" of one that was not, so a model could map the disk around
+  the folders, and it named every absolute path, the user's name with it. A file the build cannot
+  read is a problem of the source's as well, found where the file is looked for, and not a failure
+  halfway through that names its path. `check` builds and writes no package (`build --check`),
+  running the same check as a build, `checkContent` being `composePackage`'s, and takes no output;
+  a media file named by web address is still downloaded, to a temporary folder removed after, as
+  the check reads its bytes, and a video on YouTube, Vimeo, Panopto or Echo360 stays an address, as
+  in a build. `publicFetch`, passed as `fetch`, refuses every network that is not the
+  public internet on every hop, through `net.BlockList`, which matches an IPv4 address however IPv6
+  writes it: the first cut checked dotted text, and a URL writes `[::ffff:127.0.0.1]` as
+  `[::ffff:7f00:1]`, which reached a server on loopback. The local IPv4 ranges are refused behind
+  NAT64's prefix and in 6to4 too, which a gateway carries to an IPv4 network, and with them the IPv6
+  ranges no web host is on: IPv4-translated, Teredo, benchmarking, documentation, discard-only and
+  segment routing's. A name that does not resolve is refused in the words a local one is, so a
+  refusal does not tell which names a local network has. A redirect to another origin drops
+  `Authorization`, `Proxy-Authorization` and `Cookie`, as `fetch` does, and the signal stops a
+  lookup, which takes none of its own. It resolves a name and then asks, so it guards against a
+  model's mistake or a planted address, not a hostile network. Nor is `within` a guard against
+  another process racing on the folders, swapping a path for a link between its check and its use:
+  one that can write there already acts as the user, and Node has no directory handles to hold a
+  path while it is used.
+- **The outline is the content for a review, read through the semantics** (2026-11-17, #220). Every
+  result has `outline`, all of it, made when it is first read, so a build that never reads it never
+  runs it. `outlineOf(libraries, content)` takes its arguments as `checkContent` does, refuses them
+  the other way round rather than answer with nothing, and cuts at a `limit` only where one is
+  given. It writes the text fields a learner reads that hold more than their default, which in
+  loaded semantics is the content language's, so interface texts drop out in any language; a rich
+  text's blocks and line breaks apart, by ` / `, and a tag inside a word taken out with nothing in
+  its place (`H<sub>2</sub>O`); a ✓ on a `correct` item, a `correct` select's answer, a score range
+  before its feedback in a RangeList. Settings are left out, and with them a group or a list the
+  editor does not draw (Game Map's stage positions) and a text no label names, which a widget of the
+  type's own sets (Find the Hotspot's figure, Virtual Tour's positions): by a scan of every library
+  in the pack, the only unlabelled texts but a list's items and those `TYPES` labels. What a few
+  types say only by position or number is that one table, `TYPES`: Single Choice Set's and
+  Summary's first item is the right one, as their semantics say in words alone; slides, chapters,
+  questions and a scenario's content are numbered; a question's title the build gave
+  (`questionTitle`, the set's own label and the number, shared with its layout) is not written; a
+  scenario's links name those numbers, a question's own link left out, since its alternatives lead;
+  an Interactive Video's interactions and bookmarks start with their times, a bookmark named as
+  one. The first cut read keys, not semantics: it dropped every number ("1969" as an answer), hid
+  True/False's answer, gave a Question Set 29 lines of which 23 were interface texts, ran a heading
+  into its paragraph, and showed no slide, link or time. The tags a text holds are taken out by
+  `stripTags`, one function in `text.mjs` for the generator, the layouts, `schema` and the outline,
+  which reads markup in the content check's pieces (`PIECE`, as `markupText` checks a field): a tag
+  runs from a `<` before a letter, `/` or `!` to the first `>`, and each is a space, never nothing,
+  which is what CodeQL asks of a tag remover (alert #46 on the first cut). A second cut read quotes
+  in a tag as a browser does, and took the apostrophe of an unquoted attribute (`href=it's`) for the
+  start of a quoted one, running a link's tag into the text after it. Read as the check reads it, a
+  `<` inside an attribute no longer cuts a tag short and a `<` that starts none is text: the one
+  change to what a build writes without the options, its result having `outline` besides, where the
+  generator's check for an empty field and the layouts' measures had read part of a tag as text, or
+  a text as a tag. The outline splits rich text at its tags (`tagsIn`) and plain text at its line
+  breaks before it reads entities, so no text, an encoded one included, can pass for a break.
 - **The pack is pinned.** The dependency is `workspace:*`, published as the exact version
   packages/libraries has, so a release builds with the libraries it was tested with and one command
   needs no project set up; `--libraries` names another `parts/` folder. Each part is checked

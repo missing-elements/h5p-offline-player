@@ -1,4 +1,5 @@
 import { newId } from './generator.mjs'
+import { stripTags } from './text.mjs'
 
 /**
  * What a content type needs beyond its semantics. H5P's editor has a widget of its own for some
@@ -49,7 +50,7 @@ const machineName = (library) => (typeof library === 'string' ? library.trim().s
 
 /** Text without its tags and entities, for measuring. @param {string} html */
 function textOf(html) {
-  return html.replace(/<[^<>]*>/g, ' ').replace(/&[a-zA-Z#0-9]+;/g, '_').replace(/\s+/g, ' ').trim()
+  return stripTags(html).replace(/&[a-zA-Z#0-9]+;/g, '_')
 }
 
 /** A field's semantics, found by a path of names. @param {any[]} semantics @param {string[]} names */
@@ -68,15 +69,25 @@ function fieldAt(semantics, names) {
 /* ---------------------------------------------------------------- Question Set */
 
 /**
+ * The title a Question Set gives a question that has none: the set's own label for a question, in
+ * the content's language, and its number. The outline leaves it out, as the build's and not an
+ * author's.
+ * @param {any[]} semantics the set's, as loaded for the content
+ * @param {number} index
+ */
+export function questionTitle(semantics, index) {
+  return `${fieldAt(semantics, ['texts', 'questionLabel'])?.default ?? 'Question'} ${index + 1}`
+}
+
+/**
  * A question with no title is named as the set labels it itself, in the content's language: its
  * result screen lists each question by this title.
  * @type {Layout}
  */
 const questionSet = {
   after(params, path, context) {
-    const label = fieldAt(context.semantics, ['texts', 'questionLabel'])?.default ?? 'Question'
     ;(params.questions ?? []).forEach((/** @type {any} */ question, /** @type {number} */ i) => {
-      if (isObject(question?.metadata) && question.metadata.title === undefined) question.metadata.title = `${label} ${i + 1}`
+      if (isObject(question?.metadata) && question.metadata.title === undefined) question.metadata.title = questionTitle(context.semantics, i)
     })
   }
 }

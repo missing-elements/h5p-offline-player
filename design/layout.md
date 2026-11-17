@@ -178,13 +178,17 @@ packages/author/          @missing-elements/h5p-author — a playable .h5p of an
                             libraries and content written into a zip.js writer
   lib/node.mjs              what only Node does, and the one module that imports `node:`: the pack read
                             from disk, a source's files beside it, downloads in a temporary folder,
-                            the package written to a path and normalized (#108)
+                            the package written to a path and normalized (#108); a build confined to
+                            folders (`within`) and to the public internet (`publicFetch`, #220)
   lib/install.mjs           what an H5P site's upload check wants with the libraries that play, at the
                             exact versions (`installClosure`), written after the content; the check
                             itself, `missingForInstall`, for apps/skills and a tool beside the build (#146)
   lib/check.mjs             `checkContent`: content in the form H5P saves it checked, the layouts' `after`
                             run, for a tool that edits a saved package and for the build, which runs it
                             last on what it writes (#107); no Node import of its own
+  lib/outline.mjs           `outlineOf`: a content as plain lines for a review, read through its
+                            libraries' semantics, every build result's `outline` (#220); no Node
+                            import of its own
   lib/libraries.mjs         `loadLibraries`: the libraries content brings in, loaded and localized as
                             the build loads them, for the build and for a tool beside it;
                             `packageLibraries`, a package's own over the pack's (#107); no Node
@@ -212,7 +216,8 @@ packages/author/          @missing-elements/h5p-author — a playable .h5p of an
                             carries and git does not (#172, #178)
   tests/                    node tests: the generator, text and translations, layouts and schema, the
                             loader, builds with media from disk and a local server, the command, the
-                            quiz format, the check of saved content, the demo's packages among it, and
+                            quiz format, the check of saved content, the demo's packages among it, a
+                            confined build, the guarded fetch and the outline (confine.test.ts), and
                             the page's build (page.test.ts, against Node's); browser/ the page's build in
                             Chromium, its packages played by the verifier in Node through a Vitest
                             command (`playUntrusted`, vitest.config.ts); fixtures/ the quiz format's

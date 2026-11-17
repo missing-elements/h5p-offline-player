@@ -20,6 +20,53 @@ export function escapeText(value) {
 }
 
 /**
+ * A tag, a comment, or a lone `<` or `>`: the pieces the content check reads markup in. A tag runs
+ * from a `<` before a letter, `/` or `!` to the first `>`. A comment left open runs to the end, as a
+ * browser reads it, so its end is looked for once and not again from every `<!--` after it.
+ */
+const PIECE = /(<(?=[^a-zA-Z!/])|<!--[\s\S]*?(?:-->|$)|<[^>]*(>|$)|>)/g
+
+/**
+ * Text without its tags and comments, read as the content check splits markup (`PIECE`): each a
+ * space, never nothing, so taking one out cannot join what was around it into another; a lone `<`
+ * or `>` kept as text; every run of space one, trimmed. Entities are left as they are
+ * (`decodeEntities` reads them).
+ * @param {string} html
+ */
+export function stripTags(html) {
+  return html.replace(PIECE, (piece) => (piece.length > 1 ? ' ' : piece)).replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * The tags and comments in a markup text, as `stripTags` reads them, each with its `index`.
+ * @param {string} html
+ * @returns {Generator<RegExpMatchArray>}
+ */
+export function* tagsIn(html) {
+  for (const piece of html.matchAll(PIECE)) if (piece[0].length > 1) yield piece
+}
+
+/** The named entities stored text holds: those `escapeText` writes, and a few an author types. */
+const NAMED = /** @type {Record<string, string>} */ ({
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', shy: '­', ndash: '–', mdash: '—', hellip: '…',
+  lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”', laquo: '«', raquo: '»', bull: '•', middot: '·', deg: '°', times: '×',
+  copy: '©', reg: '®', trade: '™', euro: '€', pound: '£', yen: '¥', cent: '¢', sect: '§', para: '¶', frac12: '½'
+})
+
+/**
+ * Entities read, in one pass, so `&amp;lt;` is `&lt;` and not `<`: numeric ones, and the named
+ * ones above. An entity it does not know is left as written.
+ * @param {string} text
+ */
+export function decodeEntities(text) {
+  return text.replace(/&(?:#(\d{1,7})|#[xX]([0-9a-fA-F]{1,6})|([a-zA-Z][a-zA-Z0-9]*));/g, (entity, decimal, hex, name) => {
+    if (name) return Object.hasOwn(NAMED, name) ? NAMED[name] : entity
+    const code = decimal ? Number(decimal) : Number.parseInt(hex, 16)
+    return code > 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff) ? String.fromCodePoint(code) : entity
+  })
+}
+
+/**
  * The widget H5P's editor draws a field with: its `widget`, or for a ShowWhen, the widget the
  * ShowWhen draws inside it, else the field's type (h5peditor.js `getWidgetName`, H5PEditor.ShowWhen).
  * @param {any} field
@@ -99,12 +146,6 @@ function stylePatterns(field) {
   return patterns.map((pattern) => new RegExp(pattern, 'i'))
 }
 
-/**
- * A tag, a comment, or a lone `<` or `>`: the pieces the content check reads markup in. A comment
- * left open runs to the end, as a browser reads it, so its end is looked for once and not again
- * from every `<!--` after it.
- */
-const PIECE = /(<(?=[^a-zA-Z!/])|<!--[\s\S]*?(?:-->|$)|<[^>]*(>|$)|>)/g
 const ATTRIBUTE = /([a-zA-Z_:][-a-zA-Z0-9_:.]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g
 const SAFE_URL = /^(?:https?:|mailto:|ftp:|[^:]*$)/i
 

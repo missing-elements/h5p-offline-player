@@ -8,6 +8,7 @@
 
 export { bundleLibraries, contentTypes } from './bundle.mjs'
 export { checkContent } from './check.mjs'
+export { outlineOf } from './outline.mjs'
 export { ContentGenerator, librariesIn, libraryString } from './generator.mjs'
 export { missingForInstall } from './install.mjs'
 export { loadLibraries, packageLibraries } from './libraries.mjs'

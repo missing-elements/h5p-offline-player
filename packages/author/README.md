@@ -168,6 +168,7 @@ Set's 2.6 MB, a container's up to 8.4 MB. `--all <folder>` writes one per conten
 
 - `--libraries <folder>` or `--libraries=<folder>`: another copy of the pack's `parts/` folder, in
   place of the pinned one.
+- `build --check <source.json>`: the problems and notes of a source, with no package written.
 - `-h`, `--help`; `-v`, `--version`: this package's version and the pack's.
 
 ## API
@@ -175,12 +176,38 @@ Set's 2.6 MB, a container's up to 8.4 MB. `--all <folder>` writes one per conten
 ```js
 import { buildPackage, schemaOf, SourceError } from '@missing-elements/h5p-author'
 
-const { output, manifest, content, libraries, install, translations, notes, media } =
+const { output, manifest, content, libraries, install, translations, notes, media, outline } =
   await buildPackage(source, 'rivers.h5p', { base: process.cwd() })
 ```
 
-`buildPackage(source, output, { libraries, base, fetch })` refuses an existing output, and throws a
-`SourceError` whose `problems` are `{ path, message }`; `libraries` are the folders the package
+`buildPackage(source, output, { libraries, base, fetch, within, check })` refuses an existing output,
+and throws a `SourceError` whose `problems` are `{ path, message }`; with `check` it builds and
+writes no package and takes no output (`buildPackage(source, undefined, { check: true })`), though a
+media file named by web address is still downloaded, to a temporary folder removed after; a video on
+YouTube, Vimeo, Panopto or Echo360 stays an address, as in a build. For a build run
+on what a model wrote: `within` is a list of the folders the output and every local file the source
+names must be inside, on their real paths, and its problems then name no path but the one the
+source wrote. It does not cover a file named by web address, which is downloaded with the `fetch`
+given, the global one by default: pass `fetch: publicFetch`, a `fetch` that refuses an address on a
+local network however it is written, redirects included. A result's `outline` is the content as
+plain lines for a review, made when it is first read: what the author wrote, the right answers
+marked, slides, chapters and questions numbered, a scenario's links and a video's times written,
+interface texts and settings left out. `outlineOf(libraries, content, { limit })` makes one from
+what `loadLibraries` loaded for a content and the content, `{ type, params }`, as `checkContent`
+takes them, cut at `limit` lines where one is given.
+
+```js
+import { readFile } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
+import { buildPackage, publicFetch } from '@missing-elements/h5p-author'
+
+// A build run on what a model wrote: files only from `folder`, nothing from a local network.
+const folder = resolve('work')
+const source = JSON.parse(await readFile(join(folder, 'rivers.json'), 'utf8'))
+const { outline } = await buildPackage(source, join(folder, 'rivers.h5p'), { base: folder, within: [folder], fetch: publicFetch })
+```
+
+A result's `libraries` are the folders the package
 plays with, `install` those carried for an H5P site's upload check. `missingForInstall(libraries)`
 is that check, over a package's `library.json` files: what a site with no library installed would
 refuse it for, empty for a build. `schemaOf(machineName, { markdown, all,
