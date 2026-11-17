@@ -78,6 +78,19 @@ describe('text as H5P stores it', () => {
     expect(problems).toEqual(['has a comment, which H5P removes: take it out'])
   })
 
+  it('refuses a quote a tag leaves open, as a > inside an attribute ends the tag there and a browser reads on past it (#222)', () => {
+    const problems = (value: string) => {
+      const said: string[] = []
+      markupText(value, { tags: ['a'] }, (message) => said.push(message))
+      return said
+    }
+    const open = 'has <a> with a quote it does not close: a > inside an attribute ends the tag there, so write &gt; for it'
+    expect(problems('<p><a title="a>b" href="https://example.org/">link</a> after</p>')).toEqual([open])
+    expect(problems("<p><a title='x>link</a></p>")).toEqual([open])
+    // Written as an entity, or quoted whole, or unquoted with an apostrophe in it, a value is no matter.
+    expect(problems('<p><a title="a&gt;b" data-note=\'it"s\' href="https://example.org/?q=a=b">link</a> <a href=it\'s>x</a></p>')).toEqual([])
+  })
+
   it('takes time in proportion to the text, whatever it holds', () => {
     // The patterns before took three seconds on the first two at 40,000 characters, and four times as long at twice that.
     const start = performance.now()

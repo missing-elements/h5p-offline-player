@@ -164,6 +164,13 @@ export function markupText(value, field, report, { saved = false } = {}) {
     if (!match[1]) {
       // The slash of `<br />` is not part of the last attribute, as the content check reads it.
       const attributes = match[3].trimEnd().replace(/\/$/, '')
+      // A quote the tag leaves open: a `>` inside a quoted value ended the tag here, as the content
+      // check splits markup, or the quote was never closed. A browser reads the value whole and the
+      // tag on to a later `>`, so the text in between is lost and what follows is drawn inside the
+      // tag's element (#222).
+      if (/=\s*["']/.test(attributes.replace(/=\s*(?:"[^"]*"|'[^']*')/g, '='))) {
+        once(`has <${tag}> with a quote it does not close: a > inside an attribute ends the tag there, so write &gt; for it`)
+      }
       for (const [, name, double, single, bare] of attributes.matchAll(ATTRIBUTE)) {
         const attribute = name.toLowerCase()
         const content = double ?? single ?? bare ?? ''
