@@ -142,8 +142,9 @@ went; `typecheck` and `prepack` both run it. Three rules, with TypeScript 7:
 build) so a broken tree cannot ship; the browser suite is left out because it needs an installed
 Chromium. Firefox, WebKit and the slow browser files run only in CI's weekly run and a run by hand,
 so before publishing the player, run CI by hand on main (`gh workflow run ci.yml`) and wait for
-green. Then `prepack` copies the root README and LICENSE into the package, which is where npm
-takes them from. The repository sets no `ignore-scripts`, so `prepublishOnly` runs; pnpm 10 blocks
+green. Then `prepack` copies the root LICENSE into the package, which is where npm takes it
+from. The player's README is its own, `packages/player/README.md`, since the root one is the
+toolkit's front page. The repository sets no `ignore-scripts`, so `prepublishOnly` runs; pnpm 10 blocks
 dependency scripts by itself. The build deletes `types/` and the TypeScript build info first:
 `tsc -b` never removes a declaration whose source was deleted.
 
