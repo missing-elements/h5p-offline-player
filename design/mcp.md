@@ -22,11 +22,11 @@ web, is #210 and not this.
   them under 6,000 characters.
 - **The folders: `--allow`, else the app's roots, else Desktop, Documents and Downloads.** A folder
   the person named when adding the server is their choice and comes first; the app's roots come
-  next, asked on every call, since they change; never the home folder whole, so a default folder
-  that is a link to the home folder, or to a folder holding it, is left out. A build reads local
-  files and writes its package only there (`within`), and refuses a web address on a local network
-  (`publicFetch`, a guard against a model's mistake or a planted address, not a hostile network);
-  the preview opens only a package there (`inside`).
+  next, asked on every call, since they change; both are taken as given. The defaults are never
+  the home folder whole: one that is a link to the home folder, or to a folder holding it, is left
+  out. A build reads local files and writes its package only there (`within`), and refuses a web
+  address on a local network (`publicFetch`, a guard against a model's mistake or a planted
+  address, not a hostile network); the preview opens only a package there (`inside`).
 - **A build never writes over a file.** With no `output`, the package is named from its title
   (`fileStem`: the title's letters and digits, in any script, cut at 60 characters, and `-file`
   after a name Windows keeps for a device, as `con`). A name that is taken, the package's or its

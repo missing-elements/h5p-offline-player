@@ -102,16 +102,21 @@ describe('h5p_build', () => {
     expect(JSON.parse(await readFile(join(folder, 'boiling-point.source.json'), 'utf8'))).toEqual(SOURCE)
   })
 
-  it('takes the next number rather than write over a file, or through a link', async () => {
+  it('takes the next number rather than write over a file', async () => {
     expect(await build('Again')).toBe(join(folder, 'again.h5p'))
     expect(await build('Again')).toBe(join(folder, 'again-2.h5p'))
     await writeFile(join(folder, 'mine.h5p'), 'the person\'s own file')
+    expect(await build('Boiling point', { output: 'mine.h5p' })).toBe(join(folder, 'mine-2.h5p'))
+    expect(await readFile(join(folder, 'mine.h5p'), 'utf8')).toBe('the person\'s own file')
+  })
+
+  // A link to a file takes privileges Windows does not give by default.
+  it.skipIf(process.platform === 'win32')('takes the next number rather than write through a link', async () => {
     // A link holds its name, even one that leads nowhere: written through, it would make a file
     // outside the folder.
     const outside = join(elsewhere, 'source.json')
-    await symlink(outside, join(folder, 'mine-2.source.json'))
-    expect(await build('Boiling point', { output: 'mine.h5p' })).toBe(join(folder, 'mine-3.h5p'))
-    expect(await readFile(join(folder, 'mine.h5p'), 'utf8')).toBe('the person\'s own file')
+    await symlink(outside, join(folder, 'linked.source.json'))
+    expect(await build('Linked')).toBe(join(folder, 'linked-2.h5p'))
     await expect(access(outside)).rejects.toThrow()
   })
 

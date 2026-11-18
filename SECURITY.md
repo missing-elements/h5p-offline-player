@@ -77,10 +77,10 @@ model may have written:
   those folders, links followed. Given `publicFetch`, it refuses a web address
   on a local network, redirects included; it resolves a name and then asks, so
   it guards against a mistaken or planted address, not a hostile network.
-- The MCP server always builds so, in the folders it was given, else the app's
-  roots, else Desktop, Documents and Downloads, never the home folder whole. It
-  never writes over a file, and its preview serves one package on `127.0.0.1`
-  until its tab is closed.
+- The MCP server always builds so, in the folders the person gave it, else the
+  app's roots, as they are given. Given none, it uses Desktop, Documents and
+  Downloads, and never the home folder whole. It never writes over a file, and
+  its preview serves one package on `127.0.0.1` until its tab is closed.
 
 Reports are particularly helpful for issues such as:
 

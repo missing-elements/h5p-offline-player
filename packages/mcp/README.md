@@ -36,8 +36,8 @@ Then ask, for example: "Make a five-question quiz about the water cycle as an H5
 It reads the files your content names, and writes packages, only in its folders: those you give
 with `--allow`, as in `"args": ["-y", "@missing-elements/h5p-mcp", "--allow", "/Users/me/Lessons"]`
 (repeat it for more); else the folders your app gives it; else your Desktop, Documents and
-Downloads. Never your home folder whole. It never writes over a file: a name that is taken gets a
-number, and it says which.
+Downloads, and then never your home folder whole. It never writes over a file: a name that is taken
+gets a number, and it says which.
 
 ## Tools
 
@@ -49,11 +49,12 @@ number, and it says which.
 
 ## What leaves your computer
 
-The build downloads each picture, video, audio or other file your content names by web address. It
-refuses an address on your local network: a guard against a mistaken or planted address, not
-against a hostile network. The check and the preview play the package from your computer; content
-that embeds a YouTube video or shows math loads those from the web, as H5P does anywhere. Your app
-sends your conversation to its model, as it does without this server.
+The build downloads each picture, video, recording or other file your content names by web
+address, but for a video on YouTube, Vimeo, Panopto or Echo360, which stays an address and plays
+from there. It refuses an address on your local network: a guard against a mistaken or planted
+address, not against a hostile network. The check and the preview play the package from your
+computer; such a video, and math, load from the web, as H5P does anywhere. Your app sends your
+conversation to its model, as it does without this server.
 
 ## Licence
 
