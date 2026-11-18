@@ -1,3 +1,4 @@
+import { mp4Info } from '@missing-elements/h5p-normalize/mp4'
 import { escapeText } from './text.mjs'
 
 /**
@@ -28,6 +29,15 @@ const TYPES = {
 
 /** The folder under `content/` H5P's editor keeps each kind in (h5peditor-file.class.php). */
 const FOLDERS = { image: 'images', video: 'videos', audio: 'audios', file: 'files' }
+
+/** The containers a video and a recording come in, among H5P's types, and how to name them. */
+const PLAYS = {
+  video: { takes: ['mp4', 'webm', 'ogg'], what: 'an MP4, WebM or Ogg video' },
+  audio: { takes: ['mp3', 'mp4', 'wav', 'ogg', 'webm'], what: 'an MP3, M4A, WAV, Ogg or WebM recording' }
+}
+
+/** Codecs of an mp4's picture that not every browser plays, by the name its index gives them. */
+const NOT_EVERYWHERE = /** @type {Record<string, string>} */ ({ hvc1: 'HEVC (H.265)', hev1: 'HEVC (H.265)' })
 
 /** Whether a host name is one of these domains or under one. @param {string} host @param {string[]} domains */
 const under = (host, domains) => domains.some((domain) => host === domain || host.endsWith(`.${domain}`))
@@ -100,11 +110,11 @@ const IDLE_MS = 60_000
  *   name(source: string): string,
  *   local(source: string): Promise<{ file: F } | { missing: string }>,
  *   keep(body: ReadableStream<Uint8Array>, extension: string): Promise<F>,
- *   open(file: F): Promise<{ read(offset: number, length: number): Promise<Uint8Array>, close(): Promise<void> }>
+ *   open(file: F): Promise<{ size: number, read(offset: number, length: number): Promise<Uint8Array>, close(): Promise<void> }>
  * }} MediaAccess
  *   `what`, what a source's path names, for problems; `name`, the file's own name it names;
  *   `local`, that file, or why there is none; `keep`, a download's bytes kept; `open`, a kept
- *   file's bytes read from an offset, fewer at its end
+ *   file's length, and its bytes read from an offset, fewer at its end
  */
 
 /**
@@ -176,6 +186,35 @@ export async function imageSize(read) {
   return null
 }
 
+/**
+ * Whether bytes start with an MPEG audio frame's header a decoder takes: the sync bits, then no
+ * reserved version, layer, bit rate or sample rate.
+ * @param {Uint8Array} head
+ */
+const mpegFrame = (head) => head.length >= 4 && head[0] === 0xff && (head[1] & 0xe0) === 0xe0 && (head[1] & 0x18) !== 0x08 &&
+  (head[1] & 0x06) !== 0 && (head[2] & 0xf0) !== 0xf0 && (head[2] & 0x0c) !== 0x0c
+
+/**
+ * What a video's or a recording's first bytes say it is: its container, a web page, or none known.
+ * An mp4 or an m4a starts with `ftyp`, WebM with EBML's mark, Ogg with `OggS`, WAV with RIFF's
+ * `WAVE`, MP3 with an ID3 tag or a frame header; a page with `<`, in UTF-8 or, after its
+ * byte-order mark, in UTF-16.
+ * @param {Uint8Array} head the file's first 16 bytes, or all of a shorter one
+ * @returns {'mp4' | 'webm' | 'ogg' | 'wav' | 'mp3' | 'page' | undefined}
+ */
+function containerOf(head) {
+  const ascii = (/** @type {number} */ offset, /** @type {number} */ length) => String.fromCharCode(...head.subarray(offset, offset + length))
+  if (ascii(4, 4) === 'ftyp') return 'mp4'
+  if (head[0] === 0x1a && head[1] === 0x45 && head[2] === 0xdf && head[3] === 0xa3) return 'webm'
+  if (ascii(0, 4) === 'OggS') return 'ogg'
+  if (ascii(0, 4) === 'RIFF' && ascii(8, 4) === 'WAVE') return 'wav'
+  if (ascii(0, 3) === 'ID3' || mpegFrame(head)) return 'mp3'
+  const text = ascii(0, head.length)
+  // UTF-16 read as its characters by leaving out the zero bytes, which only it has here.
+  const page = /^(?:\xff\xfe|\xfe\xff)/.test(text) ? text.slice(2).replaceAll('\0', '') : text.replace(/^\xef\xbb\xbf/, '')
+  return /^\s*</.test(page) ? 'page' : undefined
+}
+
 /** @template F */
 export class MediaStore {
   /**
@@ -193,18 +232,30 @@ export class MediaStore {
     this.known = new Map()
     /** @type {Set<string>} */
     this.names = new Set()
+    /** @type {Map<string, number>} a video's or a recording's length in seconds, by its path in the package, where its index gave one */
+    this.lengths = new Map()
+  }
+
+  /**
+   * A video's or a recording's length in seconds, by its path in the package, where it was read.
+   * @param {string} path
+   */
+  lengthOf(path) {
+    return this.lengths.get(path)
   }
 
   /**
    * A written file made what H5P stores: `{ path, mime, width?, height?, copyright }`, its bytes
-   * staged for the package.
+   * staged for the package. A picture's size is read from its bytes, and a video's or a
+   * recording's container; an mp4's index too, for its length and what its tracks hold.
    * @param {any} field the image, video, audio or file field
    * @param {{ path: string, copyright?: any }} value as written
    * @param {string} at where it is written, for problems
    * @param {(path: string, message: string) => void} report
+   * @param {(path: string, message: string) => void} [note] what is worth saying of a file and no reason not to build
    * @returns {Promise<Record<string, unknown>>}
    */
-  async resolve(field, value, at, report) {
+  async resolve(field, value, at, report, note = () => {}) {
     const kind = /** @type {'image' | 'video' | 'audio' | 'file'} */ (field.type)
     const source = value.path.trim()
     const copyright = this.copyright(value.copyright, `${at}.copyright`, report)
@@ -245,6 +296,14 @@ export class MediaStore {
         } finally {
           await file.close()
         }
+      } else if (kind === 'video' || kind === 'audio') {
+        const file = await this.access.open(staged.from)
+        try {
+          const length = await this.#played(file, kind, source, web, `${at}.path`, report, note)
+          if (length) this.lengths.set(name, length)
+        } finally {
+          await file.close()
+        }
       }
       this.files.push({ name, from: staged.from })
       this.known.set(key, described)
@@ -281,6 +340,46 @@ export class MediaStore {
       out[key] = key === 'license' || key === 'version' ? entry : escapeText(entry)
     }
     return out
+  }
+
+  /**
+   * A video's or a recording's bytes held to what its field takes: its container, from its first
+   * bytes, a problem where it is none of those; for an mp4, its index, a problem where there is
+   * none to read, and a note for a file with no sound, no picture, or a picture not every browser
+   * plays. A file whose index lists no track says nothing either way.
+   * @param {{ size: number, read(offset: number, length: number): Promise<Uint8Array> }} file
+   * @param {'video' | 'audio'} kind
+   * @param {string} source as written
+   * @param {boolean} web named by a web address
+   * @param {string} at
+   * @param {(path: string, message: string) => void} report
+   * @param {(path: string, message: string) => void} note
+   * @returns {Promise<number | undefined>} its length in seconds, where its index gives one
+   */
+  async #played(file, kind, source, web, at, report, note) {
+    const { takes, what } = PLAYS[kind]
+    // An mp4 by its index, as the normalizer reads one, after `ftyp` or an older file's `moov`,
+    // `mdat`, `free` or `wide`; any other by its first bytes.
+    const info = await mp4Info((offset, length) => file.read(offset, length), file.size)
+    const container = info ? 'mp4' : containerOf(await file.read(0, 16))
+    if (container === 'page') {
+      report(at, `${source} is a web page, not ${kind === 'video' ? 'a video' : 'a recording'}${web ? ': give the address of the file itself' : ''}`)
+      return undefined
+    }
+    if (!container || !takes.includes(container)) {
+      report(at, `${source} is not ${what}: its first bytes are none of theirs`)
+      return undefined
+    }
+    if (!info) {
+      if (container === 'mp4') report(at, `${source} has no index (moov) a player can read: is the file whole?`)
+      return undefined
+    }
+    const held = new Set(info.tracks.map((track) => track.kind))
+    if (held.size && !held.has('audio')) note(at, `${source} has no sound`)
+    if (held.size && kind === 'video' && !held.has('video')) note(at, `${source} has no picture`)
+    const codecs = new Set(info.tracks.filter((track) => track.kind === 'video').map((track) => NOT_EVERYWHERE[track.codec]).filter(Boolean))
+    for (const codec of codecs) note(at, `${source} is ${codec}, which not every browser plays; H.264 plays in all of them`)
+    return info.duration
   }
 
   /**

@@ -58,6 +58,8 @@ Exit 2: the check could not run (no browser, no such file).
 | `drew nothing` | started, empty frame | usually empty or wrongly nested parameters |
 | warning: `runtime error after ready` | often a harmless resize exception; sometimes a broken sub-content | check the screenshot; fix only if something is missing |
 | warning: `request failed: content/…` | a media file `content.json` references is not in the archive | add it or fix the path |
+| warning: `video does not play: <file>: …` (or `audio`) | the browser gave up on the file: not a video or a recording at all (a web page saved under its name), or one it cannot decode | open the file itself; replace it with the real one, a video as H.264 mp4 |
+| warning: `video not checked: … this browser plays no H.264`, or `audio not checked: … no AAC` | the browser the check ran in lacks the codec most mp4 and m4v videos (H.264) or m4a recordings (AAC) use | install Chrome or Edge, or pass `--browser`, and check again |
 | warning: `blocked by the frame's CSP` | content loading from an outside origin | put the asset in the package |
 | warning: `content check: <field>: markup removed: …` (with `--untrusted`) | the field holds tags, attributes or styles its library does not allow; the site will strip them | write the field in what `semantics.json` allows for it (its `tags` and `font`), or accept the loss if the text still reads right |
 | warning: `content check: <field>: removed`, `… became …` | a field the semantics do not name, or a value outside its options or range; or the libraries' upgrade moved it, when the pack is newer than what the content was written for | match the field to `semantics.json`, or build against the pack's versions |

@@ -47,12 +47,13 @@ const RUNTIME_ALLOWLIST = {
   ],
   style: ['fonts.googleapis.com'],
   font: ['fonts.gstatic.com', 'fonts.googleapis.com'],
-  // What script fetches, by path, since one endpoint is all it needs. Found on 2026-10-28 by
-  // scanning every script and stylesheet in the pack for the hosts they name, then reading what
-  // each load is; the invariant in AGENTS.md records the scan and what it left out. Vimeo's SDK
-  // reads the video's oEmbed record before it can create the player: given the URL and an
-  // element, as H5P.Video's handler gives it, it has nothing else to build the frame from.
-  // Refused, the handler shows its loading error after eight seconds.
+  // What script fetches, by path, since one endpoint is all it needs. Found on 2026-10-28 by scanning
+  // every script and stylesheet in the pack for the hosts they name, then reading what each load is;
+  // design/security.md records the scan and what it left out, under
+  // *The frame CSP's runtime allowlist is written without schemes*. Vimeo's SDK reads the video's
+  // oEmbed record before it can create the player: given the URL and an element, as H5P.Video's
+  // handler gives it, it has nothing else to build the frame from. Refused, the handler shows its
+  // loading error after eight seconds.
   connect: ['vimeo.com/api/oembed.json'],
   // TimelineJS, under H5P.Timeline, fetches a slide's web media as JSONP, a `<script>` naming the
   // endpoint, so these are script sources, in both policies: Wikipedia in any language, Vimeo's

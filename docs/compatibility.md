@@ -121,8 +121,9 @@ with the specification is a conformance fix.
 ### The normalizer, `@missing-elements/h5p-normalize`
 
 The command's options, and `normalizeArchive()`, `formatBytes()` and `archiveFingerprint()`, with
-their types, and `crc32()` from `@missing-elements/h5p-normalize/crc32`, which embed and h5p-author
-take through a range. The content of a package it rewrites never changes. How it lays out the zip may change in a minor, as
+their types, `crc32()` from `@missing-elements/h5p-normalize/crc32`, which embed and h5p-author take
+through a range, and `mp4Info()` from `@missing-elements/h5p-normalize/mp4`, which h5p-author takes
+the same way. The content of a package it rewrites never changes. How it lays out the zip may change in a minor, as
 long as the player streams the result at least as well.
 
 ### The verifier, `@missing-elements/h5p-verify`

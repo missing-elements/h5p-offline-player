@@ -45,10 +45,9 @@ pnpm preview:demo      # serves dist-demo/ with the production headers and the /
 ```
 
 `pnpm test` runs the packages one at a time (`--workspace-concurrency=1`). The demo's `test`
-runs the player's `prepare:dev` and the verifier's runs the player's `build`, and both of those
-begin with `sync:assets`, which deletes `public/frame-assets/` and writes it again. Run in
-parallel, as `pnpm -r` does once their shared dependency is done, one run deleted the directory
-while the other was writing into it. CI hit exactly that: ENOENT on `frame.bundle.js`.
+runs the player's `prepare:dev` and the verifier's runs the player's `build`, and both begin with
+`sync:assets`, which deletes `public/frame-assets/` and writes it again; run in parallel, one run
+deletes the directory while the other writes into it (ENOENT on `frame.bundle.js` in CI).
 
 pnpm forwards extra arguments on its own: `pnpm preview:demo --port 4199`, not `-- --port`. A
 literal `--` reaches the script, which Vite then reads as the end of its options.
@@ -64,8 +63,7 @@ to `packages/player/public/frame-assets/`, and builds the fixtures into
 `packages/player/public/fixtures/`. None of those directories is in git; all are reproducible.
 
 The browser provider is a package, not a name: `provider: playwright()` from
-`@vitest/browser-playwright`. Vitest 4 moved providers out of the core package, so a bare
-`provider: 'playwright'` string silently stops being valid.
+`@vitest/browser-playwright`; a bare `provider: 'playwright'` string is not valid in Vitest 4.
 
 **What is tested**, by the owner's rule: the packages and their source, and of the demo app only
 the installable app; the demo's pages are checked by hand, and the skills are tested from

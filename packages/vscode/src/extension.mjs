@@ -3,7 +3,7 @@ import { Previews, VIEW_TYPE } from './previews.mjs'
 
 /**
  * H5P Preview by Missing Elements: a `.h5p` opens in a read-only editor that plays it in the real
- * player, served from this computer. See AGENTS.md, *The VS Code extension*.
+ * player, served from this computer. See design/vscode.md.
  * @param {vscode.ExtensionContext} context
  */
 export function activate(context) {
