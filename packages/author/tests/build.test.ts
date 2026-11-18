@@ -377,7 +377,12 @@ describe('any content type in the pack', () => {
     expect(shape.required).toEqual(['type', 'title', 'language', 'license', 'authors'])
     expect(shape.properties.license.enum).toEqual(LICENSES)
     expect(shape.properties.authors.items).toMatchObject({ required: ['name', 'role'], additionalProperties: false })
+    // No other field, as a build refuses one: said as the build says it.
+    expect(shape).toMatchObject({ additionalProperties: false })
     expect(sourceSchema.safeParse({ ...META, ...blanks }).success).toBe(true)
+    expect(sourceSchema.safeParse({ ...META, ...blanks, extra: 1 }).error?.issues.map(({ message }) => message)).toEqual([
+      'is not a field of a source; the fields are type, title, language, license, licenseVersion, authors, source, yearFrom, yearTo, params'
+    ])
   })
 
   it('says what to write for what is in the wrong place, checks it in the same build, and counts no list it refused an item of (#172)', async () => {

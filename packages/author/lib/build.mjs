@@ -9,7 +9,7 @@ import { machineNameOf, NAMING_KEYS, namingKey, nearestNames } from './names.mjs
 import { quizProblems, quizSource } from './quiz.mjs'
 import { outlineOf } from './outline.mjs'
 import { SourceError } from './source-error.mjs'
-import { authorHolds, holds, sourceSchema, TYPE } from './source-schema.mjs'
+import { authorHolds, holds, NO_FIELD, NO_SOURCE, sourceSchema, TYPE } from './source-schema.mjs'
 import { escapeText } from './text.mjs'
 import { LAYOUTS, placesOf, videoTimes } from './types.mjs'
 
@@ -35,8 +35,8 @@ export { SourceError }
 /** @param {unknown} value @returns {value is Record<string, any>} */
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
 
-/** A source's fields. */
-const FIELDS = ['type', 'title', 'language', 'license', 'licenseVersion', 'authors', 'source', 'yearFrom', 'yearTo', 'params']
+/** A source's fields, as `sourceSchema` declares them. */
+const FIELDS = Object.keys(sourceSchema.shape)
 /** Those a source says of itself, which H5P keeps in an object of their own, `metadata`. */
 const OWN = FIELDS.filter((name) => name !== 'type' && name !== 'params')
 
@@ -78,8 +78,7 @@ export function sourceOf(input, names) {
   /** @type {Problem[]} */
   const problems = []
   const report = (/** @type {string} */ path, /** @type {string} */ message) => problems.push({ path, message })
-  if (!isObject(input)) throw new SourceError([{ path: 'source', message: 'expected an object: { "type", "title", "language", "license", "authors", "params" }' }])
-  const fields = `the fields are ${FIELDS.join(', ')}`
+  if (!isObject(input)) throw new SourceError([{ path: 'source', message: NO_SOURCE }])
   /** @type {Record<string, any>} what is written for each field */
   const given = Object.fromEntries(FIELDS.filter((name) => input[name] !== undefined).map((name) => [name, input[name]]))
   /** @type {Record<string, string>} where each is written */
@@ -110,7 +109,7 @@ export function sourceOf(input, names) {
       at[name] = `metadata.${name}`
     }
     for (const inner of Object.keys(value)) {
-      if (!own.includes(inner)) report(`metadata.${inner}`, OWN.includes(inner) ? 'is written beside type already' : `is not a field of a source; ${fields}`)
+      if (!own.includes(inner)) report(`metadata.${inner}`, OWN.includes(inner) ? 'is written beside type already' : NO_FIELD)
     }
     rest = rest.filter((each) => each !== 'metadata')
   }
@@ -118,7 +117,7 @@ export function sourceOf(input, names) {
   if (rest.length && given.params === undefined) {
     report('params', `is not written: the content's fields go in it, not beside type: write "params": { ${rest.map((key) => `"${key}": …`).join(', ')} }`)
     given.params = Object.fromEntries(rest.map((key) => [key, input[key]]))
-  } else for (const key of rest) report(key, `is not a field of a source; ${fields}`)
+  } else for (const key of rest) report(key, NO_FIELD)
 
   // Each field held to `sourceSchema`, with what it cannot say alone written here.
   const field = sourceSchema.shape

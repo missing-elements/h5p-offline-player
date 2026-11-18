@@ -44,12 +44,8 @@ const author = z.strictObject({
   }
 })
 
-/**
- * What a source says of itself, and its content's fields in `params`. What a field cannot say
- * alone stays in `sourceOf`: a content type named loosely, a licence written with its version, a
- * version for a licence that takes none, and fields written in the wrong place.
- */
-export const sourceSchema = z.object({
+/** A source's fields, in the order they are listed, each with what it takes. */
+const fields = {
   type: z.string({ error: TYPE }).check(z.refine(written, { error: TYPE }), z.describe('The content type\'s machine name, as "H5P.MultiChoice"')),
   title: z.string({ error: TITLE }).check(z.refine(written, { error: TITLE }), z.maxLength(255, { error: 'takes at most 255 characters' })),
   language: z.string({ error: LANGUAGE }).check(z.refine(isTag, { error: LANGUAGE }), z.describe('A BCP 47 tag, as "en"')),
@@ -61,6 +57,21 @@ export const sourceSchema = z.object({
   yearTo: z.optional(z.int({ error: YEAR })),
   params: z.optional(z.record(z.string(), z.unknown(), { error: 'expected an object of the content type\'s fields' })
     .check(z.describe('The content type\'s fields that differ from their defaults')))
+}
+
+/** @internal What is said of a key that is no field of a source. */
+export const NO_FIELD = `is not a field of a source; the fields are ${Object.keys(fields).join(', ')}`
+/** @internal What is said of a source that is no object. */
+export const NO_SOURCE = 'expected an object: { "type", "title", "language", "license", "authors", "params" }'
+
+/**
+ * What a source says of itself, and its content's fields in `params`, and nothing else, as a build
+ * refuses any other field. What a field cannot say alone stays in `sourceOf`: a content type named
+ * loosely, a licence written with its version, a version for a licence that takes none, and fields
+ * written in the wrong place.
+ */
+export const sourceSchema = z.strictObject(fields, {
+  error: (issue) => (issue.code === 'unrecognized_keys' ? NO_FIELD : NO_SOURCE)
 })
 
 /**

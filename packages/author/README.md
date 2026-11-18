@@ -223,11 +223,13 @@ none the one name under `contentType` or `library`; `null` where none can be mea
 in the published format (`{ "kind": … }`), which the build reads as a Question Set or a Multiple
 Choice by rules of its own. A page that hands a chat a type's notes with a source's problems asks
 it, and hands over the type the build took. `sourceSchema` is a source's own fields, `type`,
-`title`, `language`, `license`, `authors` and the rest, as the zod/mini schema a build holds them to;
-`toJSONSchema(sourceSchema, { io: 'input' })` from `zod/mini` gives them as JSON Schema, to show a
-model the shape of a source before it writes one. A build reads a source more loosely than the
-schema, and says what to write: check one with `buildPackage(source, undefined, { check: true })`,
-not with the schema alone. `ContentGenerator` is the engine underneath, also run by
+`title`, `language`, `license`, `authors` and the rest, as the zod/mini schema a build holds them to,
+and no other field. To show a model the shape of a source before it writes one, turn it into JSON
+Schema with `toJSONSchema(sourceSchema, { io: 'input' })` from zod 4.2 or later, installed as a
+dependency of your own, since the author package's copy is not yours to import. A build reads a
+source more loosely than the schema, and says what to write: check one with
+`buildPackage(source, undefined, { check: true })`, not with the schema alone. `ContentGenerator`
+is the engine underneath, also run by
 the repository's sweep of every content type.
 
 A tool beside the build takes the libraries as the build loads them, the generator, and the
