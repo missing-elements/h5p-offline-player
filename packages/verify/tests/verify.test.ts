@@ -16,6 +16,7 @@ import { contentChanges, summarize, verifyPackage } from '../lib/verify.mjs'
 const bin = resolve(import.meta.dirname, '../bin/h5p-verify.mjs')
 const content = resolve(import.meta.dirname, '../../../apps/demo/demo/content')
 const quiz = join(content, 'quiz.h5p')
+const video = join(content, 'video.h5p')
 /** The workspace's library pack, served by the verifier itself, so the untrusted cases need no network. */
 const pack = resolve(import.meta.dirname, '../../libraries/libraries.h5p')
 /** The same pack split into its parts, which `libraries=pack` plays from. */
@@ -30,15 +31,16 @@ afterAll(async () => {
 })
 
 /**
- * The quiz written again as `name` under `dir`, each file entry through `each`, which writes what
+ * A package written again as `name` under `dir`, each file entry through `each`, which writes what
  * it keeps, as it is or changed; `then` adds what else the archive should carry.
  */
-async function rewrittenQuiz(
+async function rewritten(
+  from: string,
   name: string,
   each: (entry: Entry, bytes: Uint8Array, writer: ZipWriter<Blob>) => Promise<void>,
   then: (writer: ZipWriter<Blob>) => Promise<void> = async () => {}
 ): Promise<string> {
-  const reader = new ZipReader(new BlobReader(new Blob([await readFile(quiz)])))
+  const reader = new ZipReader(new BlobReader(new Blob([await readFile(from)])))
   const writer = new ZipWriter(new BlobWriter('application/zip'))
   for (const entry of await reader.getEntries()) {
     if (entry.directory) continue
@@ -50,6 +52,9 @@ async function rewrittenQuiz(
   await writeFile(path, new Uint8Array(await (await writer.close()).arrayBuffer()))
   return path
 }
+
+/** The quiz written again, as `rewritten` writes a package. */
+const rewrittenQuiz = (name: string, ...rest: Parameters<typeof rewritten> extends [string, string, ...infer R] ? R : never) => rewritten(quiz, name, ...rest)
 
 /** The quiz as h5p.com would export it: `h5p.json` and `content/`, no library folders. */
 const strippedQuiz = () =>
@@ -209,6 +214,26 @@ describe('h5p-verify', () => {
     expect(report.reasons[0]).toMatch(/^bad-archive: /)
     expect(report.screenshot).toBeNull()
     expect(summarize(report)).toContain('--libraries pack')
+  }, 120_000)
+
+  it('warns of a video that does not play, as a web page saved under its name (#218)', async () => {
+    const page = await rewritten(video, 'page-video.h5p', async (entry, bytes, writer) => {
+      await writer.add(entry.filename, new Uint8ArrayReader(entry.filename.endsWith('.mp4') ? new TextEncoder().encode('<!DOCTYPE html><title>File:clip.mp4</title>') : bytes))
+    })
+    const report = await verifyPackage({ file: page })
+    // The rest of the content plays: a warning, as it stood unseen beside pass before.
+    expect(report.verdict).toBe('pass')
+    expect(report.warnings).toContainEqual(expect.stringMatching(/^video (?:does not play|not checked): videos\/[^/]+\.mp4: /))
+    // The demo's own video plays, and is not named.
+    const played = await verifyPackage({ file: video })
+    expect(played.warnings.filter((warning) => warning.startsWith('video does not play'))).toEqual([])
+    // A name with an escape that is not one, `%zz`, is named as written, and loses no warning.
+    const odd = await rewritten(video, 'odd-video.h5p', async (entry, bytes, writer) => {
+      if (entry.filename.endsWith('.mp4')) await writer.add('content/videos/odd%zz.mp4', new TextReader('<!DOCTYPE html><title>File:clip.mp4</title>'))
+      else if (entry.filename === 'content/content.json') await writer.add(entry.filename, new TextReader(new TextDecoder().decode(bytes).replace(/videos\/[^"]+\.mp4/, 'videos/odd%zz.mp4')))
+      else await writer.add(entry.filename, new Uint8ArrayReader(bytes))
+    })
+    expect((await verifyPackage({ file: odd })).warnings).toContainEqual(expect.stringMatching(/^video (?:does not play|not checked): videos\/odd%zz\.mp4: /))
   }, 120_000)
 
   it('fails a file that is not an archive', async () => {

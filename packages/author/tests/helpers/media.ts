@@ -37,16 +37,4 @@ export function jpeg(width: number, height: number, padding = 0) {
   return Buffer.concat([...segments, frame, Buffer.from([0xff, 0xd9])])
 }
 
-/** An mp4 as boxes, its index after its media unless `faststart`. */
-export function mp4(faststart: boolean) {
-  const box = (type: string, body: Buffer) => {
-    const head = Buffer.alloc(8)
-    head.writeUInt32BE(8 + body.length)
-    head.write(type, 4)
-    return Buffer.concat([head, body])
-  }
-  const ftyp = box('ftyp', Buffer.from('isom\0\0\0\0isomavc1'))
-  const moov = box('moov', box('mvhd', Buffer.alloc(100)))
-  const mdat = box('mdat', Buffer.alloc(4096, 7))
-  return Buffer.concat(faststart ? [ftyp, moov, mdat] : [ftyp, mdat, moov])
-}
+export { mp4 } from './mp4'

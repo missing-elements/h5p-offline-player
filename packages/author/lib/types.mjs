@@ -448,6 +448,35 @@ const interactiveVideo = {
   }
 }
 
+/**
+ * An Interactive Video's times held to its video's length, where the build read one (an mp4's
+ * index gives it): an interaction that starts past the end never shows, a bookmark or an end
+ * screen past it is never reached, a start past it plays nothing. An interaction may end past it,
+ * and shows to the end.
+ * @param {any} params an Interactive Video's, as H5P stores them
+ * @param {string} path where they are
+ * @param {(file: string) => number | undefined} lengthOf a video's length in seconds, by its path in the package
+ * @param {(path: string, message: string) => void} report
+ */
+export function videoTimes(params, path, lengthOf, report) {
+  const files = params?.interactiveVideo?.video?.files
+  const length = (Array.isArray(files) ? files : []).map((file) => (typeof file?.path === 'string' ? lengthOf(file.path) : undefined)).find((each) => each !== undefined)
+  if (length === undefined) return
+  const end = `the video ends at ${Math.round(length * 100) / 100} s`
+  const late = (/** @type {unknown} */ time) => typeof time === 'number' && time > length
+  const list = (/** @type {unknown} */ value) => (Array.isArray(value) ? value : [])
+  const assets = params.interactiveVideo.assets
+  list(assets?.interactions).forEach((interaction, i) => {
+    if (late(interaction?.duration?.from)) report(`${path}.interactiveVideo.assets.interactions[${i}].duration`, `starts at ${interaction.duration.from} s, after ${end}`)
+  })
+  for (const key of ['bookmarks', 'endscreens']) {
+    list(assets?.[key]).forEach((mark, i) => {
+      if (late(mark?.time)) report(`${path}.interactiveVideo.assets.${key}[${i}].time`, `is ${mark.time} s, after ${end}`)
+    })
+  }
+  if (late(params.override?.startVideoAt)) report(`${path}.override.startVideoAt`, `is ${params.override.startVideoAt} s, after ${end}`)
+}
+
 /* ---------------------------------------------------------------- Branching Scenario */
 
 /**

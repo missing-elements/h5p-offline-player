@@ -136,7 +136,12 @@ export function nodeMedia({ base, temporary, within }) {
     },
     async open(file) {
       const handle = await open(file, 'r')
+      const { size } = await handle.stat().catch(async (error) => {
+        await handle.close()
+        throw error
+      })
       return {
+        size,
         async read(offset, length) {
           const bytes = new Uint8Array(length)
           const { bytesRead } = await handle.read(bytes, 0, length, offset)

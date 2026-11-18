@@ -64,8 +64,11 @@ What `params` takes is what H5P's editor would let an author save in the same fo
 - **Sub-content**: `{ "library": "H5P.MultiChoice", "params": { … }, "metadata": { "title": "…" } }`,
   filled in the same way, at the pack's version.
 - **Files**: `{ "path": "photo.jpg" }`, a file beside the source or an `http(s)` address, with an
-  optional `copyright`. Each is copied into the package with its type and, for a picture, its size;
-  the package is then laid out to stream, media stored and an mp4's index first. A YouTube, Vimeo,
+  optional `copyright`. Each is copied into the package with its type and, for a picture, its size.
+  A video or a recording is read from its first bytes, and one that is not what its field takes, a
+  web page at a file's address among them, is refused; an mp4's index says whether it has sound
+  and, where it gives one, its length, past which an Interactive Video's times are refused. The
+  package is then laid out to stream, media stored and an mp4's index first. A YouTube, Vimeo,
   Panopto or Echo360 address stays where it is, if it is one H5P.Video plays: a Short's is taken
   as its video's, and another address on those sites is refused. A download is given up once
   nothing has arrived for a minute, however long it runs.

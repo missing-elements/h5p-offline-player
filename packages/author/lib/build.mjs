@@ -10,7 +10,7 @@ import { quizProblems, quizSource } from './quiz.mjs'
 import { outlineOf } from './outline.mjs'
 import { SourceError } from './source-error.mjs'
 import { escapeText } from './text.mjs'
-import { LAYOUTS, placesOf } from './types.mjs'
+import { LAYOUTS, placesOf, videoTimes } from './types.mjs'
 
 export { SourceError }
 
@@ -310,7 +310,7 @@ export async function composePackage(source, pack, media, said = []) {
 
   // Media: copied, described, put in place of what was written.
   for (const { field, value, path } of generator.media) {
-    const resolved = await media.resolve(field, value, path, report)
+    const resolved = await media.resolve(field, value, path, report, note)
     for (const key of Object.keys(value)) delete value[key]
     Object.assign(value, resolved)
   }
@@ -337,6 +337,12 @@ export async function composePackage(source, pack, media, said = []) {
     if (!known && !shortened(path)) problems.push({ path, message })
   }
   for (const added of checked.notes) if (!notes.some(({ path, message }) => path === added.path && message === added.message)) notes.push(added)
+  // Times past the end of a video whose length was read, which only a build, with the file, knows;
+  // none in a list an item of which was refused, whose indices are no longer the source's.
+  const timed = (/** @type {string} */ path, /** @type {string} */ message) => { if (!shortened(path)) report(path, message) }
+  for (const place of placesOf(main, checked.params)) {
+    if (place.library === 'H5P.InteractiveVideo') videoTimes(place.params, inSource(place.path), (file) => media.lengthOf(file), timed)
+  }
   if (said.length || problems.length) throw new SourceError([...said, ...problems])
   const content = checked.params
 
