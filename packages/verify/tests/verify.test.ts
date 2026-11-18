@@ -227,6 +227,13 @@ describe('h5p-verify', () => {
     // The demo's own video plays, and is not named.
     const played = await verifyPackage({ file: video })
     expect(played.warnings.filter((warning) => warning.startsWith('video does not play'))).toEqual([])
+    // A name with an escape that is not one, `%zz`, is named as written, and loses no warning.
+    const odd = await rewritten(video, 'odd-video.h5p', async (entry, bytes, writer) => {
+      if (entry.filename.endsWith('.mp4')) await writer.add('content/videos/odd%zz.mp4', new TextReader('<!DOCTYPE html><title>File:clip.mp4</title>'))
+      else if (entry.filename === 'content/content.json') await writer.add(entry.filename, new TextReader(new TextDecoder().decode(bytes).replace(/videos\/[^"]+\.mp4/, 'videos/odd%zz.mp4')))
+      else await writer.add(entry.filename, new Uint8ArrayReader(bytes))
+    })
+    expect((await verifyPackage({ file: odd })).warnings).toContainEqual(expect.stringMatching(/^video (?:does not play|not checked): videos\/odd%zz\.mp4: /))
   }, 120_000)
 
   it('fails a file that is not an archive', async () => {

@@ -245,23 +245,36 @@ export async function verifyPackage(options) {
           .catch(() => null)
       : null
     // Each video and recording in the frame, after the settle: one the browser gave up on does not
-    // play, though the rest of the content drew (#218). Where this browser plays no H.264 at all,
-    // as Playwright's own Chromium, an mp4 it gave up on says nothing of the file.
+    // play, though the rest of the content drew (#218). Where this browser plays no H.264, or for a
+    // recording no AAC, as a Chromium built without them, an mp4 or an m4a it gave up on says
+    // nothing of the file.
     const media = frame
       ? await frame
           .evaluate(() => ({
-            h264: document.createElement('video').canPlayType('video/mp4; codecs="avc1.42E01E"') !== '',
+            plays: {
+              video: document.createElement('video').canPlayType('video/mp4; codecs="avc1.42E01E"') !== '',
+              audio: document.createElement('audio').canPlayType('audio/mp4; codecs="mp4a.40.2"') !== ''
+            },
             failed: [...document.querySelectorAll('video, audio')].flatMap((element) => {
               const played = /** @type {HTMLMediaElement} */ (element)
               const src = played.currentSrc || played.src
               // A file of the package's by its path there; any other by its address.
               const own = URL.canParse(src) && new URL(src).origin === location.origin && src.includes('/content/')
-              const name = own ? decodeURIComponent(src.replace(/^.*?\/content\//, '')) : src
+              const path = src.replace(/^.*?\/content\//, '')
+              // As written where an escape in it is not one, `%zz`, rather than losing every warning.
+              let name = src
+              if (own) {
+                try {
+                  name = decodeURIComponent(path)
+                } catch {
+                  name = path
+                }
+              }
               return played.error ? [{ kind: played.localName, name, code: played.error.code }] : []
             })
           }))
-          .catch(() => ({ h264: true, failed: [] }))
-      : { h264: true, failed: [] }
+          .catch(() => ({ plays: { video: true, audio: true }, failed: [] }))
+      : { plays: { video: true, audio: true }, failed: [] }
     /** @type {BlockedLoad[]} */
     const csp = frame ? await frame.evaluate(() => /** @type {PageWindow} */ (window).__csp ?? []).catch(() => []) : []
     // Untrusted, the package's `content.json` beside what the runtime was handed: the Service
@@ -347,7 +360,8 @@ export async function verifyPackage(options) {
     }
     for (const message of dedupe(report.errors.filter((e) => e.afterReady).map((e) => e.message))) report.warnings.push(`runtime error after ready: ${message}`)
     for (const { kind, name, code } of media.failed) {
-      if (!media.h264 && /\.(?:mp4|m4a)$/i.test(name)) report.warnings.push(`${kind} not checked: ${name}: this browser plays no H.264; Chrome or Edge does`)
+      const audio = kind === 'audio'
+      if (!media.plays[audio ? 'audio' : 'video'] && /\.(?:mp4|m4v|m4a)$/i.test(name)) report.warnings.push(`${kind} not checked: ${name}: this browser plays no ${audio ? 'AAC' : 'H.264'}; Chrome or Edge does`)
       else report.warnings.push(`${kind} does not play: ${name}: ${MEDIA_ERRORS[code] ?? `media error ${code}`}`)
     }
     for (const { url, status, error } of failedRequests) report.warnings.push(`request failed: ${url} (${status ?? error})`)
