@@ -83,7 +83,7 @@ Applied to this repository:
   generator so that the weekly refresh sees no change.
 
 Left as they are: the npm names, whose scope names the author, and which the policy treats as
-names in code, and so the repository's, `missing-elements/h5p-toolkit`; descriptive uses
+names in code, and so the repository's name, `missing-elements/h5p-toolkit`; descriptive uses
 ("Self-hosted H5P …"), which it allows as a "secondary identifier"; the `— h5p-offline-player`
 at the end of the page titles; and the title inside the pack's archives, "H5P Offline Player
 library pack", which nobody sees. Changing that one changes

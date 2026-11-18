@@ -66,7 +66,7 @@ document.querySelector('h5p-player').pack = pack
 ```
 
 On an AI site builder, one prompt can make this install. Lovable did, from
-`Embed an H5P file using https://github.com/missing-elements/h5p-toolkit` and the `.h5p`
+`Embed an H5P file using https://github.com/missing-elements/h5p-offline-player` and the `.h5p`
 file uploaded in the chat: on [the example it built](https://embed-h5p-file.lovable.app/), it
 bundled the element and its Service Worker, served the runtime from `public/h5p-runtime/` with
 `assets-base`, and set `libraries="pack"`. Its hosting answers `Range`, so the package is read in
