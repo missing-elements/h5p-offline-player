@@ -187,9 +187,18 @@ export async function imageSize(read) {
 }
 
 /**
+ * Whether bytes start with an MPEG audio frame's header a decoder takes: the sync bits, then no
+ * reserved version, layer, bit rate or sample rate.
+ * @param {Uint8Array} head
+ */
+const mpegFrame = (head) => head.length >= 4 && head[0] === 0xff && (head[1] & 0xe0) === 0xe0 && (head[1] & 0x18) !== 0x08 &&
+  (head[1] & 0x06) !== 0 && (head[2] & 0xf0) !== 0xf0 && (head[2] & 0x0c) !== 0x0c
+
+/**
  * What a video's or a recording's first bytes say it is: its container, a web page, or none known.
  * An mp4 or an m4a starts with `ftyp`, WebM with EBML's mark, Ogg with `OggS`, WAV with RIFF's
- * `WAVE`, MP3 with an ID3 tag or a frame's sync bits; a page with `<`.
+ * `WAVE`, MP3 with an ID3 tag or a frame header; a page with `<`, in UTF-8 or, after its
+ * byte-order mark, in UTF-16.
  * @param {Uint8Array} head the file's first 16 bytes, or all of a shorter one
  * @returns {'mp4' | 'webm' | 'ogg' | 'wav' | 'mp3' | 'page' | undefined}
  */
@@ -199,9 +208,11 @@ function containerOf(head) {
   if (head[0] === 0x1a && head[1] === 0x45 && head[2] === 0xdf && head[3] === 0xa3) return 'webm'
   if (ascii(0, 4) === 'OggS') return 'ogg'
   if (ascii(0, 4) === 'RIFF' && ascii(8, 4) === 'WAVE') return 'wav'
-  if (ascii(0, 3) === 'ID3' || (head[0] === 0xff && (head[1] & 0xe0) === 0xe0)) return 'mp3'
-  if (/^(?:\xef\xbb\xbf)?\s*</.test(ascii(0, head.length))) return 'page'
-  return undefined
+  if (ascii(0, 3) === 'ID3' || mpegFrame(head)) return 'mp3'
+  const text = ascii(0, head.length)
+  // UTF-16 read as its characters by leaving out the zero bytes, which only it has here.
+  const page = /^(?:\xff\xfe|\xfe\xff)/.test(text) ? text.slice(2).replaceAll('\0', '') : text.replace(/^\xef\xbb\xbf/, '')
+  return /^\s*</.test(page) ? 'page' : undefined
 }
 
 /** @template F */
@@ -347,7 +358,10 @@ export class MediaStore {
    */
   async #played(file, kind, source, web, at, report, note) {
     const { takes, what } = PLAYS[kind]
-    const container = containerOf(await file.read(0, 16))
+    // An mp4 by its index, read as the normalizer reads one, whatever atom comes first; any other
+    // by its first bytes.
+    const info = await mp4Info((offset, length) => file.read(offset, length), file.size)
+    const container = info ? 'mp4' : containerOf(await file.read(0, 16))
     if (container === 'page') {
       report(at, `${source} is a web page, not ${kind === 'video' ? 'a video' : 'a recording'}${web ? ': give the address of the file itself' : ''}`)
       return undefined
@@ -356,10 +370,8 @@ export class MediaStore {
       report(at, `${source} is not ${what}: its first bytes are none of theirs`)
       return undefined
     }
-    if (container !== 'mp4') return undefined
-    const info = await mp4Info((offset, length) => file.read(offset, length), file.size)
     if (!info) {
-      report(at, `${source} has no index (moov) a player can read: is the file whole?`)
+      if (container === 'mp4') report(at, `${source} has no index (moov) a player can read: is the file whole?`)
       return undefined
     }
     const held = new Set(info.tracks.map((track) => track.kind))

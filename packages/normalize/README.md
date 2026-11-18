@@ -58,10 +58,14 @@ TypeScript declarations ship with the package: `Report` and `EntryResult` descri
 
 Node only, not a browser. `crc32(bytes, previous)` from `@missing-elements/h5p-normalize/crc32`
 is the CRC-32 it writes entries with, for code that writes zips beside it, in a page too: zlib's in
-Node, a table elsewhere. `mp4Info(read, size)` from `@missing-elements/h5p-normalize/mp4` is what an
-mp4's index says, read as the faststart walks it, for h5p-author's build, in a page too: its length
-in seconds and each track's kind and codec, through `read(offset, length)` from atoms' headers and a
-few small atoms, never the media. Why deflated video cannot stream: the demo's
+Node, a table elsewhere.
+
+`mp4Info(read, size)` from `@missing-elements/h5p-normalize/mp4` says what an mp4's index holds: its
+length in seconds, and each track's kind and codec. `read(offset, length)` gives the file's bytes,
+fewer at its end, so it runs on a file in Node or a `Blob` in a page. It reads atoms' headers and a
+few small atoms, never the media.
+
+Why deflated video cannot stream: the demo's
 [normalize page](https://github.com/missing-elements/h5p-offline-player/blob/main/apps/demo/demo/normalize.html).
 
 ## Licence

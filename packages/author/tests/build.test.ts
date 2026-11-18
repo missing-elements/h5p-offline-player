@@ -693,16 +693,20 @@ describe('media', () => {
     await writeFile(join(dir, 'page.mp4'), '<!DOCTYPE html><title>clip</title>')
     await writeFile(join(dir, 'song.mp3'), 'not a recording at all')
     await writeFile(join(dir, 'cut.mp4'), mp4(true).subarray(0, 40))
+    // A page in UTF-16: its byte-order mark, FF FE, once passed for an MP3 frame's sync bits.
+    await writeFile(join(dir, 'wide.mp3'), Buffer.from('\ufeff<!DOCTYPE html><title>song</title>', 'utf16le'))
     const video = (path: string) => ({ content: { library: 'H5P.Video', params: { sources: { path } } } })
+    const audio = (path: string) => ({ content: { library: 'H5P.Audio', params: { files: { path } } } })
     expect(await problems({
       ...META,
       type: 'H5P.Column',
-      params: { content: [video('page.mp4'), video(`${origin}/wiki/File:clip.mp4`), { content: { library: 'H5P.Audio', params: { files: { path: 'song.mp3' } } } }, video('cut.mp4')] }
+      params: { content: [video('page.mp4'), video(`${origin}/wiki/File:clip.mp4`), audio('song.mp3'), video('cut.mp4'), audio('wide.mp3')] }
     }, { base: dir })).toEqual([
       'params.content[0].content.params.sources.path: page.mp4 is a web page, not a video',
       `params.content[1].content.params.sources.path: ${origin}/wiki/File:clip.mp4 is a web page, not a video: give the address of the file itself`,
       'params.content[2].content.params.files.path: song.mp3 is not an MP3, M4A, WAV, Ogg or WebM recording: its first bytes are none of theirs',
-      'params.content[3].content.params.sources.path: cut.mp4 has no index (moov) a player can read: is the file whole?'
+      'params.content[3].content.params.sources.path: cut.mp4 has no index (moov) a player can read: is the file whole?',
+      'params.content[4].content.params.files.path: wide.mp3 is a web page, not a recording'
     ])
   })
 
@@ -711,10 +715,12 @@ describe('media', () => {
     await writeFile(join(dir, 'radio.mp4'), mp4(true, { seconds: 30, tracks: [['soun', 'mp4a']] }))
     await writeFile(join(dir, 'phone.mp4'), mp4(true, { seconds: 30, tracks: [['vide', 'hvc1'], ['soun', 'mp4a']] }))
     await writeFile(join(dir, 'fine.mp4'), mp4(true, { seconds: 30, tracks: [['vide', 'avc1'], ['soun', 'mp4a']] }))
+    // An older file with no `ftyp`, its index first: an mp4 by its index, as the normalizer reads it.
+    await writeFile(join(dir, 'old.mp4'), mp4(true, { seconds: 30, tracks: [['vide', 'avc1'], ['soun', 'mp4a']] }).subarray(24))
     const { notes } = await build({
       ...META,
       type: 'H5P.Column',
-      params: { content: ['silent.mp4', 'radio.mp4', 'phone.mp4', 'fine.mp4'].map((path) => ({ content: { library: 'H5P.Video', params: { sources: { path } } } })) }
+      params: { content: ['silent.mp4', 'radio.mp4', 'phone.mp4', 'fine.mp4', 'old.mp4'].map((path) => ({ content: { library: 'H5P.Video', params: { sources: { path } } } })) }
     }, { base: dir })
     expect(notes.filter(({ path }) => path.endsWith('.sources.path')).map(({ path, message }) => `${path}: ${message}`)).toEqual([
       'params.content[0].content.params.sources.path: silent.mp4 has no sound',
@@ -738,6 +744,10 @@ describe('media', () => {
     ])
     // Within its length, an interaction that ends past it included, it builds.
     expect((await build(source([text(5, 40)], [{ time: 10, label: 'In' }]), { base: dir })).content.interactiveVideo.assets.interactions).toHaveLength(1)
+    // An item refused leaves a list whose indices are not the source's: no time is named in it.
+    expect(await problems(source(['a stray line', text(500, 600)], []), { base: dir })).toEqual([
+      expect.stringMatching(/^params\.interactiveVideo\.assets\.interactions\[0\]: expected an object/)
+    ])
   })
 
   it('gives a download up once nothing has arrived for a while, however long a slow one takes', async () => {

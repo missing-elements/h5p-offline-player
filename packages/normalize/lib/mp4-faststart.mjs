@@ -52,7 +52,8 @@ export async function planFaststart(file, base, size) {
     await readExact(file, buffer, base + offset)
     return buffer
   }
-  const atoms = await topLevelAtoms(read, size)
+  // As far as a fragment, which says the file streams as it is, however many follow.
+  const atoms = await topLevelAtoms(read, size, 'moof')
   if (!atoms) return skipped('not an ISO media file')
   if (atoms.some((atom) => atom.type === 'moof')) return skipped('fragmented mp4, already streamable')
 

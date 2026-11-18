@@ -27,33 +27,43 @@ const LEADING_TYPES = new Set(['ftyp', 'moov', 'mdat', 'free', 'skip', 'wide', '
 /** What a track holds, by its handler's type. */
 const KINDS = /** @type {Record<string, 'video' | 'audio'>} */ ({ vide: 'video', soun: 'audio' })
 
+/**
+ * More atoms than a real file has at one level, a fragmented one included as far as its index:
+ * a file of more is not one this reads, and is not walked to its end, so that one made of tiny
+ * atoms costs neither the memory nor the time.
+ */
+const MAX_ATOMS = 10_000
+
 /** @param {Uint8Array} bytes */
 const ascii = (bytes) => String.fromCharCode(...bytes)
 
 /**
- * The atoms between `start` and `end`, each by its header, or `null` where one is not whole there
- * or is no atom.
+ * The atoms between `start` and `end`, each by its header, as far as the first of type `until`
+ * where one is given; `null` where one is not whole there or is no atom, or where there are more
+ * than `MAX_ATOMS`.
  * @param {Read} read
  * @param {number} start
  * @param {number} end
- * @param {boolean} [file] the file's own atoms, the first of which has a type a file starts with
+ * @param {{ file?: boolean, until?: string }} [options] `file`, the file's own atoms, the first of
+ *   which has a type a file starts with; `until`, the type to stop at
  * @returns {Promise<Atom[] | null>}
  */
-async function atomsIn(read, start, end, file = false) {
+async function atomsIn(read, start, end, { file = false, until } = {}) {
   /** @type {Atom[]} */
   const atoms = []
   let position = start
   while (position < end) {
-    if (end - position < 8) return null
-    const header = await read(position, Math.min(16, end - position))
+    if (end - position < 8 || atoms.length === MAX_ATOMS) return null
+    const header = await read(position, 8)
     if (header.length < 8) return null
-    const view = new DataView(header.buffer, header.byteOffset, header.byteLength)
-    let size = view.getUint32(0)
+    let size = new DataView(header.buffer, header.byteOffset, 8).getUint32(0)
     const type = ascii(header.subarray(4, 8))
     let headerSize = 8
     if (size === 1) {
-      if (header.length < 16) return null
-      size = Number(view.getBigUint64(8))
+      // A 64-bit size, read only where an atom has one: the eight bytes after a header are its data.
+      const wide = end - position < 16 ? new Uint8Array(0) : await read(position + 8, 8)
+      if (wide.length < 8) return null
+      size = Number(new DataView(wide.buffer, wide.byteOffset, 8).getBigUint64(0))
       headerSize = 16
     } else if (size === 0) {
       size = end - position
@@ -62,20 +72,34 @@ async function atomsIn(read, start, end, file = false) {
     if (!/^[\x20-\x7e]{4}$/.test(type)) return null
     if (file && atoms.length === 0 && !LEADING_TYPES.has(type)) return null
     atoms.push({ type, offset: position, size, headerSize })
+    if (type === until) break
     position += size
   }
   return atoms
 }
 
 /**
- * The top-level atoms of the file, or `null` where its structure is not one this understands.
+ * The top-level atoms of the file, as far as the first of type `until` where one is given, or
+ * `null` where its structure is not one this understands.
  * @internal the walk the faststart shares
  * @param {Read} read
  * @param {number} size the file's length
+ * @param {string} [until]
  * @returns {Promise<Atom[] | null>}
  */
-export function topLevelAtoms(read, size) {
-  return atomsIn(read, 0, size, true)
+export function topLevelAtoms(read, size, until) {
+  return atomsIn(read, 0, size, { file: true, until })
+}
+
+/**
+ * Text in an atom's body, from `at`: never past the atom, and none where it is too short.
+ * @param {Read} read
+ * @param {Atom | undefined} atom
+ * @param {number} at
+ * @param {number} length
+ */
+async function textIn(read, atom, at, length) {
+  return atom && atom.size - atom.headerSize >= at + length ? ascii(await read(atom.offset + atom.headerSize + at, length)) : ''
 }
 
 /** @param {Read} read @param {Atom} atom */
@@ -89,9 +113,11 @@ const childrenOf = (read, atom) => atomsIn(read, atom.offset + atom.headerSize, 
  * @returns {Promise<Mp4Info | null>}
  */
 export async function mp4Info(read, size) {
-  const moov = (await topLevelAtoms(read, size))?.find((atom) => atom.type === 'moov')
+  // As far as the index, which a fragmented file has first, and any other first or last.
+  const moov = (await topLevelAtoms(read, size, 'moov'))?.find((atom) => atom.type === 'moov')
   const index = moov && (await childrenOf(read, moov))
-  if (!index) return null
+  // An index says what the movie is in its header: without one, it is none.
+  if (!index?.some((atom) => atom.type === 'mvhd')) return null
   /** @type {Mp4Info} */
   const info = { duration: undefined, tracks: [] }
   for (const atom of index) {
@@ -111,7 +137,7 @@ export async function mp4Info(read, size) {
  * @param {Atom} mvhd
  */
 async function durationOf(read, mvhd) {
-  const body = await read(mvhd.offset + mvhd.headerSize, 32)
+  const body = await read(mvhd.offset + mvhd.headerSize, Math.min(32, mvhd.size - mvhd.headerSize))
   const wide = body[0] === 1
   if (body.length < (wide ? 32 : 20)) return undefined
   const view = new DataView(body.buffer, body.byteOffset, body.byteLength)
@@ -136,7 +162,7 @@ async function trackOf(read, trak) {
   const stbl = minf && (await childrenOf(read, minf))?.find((atom) => atom.type === 'stbl')
   const stsd = stbl && (await childrenOf(read, stbl))?.find((atom) => atom.type === 'stsd')
   // After the version and flags: `hdlr` has a word before its handler, `stsd` its count and the entry's size.
-  const handler = hdlr ? ascii(await read(hdlr.offset + hdlr.headerSize + 8, 4)) : ''
-  const codec = stsd ? ascii(await read(stsd.offset + stsd.headerSize + 12, 4)) : ''
+  const handler = await textIn(read, hdlr, 8, 4)
+  const codec = await textIn(read, stsd, 12, 4)
   return { kind: KINDS[handler] ?? 'other', codec }
 }
