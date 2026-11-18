@@ -4,11 +4,12 @@ import { checkContent, layoutContext, valueAt } from './check.mjs'
 import { ContentGenerator, libraryString } from './generator.mjs'
 import { installClosure } from './install.mjs'
 import { loadLibraries } from './libraries.mjs'
-import { CC_VERSIONS, LICENSES, ROLES } from './metadata.mjs'
+import { CC_VERSIONS } from './metadata.mjs'
 import { machineNameOf, NAMING_KEYS, namingKey, nearestNames } from './names.mjs'
 import { quizProblems, quizSource } from './quiz.mjs'
 import { outlineOf } from './outline.mjs'
 import { SourceError } from './source-error.mjs'
+import { authorHolds, holds, sourceSchema, TYPE } from './source-schema.mjs'
 import { escapeText } from './text.mjs'
 import { LAYOUTS, placesOf, videoTimes } from './types.mjs'
 
@@ -24,11 +25,9 @@ export { SourceError }
  */
 
 /**
- * @typedef {{ name: string, role: string }} Author
- * @typedef {{
- *   type: string, title: string, language: string, license: string, licenseVersion?: string,
- *   authors: Author[], source?: string, yearFrom?: number, yearTo?: number, params: Record<string, unknown>
- * }} Source a package's source: the content type, its metadata, and the parameters that differ from the defaults
+ * @typedef {import('zod/mini').output<typeof sourceSchema>} Source a package's source, as `sourceSchema`
+ *   declares it: the content type, its metadata, and the parameters that differ from the defaults
+ * @typedef {Source['authors'][number]} Author
  * @typedef {{ path: string, message: string }} Problem
  * @typedef {import('./translate.mjs').TranslationReport} TranslationReport
  */
@@ -121,10 +120,12 @@ export function sourceOf(input, names) {
     given.params = Object.fromEntries(rest.map((key) => [key, input[key]]))
   } else for (const key of rest) report(key, `is not a field of a source; ${fields}`)
 
+  // Each field held to `sourceSchema`, with what it cannot say alone written here.
+  const field = sourceSchema.shape
   let typed = false
   const type = typeof given.type === 'string' ? given.type.trim() : ''
   if (named) typed = true
-  else if (!type) report(at.type, 'expected a content type\'s machine name, such as "H5P.Blanks"')
+  else if (!type) holds(field.type, given.type, at.type, report)
   else if (names) {
     const found = machineNameOf(type, names)
     if (!found) {
@@ -142,57 +143,36 @@ export function sourceOf(input, names) {
     report(at.type, `takes the machine name alone, "${name}": the version is the pack's newest`)
     given.type = name
     typed = true
-  } else if (!/^\S+$/.test(type)) report(at.type, 'expected a content type\'s machine name, such as "H5P.Blanks"')
+  } else if (!/^\S+$/.test(type)) report(at.type, TYPE)
   else typed = true
 
-  /** @type {Record<string, any>} */
+  /** @type {Record<string, any>} a stand-in for each field that does not hold */
   const source = { type: typed ? String(given.type).trim() : '', title: '', language: 'en', license: 'U', authors: [], params: {} }
-  if (typeof given.title !== 'string' || !given.title.trim()) report(at.title, 'expected the activity\'s title')
-  else if (given.title.length > 255) report(at.title, 'takes at most 255 characters')
-  else source.title = given.title
-  let tag = typeof given.language === 'string'
-  try {
-    if (tag) Intl.getCanonicalLocales(given.language)
-  } catch {
-    tag = false
-  }
-  if (tag) source.language = given.language
-  else report(at.language, 'expected a BCP 47 language tag, such as "en" or "de-AT"')
+  if (holds(field.title, given.title, at.title, report)) source.title = given.title
+  if (holds(field.language, given.language, at.language, report)) source.language = given.language
   // A licence written with its version, "CC BY 4.0", as it is spoken of: H5P keeps the version in
   // a field of its own. The names alone, which this problem used to list, had a chat drop the
   // version to fit them.
   const versioned = typeof given.license === 'string' ? /^CC[ -](BY(?:-(?:NC-SA|NC-ND|NC|ND|SA))?)[ -]v?(\d\.\d)$/i.exec(given.license.trim()) : null
   const license = versioned ? `CC ${versioned[1].toUpperCase()}` : given.license
-  if (LICENSES.includes(given.license)) source.license = given.license
-  else if (versioned) {
+  if (versioned) {
     const written = JSON.stringify(given.license)
     if (given.licenseVersion !== undefined) report(at.license, `${written} holds the version too, which licenseVersion names: write "license": "${license}"`)
     else if (CC_VERSIONS.includes(versioned[2])) report(at.license, `${written} holds the version too: write "license": "${license}" and "licenseVersion": "${versioned[2]}"`)
     else report(at.license, `${written} holds a version too: write "license": "${license}" and "licenseVersion", one of ${CC_VERSIONS.join(', ')}`)
     source.license = license
     if (given.licenseVersion === undefined && CC_VERSIONS.includes(versioned[2])) source.licenseVersion = versioned[2]
-  } else report(at.license, `use one of ${LICENSES.map((each) => JSON.stringify(each)).join(', ')}; "U" when it is not known`)
+  } else if (holds(field.license, given.license, at.license, report)) source.license = given.license
   if (given.licenseVersion !== undefined) {
     if (!String(license).startsWith('CC ') || license === 'CC0 1.0' || license === 'CC PDM') report(at.licenseVersion, 'is for a Creative Commons BY licence only')
-    else if (!CC_VERSIONS.includes(given.licenseVersion)) report(at.licenseVersion, `use one of ${CC_VERSIONS.join(', ')}`)
-    else source.licenseVersion = given.licenseVersion
+    else if (holds(field.licenseVersion, given.licenseVersion, at.licenseVersion, report)) source.licenseVersion = given.licenseVersion
   }
-  if (!Array.isArray(given.authors) || !given.authors.length) report(at.authors, 'name at least one author: [{ "name": "…", "role": "Author" }]')
-  else given.authors.forEach((/** @type {unknown} */ author, /** @type {number} */ i) => {
-    const before = problems.length
-    if (!isObject(author) || typeof author.name !== 'string' || !author.name.trim()) report(`${at.authors}[${i}].name`, 'expected the author\'s name')
-    else if (!ROLES.includes(author.role)) report(`${at.authors}[${i}].role`, `use one of ${ROLES.join(', ')}`)
-    else for (const key of Object.keys(author)) if (key !== 'name' && key !== 'role') report(`${at.authors}[${i}].${key}`, 'is not part of an author; write name and role')
-    if (problems.length === before) source.authors.push(author)
-  })
-  if (given.source !== undefined && (typeof given.source !== 'string' || !/^https?:\/\/\S+$/i.test(given.source))) report(at.source, 'expected the address the content comes from')
-  else if (given.source !== undefined) source.source = given.source
-  for (const key of ['yearFrom', 'yearTo']) {
-    if (given[key] !== undefined && !Number.isInteger(given[key])) report(at[key], 'expected a year')
-    else if (given[key] !== undefined) source[key] = given[key]
+  // The authors that hold are kept, so the content is checked with them.
+  const authorsHold = holds(field.authors, given.authors, at.authors, report)
+  if (Array.isArray(given.authors)) source.authors = authorsHold ? given.authors : given.authors.filter(authorHolds)
+  for (const key of /** @type {const} */ (['source', 'yearFrom', 'yearTo', 'params'])) {
+    if (given[key] !== undefined && holds(field[key], given[key], at[key], report)) source[key] = given[key]
   }
-  if (given.params !== undefined && !isObject(given.params)) report('params', 'expected an object of the content type\'s fields')
-  else if (given.params !== undefined) source.params = given.params
   return { source: /** @type {Source} */ (source), problems, typed }
 }
 
