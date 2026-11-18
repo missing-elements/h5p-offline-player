@@ -305,6 +305,15 @@ text to the content check's rules, and `apps/skills` plays every example untrust
   of the library is the sub-content's `metadata.title`. `readSource` keeps its contract.
   `sourceType(source, names)` is exported (#176) so the build page hands back the type the build
   took and keeps no copy of the rule.
+- **A source's own fields are declared once, as `sourceSchema`** (#230). `sourceOf` takes the list
+  of fields from it, holds each field to it and says its message where the field was written; it is
+  the `Source` type, it takes no other field, as a build does not, and it is exported so that a
+  model can be shown the shape before writing a source. What one field cannot say alone stays in
+  `sourceOf`: the content type named loosely, a licence written with its version, a version for a
+  licence that takes none, and fields in the wrong place. Every problem of an author is said at
+  once, and an author written as a name alone is said with the object to write. It is zod/mini,
+  23 kB minified, since a build runs in a page too, where zod's chained API takes 93 kB; JSON
+  Schema is made where it is shown.
 - **The skill is installed, and its page lists what step 3 fetches.** Claude and ChatGPT install
   the skill as a zip, and Grok reads the zip attached to a message; reading it by its link was
   dropped (missing-elements.github.io#42). Since the 0.10.0 pin the organisation's site serves the

@@ -2,8 +2,9 @@
  * @missing-elements/h5p-author/core: what the package does that needs neither Node nor a page, for
  * a tool that runs beside a build in either: the generator, the libraries loaded as a build loads
  * them from any source of them, the parts a content type's build can read, the check of saved
- * content, the rules for text, and which content type a source is written in, as a build reads it. The package's entry for Node (`.`) and the one for a page
- * (`./browser`) carry all of it, each with its own `buildPackage` and `openPack`.
+ * content, the rules for text, which content type a source is written in, as a build reads it, and
+ * a source's own fields as the schema a build holds them to. The package's entry for Node (`.`) and
+ * the one for a page (`./browser`) carry all of it, each with its own `buildPackage` and `openPack`.
  */
 
 export { bundleLibraries, contentTypes } from './bundle.mjs'
@@ -15,6 +16,7 @@ export { loadLibraries, packageLibraries } from './libraries.mjs'
 export { sourceType } from './names.mjs'
 export { GENERATED_END, GENERATED_START } from './schema.mjs'
 export { SourceError } from './source-error.mjs'
+export { sourceSchema } from './source-schema.mjs'
 export { allowedTags, editorWidget, markupText, plainText, takesMarkup } from './text.mjs'
 
 /**

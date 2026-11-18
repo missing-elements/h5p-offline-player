@@ -102,6 +102,9 @@ importers:
       '@zip.js/zip.js':
         specifier: ^2.24.0
         version: 2.24.0
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
     devDependencies:
       '@missing-elements/h5p-verify':
         specifier: workspace:*
