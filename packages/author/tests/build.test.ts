@@ -9,8 +9,10 @@ import { promisify } from 'node:util'
 import { BlobReader, TextWriter, Uint8ArrayWriter, ZipReader } from '@zip.js/zip.js'
 import { pack } from '@missing-elements/h5p-libraries'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { buildPackage, librariesIn, missingForInstall, SourceError } from '../lib/author.mjs'
+import { toJSONSchema } from 'zod/mini'
+import { buildPackage, librariesIn, missingForInstall, SourceError, sourceSchema } from '../lib/author.mjs'
 import { readSource } from '../lib/build.mjs'
+import { LICENSES } from '../lib/metadata.mjs'
 import { MediaStore } from '../lib/media.mjs'
 import { nodeMedia } from '../lib/node.mjs'
 import { quizProblems } from '../lib/quiz.mjs'
@@ -358,6 +360,29 @@ describe('any content type in the pack', () => {
       expect.stringMatching(/^params\.behaviour\.sideways: is not a field here/)
     ])
     expect((await readdir(dir)).filter(name => name.startsWith('failed-') || name.startsWith('.h5p-author-'))).toEqual([])
+  })
+
+  it('holds a source\'s own fields to one schema, which is what an app is shown of a source (#230)', async () => {
+    const blanks = { type: 'H5P.Blanks', params: { questions: ['The *Danube* flows east.'] } }
+    // An author written as a name alone, as Haiku wrote one through the MCP server: said with the object to write.
+    expect(await problems({ ...META, ...blanks, authors: ['Unknown'] })).toEqual(['authors[0]: expected an author: write { "name": "Unknown", "role": "Author" }'])
+    // Every problem of an author at once, each at its own path.
+    expect(await problems({ ...META, ...blanks, authors: [{ name: ' ', role: 'Writer', email: 'ann@example.org' }] })).toEqual([
+      'authors[0].name: expected the author\'s name',
+      'authors[0].role: use one of Author, Editor, Licensee, Originator',
+      'authors[0].email: is not part of an author; write name and role'
+    ])
+    // The same fields, as JSON Schema: those a source must name, the codes, an author's two fields.
+    const shape = toJSONSchema(sourceSchema, { io: 'input' }) as { required: string[], properties: Record<string, any> }
+    expect(shape.required).toEqual(['type', 'title', 'language', 'license', 'authors'])
+    expect(shape.properties.license.enum).toEqual(LICENSES)
+    expect(shape.properties.authors.items).toMatchObject({ required: ['name', 'role'], additionalProperties: false })
+    // No other field, as a build refuses one: said as the build says it.
+    expect(shape).toMatchObject({ additionalProperties: false })
+    expect(sourceSchema.safeParse({ ...META, ...blanks }).success).toBe(true)
+    expect(sourceSchema.safeParse({ ...META, ...blanks, extra: 1 }).error?.issues.map(({ message }) => message)).toEqual([
+      'is not a field of a source; the fields are type, title, language, license, licenseVersion, authors, source, yearFrom, yearTo, params'
+    ])
   })
 
   it('says what to write for what is in the wrong place, checks it in the same build, and counts no list it refused an item of (#172)', async () => {

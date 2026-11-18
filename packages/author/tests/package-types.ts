@@ -2,7 +2,7 @@
 // published declarations, not the source. `pnpm typecheck` writes them first.
 import {
   allowedTags, buildPackage, bundleLibraries, checkContent, ContentGenerator, contentTypes, GENERATED_START, loadLibraries, markupText, openPack, packageLibraries, plainText, schemaOf, SourceError,
-  writeBundle, writeBundles,
+  sourceSchema, writeBundle, writeBundles,
   type BuildResult, type BundleResult, type CheckedContent, type LibraryRecord, type LibrarySource, type PackageFiles, type Source, type TranslationReport
 } from '@missing-elements/h5p-author'
 // @ts-expect-error The source reader is internal: a helper the tests import from its module.
@@ -13,6 +13,9 @@ import { bundleLibraries as bundleBeside, checkContent as checkBeside, ContentGe
 import { buildPackage as noBuild } from '@missing-elements/h5p-author/core'
 
 const source: Source = { type: 'H5P.TrueFalse', title: 'T', language: 'en', license: 'U', authors: [{ name: 'A', role: 'Author' }], params: {} }
+// The schema a source's own fields are held to is the `Source` type.
+const parsed: Source | undefined = sourceSchema.safeParse({ ...source, params: undefined }).data
+void parsed
 export async function check(): Promise<[BuildResult, string, string]> {
   const built = await buildPackage(source, 'out.h5p', { libraries: 'parts', base: '.' })
   try {
