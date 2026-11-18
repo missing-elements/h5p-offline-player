@@ -54,8 +54,9 @@ server, for ChatGPT or Claude on the web, is #210 and not this.
 - **A read writes beside the package, and names its files where it wrote them** (#236).
   `h5p_read` takes a package in the folders, a name alone being the first folder's, and writes its
   source and media into a new folder beside it, named after it and numbered where the name is
-  taken, as a package is. It answers with the source, each file it wrote named by its full path,
-  so `h5p_build` reads them wherever its package goes. Asked to add two harder questions to the
+  taken, as a package is. It answers with the source, each file named by its full path in that
+  folder, so `h5p_build` reads them wherever its package goes, and looks for one the package lacks
+  there and nowhere else. Asked to add two harder questions to the
   demo's quiz, Haiku read it and built at the first build in 6 of 6 runs. With the package
   described as a path in the server's folders, it first guessed one from its working folder in 3
   of 3; described "by its file name alone", in none of 3.

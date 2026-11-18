@@ -68,17 +68,19 @@ const OUTLINE_LINES = 80
 const sourceBeside = (path) => path.replace(/\.h5p$/i, '.source.json')
 
 /**
- * A read source's files named where they were written, so that a build reads them wherever its
- * package goes: each file the read wrote, by its path from the folder, made that folder's.
+ * A read source's files named in the folder it was read into, so that a build looks for each there
+ * and nowhere else: one the read wrote, where it is, and one the package lacks, where the person can
+ * put it. Every file a read source names, but by a web address, is under its folder by its path
+ * (`readPackage`); a path is a field of a file alone in every content type.
  * @param {unknown} value
  * @param {string} folder
- * @param {Set<string>} files
  * @returns {unknown}
  */
-function located(value, folder, files) {
-  if (Array.isArray(value)) return value.map((each) => located(each, folder, files))
+function located(value, folder) {
+  if (Array.isArray(value)) return value.map((each) => located(each, folder))
   if (!value || typeof value !== 'object') return value
-  const entries = Object.entries(value).map(([key, each]) => [key, key === 'path' && typeof each === 'string' && files.has(each) ? join(folder, ...each.split('/')) : located(each, folder, files)])
+  const local = (/** @type {unknown} */ each) => typeof each === 'string' && !/^[a-z][a-z0-9+.-]*:/i.test(each)
+  const entries = Object.entries(value).map(([key, each]) => [key, key === 'path' && local(each) ? join(folder, ...String(each).split('/')) : located(each, folder)])
   return Object.fromEntries(entries)
 }
 
@@ -275,7 +277,7 @@ export async function createServer(options = {}) {
     const media = result.files.length ? `, with its ${result.files.length} media file${result.files.length === 1 ? '' : 's'} beside it` : ''
     const lines = [`Read ${path}: ${result.source.type}. Its source is in ${result.output}${media}.`]
     for (const { path: at, message } of result.notes) lines.push(`Note: ${at} ${message}`)
-    const source = { ...result.source, params: located(result.source.params, folder, new Set(result.files)) }
+    const source = { ...result.source, params: located(result.source.params, folder) }
     lines.push('', 'The source, each file named where it was written: change it as the person asks and pass it to h5p_build.', JSON.stringify(source))
     return answer(lines.join('\n'))
   })

@@ -1,4 +1,4 @@
-import { access, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { Client } from '@modelcontextprotocol/client'
@@ -168,14 +168,36 @@ describe('h5p_read', () => {
     expect(text).toContain(`Read ${built}: H5P.Column. Its source is in ${join(beside, 'one-pixel.source.json')}, with its 1 media file beside it.`)
     const read = JSON.parse(text.split('\n').at(-1)!)
     expect(read).toMatchObject({ type: 'H5P.Column', title: 'One pixel', params: { content: [{ content: { library: 'H5P.Image', params: { alt: 'A pixel' } } }] } })
-    // Where it was written, read by a build wherever its package goes.
+    // Where it was written, read by a build wherever its package goes: the source file, written
+    // beside it, names it from there.
+    const written = JSON.parse(await readFile(join(beside, 'one-pixel.source.json'), 'utf8'))
     const path = read.params.content[0].content.params.file.path
-    expect(path.startsWith(`${beside}/`)).toBe(true)
+    expect(path).toBe(join(beside, ...written.params.content[0].content.params.file.path.split('/')))
     await access(path)
     const again = builtOf(await call('h5p_build', { source: { ...read, title: 'One pixel, again' }, verify: false }))
     expect(again).toBe(join(folder, 'one-pixel-again.h5p'))
     // Read again, it takes a folder of its own: nothing is written over.
     expect(textOf(await call('h5p_read', { package: 'one-pixel.h5p' }))).toContain(`Its source is in ${join(folder, 'one-pixel-2', 'one-pixel.source.json')}`)
+  })
+
+  it('names a file the package lacks in the folder it read into, so a build looks for it there and nowhere else', async () => {
+    await writeFile(join(folder, 'pixel.png'), PIXEL)
+    const picture = { library: 'H5P.Image', params: { file: { path: 'pixel.png' }, alt: 'A pixel' } }
+    const built = builtOf(await call('h5p_build', { source: { ...SOURCE, type: 'H5P.Column', title: 'Lost pixel', params: { content: [{ content: picture }] } }, verify: false }))!
+    // The picture's entry renamed, as a package made elsewhere may lack a file its content names.
+    const bytes = (await readFile(built)).toString('latin1')
+    const entry = /content\/(images\/[^/\0]+?)\.png/.exec(bytes)![1]
+    await writeFile(join(folder, 'lost.h5p'), Buffer.from(bytes.replaceAll(`content/${entry}.png`, `content/${entry}.pnx`), 'latin1'))
+    // Where a build given the package's path alone would look.
+    await mkdir(join(folder, 'images'), { recursive: true })
+    await writeFile(join(folder, `${entry}.png`), PIXEL)
+    const text = textOf(await call('h5p_read', { package: 'lost.h5p' }))
+    expect(text).toContain(`Note: params names the file ${entry}.png, which is not in the package: a build of this source asks for it`)
+    const read = JSON.parse(text.split('\n').at(-1)!)
+    expect(read.params.content[0].content.params.file.path).toBe(join(folder, 'lost', ...`${entry}.png`.split('/')))
+    const again = await call('h5p_build', { source: { ...read, title: 'Lost pixel, again' }, verify: false })
+    expect(builtOf(again)).toBeUndefined()
+    expect(textOf(again)).toContain('no such file in the folders this build may read')
   })
 
   it('refuses a package outside its folders, and says why one is refused', async () => {
