@@ -12,7 +12,7 @@ An H5P package is JavaScript, and the player runs it on the origin that serves t
 | Cannot host a file (page builder, hosted CMS, LMS page) | **Embed** |
 
 Installed, you get the whole API, and a package played as it is runs as your site. Embedded, the
-player page that [`@missing-elements/h5p-embed`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#readme)
+player page that [`@missing-elements/h5p-embed`](https://github.com/missing-elements/h5p-toolkit/tree/main/packages/embed#readme)
 writes is framed from a domain that holds nothing else, so a package never sees your site's
 cookies, storage or page, and you get its results as relayed xAPI. `untrusted` plays a package as
 data, none of its own code running and its content checked, as an H5P plugin checks an author's

@@ -64,7 +64,7 @@
         runs: it plays with the library pack's code, and its content is checked against each
         library's field definitions before it is shown, as the H5P CMS plugins check an author's
         upload, which makes it as contained as in an H5P plugin on the same site.
-        <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/docs/untrusted.md" rel="noopener">Packages you did not make</a>
+        <a href="https://github.com/missing-elements/h5p-toolkit/blob/main/docs/untrusted.md" rel="noopener">Packages you did not make</a>
         sets the two modes beside the plugins'. Embedded, a package runs on the player domain and never sees your page,
         cookies, storage or APIs; results reach you as relayed xAPI, and storage is kept per
         embedding site. In every setup the package is named by <code>src</code> — the element's
@@ -239,7 +239,7 @@ cp node_modules/@missing-elements/h5p-libraries/libraries.txt public/h5p-librari
         <code>nginx.conf</code> and an <code>.htaccess</code> for a server of your own, and the
         files Netlify, Cloudflare Pages and Vercel read. <code>--packages</code> limits
         the hosts packages may come from, and <code>--ancestors</code> the sites that may frame it;
-        the <a href="https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#readme" rel="noopener">package's README</a>
+        the <a href="https://github.com/missing-elements/h5p-toolkit/tree/main/packages/embed#readme" rel="noopener">package's README</a>
         has the rest. Then, on your site:
       </p>
       <pre class="code" data-lang="html">&lt;iframe src="https://h5p-player.example.net/?src=https://alekswebnet.github.io/h5p/gh-normalized.h5p&amp;xapi=https://your-site.example"
@@ -264,7 +264,7 @@ cp node_modules/@missing-elements/h5p-libraries/libraries.txt public/h5p-librari
         <li><code>h5p-sw.js</code> is on the page's own origin. With a bundler that is automatic.</li>
         <li>The package's host sends CORS headers, or no browser can read the file. Without them the element reports <code>error: no-cors</code>, and your page can offer a file picker instead.</li>
         <li><code>Range</code> support on the host is optional. With it a 300 MB package starts after a few kilobytes; without it the archive is downloaded once and played from the browser's cache, booting as soon as its libraries have arrived.</li>
-        <li>Licences: the player is MIT. The H5P core runtime it loads is GPL-3.0, which is why it is a package of its own, <code>@missing-elements/h5p-runtime</code>, whose <code>dist/</code> carries its <code>LICENSE.txt</code> and <code>NOTICE.txt</code>; keep them with it when you copy or serve it. The runtime's <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/packages/runtime/NOTICE.md" rel="noopener">NOTICE.md</a> has the full account.</li>
+        <li>Licences: the player is MIT. The H5P core runtime it loads is GPL-3.0, which is why it is a package of its own, <code>@missing-elements/h5p-runtime</code>, whose <code>dist/</code> carries its <code>LICENSE.txt</code> and <code>NOTICE.txt</code>; keep them with it when you copy or serve it. The runtime's <a href="https://github.com/missing-elements/h5p-toolkit/blob/main/packages/runtime/NOTICE.md" rel="noopener">NOTICE.md</a> has the full account.</li>
       </ul>
 
       <h2>Listening to it</h2>
@@ -309,9 +309,9 @@ input.addEventListener('change', () =&gt; { player.file = input.files[0] })</pre
 
       <p>
         The element's whole API is in
-        <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/docs/api.md" rel="noopener">docs/api.md</a>; when something goes wrong, see
-        <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/docs/troubleshooting.md" rel="noopener">Troubleshooting</a>, and for a site
-        with one Service Worker, <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/docs/single-worker.md" rel="noopener">single-worker hosts</a>.
+        <a href="https://github.com/missing-elements/h5p-toolkit/blob/main/docs/api.md" rel="noopener">docs/api.md</a>; when something goes wrong, see
+        <a href="https://github.com/missing-elements/h5p-toolkit/blob/main/docs/troubleshooting.md" rel="noopener">Troubleshooting</a>, and for a site
+        with one Service Worker, <a href="https://github.com/missing-elements/h5p-toolkit/blob/main/docs/single-worker.md" rel="noopener">single-worker hosts</a>.
       </p>
 
       <footer>
@@ -319,7 +319,7 @@ input.addEventListener('change', () =&gt; { player.file = input.files[0] })</pre
           <a href="/">Player page</a>
           <a href="/demo/">All examples</a>
           <a href="https://www.npmjs.com/package/@missing-elements/h5p-offline-player" rel="noopener">On npm</a>
-          <a href="https://github.com/missing-elements/h5p-offline-player" rel="noopener">Source and README</a>
+          <a href="https://github.com/missing-elements/h5p-toolkit" rel="noopener">Source and README</a>
         </nav>
       </footer>
     </main>

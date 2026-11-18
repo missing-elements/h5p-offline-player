@@ -74,11 +74,11 @@ VS Code 1.90 or later, on the desktop. VS Code for the Web cannot run the server
 
 ## Related
 
-- [h5p-offline-player](https://github.com/missing-elements/h5p-offline-player): the player, a web
+- [h5p-offline-player](https://github.com/missing-elements/h5p-toolkit): the player, a web
   component that plays H5P on any website you host, with no H5P server.
-- [h5p-verify](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/verify):
+- [h5p-verify](https://github.com/missing-elements/h5p-toolkit/tree/main/packages/verify):
   checks from the command line that a package plays; `--preview` opens it in your browser.
-- [h5p-normalize](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/normalize):
+- [h5p-normalize](https://github.com/missing-elements/h5p-toolkit/tree/main/packages/normalize):
   rewrites a package so that its video streams.
 
 ## Licence

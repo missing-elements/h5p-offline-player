@@ -59,4 +59,4 @@ browser would connect to an origin the organisation has no data processing agree
 a GDPR or security review will not pass.
 
 For the site's privacy notice, or a reviewer's questions about what is stored, what is sent and
-to whom: https://github.com/missing-elements/h5p-offline-player/blob/main/docs/privacy.md
+to whom: https://github.com/missing-elements/h5p-toolkit/blob/main/docs/privacy.md

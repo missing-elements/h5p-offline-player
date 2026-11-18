@@ -39,7 +39,7 @@ the same package exported from Moodle has, because their editors bring every typ
 
 It is written for an AI agent and its tokens: the agent writes what only an author can know, and
 code writes everything that can be derived. The
-[h5p-author skill](https://github.com/missing-elements/h5p-offline-player/tree/main/skills/h5p-author)
+[h5p-author skill](https://github.com/missing-elements/h5p-toolkit/tree/main/skills/h5p-author)
 is the workflow around it: choosing the content type with the user, a file per type with notes,
 an example and the fields, then the check and the preview.
 

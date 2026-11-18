@@ -26,7 +26,7 @@ async function notices() {
   const licence = (await readFile(resolve(zipJs, 'LICENSE'), 'utf8')).trim()
   if (licence.includes('*/')) throw new Error('[build] the zip.js licence would end the comment early')
   return (
-    `/*! @missing-elements/h5p-embed ${version}, the SCORM page. Copyright (c) 2026 missing-elements. MIT (https://github.com/missing-elements/h5p-offline-player/blob/main/LICENSE). ` +
+    `/*! @missing-elements/h5p-embed ${version}, the SCORM page. Copyright (c) 2026 missing-elements. MIT (https://github.com/missing-elements/h5p-toolkit/blob/main/LICENSE). ` +
     `Bundles the library rules of @missing-elements/h5p-offline-player (MIT) and zip.js ${zip} (https://github.com/gildas-lormeau/zip.js):\n\n${licence}\n*/`
   )
 }

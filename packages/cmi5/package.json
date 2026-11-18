@@ -5,12 +5,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/missing-elements/h5p-offline-player.git",
+    "url": "git+https://github.com/missing-elements/h5p-toolkit.git",
     "directory": "packages/cmi5"
   },
-  "homepage": "https://github.com/missing-elements/h5p-offline-player/tree/main/packages/cmi5#readme",
+  "homepage": "https://github.com/missing-elements/h5p-toolkit/tree/main/packages/cmi5#readme",
   "bugs": {
-    "url": "https://github.com/missing-elements/h5p-offline-player/issues"
+    "url": "https://github.com/missing-elements/h5p-toolkit/issues"
   },
   "publishConfig": {
     "access": "public"

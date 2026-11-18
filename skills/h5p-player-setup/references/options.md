@@ -25,7 +25,7 @@ Formulas need `H5P.MathDisplay` in the package, or `libraries="pack"`, which car
 
 A site moving from h5p-standalone finds its options here under the same names; the full mapping,
 including the ones the `.h5p` or the events replace:
-https://github.com/missing-elements/h5p-offline-player/blob/main/docs/h5p-standalone.md
+https://github.com/missing-elements/h5p-toolkit/blob/main/docs/h5p-standalone.md
 
 ## Resume, only when asked for
 
@@ -42,4 +42,4 @@ still not stored. With `resume="host"` and each save sent to a server, `save-int
 spaces the saves as the H5P plugins do; the default is 10 seconds.
 
 The element's full API and events:
-https://github.com/missing-elements/h5p-offline-player/blob/main/docs/api.md
+https://github.com/missing-elements/h5p-toolkit/blob/main/docs/api.md

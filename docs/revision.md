@@ -23,7 +23,7 @@ release that changes none of a package's libraries leaves its revision as it was
 published `.h5p`, from which anyone can recompute it.
 
 The recipe does not change within a major version of the player, and a major that changes it
-gives the new value a prefix of its own ([Compatibility](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/compatibility.md)).
+gives the new value a prefix of its own ([Compatibility](https://github.com/missing-elements/h5p-toolkit/blob/main/docs/compatibility.md)).
 
 It identifies a build; it does not seal one, since a CRC can be forged on purpose. It also cannot
 say *when* a build was current — that belongs in your LMS, LRS or document control, against which

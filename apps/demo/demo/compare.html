@@ -89,7 +89,7 @@
       <ul class="list">
         <li><strong>A <code>.h5p</code> plays as it is.</strong> No unzipping, no upload step, no folder per package: a URL to the file, or a file picked from disk. A 300 MB package starts after a few kilobytes on a host that honours <code>Range</code>, and on one that does not it starts as soon as its libraries have arrived.</li>
         <li><strong>Offline, with nothing but a browser.</strong> <a href="/app/">The installable app</a> opens a <code>.h5p</code> file on a computer or a phone and plays it with no network, the libraries included: no account, no site to sign in to, nothing to install from an app store.</li>
-        <li><strong>Every statement names its build.</strong> Each xAPI statement carries <code>context.revision</code>, a fingerprint of the package it came from, so a completion record says which version the learner finished. <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/docs/revision.md" rel="noopener">How</a>.</li>
+        <li><strong>Every statement names its build.</strong> Each xAPI statement carries <code>context.revision</code>, a fingerprint of the package it came from, so a completion record says which version the learner finished. <a href="https://github.com/missing-elements/h5p-toolkit/blob/main/docs/revision.md" rel="noopener">How</a>.</li>
         <li><strong>cmi5, without an H5P server.</strong> The package stays on a static host and an LMS launches it as an assignable unit, checked against ADL&rsquo;s CATAPULT. <a href="/demo/cmi5.html">The cmi5 example</a>.</li>
         <li><strong>Tools for packages made by machine.</strong> <code>h5p-verify</code> plays a package headless and says whether it works; <code>h5p-normalize</code> rewrites one so its video streams. Both are commands, both have agent skills.</li>
         <li><strong>MIT, with the GPL kept apart.</strong> The H5P core runtime is GPL-3.0; it is a package of its own, so the element in your bundle is MIT alone.</li>
@@ -100,7 +100,7 @@
         <li><strong>You need to edit content.</strong> This is a player. Author in Lumi, on h5p.com or in a site with the H5P plugin, export the <code>.h5p</code>, and play it here &mdash; the two work together.</li>
         <li><strong>Your site already runs Moodle.</strong> Its built-in H5P plays and edits content, records scores in the gradebook, and plays offline in the Moodle app. Use it.</li>
         <li><strong>You want it managed for you.</strong> h5p.com hosts, edits, reports and integrates with LMSs, with support, for a subscription. This player needs someone to deploy and update it.</li>
-        <li><strong>You want scores stored per learner with no code.</strong> The H5P plugins for WordPress, Drupal and Moodle keep results per user out of the box. Here results are events: your page, an LRS or cmi5 decides where they go. For an LMS such as Moodle, ILIAS, OpenOLAT or Chamilo, <a href="https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#a-scorm-package-for-an-lms" rel="noopener"><code>h5p-embed --scorm</code></a> wraps a package as a SCORM zip that reports the score and the learner&rsquo;s place to it.</li>
+        <li><strong>You want scores stored per learner with no code.</strong> The H5P plugins for WordPress, Drupal and Moodle keep results per user out of the box. Here results are events: your page, an LRS or cmi5 decides where they go. For an LMS such as Moodle, ILIAS, OpenOLAT or Chamilo, <a href="https://github.com/missing-elements/h5p-toolkit/tree/main/packages/embed#a-scorm-package-for-an-lms" rel="noopener"><code>h5p-embed --scorm</code></a> wraps a package as a SCORM zip that reports the score and the learner&rsquo;s place to it.</li>
         <li><strong>Your users upload content types the library pack lacks.</strong> The H5P plugins install new library code from an administrator&rsquo;s upload; here a package played <code>untrusted</code> gets its libraries from a pack pinned per release, and one that needs a newer library waits for the next pack. <em>Data and trust</em>, below, has what the check covers.</li>
         <li><strong>You have a few packages and are happy to unzip them.</strong> h5p-standalone is smaller and has been around longer; served from static files, media streams from the host directly.</li>
       </ul>
@@ -114,7 +114,7 @@
         player keeps, in the browser on that device, the packages&rsquo; files and a list of what was
         played, and the content&rsquo;s own saved state only when <code>resume</code> is set.
         Statements are not stored at all.
-        <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/docs/privacy.md" rel="noopener">What is stored and sent</a>
+        <a href="https://github.com/missing-elements/h5p-toolkit/blob/main/docs/privacy.md" rel="noopener">What is stored and sent</a>
         has the details.
       </p>
       <p>
@@ -131,7 +131,7 @@
         from the pack you chose, its content folder serves the plugins&rsquo; list of file types and
         nothing else, and its content is checked against each library&rsquo;s field definitions by a
         port of the plugins&rsquo; own validator, compared with the original on 98 cases.
-        <a href="https://github.com/missing-elements/h5p-offline-player/blob/main/docs/untrusted.md" rel="noopener">Packages you did not make</a>
+        <a href="https://github.com/missing-elements/h5p-toolkit/blob/main/docs/untrusted.md" rel="noopener">Packages you did not make</a>
         has the details. Embed adds a domain on top: a package then runs apart from your site
         altogether, where a hostile one cannot touch your logins, though it can read what other
         packages stored on that domain.
@@ -140,7 +140,7 @@
       <p>
         Facts about the other options are from their documentation as of October 2026 and may have
         changed; corrections are welcome as
-        <a href="https://github.com/missing-elements/h5p-offline-player/issues" rel="noopener">issues</a>.
+        <a href="https://github.com/missing-elements/h5p-toolkit/issues" rel="noopener">issues</a>.
       </p>
 
       <footer>
@@ -149,7 +149,7 @@
           <a href="/demo/setup.html">Setup</a>
           <a href="/demo/">All examples</a>
           <a href="https://www.npmjs.com/package/@missing-elements/h5p-offline-player" rel="noopener">On npm</a>
-          <a href="https://github.com/missing-elements/h5p-offline-player" rel="noopener">Source and README</a>
+          <a href="https://github.com/missing-elements/h5p-toolkit" rel="noopener">Source and README</a>
         </nav>
       </footer>
     </main>

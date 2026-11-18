@@ -199,7 +199,7 @@ ${
 `
     : ''
 }
-https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed
+https://github.com/missing-elements/h5p-toolkit/tree/main/packages/embed
 `
 }
 

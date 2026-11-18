@@ -18,7 +18,7 @@
 ;(() => {
   if (matchMedia('(display-mode: standalone), (display-mode: window-controls-overlay)').matches) return
 
-  const API = 'https://api.github.com/repos/missing-elements/h5p-offline-player'
+  const API = 'https://api.github.com/repos/missing-elements/h5p-toolkit'
   const KEY = 'h5p-demo-stars'
   const FRESH_MS = 60 * 60 * 1000
   const RETRY_MS = 10 * 60 * 1000

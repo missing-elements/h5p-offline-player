@@ -20,7 +20,7 @@ file under a licence comment and minified. `h5p.css` is the core's stylesheets, 
 `H5PCore::$styles` names, joined and rebuilt so that it stands alone: its icon fonts and image
 inlined as data URLs, its Inter and Open Sans faces moved to `fonts/` and listed in
 `MANIFEST.json` for the player's frame document to declare. `vendor/h5p-core/` in the
-[repository](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/runtime)
+[repository](https://github.com/missing-elements/h5p-toolkit/tree/main/packages/runtime)
 holds the files as upstream has them, and `scripts/sync-core.mjs` takes them from upstream.
 
 Until 2026-10-18 the core came by way of [h5p-standalone](https://github.com/tunapanda/h5p-standalone),
@@ -70,7 +70,7 @@ it departs from the original, the file's leading comment says how and why.
 strings for its own H5P support, and `core_h5p\framework::t()` in Moodle says which of its
 strings is which. Copyright Moodle and its translators, under the **GNU General Public License
 v3.0 or later**, which this package's GPL-3.0 accepts. `l10n/index.json` in the
-[repository](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/runtime/l10n)
+[repository](https://github.com/missing-elements/h5p-toolkit/tree/main/packages/runtime/l10n)
 names the pack each
 language came from, the date they were taken and the strings left in English, where a pack
 had none or one that broke a placeholder. The file opens with a comment naming its source.
