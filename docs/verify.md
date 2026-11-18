@@ -1,6 +1,6 @@
 # Checking that a package plays
 
-[`@missing-elements/h5p-verify`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/verify)
+[`@missing-elements/h5p-verify`](https://github.com/missing-elements/h5p-toolkit/tree/main/packages/verify)
 plays a package through the player in a headless browser and says whether it worked. It needs
 Node 22 or later:
 
@@ -35,9 +35,9 @@ does the same in an editor tab, and plays the file again whenever it is rewritte
 library pack, so an export without its libraries plays offline.
 
 For authoring, the
-[`h5p-author` skill](https://github.com/missing-elements/h5p-offline-player/tree/main/skills/h5p-author)
+[`h5p-author` skill](https://github.com/missing-elements/h5p-toolkit/tree/main/skills/h5p-author)
 adds a prompt-to-package workflow for 28 content types, on
-[`@missing-elements/h5p-author`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/author#readme).
+[`@missing-elements/h5p-author`](https://github.com/missing-elements/h5p-toolkit/tree/main/packages/author#readme).
 It takes a short JSON source of only what differs from a type's defaults, fills the rest from the
 libraries' semantics and translations, includes their runtime dependencies, then requires this
 playback check and screenshot review, and opens the package in the preview for a person to work

@@ -1,7 +1,7 @@
 # @missing-elements/h5p-verify
 
 Plays an `.h5p` package in a headless browser through
-[h5p-offline-player](https://github.com/missing-elements/h5p-offline-player) and reports whether
+[h5p-offline-player](https://github.com/missing-elements/h5p-toolkit) and reports whether
 it works. Needs Node 22 or later; write `@latest`, since without it npm on an older Node quietly
 installs the last version that supported it.
 
@@ -32,7 +32,7 @@ accessibility or licensing: look at the screenshot.
 ## Played untrusted
 
 A site that plays packages it did not make plays them
-[`untrusted`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/untrusted.md),
+[`untrusted`](https://github.com/missing-elements/h5p-toolkit/blob/main/docs/untrusted.md),
 as the H5P plugins treat an upload: none of the package's own code runs, its libraries come only
 from the site's pack, and its content is checked against each library's `semantics.json`.
 `--untrusted` plays it that way:
@@ -123,9 +123,9 @@ its `url`, `close()`, and a `closed` promise that settles with `closed` once its
 opens an address in the default browser, false where no opener started.
 
 An [agent skill](https://agentskills.io) for it ships in the repository:
-`npx skills add missing-elements/h5p-offline-player --skill h5p-verify`.
+`npx skills add missing-elements/h5p-toolkit --skill h5p-verify`.
 
 ## Licence
 
 MIT. It runs the player, whose H5P runtime is GPL-3.0; see the player's
-[NOTICE.md](https://github.com/missing-elements/h5p-offline-player/blob/main/packages/player/NOTICE.md).
+[NOTICE.md](https://github.com/missing-elements/h5p-toolkit/blob/main/packages/player/NOTICE.md).

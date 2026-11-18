@@ -340,7 +340,7 @@ l10n.js
 Corresponding source for the GPL parts as built:
 ${core.repository}/tree/${core.commit}
 (js/ and styles/), and
-https://github.com/missing-elements/h5p-offline-player/tree/main/packages/runtime, whose
+https://github.com/missing-elements/h5p-toolkit/tree/main/packages/runtime, whose
 vendor/h5p-core/ holds the same files and scripts/ the build that joins them.
 `
 }

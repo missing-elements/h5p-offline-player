@@ -1,6 +1,6 @@
 # @missing-elements/h5p-cmi5
 
-cmi5 for [h5p-offline-player](https://github.com/missing-elements/h5p-offline-player): turns a
+cmi5 for [h5p-offline-player](https://github.com/missing-elements/h5p-toolkit): turns a
 page holding `<h5p-player>` into a cmi5 assignable unit, so an LMS can launch an `.h5p` package
 and record the result. The package stays on your static host; the LMS imports a small course
 structure naming your page. No dependencies.
@@ -98,8 +98,8 @@ and the launch's `launchParameters`, `launchData`, `learnerPreferences`, `return
   device.
 
 A working page with a simulated LMS is the demo's
-[cmi5 example](https://github.com/missing-elements/h5p-offline-player/blob/main/apps/demo/demo/cmi5-page.js);
-the full guide is [docs/cmi5.md](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/cmi5.md).
+[cmi5 example](https://github.com/missing-elements/h5p-toolkit/blob/main/apps/demo/demo/cmi5-page.js);
+the full guide is [docs/cmi5.md](https://github.com/missing-elements/h5p-toolkit/blob/main/docs/cmi5.md).
 
 ## Licence
 

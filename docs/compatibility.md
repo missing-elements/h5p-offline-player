@@ -13,12 +13,12 @@ Two kinds of fix ship in any release, a patch included:
 
 - **Security.** A fix that refuses something hostile, even when it refuses a package that played
   before. Which releases receive one is in
-  [SECURITY.md](https://github.com/missing-elements/h5p-offline-player/blob/main/SECURITY.md).
+  [SECURITY.md](https://github.com/missing-elements/h5p-toolkit/blob/main/SECURITY.md).
 - **Conformance.** A fix that brings what a package sends or writes into line with the standard
   it implements — xAPI, cmi5, the zip format — even when a system downstream accepted the old
   form.
 
-Each release's notes, on [GitHub](https://github.com/missing-elements/h5p-offline-player/releases),
+Each release's notes, on [GitHub](https://github.com/missing-elements/h5p-toolkit/releases),
 list a breaking change, or a fix of either kind, first, with what to do about it.
 
 ## What is covered
@@ -26,7 +26,7 @@ list a breaking change, or a fix of either kind, first, with what to do about it
 ### The player, `@missing-elements/h5p-offline-player`
 
 - **The element.** `<h5p-player>`, and every attribute, property, method and event in
-  [the element's API](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/api.md), with the
+  [the element's API](https://github.com/missing-elements/h5p-toolkit/blob/main/docs/api.md), with the
   values and `detail` shapes given there. A new error `code` or `progress` phase can come in a
   minor: treat one you do not know as the general case.
 - **The files.** The package's exports — `.`, the element, and `./sw`, `mountH5P` — and the four
@@ -37,7 +37,7 @@ list a breaking change, or a fix of either kind, first, with what to do about it
   left to the network, or to the host's own handlers.
 - **What statements carry.** `context.platform` is `h5p-offline-player <version>`, and
   `context.revision` is `sha256:<hex>`, followed by `; libraries` and the fingerprint of what
-  supplied libraries, a bundle's or the pack's archives' ([Which build a learner completed](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/revision.md)).
+  supplied libraries, a bundle's or the pack's archives' ([Which build a learner completed](https://github.com/missing-elements/h5p-toolkit/blob/main/docs/revision.md)).
   The recipe behind the hash does not change within a major, and a major that changes it gives
   the new value a prefix of its own, so an audit can always tell which recipe to recompute with.
 - **What names a package.** `activity-id` defaults to the package URL, and the statements'
@@ -52,7 +52,7 @@ list a breaking change, or a fix of either kind, first, with what to do about it
 - **Versions side by side.** Within a major, an element plays with a Service Worker from an older
   release: it updates its own worker before the first load, and logs a warning where it cannot —
   a stale copy of `h5p-sw.js` on the host, or a host's worker with the routes mounted. A worker
-  serves an element from an older release too. [Upgrading](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/single-worker.md#upgrading)
+  serves an element from an older release too. [Upgrading](https://github.com/missing-elements/h5p-toolkit/blob/main/docs/single-worker.md#upgrading)
   says what a host does about it.
 
 ### The runtime, `@missing-elements/h5p-runtime`
@@ -90,7 +90,7 @@ library's `editorDependencies` and `dynamicDependencies` beside its `preloadedDe
 
 - **The command's options**, and the files it writes for each kind of host.
 - **The page's interface**: its query parameters and the messages it posts, as its
-  [README](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed#readme)
+  [README](https://github.com/missing-elements/h5p-toolkit/tree/main/packages/embed#readme)
   lists them: what a snippet, or a page that reads `report`, is built on.
 - **`buildSite()`**, the command as a function, and **`startEmbed()`**, the page as one, with
   their options and their types; and `resizer.js`, which speaks H5P's own resizer protocol.
@@ -114,7 +114,7 @@ the LMS.
 ### cmi5, `@missing-elements/h5p-cmi5`
 
 `startCmi5()`, `isCmi5Launch()` and `createCmi5Client()`, with the options and the session's and
-client's methods its [README](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/cmi5#readme)
+client's methods its [README](https://github.com/missing-elements/h5p-toolkit/tree/main/packages/cmi5#readme)
 lists, and their types. The statements it sends are cmi5's, so a fix that brings one into line
 with the specification is a conformance fix.
 

@@ -339,7 +339,7 @@ Serve it from a domain that holds nothing else, and frame it:
           style="width: 100%; border: 0"></iframe>
   <script src="https://<this domain>/resizer.js"></script>
 
-https://github.com/missing-elements/h5p-offline-player/tree/main/packages/embed
+https://github.com/missing-elements/h5p-toolkit/tree/main/packages/embed
 `
 }
 

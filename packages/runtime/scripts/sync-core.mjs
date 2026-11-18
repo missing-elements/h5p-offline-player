@@ -36,7 +36,7 @@ const fail = (message) => {
 
 /** GitHub's API, with a token when the environment has one: sixty requests an hour without. */
 async function api(path) {
-  const headers = { accept: 'application/vnd.github+json', 'user-agent': 'h5p-offline-player core sync' }
+  const headers = { accept: 'application/vnd.github+json', 'user-agent': 'h5p-toolkit core sync' }
   if (process.env.GITHUB_TOKEN) headers.authorization = `Bearer ${process.env.GITHUB_TOKEN}`
   const response = await fetch(`https://api.github.com/repos/${REPOSITORY}/${path}`, { headers })
   if (!response.ok) fail(`GitHub answered ${response.status} for ${path}`)

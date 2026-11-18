@@ -17,7 +17,7 @@ const require = createRequire(import.meta.url)
 const vsce = join(dirname(require.resolve('@vscode/vsce/package.json')), 'vsce')
 const { name, version } = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'))
 const out = `${name}-${version}.vsix`
-const folder = 'https://github.com/missing-elements/h5p-offline-player'
+const folder = 'https://github.com/missing-elements/h5p-toolkit'
 
 // As the other packages' prepack does: the repository's licence, in the package.
 await cp(join(root, '..', '..', 'LICENSE'), join(root, 'LICENSE'))

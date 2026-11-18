@@ -9,12 +9,12 @@
   "icon": "icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/missing-elements/h5p-offline-player.git",
+    "url": "https://github.com/missing-elements/h5p-toolkit.git",
     "directory": "packages/vscode"
   },
-  "homepage": "https://github.com/missing-elements/h5p-offline-player/tree/main/packages/vscode#readme",
+  "homepage": "https://github.com/missing-elements/h5p-toolkit/tree/main/packages/vscode#readme",
   "bugs": {
-    "url": "https://github.com/missing-elements/h5p-offline-player/issues"
+    "url": "https://github.com/missing-elements/h5p-toolkit/issues"
   },
   "engines": {
     "vscode": "^1.90.0"

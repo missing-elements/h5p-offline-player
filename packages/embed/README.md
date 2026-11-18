@@ -180,9 +180,9 @@ instead.
 Replacing the zip with one written from another `.h5p`, or with other libraries from the pack,
 starts learners over, since their saved state belongs to what it was saved in.
 
-An [agent skill](https://github.com/missing-elements/h5p-offline-player/tree/main/skills/h5p-to-scorm)
+An [agent skill](https://github.com/missing-elements/h5p-toolkit/tree/main/skills/h5p-to-scorm)
 takes an agent through it, from checking the package to the setting each LMS needs:
-`npx skills add missing-elements/h5p-offline-player --skill h5p-to-scorm`.
+`npx skills add missing-elements/h5p-toolkit --skill h5p-to-scorm`.
 
 ### Options of the zip
 
@@ -328,7 +328,7 @@ player domain, the package hosts and, only for `pack` on a site built with `--no
 `cdn.jsdelivr.net`. A SCORM package contacts nothing but the LMS it was uploaded to, which gets the
 score, the result, the time spent and the learner's saved state. What the player stores and
 sends, for a privacy notice or a GDPR review:
-[Privacy and data protection](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/privacy.md).
+[Privacy and data protection](https://github.com/missing-elements/h5p-toolkit/blob/main/docs/privacy.md).
 
 ## Licences
 

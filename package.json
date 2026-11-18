@@ -1,5 +1,5 @@
 {
-  "name": "h5p-offline-player-workspace",
+  "name": "h5p-toolkit-workspace",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.24.0",

@@ -5,12 +5,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/missing-elements/h5p-offline-player.git",
+    "url": "git+https://github.com/missing-elements/h5p-toolkit.git",
     "directory": "packages/normalize"
   },
-  "homepage": "https://github.com/missing-elements/h5p-offline-player/tree/main/packages/normalize#readme",
+  "homepage": "https://github.com/missing-elements/h5p-toolkit/tree/main/packages/normalize#readme",
   "bugs": {
-    "url": "https://github.com/missing-elements/h5p-offline-player/issues"
+    "url": "https://github.com/missing-elements/h5p-toolkit/issues"
   },
   "publishConfig": {
     "access": "public"

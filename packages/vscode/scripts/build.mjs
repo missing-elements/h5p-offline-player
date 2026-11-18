@@ -111,7 +111,7 @@ await writeFile(
 H5P is a trademark of H5P Group. This extension is made by Missing Elements and is not
 affiliated with or endorsed by H5P Group.
 
-https://github.com/missing-elements/h5p-offline-player/tree/main/packages/vscode
+https://github.com/missing-elements/h5p-toolkit/tree/main/packages/vscode
 `
 )
 

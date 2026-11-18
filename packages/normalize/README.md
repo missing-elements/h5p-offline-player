@@ -1,7 +1,7 @@
 # @missing-elements/h5p-normalize
 
 Rewrites an `.h5p` package once, where it is published, so that it streams well through
-[h5p-offline-player](https://github.com/missing-elements/h5p-offline-player). Only the zip
+[h5p-offline-player](https://github.com/missing-elements/h5p-toolkit). Only the zip
 container changes: media is stored rather than deflated, an mp4 with its index at the end is
 remuxed (not re-encoded) to put it first, content media goes last, and stored scripts, styles and
 JSON are deflated. Everything else is copied byte for byte.
@@ -66,7 +66,7 @@ fewer at its end, so it runs on a file in Node or a `Blob` in a page. It reads a
 few small atoms, never the media.
 
 Why deflated video cannot stream: the demo's
-[normalize page](https://github.com/missing-elements/h5p-offline-player/blob/main/apps/demo/demo/normalize.html).
+[normalize page](https://github.com/missing-elements/h5p-toolkit/blob/main/apps/demo/demo/normalize.html).
 
 ## Licence
 

@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for contributing to `h5p-offline-player`.
+Thank you for contributing to `h5p-toolkit`.
 
 ## Before you start
 
@@ -24,8 +24,8 @@ dedicated worker. For architectural constraints and security boundaries, read
 ## Local setup
 
 ```bash
-git clone https://github.com/missing-elements/h5p-offline-player.git
-cd h5p-offline-player
+git clone https://github.com/missing-elements/h5p-toolkit.git
+cd h5p-toolkit
 pnpm install --frozen-lockfile
 pnpm --filter @missing-elements/h5p-offline-player exec playwright install chromium
 ```

@@ -16,4 +16,4 @@
 | "This content has changed since you last used it. You'll be starting over." | the package at that URL was replaced since the state was saved; the state is keyed by the build | expected, H5P's own dialog; OK drops the old state and the content saves afresh under the new build |
 
 Every symptom and its fix, in more detail:
-https://github.com/missing-elements/h5p-offline-player/blob/main/docs/troubleshooting.md
+https://github.com/missing-elements/h5p-toolkit/blob/main/docs/troubleshooting.md

@@ -388,7 +388,7 @@ for (const button of document.querySelectorAll('.samples button')) {
  * issue is public. GitHub fills a form's fields from the query by their `id`; it refuses `labels`
  * from a visitor who may not set them, and the form adds `bug` itself.
  */
-const REPORT_FORM = 'https://github.com/missing-elements/h5p-offline-player/issues/new'
+const REPORT_FORM = 'https://github.com/missing-elements/h5p-toolkit/issues/new'
 /** GitHub answers a longer address with a 414, so the log is cut from its middle to fit. */
 const REPORT_MAX_LENGTH = 7000
 

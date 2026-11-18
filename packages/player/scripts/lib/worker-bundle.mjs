@@ -58,7 +58,7 @@ async function zipJsNotice() {
  */
 export async function playerNotice() {
   const { version } = JSON.parse(await readFile(resolve(rootDir, 'package.json'), 'utf8'))
-  return `/*! @missing-elements/h5p-offline-player ${version}. Copyright (c) 2026 missing-elements. MIT (https://github.com/missing-elements/h5p-offline-player/blob/main/LICENSE). */`
+  return `/*! @missing-elements/h5p-offline-player ${version}. Copyright (c) 2026 missing-elements. MIT (https://github.com/missing-elements/h5p-toolkit/blob/main/LICENSE). */`
 }
 
 async function shared() {

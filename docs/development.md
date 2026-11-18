@@ -35,4 +35,4 @@ The demo deploys to Vercel from `vercel.json`. Its `/app/` page is the player as
 app that plays `.h5p` files with no network, libraries included; `/app/?src=<url of a .h5p>`
 opens a package from the web in it.
 
-Working on the code? Start with [AGENTS.md](https://github.com/missing-elements/h5p-offline-player/blob/main/AGENTS.md).
+Working on the code? Start with [AGENTS.md](https://github.com/missing-elements/h5p-toolkit/blob/main/AGENTS.md).
