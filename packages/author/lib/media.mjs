@@ -358,8 +358,8 @@ export class MediaStore {
    */
   async #played(file, kind, source, web, at, report, note) {
     const { takes, what } = PLAYS[kind]
-    // An mp4 by its index, read as the normalizer reads one, whatever atom comes first; any other
-    // by its first bytes.
+    // An mp4 by its index, as the normalizer reads one, after `ftyp` or an older file's `moov`,
+    // `mdat`, `free` or `wide`; any other by its first bytes.
     const info = await mp4Info((offset, length) => file.read(offset, length), file.size)
     const container = info ? 'mp4' : containerOf(await file.read(0, 16))
     if (container === 'page') {

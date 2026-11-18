@@ -56,7 +56,7 @@ knows which folders those are.
 
 TypeScript declarations ship with the package: `Report` and `EntryResult` describe what it returns.
 
-Node only, not a browser. `crc32(bytes, previous)` from `@missing-elements/h5p-normalize/crc32`
+`normalizeArchive()` is Node only, not a browser. `crc32(bytes, previous)` from `@missing-elements/h5p-normalize/crc32`
 is the CRC-32 it writes entries with, for code that writes zips beside it, in a page too: zlib's in
 Node, a table elsewhere.
 
