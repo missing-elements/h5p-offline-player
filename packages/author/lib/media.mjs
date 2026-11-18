@@ -90,17 +90,29 @@ const COPYRIGHT_LICENSES = ['U', 'CC BY', 'CC BY-SA', 'CC BY-ND', 'CC BY-NC', 'C
 /** The parts of a file's copyright a source writes, as H5P records them. */
 const COPYRIGHT_FIELDS = ['license', 'author', 'title', 'year', 'source', 'version']
 
+/** A file's copyright source as H5P's editor takes it, and a build: a web address. */
+const COPYRIGHT_SOURCE = /^https?:\/\/.+/i
+
 /**
  * A saved file's copyright as a source writes it (#236): its parts that hold text, and nothing
  * where that is the licence "U" alone, which a build gives a file with none. H5P's editor saves
- * every part, empty where nobody wrote it, and a build refuses an empty one.
+ * every part, empty where nobody wrote it, and a build refuses an empty one. A part a build
+ * refuses, a licence H5P does not list for a file or a source that is no web address, is left out,
+ * and `left` is told; a licence goes with its version.
  * @param {unknown} copyright
+ * @param {(key: 'license' | 'source', value: string) => void} [left]
  * @returns {Record<string, string> | undefined}
  * @internal
  */
-export function writtenCopyright(copyright) {
+export function writtenCopyright(copyright, left = () => {}) {
   if (!copyright || typeof copyright !== 'object' || Array.isArray(copyright)) return undefined
-  const kept = Object.fromEntries(Object.entries(copyright).filter(([key, value]) => COPYRIGHT_FIELDS.includes(key) && typeof value === 'string' && value.trim() !== ''))
+  const parts = Object.entries(copyright).filter(([key, value]) => COPYRIGHT_FIELDS.includes(key) && typeof value === 'string' && value.trim() !== '')
+  const license = parts.find(([key]) => key === 'license')?.[1]
+  const listed = license === undefined || COPYRIGHT_LICENSES.includes(license)
+  if (!listed) left('license', license)
+  const source = parts.find(([key]) => key === 'source')?.[1]
+  if (source !== undefined && !COPYRIGHT_SOURCE.test(source)) left('source', source)
+  const kept = Object.fromEntries(parts.filter(([key, value]) => key === 'source' ? COPYRIGHT_SOURCE.test(value) : listed || (key !== 'license' && key !== 'version')))
   return Object.entries(kept).some(([key, value]) => key !== 'license' || value !== 'U') ? kept : undefined
 }
 
@@ -353,7 +365,7 @@ export class MediaStore {
         continue
       }
       if (key === 'license' && !COPYRIGHT_LICENSES.includes(entry)) report(`${at}.license`, `use one of ${COPYRIGHT_LICENSES.join(', ')}`)
-      if (key === 'source' && !/^https?:\/\/.+/i.test(entry)) report(`${at}.source`, 'expected an http(s) address')
+      if (key === 'source' && !COPYRIGHT_SOURCE.test(entry)) report(`${at}.source`, 'expected an http(s) address')
       out[key] = key === 'license' || key === 'version' ? entry : escapeText(entry)
     }
     return out

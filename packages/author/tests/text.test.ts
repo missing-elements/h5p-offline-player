@@ -63,6 +63,10 @@ describe('text as H5P stores it', () => {
       '<p>One line<br>and the next</p><p>A second: x &lt; 5 &amp; more</p>'
     )
     expect(markupText('Plain', { tags: ['em'] }, report)).toBe('<div>Plain</div>')
+    // Windows line endings, a blank line among them, as text copied from a Windows file has.
+    expect(markupText('One line\r\nand the next\r\n \r\n\r\nA second', { tags: [], enterMode: 'p' }, report)).toBe(
+      '<p>One line<br>and the next</p><p>A second</p>'
+    )
   })
 
   it('keeps markup the field takes, escapes a stray < or >, and reports what H5P would remove', () => {

@@ -108,7 +108,7 @@ export async function readContent(pack, { manifest, content }) {
     else if (entry.minorVersion !== minor) other.push(`${library}, where the pack has ${major}.${entry.minorVersion}`)
   }
   if (other.length) {
-    throw new Error(`This package's content is made for other versions of its libraries than the library pack has: ${other.join('; ')}. A read takes content made for the pack's versions: H5P moves content to a newer version as it plays it, and saved again on a site that has the pack's versions, it reads.`)
+    throw new Error(`This package's content is made for other versions of its libraries than the library pack has: ${other.join('; ')}. A read takes content made for the pack's versions. H5P moves content to a newer version as it plays it, so the package, saved again on a site that has the pack's versions, reads.`)
   }
 
   /** @type {Problem[]} */
@@ -131,6 +131,7 @@ export async function readContent(pack, { manifest, content }) {
 
   const generator = new ContentGenerator(libraries.entries)
   const params = generator.written(libraries.main, checked.params)
+  for (const { path, message } of generator.notes) note(path, message)
   const layout = layoutContext(libraries.entries, () => {}, () => {})
   for (const place of placesOf(main, params)) LAYOUTS[place.library]?.read?.(place.params, place.path, layout(place.library))
 
@@ -185,13 +186,23 @@ function ownFields(manifest, language, note) {
   const license = LICENSES.includes(manifest.license) ? manifest.license : 'U'
   if (says(manifest.license) && license !== manifest.license) note('license', `${JSON.stringify(manifest.license)} is no licence H5P names: written as "U"`)
   const versioned = license.startsWith('CC BY') && CC_VERSIONS.includes(manifest.licenseVersion)
+  if (says(manifest.licenseVersion) && !versioned) note('licenseVersion', `${JSON.stringify(manifest.licenseVersion)} is no version a source takes, which writes one for a CC BY licence only, as ${CC_VERSIONS.join(', ')}: left out`)
   /** @type {{ name: string, role: string }[]} */
-  const authors = (Array.isArray(manifest.authors) ? manifest.authors : [])
-    .filter((/** @type {unknown} */ author) => isObject(author) && typeof author.name === 'string' && author.name.trim())
-    .map((/** @type {Record<string, any>} */ author) => ({ name: author.name, role: ROLES.includes(author.role) ? author.role : 'Author' }))
+  const authors = []
+  const listed = Array.isArray(manifest.authors) ? manifest.authors : []
+  for (const [i, author] of listed.entries()) {
+    if (!isObject(author) || typeof author.name !== 'string' || !author.name.trim()) {
+      note(`authors[${i}]`, 'is no author with a name: left out')
+      continue
+    }
+    const role = ROLES.includes(author.role) ? author.role : 'Author'
+    if (says(author.role) && role !== author.role) note(`authors[${i}].role`, `${JSON.stringify(author.role)} is no role H5P names: written as "Author"`)
+    authors.push({ name: author.name, role })
+  }
   if (!authors.length) {
     authors.push({ name: 'Unknown', role: 'Author' })
-    note('authors', 'are not in h5p.json: written as "Unknown", since a source names one')
+    const why = listed.length ? 'have no name among them' : says(manifest.authors) ? 'are not a list' : 'are not in h5p.json'
+    note('authors', `${why}: written as "Unknown", since a source names one`)
   }
   /** @type {Record<string, unknown>} */
   const own = { title, language, license, ...(versioned ? { licenseVersion: manifest.licenseVersion } : {}), authors }
@@ -200,6 +211,7 @@ function ownFields(manifest, language, note) {
   for (const key of /** @type {const} */ (['yearFrom', 'yearTo'])) {
     const year = typeof manifest[key] === 'string' && /^\s*\d+\s*$/.test(manifest[key]) ? Number(manifest[key]) : manifest[key]
     if (Number.isInteger(year)) own[key] = year
+    else if (says(manifest[key])) note(key, `${JSON.stringify(manifest[key])} is no year: left out`)
   }
   for (const [key, what] of Object.entries(UNWRITTEN)) {
     if (says(manifest[key])) note(key, `is ${what}, which a source has no field for: left out`)
@@ -243,7 +255,8 @@ function ownMetadata(metadata, source) {
     if (!says(value)) return false
     if (key === 'license') return value !== 'U' && value !== source.license
     if (key === 'licenseVersion') return value !== source.licenseVersion
-    if (key === 'authors') return JSON.stringify(value.map((/** @type {any} */ author) => [author?.name, author?.role])) !== JSON.stringify(source.authors.map((author) => [author.name, author.role]))
+    // Anything but a list of authors says something of its own too, if not in a form a build takes.
+    if (key === 'authors') return !Array.isArray(value) || JSON.stringify(value.map((/** @type {any} */ author) => [author?.name, author?.role])) !== JSON.stringify(source.authors.map((author) => [author.name, author.role]))
     return true
   })
 }
@@ -264,7 +277,7 @@ function differences(built, saved, files, path = 'params', found = []) {
     built.forEach((each, i) => differences(each, saved[i], files, `${path}[${i}]`, found))
   } else if (isObject(built) && isObject(saved)) {
     if (files.has(saved)) {
-      if (built.path !== saved.path || JSON.stringify(writtenCopyright(built.copyright) ?? null) !== JSON.stringify(writtenCopyright(saved.copyright) ?? null)) found.push(path)
+      if (built.path !== saved.path || copyrightOf(built.copyright) !== copyrightOf(saved.copyright)) found.push(path)
       return found
     }
     const part = typeof saved.library === 'string'
@@ -279,6 +292,16 @@ function differences(built, saved, files, path = 'params', found = []) {
     }
   } else if (!Object.is(built, saved) && !sameText(built, saved)) found.push(path)
   return found
+}
+
+/**
+ * A file's copyright as a source writes it, for comparing: its parts in one order, H5P's editor
+ * saving them in its own, and a licence left out being the "U" a build gives.
+ * @param {unknown} copyright
+ */
+function copyrightOf(copyright) {
+  const written = writtenCopyright(copyright)
+  return written ? JSON.stringify(Object.entries({ license: 'U', ...written }).sort()) : ''
 }
 
 /**

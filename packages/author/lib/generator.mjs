@@ -353,13 +353,14 @@ export class ContentGenerator {
   #unopened(field, value, stack, path) {
     if (field.type !== 'library' || !isObject(field.default) || typeof field.default.library !== 'string' || !isObject(value) || typeof value.library !== 'string') return false
     if (value.library.trim().split(/\s+/)[0] !== field.default.library.trim().split(/\s+/)[0]) return false
-    const counts = [this.stored.length, this.unfilled.length]
+    const counts = [this.stored.length, this.unfilled.length, this.notes.length]
     try {
       const written = this.#writtenPart(field, value, stack, path)
       return isObject(written) && vacant(written.params)
     } finally {
       this.stored.length = counts[0]
       this.unfilled.length = counts[1]
+      this.notes.length = counts[2]
     }
   }
 
@@ -397,7 +398,7 @@ export class ContentGenerator {
       case 'file':
       case 'video':
       case 'audio':
-        return Array.isArray(value) ? value.map((each) => this.#writtenFile(each)) : this.#writtenFile(value)
+        return Array.isArray(value) ? value.map((each, index) => this.#writtenFile(each, `${path}[${index}]`)) : this.#writtenFile(value, path)
       case 'text':
         // Markup that is only the blocks a build wraps typing in is written as the typing.
         return typeof value === 'string' && takesMarkup(field) ? unwrapText(value, blockTag(field)) ?? value : value
@@ -431,13 +432,16 @@ export class ContentGenerator {
 
   /**
    * A saved file as a source writes it: its path, and its copyright where it gives one
-   * (`writtenCopyright`). Kept as saved in `stored`.
+   * (`writtenCopyright`), less a part a build refuses, which is noted. Kept as saved in `stored`.
    * @param {unknown} value
+   * @param {string} path
    */
-  #writtenFile(value) {
+  #writtenFile(value, path) {
     if (!isObject(value) || typeof value.path !== 'string') return structuredClone(value)
     this.stored.push(value)
-    const copyright = writtenCopyright(value.copyright)
+    const copyright = writtenCopyright(value.copyright, (key, kept) => this.note(`${path}.copyright.${key}`, key === 'license'
+      ? `${JSON.stringify(kept)} is no licence H5P lists for a file: left out, with any version, so a build gives the file "U"`
+      : `${JSON.stringify(kept)} is no web address: left out`))
     return { path: value.path, ...(copyright ? { copyright } : {}) }
   }
 

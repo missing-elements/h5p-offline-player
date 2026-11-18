@@ -1,5 +1,5 @@
 import { constants, createReadStream, createWriteStream, openAsBlob } from 'node:fs'
-import { copyFile, lstat, mkdir, mkdtemp, open, readFile, realpath, rm, stat } from 'node:fs/promises'
+import { copyFile, lstat, mkdir, mkdtemp, open, readFile, realpath, rm, rmdir, stat } from 'node:fs/promises'
 import { lookup } from 'node:dns/promises'
 import { tmpdir } from 'node:os'
 import { BlockList, isIP } from 'node:net'
@@ -161,27 +161,36 @@ export function nodeMedia({ base, temporary, within }) {
 }
 
 /**
- * Whether a path, as the file system resolves it, a link followed, is in one of the folders.
- * A path that does not exist yet is judged by its nearest folder that does.
+ * A path as the file system resolves it, links followed; of a path that does not exist yet, its
+ * nearest folder that does, with the rest of the path after it. Undefined where nothing on it exists.
  * @param {string} path
- * @param {string[]} folders
  */
-export async function inside(path, folders) {
+async function resolved(path) {
   let real = resolve(path)
   const tail = []
   for (;;) {
     try {
-      real = join(await realpath(real), ...tail.reverse())
-      break
+      return join(await realpath(real), ...tail.reverse())
     } catch {
       const parent = dirname(real)
-      if (parent === real) return false
+      if (parent === real) return undefined
       tail.push(basename(real))
       real = parent
     }
   }
+}
+
+/**
+ * Whether a path, as the file system resolves it, a link followed, is in one of the folders.
+ * A path or a folder that does not exist yet is judged by its nearest folder that does.
+ * @param {string} path
+ * @param {string[]} folders
+ */
+export async function inside(path, folders) {
+  const real = await resolved(path)
+  if (real === undefined) return false
   for (const folder of folders) {
-    const root = await realpath(resolve(folder)).catch(() => resolve(folder))
+    const root = (await resolved(folder)) ?? resolve(folder)
     const from = relative(root, real)
     // `..notes.png` is a name in the folder; only `..` itself, or a path through it, leaves it.
     if (!isAbsolute(from) && from !== '..' && !from.startsWith(`..${sep}`)) return true
@@ -446,7 +455,9 @@ function writable(path) {
  * A package read back into the source a build would take to make it again (#236), to change it and
  * build it again: written into `folder`, made where it is not there, as `<name>.source.json`, with
  * the package's media beside it at the paths the source names them by. Only the media the content
- * names are written, and only under the folder, since an archive is untrusted. Nothing is written
+ * names are written, and only under the folder, since an archive is untrusted: a file whose path
+ * is no name a read writes is left out of the source, which so names no file outside the folder,
+ * and a read that a link in the folder would take outside it writes nothing. Nothing is written
  * over: where a name is taken, nothing is written, and what was written is taken away again where
  * a later write fails.
  * @param {string} file the package, a .h5p
@@ -497,9 +508,13 @@ export async function readPackage(file, folder, options = {}) {
     const output = join(target, `${basename(input).replace(/\.h5p$/i, '') || 'package'}.source.json`)
     /** @type {{ entry: import('@zip.js/zip.js').FileEntry, to: string, path: string }[]} */
     const media = []
+    /** @type {Set<string>} */
+    const unwritable = new Set()
     for (const path of read.files) {
       if (!writable(path)) {
-        notes.push({ path: 'params', message: `names the file ${JSON.stringify(path)}, which is no path a read writes a file at: not written` })
+        // Such a path may lead anywhere, which a build of the source would read from.
+        unwritable.add(path)
+        notes.push({ path: 'params', message: `names the file ${JSON.stringify(path)}, which is no path a read writes a file at: left out of the source` })
         continue
       }
       let decoded = path
@@ -512,19 +527,26 @@ export async function readPackage(file, folder, options = {}) {
       if (!entry) notes.push({ path: 'params', message: `names the file ${path}, which is not in the package: a build of this source asks for it` })
       else media.push({ entry, to: join(target, ...path.split('/')), path })
     }
-    // Every name looked at before anything is written, so a read that cannot write all of it
-    // writes nothing.
+    const source = unwritable.size ? /** @type {import('./build.mjs').Source} */ (withoutFiles(read.source, unwritable)) : read.source
+    // Every name looked at before anything is made, so a read that cannot write all of it writes
+    // nothing: none taken, and none that a link on the way, which the folder may hold, takes out
+    // of it. The archive names the paths.
     for (const to of [output, ...media.map((each) => each.to)]) {
       if (await lstat(to).then(() => true, () => false)) throw exists(to, 'a read')
+      if (!(await inside(to, [target]))) throw new Error(`${to} leads out of ${target} through a link on its way: a read writes only in its folder`)
     }
-    await mkdir(target, { recursive: true })
     /** @type {{ path: string, made: Made }[]} */
     const made = []
+    /** @type {{ first: string, last: string }[]} the folders made, each `mkdir`'s from the first it made to the last */
+    const folders = []
+    /** @param {string} path */
+    const makeFolder = async (path) => {
+      const first = await mkdir(path, { recursive: true })
+      if (first) folders.push({ first, last: path })
+    }
     /** @param {string} to @param {(file: import('node:fs/promises').FileHandle) => Promise<void>} write */
     const create = async (to, write) => {
-      await mkdir(dirname(to), { recursive: true })
-      // A folder on the way may be a link out, which a confined read does not write through.
-      if (within && !(await inside(to, within))) throw new Error(`${to} is outside the folders this read may write in`)
+      await makeFolder(dirname(to))
       const handle = await open(to, 'wx').catch((error) => {
         throw error?.code === 'EEXIST' ? exists(to, 'a read') : error
       })
@@ -537,6 +559,7 @@ export async function readPackage(file, folder, options = {}) {
       }
     }
     try {
+      await makeFolder(target)
       for (const { entry, to } of media) {
         // Through the handle itself: a stream made from it would hold it open past the last byte.
         await create(to, (handle) => entry.getData(new WritableStream({
@@ -545,15 +568,37 @@ export async function readPackage(file, folder, options = {}) {
           }
         })).then(() => undefined))
       }
-      await create(output, (handle) => handle.writeFile(`${JSON.stringify(read.source, null, 2)}\n`))
+      await create(output, (handle) => handle.writeFile(`${JSON.stringify(source, null, 2)}\n`))
     } catch (error) {
       await Promise.all(made.map(({ path, made: file }) => removeIfMade(path, file)))
+      // Then the folders it made, the deepest first, where they are empty: what another process has
+      // put in one since keeps it.
+      for (const { first, last } of folders.reverse()) {
+        for (let path = last; ; path = dirname(path)) {
+          await rmdir(path).catch(() => {})
+          if (path === first || dirname(path) === path) break
+        }
+      }
       throw error
     }
-    return { output, source: read.source, files: media.map((each) => each.path), notes }
+    return { output, source, files: media.map((each) => each.path), notes }
   } finally {
     await reader.close()
   }
+}
+
+/**
+ * A source without the files at `paths`: one in a list is taken out of it, any other left unwritten.
+ * @param {unknown} value
+ * @param {Set<string>} paths
+ * @returns {unknown}
+ */
+function withoutFiles(value, paths) {
+  /** @param {unknown} each */
+  const named = (each) => each !== null && typeof each === 'object' && typeof (/** @type {any} */ (each).path) === 'string' && paths.has(/** @type {any} */ (each).path)
+  if (Array.isArray(value)) return value.filter((each) => !named(each)).map((each) => withoutFiles(each, paths))
+  if (value === null || typeof value !== 'object') return value
+  return Object.fromEntries(Object.entries(value).filter(([, each]) => !named(each)).map(([key, each]) => [key, withoutFiles(each, paths)]))
 }
 
 /** The date on every entry of a bundle, as on the pack's parts: a bundle of the same pack is the same bytes. */

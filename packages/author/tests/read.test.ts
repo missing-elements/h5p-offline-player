@@ -1,9 +1,9 @@
 import { execFile } from 'node:child_process'
-import { lstat, mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, readdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
-import { BlobReader, BlobWriter, TextReader, TextWriter, Uint8ArrayReader, ZipReader, ZipWriter, type FileEntry } from '@zip.js/zip.js'
+import { BlobReader, BlobWriter, TextReader, TextWriter, Uint8ArrayReader, Uint8ArrayWriter, ZipReader, ZipWriter, type FileEntry } from '@zip.js/zip.js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { buildPackage, readPackage } from '../lib/author.mjs'
 import { mp4, png } from './helpers/media'
@@ -81,6 +81,17 @@ async function opened(path: string) {
   }
 }
 
+/** The bytes of a package's entry. */
+async function entryOf(path: string, name: string) {
+  const reader = new ZipReader(new BlobReader(new Blob([await readFile(path)])))
+  try {
+    const entry = (await reader.getEntries()).find((each) => each.filename === name) as FileEntry | undefined
+    return entry && await entry.getData(new Uint8ArrayWriter())
+  } finally {
+    await reader.close()
+  }
+}
+
 /**
  * A package as another tool exports it: its `h5p.json`, its content and its media, and no library,
  * as h5p.com exports one without them.
@@ -107,7 +118,8 @@ describe.concurrent('every type file', () => {
     expect(JSON.parse(await readFile(read.output, 'utf8'))).toEqual(read.source)
     const { type, title, language, license, authors } = read.source
     expect({ type, title, language, license, authors }).toEqual({ type: first.manifest.mainLibrary, ...META })
-    for (const path of read.files) expect(await exists(join(at, 'read', path)), path).toBe(true)
+    // Each file as the package holds it, at the path the source names it by.
+    for (const path of read.files) expect(new Uint8Array(await readFile(join(at, 'read', path))), path).toEqual(await entryOf(join(at, 'example.h5p'), `content/${path}`))
     const again = await buildPackage(read.source, undefined, { base: join(at, 'read'), check: true })
     expect(withoutIds(again.content)).toEqual(withoutIds(first.content))
   }, 60_000)
@@ -198,15 +210,27 @@ describe('a package read back', () => {
 
   it('writes only inside its folder, and only where it may', async () => {
     const at = await folder()
-    const { output } = await elsewhere(at)
+    const { output, image } = await elsewhere(at)
     const { manifest, content } = await opened(output)
     content.questions[0].params.media.type.params.file.path = '../../outside.png'
     const hostile = join(at, 'hostile.h5p')
     await exported(hostile, manifest, content)
     const read = await readPackage(hostile, join(at, 'read'))
-    expect(read.notes).toContainEqual({ path: 'params', message: 'names the file "../../outside.png", which is no path a read writes a file at: not written' })
+    expect(read.notes).toContainEqual({ path: 'params', message: 'names the file "../../outside.png", which is no path a read writes a file at: left out of the source' })
+    // Nor does the source name it, for a build to read it from there.
+    expect(paths(read.source.params)).toEqual([])
+    expect(paths(JSON.parse(await readFile(read.output, 'utf8')).params)).toEqual([])
     expect(read.files).toEqual([])
     expect(await exists(join(at, 'outside.png'))).toBe(false)
+    // A link in the folder that the package's names lead through stops the read before anything is made.
+    const outside = await folder()
+    const [first] = image.split('/')
+    expect(image).toContain('/')
+    await mkdir(join(at, 'linked'))
+    await symlink(outside, join(at, 'linked', first), 'junction')
+    await expect(readPackage(output, join(at, 'linked'))).rejects.toThrow(/leads out of .+ through a link on its way: a read writes only in its folder/)
+    expect(await readdir(outside)).toEqual([])
+    expect(await readdir(join(at, 'linked'))).toEqual([first])
     // An archive whose entry leads out of its folders is not read at all.
     const leading = join(at, 'leading.h5p')
     await exported(leading, manifest, content, { '../../outside.png': new Uint8Array(png(8, 8)) })
@@ -215,6 +239,62 @@ describe('a package read back', () => {
     const elsewhereFolder = await folder()
     await expect(readPackage(output, join(at, 'read-2'), { within: [elsewhereFolder] })).rejects.toThrow(/is outside the folders this read may use/)
     await expect(readPackage(output, join(elsewhereFolder, '..', 'read-3'), { within: [at] })).rejects.toThrow(/is outside the folders this read may write in/)
+  })
+
+  it('takes away what it made where a write fails, and keeps what was there', async () => {
+    const at = await folder()
+    const { output, image } = await elsewhere(at)
+    // The picture's compressed bytes made to start a block of a type deflate has none of.
+    const bytes = new Uint8Array(await readFile(output))
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+    const name = new TextEncoder().encode(`content/${image}`)
+    const start = bytes.findIndex((_, i) => name.every((byte, j) => bytes[i + j] === byte))
+    const header = start - 30
+    expect(view.getUint32(header, true)).toBe(0x04034b50)
+    expect(view.getUint16(header + 8, true)).toBe(8)
+    bytes[start + view.getUint16(header + 26, true) + view.getUint16(header + 28, true)] = 0xff
+    const broken = join(at, 'broken.h5p')
+    await writeFile(broken, bytes)
+    // Found broken as it is written, once the folders for it are made.
+    await expect(readPackage(broken, join(at, 'read', 'deeper'))).rejects.toThrow('Invalid compressed data')
+    expect(await exists(join(at, 'read'))).toBe(false)
+    // A folder that was there stays, as does what is in it.
+    await mkdir(join(at, 'mine'))
+    await writeFile(join(at, 'mine', 'notes.txt'), 'mine')
+    await expect(readPackage(broken, join(at, 'mine'))).rejects.toThrow('Invalid compressed data')
+    expect(await readdir(join(at, 'mine'))).toEqual(['notes.txt'])
+  })
+
+  it('says what of its metadata a source has no form of, and leaves it out', async () => {
+    const at = await folder()
+    const { output, image } = await elsewhere(at)
+    const { manifest, content } = await opened(output)
+    Object.assign(manifest, { license: 'GNU GPL', licenseVersion: 'v3', yearFrom: 'last year', authors: [{ name: 'Ann Author', role: 'Writer' }, { role: 'Editor' }, 'Bo Brown'] })
+    content.questions[1].metadata = { ...content.questions[1].metadata, authors: 'Cy' }
+    content.questions[0].params.media.type.params.file.copyright = { title: 'River', license: 'CC0 1.0', version: '1.0', source: 'Wikipedia' }
+    const odd = join(at, 'odd.h5p')
+    await exported(odd, manifest, content, { [image]: new Uint8Array(png(320, 180)) })
+    const read = await readPackage(odd, join(at, 'read'))
+    expect(read.source).toMatchObject({ license: 'GNU GPL', authors: [{ name: 'Ann Author', role: 'Author' }] })
+    expect(read.source).not.toHaveProperty('licenseVersion')
+    expect(read.source).not.toHaveProperty('yearFrom')
+    const copyright = 'params.questions[0].params.media.type.params.file.copyright'
+    expect(read.notes).toEqual(expect.arrayContaining([
+      { path: 'licenseVersion', message: '"v3" is no version a source takes, which writes one for a CC BY licence only, as 4.0, 3.0, 2.5, 2.0, 1.0: left out' },
+      { path: 'authors[0].role', message: '"Writer" is no role H5P names: written as "Author"' },
+      { path: 'authors[1]', message: 'is no author with a name: left out' },
+      { path: 'authors[2]', message: 'is no author with a name: left out' },
+      { path: 'yearFrom', message: '"last year" is no year: left out' },
+      { path: `${copyright}.license`, message: '"CC0 1.0" is no licence H5P lists for a file: left out, with any version, so a build gives the file "U"' },
+      { path: `${copyright}.source`, message: '"Wikipedia" is no web address: left out' }
+    ]))
+    // A part's authors that are no list are its own too.
+    expect(read.notes.find(({ path }) => path === 'params.questions[0].metadata')?.message).toContain('params.questions[1].metadata')
+    expect(read.notes.filter(({ message }) => message.includes('reads back otherwise'))).toEqual([])
+    const params = read.source.params as { questions: { params: { media: { type: { params: { file: unknown } } } } }[] }
+    expect(params.questions[0].params.media.type.params.file).toEqual({ path: image, copyright: { title: 'River' } })
+    const again = await buildPackage(read.source, undefined, { base: join(at, 'read'), check: true })
+    expect(again.notes).toEqual([])
   })
 
   it('is a command: h5p-author read writes the source and its media, and says how to build it again', async () => {

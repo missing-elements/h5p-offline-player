@@ -203,10 +203,13 @@ text to the content check's rules, and `apps/skills` plays every example untrust
   - What a source has no field for is said and left out: the author's comments, the change log,
     the licence's extra terms, and a part's own licence or authors, a build giving every part the
     source's.
-  - An archive is untrusted: only the media the content names are written, under the folder; one
-    whose entry leads out of its folders is not read. Nothing is written over, and nothing at all
-    where a name is taken. Every type file's example, built, read and built again, is the same
-    content but for the ids, with no note (`read.test.ts`).
+  - An archive is untrusted: only the media the content names are written, under the folder, each
+    path checked before anything is made, so that a link in the folder leading out of it stops the
+    read; a file named by a path that could lead out is left out of the source, which so names no
+    file outside its folder; one whose entry leads out of its folders is not read. Nothing is
+    written over, and nothing at all where a name is taken; a read that fails takes away what it
+    made. Every type file's example, built, read and built again, is the same content and media
+    but for the ids, with no note (`read.test.ts`).
 - **A page builds too** (#108). The package has three entries: `.` for Node, `./core` for what
   needs neither Node nor a page, and `./browser`, the core and a page's `openPack` and
   `buildPackage`. They are subpaths and not the `browser` condition, which TypeScript ignores

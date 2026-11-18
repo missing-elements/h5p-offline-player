@@ -159,20 +159,21 @@ Read /work/rivers.h5p: H5P.Blanks. Wrote its source to /work/rivers/rivers.sourc
 Change it, then build it again: h5p-author build rivers/rivers.source.json <output.h5p>
 ```
 
-The source a build would take to make the package again, to change it and build it again: the
-content type and the metadata from its `h5p.json`, and of its content only what differs from the
-defaults, interface texts in the content's language included. Its pictures, videos and other files
-go beside the source, at the paths it names them by. Positions and sizes are kept, so a slide or a
-video keeps its layout. Each part gets a new id when it is built again.
+The source holds what a build takes to make the package again: the content type and the metadata
+from its `h5p.json`, and of its content only what differs from the defaults, interface texts in the
+content's language included. Its pictures, videos and other files go beside the source, at the
+paths it names them by. Positions and sizes are kept, so a slide or a video keeps its layout. Each
+part gets a new id when it is built again.
 
 It reads content made for the pack's versions of its libraries, and refuses any other, naming both
-versions: H5P moves content to a newer version as it plays it, and saved again on a site that has
-the pack's versions, it reads. What a source has no field for is said and left out: the author's comments,
-the change log, a part's own licence or authors (a build gives every part the source's). The source
-is built again in memory before it is written, and what would not come back as it is, or what a
-build would refuse, such as styles pasted from Word, is said, to fix before building. It never
-writes over a file. An archive is untrusted: only the files its content names are written, and
-only under the folder.
+versions. H5P moves content to a newer version as it plays it, so a package saved again on a site
+that has the pack's versions reads. What a source has no field for, or no form of, is said and left
+out: the author's comments, the change log, a part's own licence or authors (a build gives every
+part the source's), a file's licence that H5P does not list. The source is built again in memory
+before it is written, and what would not come back as it is, or what a build would refuse, such as
+styles pasted from Word, is said, to fix before building. It never writes over a file. An archive
+is untrusted: only the files its content names are written, only under the folder, and a file
+named by a path that could lead out of it is left out of the source.
 
 ## A content type's bundle
 

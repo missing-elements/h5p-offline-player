@@ -188,7 +188,7 @@ export function hasMarkup(value) {
  * @param {string} block `p` or `div`, as `blockTag` says for the field
  */
 export function wrapText(value, block) {
-  const paragraphs = value.trim().split(/\n[ \t]*\n+/).filter((paragraph) => paragraph.trim())
+  const paragraphs = value.trim().split(/\r?\n[ \t]*(?:\r?\n)+/).filter((paragraph) => paragraph.trim())
   return paragraphs.map((paragraph) => `<${block}>${escapeText(paragraph.trim()).replace(/\r?\n/g, '<br>')}</${block}>`).join('')
 }
 
