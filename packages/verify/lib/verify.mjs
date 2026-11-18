@@ -29,6 +29,13 @@ const CONSOLE_LINES_KEPT = 20
 const REVISION_SHOWN = 23
 /** How many of the content check's changes become warnings; `report.json` keeps them all. */
 const CHANGES_SHOWN = 20
+/** What a media element's error says, by its code (`MediaError`). */
+const MEDIA_ERRORS = /** @type {Record<number, string>} */ ({
+  1: 'its loading was stopped',
+  2: 'it could not be fetched',
+  3: 'it could not be decoded',
+  4: 'it is no format this browser plays'
+})
 /** How the runtime's boot script begins the notes it writes to the frame's console after the content check. */
 const CHECK_NOTES = "<h5p-player>: the content was checked against its libraries' semantics"
 /** The header the Service Worker wants before it hands an untrusted package's `content.json` over as written. */
@@ -237,6 +244,24 @@ export async function verifyPackage(options) {
           // the verdict rules read that as nothing drawn.
           .catch(() => null)
       : null
+    // Each video and recording in the frame, after the settle: one the browser gave up on does not
+    // play, though the rest of the content drew (#218). Where this browser plays no H.264 at all,
+    // as Playwright's own Chromium, an mp4 it gave up on says nothing of the file.
+    const media = frame
+      ? await frame
+          .evaluate(() => ({
+            h264: document.createElement('video').canPlayType('video/mp4; codecs="avc1.42E01E"') !== '',
+            failed: [...document.querySelectorAll('video, audio')].flatMap((element) => {
+              const played = /** @type {HTMLMediaElement} */ (element)
+              const src = played.currentSrc || played.src
+              // A file of the package's by its path there; any other by its address.
+              const own = URL.canParse(src) && new URL(src).origin === location.origin && src.includes('/content/')
+              const name = own ? decodeURIComponent(src.replace(/^.*?\/content\//, '')) : src
+              return played.error ? [{ kind: played.localName, name, code: played.error.code }] : []
+            })
+          }))
+          .catch(() => ({ h264: true, failed: [] }))
+      : { h264: true, failed: [] }
     /** @type {BlockedLoad[]} */
     const csp = frame ? await frame.evaluate(() => /** @type {PageWindow} */ (window).__csp ?? []).catch(() => []) : []
     // Untrusted, the package's `content.json` beside what the runtime was handed: the Service
@@ -321,6 +346,10 @@ export async function verifyPackage(options) {
       report.warnings.push(`${library} played at ${to}, older than the ${from} the content was made for, since no library source has ${from}: what ${from} added is left out`)
     }
     for (const message of dedupe(report.errors.filter((e) => e.afterReady).map((e) => e.message))) report.warnings.push(`runtime error after ready: ${message}`)
+    for (const { kind, name, code } of media.failed) {
+      if (!media.h264 && /\.(?:mp4|m4a)$/i.test(name)) report.warnings.push(`${kind} not checked: ${name}: this browser plays no H.264; Chrome or Edge does`)
+      else report.warnings.push(`${kind} does not play: ${name}: ${MEDIA_ERRORS[code] ?? `media error ${code}`}`)
+    }
     for (const { url, status, error } of failedRequests) report.warnings.push(`request failed: ${url} (${status ?? error})`)
     for (const { directive, blocked } of csp) report.warnings.push(`blocked by the frame's CSP: ${blocked} (${directive})`)
     for (const text of report.console) report.warnings.push(`console error: ${text.slice(0, 200)}`)

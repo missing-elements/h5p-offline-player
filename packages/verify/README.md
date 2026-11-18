@@ -25,8 +25,9 @@ Exit code 0: it plays (possibly with warnings); 1: it does not; 2: the check cou
 
 It checks that the archive indexes and carries the libraries it declares, that the runtime
 reaches `ready`, that nothing throws while booting (an error after `ready` is a warning), that the
-content drew something, and it lists failed requests, CSP blocks and the build's `revision`. It
-does not judge correctness, suitability, accessibility or licensing: look at the screenshot.
+content drew something, and it lists failed requests, CSP blocks, a video or a recording the
+browser could not play, and the build's `revision`. It does not judge correctness, suitability,
+accessibility or licensing: look at the screenshot.
 
 ## Played untrusted
 
