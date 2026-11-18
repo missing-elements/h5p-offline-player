@@ -76,8 +76,20 @@ text to the content check's rules, and `apps/skills` plays every example untrust
   address downloaded at build time. It lands under `content/images|videos|audios|files/` with its
   MIME type, an image's size read from its header (PNG, JPEG, GIF, BMP; a JPEG's segments walked
   to its frame header, which a colour profile can push past 64 kB), and its copyright, on H5P's
-  own list of types (no SVG, no WebP). A download is given up after a minute with no byte, not
-  after a fixed time. A YouTube, Vimeo, Panopto or Echo360 address stays an address, as the editor
+  own list of types (no SVG, no WebP). A video's or a recording's container is read: an mp4 or an
+  m4a by its index, after `ftyp` or, as in an older file, `moov`, `mdat`, `free` or `wide`, any
+  other by its first bytes. One its field does
+  not take is refused (a video takes MP4, WebM and Ogg; a recording MP3, M4A, WAV, Ogg and WebM):
+  a web page at an address that ends `.mp4`, as a wiki's file page or a share link answers, built
+  and passed the verifier before (#218). An mp4's index is read through the normalizer's
+  `mp4Info`, the walk its faststart uses, in Node and on a page alike. No index to read is a
+  problem. Where the index lists tracks, no sound or no picture is a note, a silent video being
+  one an author can mean, and so is HEVC. Where it gives a length, that holds an Interactive
+  Video's times (`videoTimes`): a start, a bookmark or an end screen past the end is refused, an
+  interaction that ends past it is not, since it shows to the end. No time is named in a list
+  where an item was refused, since the list's indices no longer match the source's. A download
+  is given up after a minute with no byte, not after a fixed time. A YouTube, Vimeo, Panopto or
+  Echo360 address stays an address, as the editor
   embeds it, and only where H5P.Video's own pattern for that host takes it, since an address none
   matches goes to its HTML5 player, which cannot play a page: a Short or a live stream is written
   as its video's watch address, and another form on those hosts is refused by name.

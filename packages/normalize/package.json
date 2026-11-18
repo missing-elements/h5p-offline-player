@@ -29,6 +29,10 @@
       "node": "./lib/crc32.mjs",
       "default": "./lib/crc32-table.mjs"
     },
+    "./mp4": {
+      "types": "./types/mp4.d.mts",
+      "default": "./lib/mp4.mjs"
+    },
     "./package.json": "./package.json"
   },
   "files": [

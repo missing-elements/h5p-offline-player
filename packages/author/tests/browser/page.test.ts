@@ -2,6 +2,7 @@ import { pack } from '@missing-elements/h5p-libraries/install'
 import { describe, expect, it } from 'vitest'
 import { commands } from 'vitest/browser'
 import { buildPackage, openPack } from '../../lib/browser.mjs'
+import { mp4 } from '../helpers/mp4'
 
 // The page's build in Chromium, as a page runs it: the pack a bundler emits, a picture the page
 // was given as a `File`, the package back as a `Blob`. Its bytes go to Node, where the verifier
@@ -73,6 +74,25 @@ describe('the build in a page', () => {
         expect(report, name).toMatchObject({ verdict: 'pass', reasons: [], warnings: [], errors: [], state: 'ready', untrusted: true })
         expect(report.contentCheck, name).toEqual({ notes: [], changes: [] })
       }
+    } finally {
+      await libraries.close()
+    }
+  })
+
+  it('reads a video\'s index from the File it was given, as a build in Node reads it from disk (#218)', async () => {
+    const libraries = await openPack(pack)
+    try {
+      const clip = new File([mp4(false, { seconds: 30, tracks: [['vide', 'avc1']] })], 'clip.mp4', { type: 'video/mp4' })
+      const source = (from: number) => ({
+        ...META,
+        type: 'H5P.InteractiveVideo',
+        params: { interactiveVideo: { video: { files: [{ path: 'clip.mp4' }] }, assets: { interactions: [{ duration: { from, to: from + 2 }, label: 'Look', action: { library: 'H5P.Text', params: { text: 'Look' } } }] } } }
+      })
+      const built = await buildPackage(source(5), { libraries, files: { 'clip.mp4': clip } })
+      expect(built.notes.filter(({ path }) => path.endsWith('.path'))).toEqual([{ path: 'params.interactiveVideo.video.files[0].path', message: 'clip.mp4 has no sound' }])
+      await expect(buildPackage(source(40), { libraries, files: { 'clip.mp4': clip } })).rejects.toMatchObject({
+        problems: [{ path: 'params.interactiveVideo.assets.interactions[0].duration', message: 'starts at 40 s, after the video ends at 30 s' }]
+      })
     } finally {
       await libraries.close()
     }

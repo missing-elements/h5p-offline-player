@@ -8,6 +8,10 @@ import { archiveFingerprint, formatBytes, normalizeArchive, type EntryResult, ty
 import { orderEntries } from '@missing-elements/h5p-normalize'
 // For the packages of this repository that write zips, h5p-author's page build among them.
 import { crc32 } from '@missing-elements/h5p-normalize/crc32'
+// For h5p-author, which reads a video's index where it builds: in Node, and on a page.
+import { mp4Info, type Mp4Info } from '@missing-elements/h5p-normalize/mp4'
+// @ts-expect-error the walk the normalizer shares with it, not part of the package's API
+import { topLevelAtoms } from '@missing-elements/h5p-normalize/mp4'
 
 export async function asACallerWould(): Promise<string> {
   const seen: EntryResult[] = []
@@ -28,6 +32,12 @@ export async function asACallerWould(): Promise<string> {
   // @ts-expect-error bytes, not text
   crc32('h5p.json')
 
-  void [moved, saved, orderEntries, checked, trailing]
+  const info: Mp4Info | null = await mp4Info(async (offset, length) => new Uint8Array(length), 100)
+  const length: number | undefined = info?.duration
+  const codecs: string[] = info?.tracks.filter(({ kind }) => kind === 'video').map(({ codec }) => codec) ?? []
+  // @ts-expect-error a read, not the bytes
+  await mp4Info(new Uint8Array(100), 100)
+
+  void [moved, saved, orderEntries, checked, trailing, length, codecs, topLevelAtoms]
   return `${report.revision} ${revision}`
 }

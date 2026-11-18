@@ -561,6 +561,8 @@ describe('media', () => {
       if (request.url === '/pictures/map.png') response.writeHead(200, { 'content-type': 'image/png' }).end(png(40, 20))
       else if (request.url === '/picture') response.writeHead(200, { 'content-type': 'image/png' }).end(png(10, 30))
       else if (request.url === '/page.html') response.writeHead(200, { 'content-type': 'text/html' }).end('<p>no</p>')
+      // A file's page on a wiki, at an address that ends as the file's name does (#218).
+      else if (request.url === '/wiki/File:clip.mp4') response.writeHead(200, { 'content-type': 'text/html' }).end('<!DOCTYPE html><title>File:clip.mp4</title>')
       else if (request.url === '/odd%zz.png') response.writeHead(200, { 'content-type': 'image/png' }).end(png(20, 10))
       else if (request.url === '/trickle.png') {
         // Slow, and never silent for long: eight pieces, 100 ms apart.
@@ -684,6 +686,67 @@ describe('media', () => {
       'params.content[1].content.params.sources.path: https://www.youtube.com/playlist?list=PL0123456789 is an address on YouTube that H5P.Video cannot play: give https://www.youtube.com/watch?v= and the video\'s id',
       'params.content[2].content.params.sources.path: https://example.panopto.eu/Panopto/Pages/Sessions/List.aspx is an address on Panopto that H5P.Video cannot play: give the viewer\'s, …/Panopto/Pages/Viewer.aspx?id= and the session\'s id',
       'params.content[3].content.params.sources.path: https://echo360.org/lesson/0b6d3a5e/classroom is an address on Echo360 that H5P.Video cannot play: give its H5P address, https://echo360.org/media/, the media\'s id and /h5p'
+    ])
+  })
+
+  it('reads a video\'s and a recording\'s first bytes, and refuses one that is not what the field takes (#218)', async () => {
+    await writeFile(join(dir, 'page.mp4'), '<!DOCTYPE html><title>clip</title>')
+    await writeFile(join(dir, 'song.mp3'), 'not a recording at all')
+    await writeFile(join(dir, 'cut.mp4'), mp4(true).subarray(0, 40))
+    // A page in UTF-16: its byte-order mark, FF FE, once passed for an MP3 frame's sync bits.
+    await writeFile(join(dir, 'wide.mp3'), Buffer.from('\ufeff<!DOCTYPE html><title>song</title>', 'utf16le'))
+    const video = (path: string) => ({ content: { library: 'H5P.Video', params: { sources: { path } } } })
+    const audio = (path: string) => ({ content: { library: 'H5P.Audio', params: { files: { path } } } })
+    expect(await problems({
+      ...META,
+      type: 'H5P.Column',
+      params: { content: [video('page.mp4'), video(`${origin}/wiki/File:clip.mp4`), audio('song.mp3'), video('cut.mp4'), audio('wide.mp3')] }
+    }, { base: dir })).toEqual([
+      'params.content[0].content.params.sources.path: page.mp4 is a web page, not a video',
+      `params.content[1].content.params.sources.path: ${origin}/wiki/File:clip.mp4 is a web page, not a video: give the address of the file itself`,
+      'params.content[2].content.params.files.path: song.mp3 is not an MP3, M4A, WAV, Ogg or WebM recording: its first bytes are none of theirs',
+      'params.content[3].content.params.sources.path: cut.mp4 has no index (moov) a player can read: is the file whole?',
+      'params.content[4].content.params.files.path: wide.mp3 is a web page, not a recording'
+    ])
+  })
+
+  it('says of an mp4 that it has no sound, no picture, or a picture not every browser plays (#218)', async () => {
+    await writeFile(join(dir, 'silent.mp4'), mp4(false, { seconds: 30, tracks: [['vide', 'avc1']] }))
+    await writeFile(join(dir, 'radio.mp4'), mp4(true, { seconds: 30, tracks: [['soun', 'mp4a']] }))
+    await writeFile(join(dir, 'phone.mp4'), mp4(true, { seconds: 30, tracks: [['vide', 'hvc1'], ['soun', 'mp4a']] }))
+    await writeFile(join(dir, 'fine.mp4'), mp4(true, { seconds: 30, tracks: [['vide', 'avc1'], ['soun', 'mp4a']] }))
+    // An older file with no `ftyp`, its index first: an mp4 by its index, as the normalizer reads it.
+    await writeFile(join(dir, 'old.mp4'), mp4(true, { seconds: 30, tracks: [['vide', 'avc1'], ['soun', 'mp4a']] }).subarray(24))
+    const { notes } = await build({
+      ...META,
+      type: 'H5P.Column',
+      params: { content: ['silent.mp4', 'radio.mp4', 'phone.mp4', 'fine.mp4', 'old.mp4'].map((path) => ({ content: { library: 'H5P.Video', params: { sources: { path } } } })) }
+    }, { base: dir })
+    expect(notes.filter(({ path }) => path.endsWith('.sources.path')).map(({ path, message }) => `${path}: ${message}`)).toEqual([
+      'params.content[0].content.params.sources.path: silent.mp4 has no sound',
+      'params.content[1].content.params.sources.path: radio.mp4 has no picture',
+      'params.content[2].content.params.sources.path: phone.mp4 is HEVC (H.265), which not every browser plays; H.264 plays in all of them'
+    ])
+  })
+
+  it('refuses an Interactive Video\'s time past the end of a video whose length it read (#218)', async () => {
+    await writeFile(join(dir, 'short.mp4'), mp4(true, { seconds: 30.0333, tracks: [['vide', 'avc1'], ['soun', 'mp4a']] }))
+    const text = (from: number, to: number) => ({ duration: { from, to }, label: 'Look', action: { library: 'H5P.Text', params: { text: 'Look' } } })
+    const source = (interactions: unknown[], bookmarks: unknown[], startVideoAt?: number) => ({
+      ...META,
+      type: 'H5P.InteractiveVideo',
+      params: { interactiveVideo: { video: { files: [{ path: 'short.mp4' }] }, assets: { interactions, bookmarks } }, ...(startVideoAt === undefined ? {} : { override: { startVideoAt, retryButton: 'on' } }) }
+    })
+    expect(await problems(source([text(5, 40), text(500, 600)], [{ time: 10, label: 'In' }, { time: 31, label: 'Out' }], 45), { base: dir })).toEqual([
+      'params.interactiveVideo.assets.interactions[1].duration: starts at 500 s, after the video ends at 30.03 s',
+      'params.interactiveVideo.assets.bookmarks[1].time: is 31 s, after the video ends at 30.03 s',
+      'params.override.startVideoAt: is 45 s, after the video ends at 30.03 s'
+    ])
+    // Within its length, an interaction that ends past it included, it builds.
+    expect((await build(source([text(5, 40)], [{ time: 10, label: 'In' }]), { base: dir })).content.interactiveVideo.assets.interactions).toHaveLength(1)
+    // An item refused leaves a list whose indices are not the source's: no time is named in it.
+    expect(await problems(source(['a stray line', text(500, 600)], []), { base: dir })).toEqual([
+      expect.stringMatching(/^params\.interactiveVideo\.assets\.interactions\[0\]: expected an object/)
     ])
   })
 

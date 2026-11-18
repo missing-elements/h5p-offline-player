@@ -115,6 +115,7 @@ function pageMedia(files) {
     keep: (body) => new Response(body).blob(),
     async open(file) {
       return {
+        size: file.size,
         read: async (offset, length) => new Uint8Array(await file.slice(offset, offset + length).arrayBuffer()),
         close: async () => {}
       }
