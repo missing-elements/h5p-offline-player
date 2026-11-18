@@ -17,8 +17,9 @@ await copyFile(resolve(repositoryRoot, 'LICENSE'), resolve(packageDir, 'LICENSE'
 
 const { name } = /** @type {{ name: string }} */ (JSON.parse(await readFile(resolve(packageDir, 'package.json'), 'utf8')))
 const readme = await readFile(resolve(repositoryRoot, 'README.md'), 'utf8')
-const title = /^# [^\n]*\n/
+// The title line up to its end, newline or not, so what follows it is copied as it is.
+const title = /^# [^\n]*/
 if (!title.test(readme)) throw new Error('README.md does not start with a "# " title')
-await writeFile(resolve(packageDir, 'README.md'), readme.replace(title, `# ${name}\n`))
+await writeFile(resolve(packageDir, 'README.md'), readme.replace(title, `# ${name}`))
 
 console.log(`[prepack] LICENSE copied, and README.md titled ${name}`)
