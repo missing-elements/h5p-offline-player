@@ -1,4 +1,4 @@
-# @missing-elements/h5p-offline-player
+# H5P Toolkit by Missing Elements
 
 [![npm](https://img.shields.io/npm/v/%40missing-elements%2Fh5p-offline-player)](https://www.npmjs.com/package/@missing-elements/h5p-offline-player)
 [![licence](https://img.shields.io/npm/l/%40missing-elements%2Fh5p-offline-player)](https://github.com/missing-elements/h5p-toolkit/blob/main/LICENSE)
