@@ -25,6 +25,12 @@ not.
   copy names no URL and the response listener already has the real failures.
 - **A CSP violation is caught with an init script** on the browser context, because the event
   fires in the document it happens in and the frame is created after the page loads.
+- **A video or a recording the browser could not play is a warning, named by its path.** After
+  the settle, every `<video>` and `<audio>` in the frame with a `MediaError` is listed as "does
+  not play", with what the error means. A web page saved as `clip.mp4` boots and draws its player,
+  and only the screenshot showed it (#218); the rest of the content plays, so it is no fail. An
+  MP4 in a browser with no H.264, or no AAC for a recording, as Playwright's Chromium, is "not
+  checked" instead: its failing there says nothing about a learner's browser.
 - **The browser is Chrome or Edge if installed, else Playwright's Chromium**, through
   `playwright-core` rather than `playwright`, so installing the package downloads nothing; the
   error names `npx playwright install chromium` as the way to get one.
