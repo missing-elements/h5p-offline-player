@@ -143,8 +143,8 @@ build) so a broken tree cannot ship; the browser suite is left out because it ne
 Chromium. Firefox, WebKit and the slow browser files run only in CI's weekly run and a run by hand,
 so before publishing the player, run CI by hand on main (`gh workflow run ci.yml`) and wait for
 green. Then `prepack` copies the root LICENSE into the package, which is where npm takes it
-from, and the root README with the package's name for its title: the root one is titled for the
-toolkit, the repository. The repository sets no `ignore-scripts`, so `prepublishOnly` runs; pnpm 10 blocks
+from. The player's README is its own, `packages/player/README.md`, since the root one is the
+toolkit's front page. The repository sets no `ignore-scripts`, so `prepublishOnly` runs; pnpm 10 blocks
 dependency scripts by itself. The build deletes `types/` and the TypeScript build info first:
 `tsc -b` never removes a declaration whose source was deleted.
 

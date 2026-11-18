@@ -11,8 +11,7 @@ types
 # reproducible from source.
 public
 
-# Copied from the repository root by the player's `prepack`, so npm finds them in the package.
-packages/player/README.md
+# Copied from the repository root by the player's `prepack`, so npm finds it in the package.
 packages/player/LICENSE
 # The same for the normalizer, the verifier, the author, the cmi5 wiring and the embed site writer, whose `prepack` copies the LICENSE.
 packages/normalize/LICENSE
