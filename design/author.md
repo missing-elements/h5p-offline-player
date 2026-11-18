@@ -361,8 +361,8 @@ text to the content check's rules, and `apps/skills` plays every example untrust
   `libraries.txt`, laid out as a build from a bundle reads them, 14.9 MB with pack 1.1.0 and the
   same bytes on every rebuild. One file for every type, because the person downloads it before a
   type is chosen; a `.tar.gz`, because ChatGPT reads an attached `.zip` as a plugin. Nothing passes
-  through a server of the organisation's this way, which with no MCP server is what the guide
-  leads with: privacy first. Step 3 builds from an attached archive first. The offer of the archive
+  through a server of the organisation's this way, which is what the guide leads with: privacy
+  first. Step 3 builds from an attached archive first. The offer of the archive
   is one fixed line in the route, but a weak model drops some of what it is asked to write, so the
   organisation's guide, not the skill, tells people using ChatGPT to attach it, or to keep it in a
   ChatGPT Project (missing-elements.github.io#49). There a `path` names a file in the sandbox,

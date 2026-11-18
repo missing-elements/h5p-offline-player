@@ -19,6 +19,11 @@ body:
         - h5p-normalize
         - h5p-verify
         - h5p-cmi5
+        - h5p-embed
+        - h5p-author
+        - h5p-mcp
+        - Agent skills
+        - VS Code extension (H5P Preview)
         - Demo site or installable app
         - Documentation
     validations:

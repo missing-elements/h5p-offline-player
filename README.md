@@ -40,7 +40,8 @@ changed, and plays every content type in the pack, trusted and untrusted.
 - **Comes with tools:** [`h5p-verify`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/verify.md) checks that a package plays,
   [`h5p-normalize`](https://github.com/missing-elements/h5p-offline-player/blob/main/docs/streaming-video.md) makes its video stream, and
   [`h5p-author`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/author#readme) builds one from a short JSON source, which a
-  Moodle site accepts as an upload too.
+  Moodle site accepts as an upload too. [`h5p-mcp`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/mcp#readme)
+  brings the build and the check to an app with no shell, such as Claude Desktop.
 
 It is a player, not an editor, and it stores no results: its events go wherever your page sends
 them. Coming from [h5p-standalone](https://github.com/tunapanda/h5p-standalone)? This player
@@ -140,7 +141,8 @@ npx skills add missing-elements/h5p-offline-player
 A chat app takes `h5p-author` as a zip that you upload or attach. Download it from
 [missing-elements.github.io/h5p/create-with-ai/#install](https://missing-elements.github.io/h5p/create-with-ai/#install),
 which says where it goes in each app. The zip holds the same h5p-author release as the site's
-build page runs.
+build page runs. In Claude Desktop, [`h5p-mcp`](https://github.com/missing-elements/h5p-offline-player/tree/main/packages/mcp#readme)
+builds onto your disk instead.
 
 ## Contributing
 

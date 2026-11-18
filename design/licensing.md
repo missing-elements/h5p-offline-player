@@ -88,7 +88,8 @@ identifier"; the `— h5p-offline-player` at the end of the page titles; and the
 pack's archives, "H5P Offline Player library pack", which nobody sees. Changing that one changes
 every part's bytes, so every package's `libraries` revision, and every learner's saved state
 starts over once; it goes with the next pack release that rewrites every part anyway. The VS Code
-extension was named to the rule from the start. Not decided: the site's address,
+extension and the MCP server, "H5P Author MCP by Missing Elements", were named to the rule from
+the start. Not decided: the site's address,
 `h5p-offline-player.vercel.app`, which names no owner (the policy approves "h5p.terrisblog.com"
 and refuses "h5pbootcamp.com"), and the tab title "H5P player" of `/embed` and the embed package's
 page, a generic use. Two limits outweigh any name: the automatic licence covers free,
