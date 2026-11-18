@@ -178,6 +178,7 @@ describe('a package read back', () => {
       ]
     })
     expect(read.notes.map(({ path }) => path)).toEqual(['language', 'params.questions[0].params.oldField', 'authors', 'authorComments', 'changes', 'params.questions[0].metadata'])
+    expect(read.notes.find(({ path }) => path === 'authors')?.message).toBe('are not in h5p.json: written as "Unknown", since a source names one')
     expect(read.notes.find(({ path }) => path === 'params.questions[0].metadata')?.message).toMatch(/licence, authors or more of their own.*a build gives every part the source's/)
     expect(read.files).toEqual([image])
     expect(await exists(join(at, 'read', image))).toBe(true)
@@ -295,6 +296,10 @@ describe('a package read back', () => {
     expect(params.questions[0].params.media.type.params.file).toEqual({ path: image, copyright: { title: 'River' } })
     const again = await buildPackage(read.source, undefined, { base: join(at, 'read'), check: true })
     expect(again.notes).toEqual([])
+    // Authors as a list with no one in it, which H5P never exports, are said as they are.
+    const empty = join(at, 'empty.h5p')
+    await exported(empty, { ...manifest, authors: [] }, content, { [image]: new Uint8Array(png(320, 180)) })
+    expect((await readPackage(empty, join(at, 'read-empty'))).notes).toContainEqual({ path: 'authors', message: 'are an empty list: written as "Unknown", since a source names one' })
   })
 
   it('is a command: h5p-author read writes the source and its media, and says how to build it again', async () => {

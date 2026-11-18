@@ -201,7 +201,9 @@ function ownFields(manifest, language, note) {
   }
   if (!authors.length) {
     authors.push({ name: 'Unknown', role: 'Author' })
-    const why = listed.length ? 'have no name among them' : says(manifest.authors) ? 'are not a list' : 'are not in h5p.json'
+    const why = manifest.authors === undefined || manifest.authors === null ? 'are not in h5p.json'
+      : !Array.isArray(manifest.authors) ? 'are not a list'
+        : listed.length ? 'have no name among them' : 'are an empty list'
     note('authors', `${why}: written as "Unknown", since a source names one`)
   }
   /** @type {Record<string, unknown>} */
