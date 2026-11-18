@@ -34,13 +34,13 @@ const PREVIEW = `Opens a .h5p package in the person's browser in the real player
 const LIST_HEAD = `The content types the library pack has, by the name a source's "type" takes. Those marked * have notes and a tested example; for the rest h5p_types gives their fields.`
 
 /**
- * A source's own fields as the author package declares them (#230), shown to the app as the shape
- * of `source`. The field itself takes any object: the build is the check, which says every problem
- * at once and reads a source written another way as it is meant (#174), where the SDK would refuse
- * it before the build looked.
+ * A source's own fields as the author package declares them (#230), shown to the app as the
+ * properties of `source`, and nothing more: no field is said to be required and none forbidden.
+ * The build is the check, which reads a source written another way as it is meant (#174) and says
+ * every problem at once, where the SDK, or an app holding a call to the schema, would refuse it
+ * before the build looked.
  */
-const SOURCE = z.toJSONSchema(sourceSchema, { io: 'input' })
-delete SOURCE.$schema
+const SOURCE_PROPERTIES = z.toJSONSchema(sourceSchema, { io: 'input' }).properties
 
 /** @param {string} text */
 const answer = (text) => ({ content: [{ type: /** @type {const} */ ('text'), text }] })
@@ -160,7 +160,7 @@ export async function createServer(options = {}) {
     title: 'Build an H5P package',
     description: BUILD,
     inputSchema: z.object({
-      source: z.record(z.string(), z.unknown()).meta({ ...SOURCE, description: 'The source, as h5p_types describes it for its type' }),
+      source: z.record(z.string(), z.unknown()).meta({ properties: SOURCE_PROPERTIES, description: 'The source, as h5p_types describes it for its type' }),
       output: z.string().optional().describe('Leave it out unless the person named a place: a file name, or a path in a folder this server may use'),
       verify: z.boolean().optional().describe('Play it and report whether it works; default true')
     }),

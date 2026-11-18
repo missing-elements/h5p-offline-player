@@ -54,11 +54,12 @@ describe('the server', () => {
     const { tools } = await client.listTools()
     expect(tools.map((tool) => tool.name).sort()).toEqual(['h5p_build', 'h5p_preview', 'h5p_types'])
     expect(client.getInstructions()).toMatch(/h5p_types[\s\S]*h5p_build[\s\S]*h5p_preview/)
-    // A source's own fields as the author package declares them, before one is written (#230).
-    expect(tools.find((tool) => tool.name === 'h5p_build')?.inputSchema.properties?.source).toMatchObject({
-      required: ['type', 'title', 'language', 'license', 'authors'],
-      properties: { authors: { items: { required: ['name', 'role'] } } }
-    })
+    // A source's own fields as the author package declares them, before one is written (#230),
+    // with nothing required or forbidden, so no app refuses a source the build would read (#174).
+    const source = tools.find((tool) => tool.name === 'h5p_build')?.inputSchema.properties?.source as Record<string, any>
+    expect(source.properties).toMatchObject({ license: { enum: expect.arrayContaining(['U', 'CC BY']) }, authors: { items: { required: ['name', 'role'] } } })
+    expect(source).not.toHaveProperty('required')
+    expect(source.additionalProperties).not.toBe(false)
     // What an app sends the model with every message: under about 1,500 tokens at four characters each.
     expect(JSON.stringify(tools).length + (client.getInstructions()?.length ?? 0)).toBeLessThan(6_000)
   })

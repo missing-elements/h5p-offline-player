@@ -21,11 +21,12 @@ web, is #210 and not this.
   instructions with every message, so they stay under about 1,500 tokens; `server.test.ts` holds
   them under 6,000 characters.
 - **`h5p_build` shows a source's own fields; the build checks them.** Its `source` carries the
-  author package's `sourceSchema` as JSON Schema (#230), so a model writes the authors and the
-  licence right before its first build: without it, Haiku wrote `"authors": ["Unknown"]` in 2 of
-  3 runs that built, and with it in none of 6. The field takes any object, since the build reads a
-  source written another way as it is meant and says every problem at once (#174), where the SDK
-  would refuse it unread.
+  fields of the author package's `sourceSchema` as JSON Schema properties (#230), so a model writes
+  the authors and the licence right before its first build: without them, Haiku wrote
+  `"authors": ["Unknown"]` in 2 of 3 runs that built, and with them in none of 9. Nothing is said
+  to be required or forbidden, and the field takes any object, since the build reads a source
+  written another way as it is meant and says every problem at once (#174), where the SDK, or an
+  app that holds a call to the schema, would refuse it unread.
 - **The folders: `--allow`, else the app's roots, else Desktop, Documents and Downloads.** A folder
   the person named when adding the server is their choice and comes first; the app's roots come
   next, asked on every call, since they change; both are taken as given. The defaults are never
