@@ -139,7 +139,8 @@ describe.concurrent('every type file', () => {
     for (const path of paths(source.params)) if (!/^https?:/.test(path)) await writeFile(join(folder, path), sample(path))
     const output = join(folder, 'example.h5p')
     const result = await buildPackage(source, output, { base: folder })
-    expect(result.notes).toEqual([])
+    // The demo's clip, every video's sample, has no sound, and the build says so (#218).
+    expect(result.notes.filter(({ message }) => !/\.mp4 has no sound$/.test(message))).toEqual([])
     await checksAsSaved(output)
     await playsBothWays(output)
   }, 180_000)

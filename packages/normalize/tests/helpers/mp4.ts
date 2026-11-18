@@ -128,3 +128,29 @@ export function chunkOffsets(bytes: Uint8Array, table: FoundAtom): number[] {
     wide ? Number(view.getBigUint64(body + 8 + index * 8)) : view.getUint32(body + 8 + index * 4)
   )
 }
+
+/**
+ * An mp4 whose index says what a reader looks for: the movie's length in `mvhd` (version 1 with
+ * `wide`), and for each track its handler in `hdlr` and its codec in `stsd`. Before its media with
+ * `faststart`, after it otherwise; `mdatSize` bytes of media nobody should read.
+ */
+export function describedMp4(options: {
+  duration?: number, timescale?: number, wide?: boolean, faststart?: boolean, mdatSize?: number,
+  tracks?: { handler: string, codec: string }[]
+} = {}): Uint8Array<ArrayBuffer> {
+  const { duration = 30_000, timescale = 1000, wide = false, faststart = true, mdatSize = 4096 } = options
+  const tracks = options.tracks ?? [{ handler: 'vide', codec: 'avc1' }, { handler: 'soun', codec: 'mp4a' }]
+  const mvhd = wide
+    ? atom('mvhd', u32s(0x01000000), u64s(0, 0), u32s(timescale), u64s(duration), new Uint8Array(80))
+    : atom('mvhd', u32s(0, 0, 0, timescale, duration), new Uint8Array(80))
+  const trak = ({ handler, codec }: { handler: string, codec: string }) => atom('trak',
+    atom('tkhd', new Uint8Array(84)),
+    atom('mdia',
+      atom('mdhd', new Uint8Array(24)),
+      atom('hdlr', u32s(0, 0), encoder.encode(handler), new Uint8Array(13)),
+      atom('minf', atom('stbl', atom('stsd', u32s(0, 1, 16), encoder.encode(codec), new Uint8Array([0, 0, 0, 0, 0, 0, 0, 1])), atom('stts', u32s(0, 0)), stco([])))))
+  const ftyp = atom('ftyp', encoder.encode('isom'), u32s(0x200), encoder.encode('isomavc1'))
+  const moov = atom('moov', mvhd, ...tracks.map(trak))
+  const mdat = atom('mdat', new Uint8Array(mdatSize).fill(7))
+  return concat(faststart ? [ftyp, moov, mdat] : [ftyp, mdat, moov])
+}

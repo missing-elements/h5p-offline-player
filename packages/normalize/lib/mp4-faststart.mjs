@@ -10,12 +10,10 @@
  * whole. Only `moov` — a few megabytes at most — is read into memory, because it is rewritten.
  */
 import { formatBytes } from './format.mjs'
+import { topLevelAtoms } from './mp4.mjs'
 
 /** Atoms whose children hold the chunk offset tables. Nothing under any other branch does. */
 const CONTAINERS = new Set(['trak', 'mdia', 'minf', 'stbl'])
-
-/** Types a file can plausibly start with. Anything else is not an ISO media file. */
-const LEADING_TYPES = new Set(['ftyp', 'moov', 'mdat', 'free', 'skip', 'wide', 'uuid', 'pnot', 'styp', 'sidx'])
 
 /** Larger than any real index; a `moov` past this is a malformed file, and is left alone. */
 const MAX_MOOV_SIZE = 256 * 1024 * 1024
@@ -25,12 +23,6 @@ const READ_CHUNK = 1024 * 1024
 /**
  * @typedef {{ start: number, end: number } | { bytes: Uint8Array }} Piece
  *   Either a range of the source file — absolute positions, end exclusive — or literal bytes.
- *
- * @typedef {object} Atom
- * @property {string} type
- * @property {number} offset relative to the start of the media file
- * @property {number} size including the header
- * @property {number} headerSize 8, or 16 with a 64-bit size
  *
  * @typedef {object} FaststartPlan
  * @property {'moved' | 'already' | 'skipped'} status
@@ -54,7 +46,13 @@ export async function planFaststart(file, base, size) {
   /** @param {string} detail */
   const skipped = (detail) => ({ status: /** @type {const} */ ('skipped'), detail, pieces: identity, size })
 
-  const atoms = await readTopLevelAtoms(file, base, size)
+  // The media file's own bytes, never past its end: it may be a range of a larger file.
+  const read = async (/** @type {number} */ offset, /** @type {number} */ length) => {
+    const buffer = Buffer.alloc(Math.max(0, Math.min(length, size - offset)))
+    await readExact(file, buffer, base + offset)
+    return buffer
+  }
+  const atoms = await topLevelAtoms(read, size)
   if (!atoms) return skipped('not an ISO media file')
   if (atoms.some((atom) => atom.type === 'moof')) return skipped('fragmented mp4, already streamable')
 
@@ -116,46 +114,6 @@ export async function* readPieces(file, pieces) {
       position += length
     }
   }
-}
-
-/**
- * The top-level atoms of the file, or `null` where its structure is not one this understands.
- * @param {import('node:fs/promises').FileHandle} file
- * @param {number} base
- * @param {number} size
- * @returns {Promise<Atom[] | null>}
- */
-async function readTopLevelAtoms(file, base, size) {
-  /** @type {Atom[]} */
-  const atoms = []
-  const header = Buffer.alloc(16)
-  let position = 0
-
-  while (position < size) {
-    if (size - position < 8) return null
-    await readExact(file, header.subarray(0, 8), base + position)
-    let atomSize = header.readUInt32BE(0)
-    const type = header.toString('latin1', 4, 8)
-    let headerSize = 8
-
-    if (atomSize === 1) {
-      if (size - position < 16) return null
-      await readExact(file, header.subarray(8, 16), base + position + 8)
-      atomSize = Number(header.readBigUInt64BE(8))
-      headerSize = 16
-    } else if (atomSize === 0) {
-      atomSize = size - position
-    }
-
-    if (atomSize < headerSize || position + atomSize > size) return null
-    if (!/^[\x20-\x7e]{4}$/.test(type)) return null
-    if (atoms.length === 0 && !LEADING_TYPES.has(type)) return null
-
-    atoms.push({ type, offset: position, size: atomSize, headerSize })
-    position += atomSize
-  }
-
-  return atoms
 }
 
 /**
