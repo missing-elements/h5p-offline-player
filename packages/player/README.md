@@ -26,17 +26,18 @@ changed, and plays every content type in the pack, trusted and untrusted.
 - **Plays packages you did not make** with [`untrusted`](https://github.com/missing-elements/h5p-toolkit/blob/main/docs/untrusted.md): none of their
   code runs, and their content is checked by a port of H5P's own validator.
 - **Reports results you can audit:** xAPI statements that name the
-  [build of the package](https://github.com/missing-elements/h5p-toolkit/blob/main/docs/revision.md) they came from, [cmi5](https://github.com/missing-elements/h5p-toolkit/blob/main/docs/cmi5.md), [resume](https://github.com/missing-elements/h5p-toolkit/blob/main/docs/resume.md), and a
-  [SCORM zip](https://github.com/missing-elements/h5p-toolkit/tree/main/packages/embed#a-scorm-package-for-an-lms): SCORM 1.2, checked in
-  Moodle, ILIAS, OpenOLAT, Chamilo, SCORM Cloud and Frappe LMS, or 2004, checked in Moodle and
-  SCORM Cloud.
+  [build of the package](https://github.com/missing-elements/h5p-toolkit/blob/main/docs/revision.md) they came from, and [resume](https://github.com/missing-elements/h5p-toolkit/blob/main/docs/resume.md).
+  With [`h5p-cmi5`](https://github.com/missing-elements/h5p-toolkit/tree/main/packages/cmi5#readme), a page holding the player is a
+  [cmi5](https://github.com/missing-elements/h5p-toolkit/blob/main/docs/cmi5.md) unit, and [`h5p-embed`](https://github.com/missing-elements/h5p-toolkit/tree/main/packages/embed#a-scorm-package-for-an-lms) writes a package as a SCORM zip:
+  SCORM 1.2, checked in Moodle, ILIAS, OpenOLAT, Chamilo, SCORM Cloud and Frappe LMS, or 2004,
+  checked in Moodle and SCORM Cloud.
 - **No tracking:** no account, cookies or telemetry, and nothing it stores leaves the learner's
   browser. The library pack comes from jsDelivr unless you serve a copy
   ([privacy](https://github.com/missing-elements/h5p-toolkit/blob/main/docs/privacy.md)).
 - **Works offline, in the content's language:** an installable app, and H5P's own buttons in
   English and 56 other languages.
-- **Tested in Chromium, Firefox and WebKit** on every change, and in Safari on macOS and iOS by
-  hand ([browsers](https://github.com/missing-elements/h5p-toolkit/blob/main/docs/compatibility.md#browsers)).
+- **Tested in Chromium** on every change, in Firefox and WebKit every week and before each
+  release, and in Safari on macOS and iOS by hand ([browsers](https://github.com/missing-elements/h5p-toolkit/blob/main/docs/compatibility.md#browsers)).
 - **Part of a toolkit:** [H5P Toolkit by Missing Elements](https://github.com/missing-elements/h5p-toolkit#readme)
   also builds packages with AI, checks that they play, makes their video stream and turns them
   into SCORM zips.

@@ -160,9 +160,10 @@ in a major. None is in that state now.
 ## Browsers
 
 The player needs a secure context — https, or `localhost` — with Service Workers, the Cache API,
-IndexedDB, Web Locks and `DecompressionStream` for `deflate-raw`. Its browser suite runs on every
-change in Chromium, Firefox and WebKit, Playwright's builds of their current releases; Safari on
-macOS and iOS is checked by hand. No version floor is published: a package that plays in a current
+IndexedDB, Web Locks and `DecompressionStream` for `deflate-raw`. Its browser suite runs in
+Chromium on every change, and in Firefox and WebKit every week and before each release of the
+player, all three Playwright's builds of their current releases; Safari on macOS and iOS is
+checked by hand. No version floor is published: a package that plays in a current
 browser and not in another that has those features is a bug, and worth reporting. Dropping an engine
 is a major change.
 

@@ -67,6 +67,8 @@ import { runtime } from '@missing-elements/h5p-runtime'
 document.querySelector('h5p-player').runtime = runtime
 ```
 
+A package that carries its libraries plays as it is; one exported without them, as h5p.com
+exports, needs `libraries="pack"` on the element.
 [Setting up the player](https://github.com/missing-elements/h5p-toolkit/blob/main/docs/setup.md)
 covers pages without a bundler, other bundlers, CORS, and which setup suits packages you did not
 make.
