@@ -1,13 +1,13 @@
 # H5P Author MCP by Missing Elements
 
 `@missing-elements/h5p-mcp` lets an AI app make H5P content on your computer: quizzes, fill in the
-blanks, flash cards, presentations, interactive books, branching scenarios and the rest of the 55
+blanks, flash cards, presentations, interactive books, branching scenarios and the rest of the 53
 content types the H5P hub serves. It writes a playable `.h5p` that carries its libraries, checks
 that it plays in a real H5P player, and opens it in your browser. No H5P site, server or account.
 
 It is a local [MCP](https://modelcontextprotocol.io) server: your app starts it on your computer,
-and it sends nothing to a server of ours. It needs Node 22 or newer, and for the check Chrome, Edge
-or another Chromium-based browser.
+and it sends nothing to a server of ours. It needs Node 22 or newer, and for the check Chrome or
+Edge; without either, run `npx playwright install chromium` once.
 
 ## Add it to your app
 
@@ -49,10 +49,11 @@ number, and it says which.
 
 ## What leaves your computer
 
-The build downloads a picture or video your content names by web address, from the public internet
-only. The check and the preview play the package from your computer; content that embeds a YouTube
-video or shows math loads those from the web, as H5P does anywhere. Your app sends your
-conversation to its model, as it does without this server.
+The build downloads each picture, video, audio or other file your content names by web address. It
+refuses an address on your local network: a guard against a mistaken or planted address, not
+against a hostile network. The check and the preview play the package from your computer; content
+that embeds a YouTube video or shows math loads those from the web, as H5P does anywhere. Your app
+sends your conversation to its model, as it does without this server.
 
 ## Licence
 

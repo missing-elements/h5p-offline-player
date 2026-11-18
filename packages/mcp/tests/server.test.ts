@@ -1,6 +1,6 @@
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { access, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
  * The server as an app runs it: the bundle the package ships, started over standard input and
  * output, given one folder, asked through the SDK's own client. The build's rules are the author
  * package's and tested there; these hold the server to calling them, to its folders, and to its
- * answers.
+ * answers. Each test builds what it needs, under a title of its own.
  */
 
 const BUNDLE = resolve(import.meta.dirname, '../dist/h5p-mcp.mjs')
@@ -26,13 +26,19 @@ type Content = { type: string, text?: string, data?: string, mimeType?: string }
 type Answer = { content: Content[], isError?: boolean }
 
 let folder: string
+/** A folder the server may not use. */
+let elsewhere: string
 let client: Client
 
 const call = async (name: string, args: Record<string, unknown> = {}) => (await client.callTool({ name, arguments: args })) as Answer
 const textOf = (answer: Answer) => answer.content.filter((part) => part.type === 'text').map((part) => part.text).join('\n')
+/** The path a build's answer names, if it built. */
+const builtOf = (answer: Answer) => /^Built (.+?\.h5p) \(/m.exec(textOf(answer))?.[1]
+const build = async (title: string, args: Record<string, unknown> = {}) => builtOf(await call('h5p_build', { source: { ...SOURCE, title }, verify: false, ...args }))
 
 beforeAll(async () => {
   folder = await mkdtemp(join(tmpdir(), 'h5p-mcp-'))
+  elsewhere = await mkdtemp(join(tmpdir(), 'h5p-mcp-elsewhere-'))
   client = new Client({ name: 'h5p-mcp-test', version: '0' })
   await client.connect(new StdioClientTransport({ command: process.execPath, args: [BUNDLE, '--allow', folder, '--no-open'], stderr: 'pipe' }))
 })
@@ -40,6 +46,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await client?.close()
   await rm(folder, { recursive: true, force: true })
+  await rm(elsewhere, { recursive: true, force: true })
 })
 
 describe('the server', () => {
@@ -95,13 +102,22 @@ describe('h5p_build', () => {
     expect(JSON.parse(await readFile(join(folder, 'boiling-point.source.json'), 'utf8'))).toEqual(SOURCE)
   })
 
-  it('takes the next number rather than write over a file', async () => {
+  it('takes the next number rather than write over a file, or through a link', async () => {
+    expect(await build('Again')).toBe(join(folder, 'again.h5p'))
+    expect(await build('Again')).toBe(join(folder, 'again-2.h5p'))
     await writeFile(join(folder, 'mine.h5p'), 'the person\'s own file')
-    const again = textOf(await call('h5p_build', { source: SOURCE, verify: false }))
-    expect(again).toContain(`Built ${join(folder, 'boiling-point-2.h5p')}`)
-    const named = textOf(await call('h5p_build', { source: SOURCE, output: 'mine.h5p', verify: false }))
-    expect(named).toContain(`Built ${join(folder, 'mine-2.h5p')}`)
+    // A link holds its name, even one that leads nowhere: written through, it would make a file
+    // outside the folder.
+    const outside = join(elsewhere, 'source.json')
+    await symlink(outside, join(folder, 'mine-2.source.json'))
+    expect(await build('Boiling point', { output: 'mine.h5p' })).toBe(join(folder, 'mine-3.h5p'))
     expect(await readFile(join(folder, 'mine.h5p'), 'utf8')).toBe('the person\'s own file')
+    await expect(access(outside)).rejects.toThrow()
+  })
+
+  it('gives builds made at once names of their own', async () => {
+    const both = await Promise.all([build('Twice'), build('Twice')])
+    expect(both.sort()).toEqual([join(folder, 'twice-2.h5p'), join(folder, 'twice.h5p')])
   })
 
   it('refuses a source with problems, each by its path, and writes nothing', async () => {
@@ -113,8 +129,7 @@ describe('h5p_build', () => {
   })
 
   it('writes nowhere but its folders', async () => {
-    const elsewhere = join(tmpdir(), 'h5p-mcp-elsewhere.h5p')
-    const answer = await call('h5p_build', { source: SOURCE, output: elsewhere, verify: false })
+    const answer = await call('h5p_build', { source: SOURCE, output: join(elsewhere, 'boiling-point.h5p'), verify: false })
     expect(answer.isError).toBe(true)
     // A model cannot know the folders, so the refusal names them and the way out.
     expect(textOf(answer)).toContain(`outside the folders this server may write in: ${folder}. Give a file name alone, or leave output out.`)
@@ -123,7 +138,9 @@ describe('h5p_build', () => {
 
 describe('h5p_preview', () => {
   it('serves a package in its folders, and answers with the address', async () => {
-    const answer = await call('h5p_preview', { package: 'boiling-point.h5p' })
+    const file = await build('Preview')
+    expect(file).toBeTruthy()
+    const answer = await call('h5p_preview', { package: basename(file!) })
     expect(answer.isError).toBeFalsy()
     const address = /http:\/\/127\.0\.0\.1:\d+\//.exec(textOf(answer))?.[0]
     expect(address).toBeTruthy()
@@ -131,7 +148,7 @@ describe('h5p_preview', () => {
   })
 
   it('refuses a file outside its folders', async () => {
-    const answer = await call('h5p_preview', { package: resolve(tmpdir(), 'elsewhere.h5p') })
+    const answer = await call('h5p_preview', { package: join(elsewhere, 'boiling-point.h5p') })
     expect(answer.isError).toBe(true)
     expect(textOf(answer)).toContain('not in a folder this server may use')
   })

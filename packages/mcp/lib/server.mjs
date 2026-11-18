@@ -1,4 +1,4 @@
-import { access, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { lstat, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -52,6 +52,9 @@ const whereFiles = (folders) => folders.length
 /** Lines of an outline past which an answer says how many more there are. */
 const OUTLINE_LINES = 80
 
+/** @param {string} path a package's */
+const sourceBeside = (path) => path.replace(/\.h5p$/i, '.source.json')
+
 /**
  * The server and its three tools. It holds no rules of its own: the build, its checks and the
  * confinement to folders are h5p-author's, the check and the preview h5p-verify's.
@@ -100,16 +103,25 @@ export async function createServer(options = {}) {
     return new Set(names.filter((name) => name.endsWith('.md')).map((name) => name.slice(0, -3)))
   }
 
+  /** The packages being built, lower-cased, as macOS and Windows match a name in any case. */
+  const building = new Set()
+
   /**
-   * A package's path in the folder, with a number added to the name where it is taken: a build
-   * never writes over a file, so a package built again takes the next number.
+   * A package's path in the folder, with a number added to the name where it is taken, the
+   * package's or its source's: a build never writes over a file, so a package built again takes
+   * the next number. A link takes its name too, even one that leads nowhere. The path is held for
+   * the build until it is let go of, so that builds at once take names of their own.
    * @param {string} folder
    * @param {string} stem the file name without `.h5p`
    */
   async function freeName(folder, stem) {
     for (let n = 1; ; n++) {
       const path = join(folder, `${stem}${n === 1 ? '' : `-${n}`}.h5p`)
-      if (!(await access(path).then(() => true, () => false))) return path
+      const taken = await Promise.all([path, sourceBeside(path)].map((each) => lstat(each).then(() => true, () => false)))
+      // Asked after the wait and held at once, with no wait between, so no other build takes it.
+      if (taken.includes(true) || building.has(path.toLowerCase())) continue
+      building.add(path.toLowerCase())
+      return path
     }
   }
 
@@ -147,26 +159,33 @@ export async function createServer(options = {}) {
   }, async ({ source, output, verify = true }) => {
     const allowed = await folders()
     if (!allowed.length) return refusal('This server has no folder to write in: start it with --allow <folder>, or give it a folder from the app.')
-    let target = output ? resolve(allowed[0], output) : await freeName(allowed[0], fileStem(source.title))
+    let target = resolve(allowed[0], output || `${fileStem(source.title)}.h5p`)
     if (!/\.h5p$/i.test(target)) target += '.h5p'
     // Said here, with the folders, since a model cannot know them: the build's own refusal names none.
     if (!(await inside(target, allowed))) return refusal(`${target} is outside the folders this server may write in: ${allowed.join(', ')}. Give a file name alone, or leave output out.`)
     // A name that is taken gets a number, as a build never writes over a file.
-    if (output) target = await freeName(dirname(target), basename(target).replace(/\.h5p$/i, ''))
+    target = await freeName(dirname(target), basename(target).replace(/\.h5p$/i, ''))
+    const sourceFile = sourceBeside(target)
     let result
+    /** @type {Error | undefined} */
+    let unwritten
     try {
       result = await buildPackage(source, target, { base: dirname(target), within: allowed, fetch: publicFetch, libraries: options.libraries })
+      // Made new: a file or a link put at its name since the name was found free is not written through.
+      unwritten = await writeFile(sourceFile, `${JSON.stringify(source, null, 2)}\n`, { flag: 'wx' }).then(() => undefined, (error) => error)
     } catch (error) {
       if (error instanceof SourceError) return refusal(`${error.message}\nFix each at its path and build again.${/outside the folders/.test(error.message) ? ` ${whereFiles(allowed)}` : ''}`)
       return refusal(error instanceof Error ? error.message : String(error))
+    } finally {
+      building.delete(target.toLowerCase())
     }
-    const sourceFile = target.replace(/\.h5p$/i, '.source.json')
-    await writeFile(sourceFile, `${JSON.stringify(source, null, 2)}\n`)
     const install = result.install.length ? `, ${result.install.length} more for installing on an H5P site` : ''
     const media = result.media.length ? `, ${result.media.length} media file${result.media.length === 1 ? '' : 's'}` : ''
     const lines = [
       `Built ${target} (${sized((await stat(target)).size)}): ${result.manifest.mainLibrary}, ${result.libraries.length} libraries${install}${media}.`,
-      `Its source is beside it, ${basename(sourceFile)}: https://missing-elements.github.io/h5p/build/ opens it under "Or open a file", to change and build again.`
+      unwritten
+        ? `Its source was not written beside it: ${unwritten.message}`
+        : `Its source is beside it, ${basename(sourceFile)}: https://missing-elements.github.io/h5p/build/ opens it under "Or open a file", to change and build again.`
     ]
     for (const { path, message } of result.notes) lines.push(`Note: ${path} ${message}`)
     const outline = result.outline.split('\n')

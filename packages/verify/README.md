@@ -117,8 +117,9 @@ if (report.verdict !== 'pass') process.exit(1)
 TypeScript declarations ship with the package: `VerifyReport` is `report.json`'s shape.
 
 `previewPackage({ file, libraries, untrusted })` serves the preview as `--preview` does and gives
-its `url`, a `closed` promise that settles once its last tab has gone, and `close()`;
-`openBrowser(url)` opens an address in the default browser, false where no opener started.
+its `url`, `close()`, and a `closed` promise that settles with `closed` once its last tab has gone,
+`unopened` when no tab came within ten minutes, or `stopped` after `close()`. `openBrowser(url)`
+opens an address in the default browser, false where no opener started.
 
 An [agent skill](https://agentskills.io) for it ships in the repository:
 `npx skills add missing-elements/h5p-offline-player --skill h5p-verify`.
