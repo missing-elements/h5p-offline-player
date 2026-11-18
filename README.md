@@ -102,8 +102,8 @@ npx @missing-elements/h5p-verify@latest course.h5p
 | [`@missing-elements/h5p-embed`](https://github.com/missing-elements/h5p-toolkit/tree/main/packages/embed#readme) | The player page as a static site, and a package as a SCORM zip |
 | [`@missing-elements/h5p-verify`](https://github.com/missing-elements/h5p-toolkit/tree/main/packages/verify#readme) | Plays a package headless and reports whether it works, or opens it in your browser |
 | [`@missing-elements/h5p-normalize`](https://github.com/missing-elements/h5p-toolkit/tree/main/packages/normalize#readme) | Rewrites a package so its video streams |
-| [`@missing-elements/h5p-author`](https://github.com/missing-elements/h5p-toolkit/tree/main/packages/author#readme) | Builds a package of any content type from a short JSON source |
-| [`@missing-elements/h5p-mcp`](https://github.com/missing-elements/h5p-toolkit/tree/main/packages/mcp#readme) | A local MCP server: an app such as Claude Desktop builds a package onto your disk, checks it and opens it in your browser |
+| [`@missing-elements/h5p-author`](https://github.com/missing-elements/h5p-toolkit/tree/main/packages/author#readme) | Builds a package of any content type from a short JSON source, and reads one back into its source |
+| [`@missing-elements/h5p-mcp`](https://github.com/missing-elements/h5p-toolkit/tree/main/packages/mcp#readme) | A local MCP server: an app such as Claude Desktop builds a package onto your disk, checks it and opens it in your browser, or reads one to change it |
 | [`@missing-elements/h5p-cmi5`](https://github.com/missing-elements/h5p-toolkit/tree/main/packages/cmi5#readme) | Makes a page holding the element a cmi5 assignable unit |
 | [H5P Preview](https://marketplace.visualstudio.com/items?itemName=MissingElements.h5p-preview) | Plays `.h5p` files in VS Code, and from [Open VSX](https://open-vsx.org/extension/MissingElements/h5p-preview) in Cursor and VSCodium |
 

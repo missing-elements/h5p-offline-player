@@ -2,22 +2,24 @@
 
 `packages/mcp` is `@missing-elements/h5p-mcp`, shown as **H5P Author MCP by Missing Elements**: a
 local MCP server over standard input and output that builds a package onto the person's disk,
-checks it, and opens it in their browser. It is for apps with no shell, Claude Desktop first; in an
-app with a shell, the skill and `npx` build already. A remote server, for ChatGPT or Claude on the
-web, is #210 and not this.
+checks it, and opens it in their browser, or reads one back to change it. It is for apps with no
+shell, Claude Desktop first; in an app with a shell, the skill and `npx` build already. A remote
+server, for ChatGPT or Claude on the web, is #210 and not this.
 
-- **It holds no rules of its own.** The build, its checks, the outline and the confinement to
-  folders (`buildPackage`, `within`, `publicFetch`, `inside`) are h5p-author's; the check, the
-  preview and opening the browser (`verifyPackage`, `summarize`, `previewPackage`, `openBrowser`)
-  are h5p-verify's. A rule a tool needs goes into those packages first, exported, so the author
-  package and the verifier are published before a server that uses something new of theirs.
-- **Three tools, and the skill's flow as the instructions.** `h5p_types` lists the pack's content
+- **It holds no rules of its own.** The build, the read, their checks, the outline and the
+  confinement to folders (`buildPackage`, `readPackage`, `within`, `publicFetch`, `inside`) are
+  h5p-author's; the check, the preview and opening the browser (`verifyPackage`, `summarize`,
+  `previewPackage`, `openBrowser`) are h5p-verify's. A rule a tool needs goes into those packages
+  first, exported, so the author package and the verifier are published before a server that uses
+  something new of theirs.
+- **Four tools, and the skill's flow as the instructions.** `h5p_types` lists the pack's content
   types, those with a type file marked, and the skill's brief; given a type, read as a build reads
   one (`sourceType`, so "true false" works), it answers with the type's file, or with `schemaOf` for
-  a type with none. `h5p_build` builds a source and `h5p_preview` opens a package. The instructions
-  are the flow in a few lines: the type is the one question, its answer is read before the source is
-  written, then the build, where the file is and what the check found, and the preview offered.
-  Not `SKILL.md`, whose build routes do not apply here. An app sends the descriptions and the
+  a type with none. `h5p_build` builds a source, `h5p_preview` opens a package, and `h5p_read`
+  reads one back into its source. The instructions are the flow in a few lines: the type is the one
+  question, its answer is read before the source is written, then the build, where the file is and
+  what the check found, and the preview offered; a package the person has is read, its source
+  changed, and built. Not `SKILL.md`, whose build routes do not apply here. An app sends the descriptions and the
   instructions with every message, so they stay under about 1,500 tokens; `server.test.ts` holds
   them under 6,000 characters.
 - **`h5p_build` shows a source's own fields; the build checks them.** Its `source` carries the
@@ -49,6 +51,14 @@ web, is #210 and not this.
   in a temporary folder, with its screenshot as an image. Where neither Chrome, Edge nor
   Playwright's Chromium is found, the answer says "Not verified" and why. A source with problems
   is refused, every problem by its path, and nothing is written.
+- **A read writes beside the package, and names its files where it wrote them** (#236).
+  `h5p_read` takes a package in the folders, a name alone being the first folder's, and writes its
+  source and media into a new folder beside it, named after it and numbered where the name is
+  taken, as a package is. It answers with the source, each file it wrote named by its full path,
+  so `h5p_build` reads them wherever its package goes. Asked to add two harder questions to the
+  demo's quiz, Haiku read it and built at the first build in 6 of 6 runs. With the package
+  described as a path in the server's folders, it first guessed one from its working folder in 3
+  of 3; described "by its file name alone", in none of 3.
 - **The SDK is v2, and the package ships its source.** `@modelcontextprotocol/server` brings only
   its core and zod, none of the HTTP frameworks v1 installed, so `bin/` and `lib/` are published as
   written, with no bundle. `McpServer` on `StdioServerTransport` serves the 2025 protocol, which
@@ -62,5 +72,4 @@ web, is #210 and not this.
   one refused. Each test builds what it needs, so each runs alone. The test script first copies
   the skill's type files into the author package, as the author's `prepack` does.
 
-Not built yet: reading a package back to a source (step 3 of #219), the MCP registry's
-`server.json` and Claude Desktop's one-click bundle.
+Not built yet: the MCP registry's `server.json` and Claude Desktop's one-click bundle.

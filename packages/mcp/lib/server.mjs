@@ -4,7 +4,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { McpServer } from '@modelcontextprotocol/server'
 import { z } from 'zod'
-import { SourceError, buildPackage, contentTypes, inside, openPack, publicFetch, schemaOf, sourceSchema, sourceType } from '@missing-elements/h5p-author'
+import { SourceError, buildPackage, contentTypes, inside, openPack, publicFetch, readPackage, schemaOf, sourceSchema, sourceType } from '@missing-elements/h5p-author'
 import { VerifyError, openBrowser, previewPackage, summarize, verifyPackage } from '@missing-elements/h5p-verify'
 import { defaultFolders, fileStem, rootFolders } from './folders.mjs'
 
@@ -23,7 +23,10 @@ const INSTRUCTIONS = `Builds H5P content as a .h5p file from a short JSON source
 2. Call h5p_types with the type and write the source from its notes, example and fields: only what differs from the defaults.
 3. Call h5p_build. Where it lists problems, fix each at its path and build again.
 4. Tell the person where the file is and what the check found, and offer h5p_preview.
-The author and the licence are what the person gave; otherwise the name you know them by, or "Unknown", and the licence "U". Say which you used.`
+The author and the licence are what the person gave; otherwise the name you know them by, or "Unknown", and the licence "U". Say which you used.
+To change a .h5p the person has, h5p_read it, change its source as asked, and h5p_build that.`
+
+const READ = `Reads a .h5p package back into its source, to change it and build it again with h5p_build: its type, title, language, licence, authors, and the params that differ from the defaults. Writes the source and the package's media into a new folder beside it, and answers with the source, each file named where it was written. Reads content made for the library pack's versions of its libraries.`
 
 const TYPES = `The H5P content types and how to write a source for one. With no type: the list, and how to write good content. With a type: its notes, a tested example and its fields. Read the type's answer before writing its source.`
 
@@ -65,8 +68,23 @@ const OUTLINE_LINES = 80
 const sourceBeside = (path) => path.replace(/\.h5p$/i, '.source.json')
 
 /**
- * The server and its three tools. It holds no rules of its own: the build, its checks and the
- * confinement to folders are h5p-author's, the check and the preview h5p-verify's.
+ * A read source's files named where they were written, so that a build reads them wherever its
+ * package goes: each file the read wrote, by its path from the folder, made that folder's.
+ * @param {unknown} value
+ * @param {string} folder
+ * @param {Set<string>} files
+ * @returns {unknown}
+ */
+function located(value, folder, files) {
+  if (Array.isArray(value)) return value.map((each) => located(each, folder, files))
+  if (!value || typeof value !== 'object') return value
+  const entries = Object.entries(value).map(([key, each]) => [key, key === 'path' && typeof each === 'string' && files.has(each) ? join(folder, ...each.split('/')) : located(each, folder, files)])
+  return Object.fromEntries(entries)
+}
+
+/**
+ * The server and its four tools. It holds no rules of its own: the build, the read, their checks
+ * and the confinement to folders are h5p-author's, the check and the preview h5p-verify's.
  * @param {ServerOptions} [options]
  */
 export async function createServer(options = {}) {
@@ -129,6 +147,22 @@ export async function createServer(options = {}) {
       const taken = await Promise.all([path, sourceBeside(path)].map((each) => lstat(each).then(() => true, () => false)))
       // Asked after the wait and held at once, with no wait between, so no other build takes it.
       if (taken.includes(true) || building.has(path.toLowerCase())) continue
+      building.add(path.toLowerCase())
+      return path
+    }
+  }
+
+  /**
+   * A new folder beside a package for what a read writes, named after it, with a number added where
+   * the name is taken, as a build's package takes one; held while the read runs.
+   * @param {string} parent
+   * @param {string} stem
+   */
+  async function freeFolder(parent, stem) {
+    for (let n = 1; ; n++) {
+      const path = join(parent, n === 1 ? stem : `${stem}-${n}`)
+      const taken = await lstat(path).then(() => true, () => false)
+      if (taken || building.has(path.toLowerCase())) continue
       building.add(path.toLowerCase())
       return path
     }
@@ -217,6 +251,33 @@ export async function createServer(options = {}) {
       }
     }
     return { content: [{ type: /** @type {const} */ ('text'), text: lines.join('\n') }, ...images] }
+  })
+
+  server.registerTool('h5p_read', {
+    title: 'Read an H5P package',
+    description: READ,
+    inputSchema: z.object({ package: z.string().describe('The .h5p by its file name alone, as the person names it, or its path in a folder this server may use') }),
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false }
+  }, async ({ package: file }) => {
+    const allowed = await folders()
+    // A name alone is the first folder's, as a source's file is.
+    const path = resolve(allowed[0] ?? '.', file)
+    if (!allowed.length || !(await inside(path, allowed))) return refusal(`${file} is not in a folder this server may use.${allowed.length ? ` ${whereFiles(allowed)}` : ''}`)
+    const folder = await freeFolder(dirname(path), fileStem(basename(path).replace(/\.h5p$/i, '')))
+    let result
+    try {
+      result = await readPackage(path, folder, { within: allowed, libraries: options.libraries })
+    } catch (error) {
+      return refusal(error instanceof Error ? error.message : String(error))
+    } finally {
+      building.delete(folder.toLowerCase())
+    }
+    const media = result.files.length ? `, with its ${result.files.length} media file${result.files.length === 1 ? '' : 's'} beside it` : ''
+    const lines = [`Read ${path}: ${result.source.type}. Its source is in ${result.output}${media}.`]
+    for (const { path: at, message } of result.notes) lines.push(`Note: ${at} ${message}`)
+    const source = { ...result.source, params: located(result.source.params, folder, new Set(result.files)) }
+    lines.push('', 'The source, each file named where it was written: change it as the person asks and pass it to h5p_build.', JSON.stringify(source))
+    return answer(lines.join('\n'))
   })
 
   server.registerTool('h5p_preview', {
