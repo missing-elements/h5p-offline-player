@@ -1,6 +1,6 @@
 # Layout
 
-A pnpm workspace of nine packages and two apps. Eight packages are published to npm; the VS Code
+A pnpm workspace of ten packages and two apps. Nine packages are published to npm; the VS Code
 extension is a `.vsix`. Paths in `design/` are relative to their part: `src/…` and `scripts/…`
 mean the player's unless a file says otherwise. `dist/`, `types/`, the player's `public/` and the
 runtime's `index.js` are generated and not in git.
@@ -30,6 +30,8 @@ packages/verify/       a package played headless (lib/verify.mjs) and in a brows
 packages/author/       a playable .h5p from a short source: lib/build.mjs both builds, node.mjs
                        Node's, generator.mjs content from semantics, check.mjs, outline.mjs,
                        types.mjs the editor widgets' rules; scripts/ the skill's sync and copy
+packages/mcp/          the local MCP server: bin/h5p-mcp.mjs the command, lib/server.mjs its three
+                       tools, lib/folders.mjs the folders it may use
 packages/cmi5/         the element as a cmi5 AU: src/index.ts startCmi5, src/client.ts the protocol
 packages/embed/        site/ the embed page and the SCORM page; lib/build.mjs the site,
                        lib/scorm*.mjs the SCORM zip in Node and in a page; scorm/ its launch page

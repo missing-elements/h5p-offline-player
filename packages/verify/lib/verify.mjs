@@ -6,6 +6,7 @@ import { chromium, errors as playwrightErrors } from 'playwright-core'
 import { VerifyError, librarySources, packageFile, playerDist, sendFile, serve } from './serve.mjs'
 
 export { VerifyError }
+export { openBrowser, previewPackage } from './preview.mjs'
 
 /** @import { DowngradedLibrary, H5PPlayerElement, PlayerErrorDetail, PlayerState, RefreshedLibrary } from '@missing-elements/h5p-offline-player' */
 

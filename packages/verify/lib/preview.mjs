@@ -55,7 +55,6 @@ const HEARTBEAT_MS = 15_000
  * Serves the package and its page until the preview is stopped or stops by itself: `closed`
  * settles with `closed` once its last tab has gone, `unopened` when no tab came within `openWait`,
  * and `stopped` after `close()`.
- * @internal
  * @param {PreviewOptions} options
  * @returns {Promise<{ url: string, closed: Promise<'closed' | 'unopened' | 'stopped'>, close: () => void }>}
  */
@@ -214,7 +213,6 @@ export function byteRange(header, size) {
 /**
  * Opens `url` in the default browser. False when no opener could be started, `xdg-open` missing on
  * a server for one; the command prints the address either way.
- * @internal
  * @param {string} url
  * @returns {Promise<boolean>}
  */

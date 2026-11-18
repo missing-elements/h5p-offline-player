@@ -1,7 +1,7 @@
 // The package as a caller sees it, by its own name: through the `types` condition, so this checks the
 // published declarations, not the source. `pnpm typecheck` writes them first.
 import {
-  allowedTags, buildPackage, bundleLibraries, checkContent, ContentGenerator, contentTypes, GENERATED_START, loadLibraries, markupText, openPack, packageLibraries, plainText, schemaOf, SourceError,
+  allowedTags, buildPackage, bundleLibraries, checkContent, ContentGenerator, contentTypes, GENERATED_START, inside, loadLibraries, markupText, openPack, packageLibraries, plainText, schemaOf, SourceError,
   sourceSchema, writeBundle, writeBundles,
   type BuildResult, type BundleResult, type CheckedContent, type LibraryRecord, type LibrarySource, type PackageFiles, type Source, type TranslationReport
 } from '@missing-elements/h5p-author'
@@ -26,6 +26,9 @@ export async function check(): Promise<[BuildResult, string, string]> {
   const generator = new ContentGenerator(new Map(), { lenient: true, id: (count) => String(count) })
   generator.problems.length = 0
   void readSource
+  // A tool that confines what it reads to folders asks as a confined build does.
+  const confined: boolean = await inside('lesson/picture.png', ['lesson'])
+  void confined
   return [built, await schemaOf('H5P.Blanks', { markdown: true }), GENERATED_START]
 }
 

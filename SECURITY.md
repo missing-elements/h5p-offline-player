@@ -14,6 +14,8 @@ versions of the packages in this repository:
 | `@missing-elements/h5p-embed` | Latest release and `main` |
 | `@missing-elements/h5p-runtime` | Latest release and `main` |
 | `@missing-elements/h5p-libraries` | Latest release and `main` |
+| `@missing-elements/h5p-author` | Latest release and `main` |
+| `@missing-elements/h5p-mcp` | Latest release and `main` |
 | Demo and installable app | Deployment from `main` |
 
 Older releases may receive a fix when practical, but users should upgrade to a
@@ -68,6 +70,20 @@ The relevant security boundary depends on how the player is deployed:
   cannot make a package's own JavaScript safe when the package plays as it is;
   that is what `untrusted` withholds.
 
+The author package and the MCP server build packages from a source that a
+model may have written:
+
+- Given `within`, a build reads local files and writes its package only in
+  those folders, links followed. Given `publicFetch`, it refuses to download
+  from a web address on a local network, redirects included; it resolves a
+  name and then asks, so it guards against a mistaken or planted address, not
+  a hostile network. A video on YouTube, Vimeo, Panopto or Echo360 is not
+  downloaded: its address is kept, and the player loads it wherever it points.
+- The MCP server always builds so, in the folders the person gave it, else the
+  app's roots, as they are given. Given none, it uses Desktop, Documents and
+  Downloads, and never the home folder whole. It never writes over a file, and
+  its preview serves one package on `127.0.0.1` until its tab is closed.
+
 Reports are particularly helpful for issues such as:
 
 - archive path traversal, package-to-package data exposure, or virtual-route
@@ -82,8 +98,12 @@ Reports are particularly helpful for issues such as:
 - cross-origin request, redirect, or navigation-policy bypasses;
 - denial of service that defeats documented streaming, size, storage, or
   lifecycle safeguards;
+- a build confined by `within` that reads or writes outside its folders or
+  writes over a file, `publicFetch` reaching a local network by an address it
+  should refuse, or the MCP server reaching a file outside its folders;
 - vulnerabilities in the published player, runtime, library bundle, normalizer,
-  verifier, cmi5 package, embed site writer, demo, or installable app.
+  verifier, author package, MCP server, cmi5 package, embed site writer, demo,
+  or installable app.
 
 A malicious H5P archive executing its own bundled JavaScript when it plays as
 it is, is an expected property of H5P, not by itself a vulnerability. It
