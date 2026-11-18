@@ -17,46 +17,39 @@ Where extracted bytes are kept and how they are written: the chunk store and its
 
 - **The chunk writer's `abort` publishes nothing.** Everything that reached the store is already
   recorded by the `publish` that followed its write; bytes still in the partial buffer were never
-  stored. Publishing `written` on abort — which it once did — put the watermark past the data,
-  and a reader that trusted it got a short body.
-- **A downloaded archive is read back before it is reported done.** WebKit can lose a cache's writes
-  when the Jobs worker that made them is terminated just after them: measured on 2026-10-13 in
-  Playwright's WebKit, a package from a host without `Range` downloaded whole — record written and
-  read back as complete — its element removed a millisecond later, which terminates the Jobs worker,
-  and played again at once: the second worker found the cache empty, downloaded every byte, and
-  could not read back its own record a moment later. Nothing deleted the cache, from any context;
-  deleting it by name and downloading again kept everything, every time. A check before the job did
-  not help — the writes vanish during it — so `downloadArchive` reads the record back at the end
-  and, when it is not complete, starts the cache afresh (`ChunkStore.destroy`) and downloads once
-  more; a second loss is a `bad-archive` naming the storage. The archive is all or nothing, so that
-  is where the check pays. An extraction's or a warm's writes lost the same way are not checked, and
-  what the virtual server then serves for them is not measured. It takes a replay within
-  milliseconds of removing the element, which the tests do and a learner rarely does; Safari itself
-  is not measured. `playback.test.ts` failed four tests in WebKit without it.
+  stored. Publishing `written` on abort would put the watermark past the data, and a reader that
+  trusted it would get a short body.
+- **A downloaded archive is read back before it is reported done.** WebKit can lose a cache's
+  writes when the Jobs worker that made them is terminated just after them (an element removed and
+  the package played again at once): the second worker finds the cache empty and cannot read back
+  its own record. Nothing deletes the cache; a check before the job does not help, since the
+  writes vanish during it. So `downloadArchive` reads the record back at the end and, when it is
+  not complete, starts the cache afresh (`ChunkStore.destroy`) and downloads once more; a second
+  loss is a `bad-archive` naming the storage. The archive is all or nothing, so that is where the
+  check pays. An extraction's or a warm's writes lost the same way are not checked. `playback.test.ts`
+  fails in WebKit without it.
 - **An aborted job gives up its `inFlight` key at once, not when the abort finishes.** The
   teardown takes several tasks, and a second press of Play posts `abort` and `download` back to
   back; a key still held by the dying job made the new request look like a duplicate, and nothing
   ever answered it. The `finally` deletes only its own entry for the same reason.
 - **Extractions run one at a time, and the order is the policy.** A runtime asks for every
-  video it instantiates at boot, not only the one on screen: an Interactive Book from sodix.de
-  with six deflated videos (4.6 to 57.8 MB, none faststart) kept two `<video>` elements attached
-  and still requested all six within the first second — H5P.Video creates a media element per
-  chapter, and a detached one loads its header all the same. Three extractions and three inline
-  inflates then shared 1.27 MB/s, and the first chapter's 21 MB video, which plays nothing until
-  its last byte because its `moov` is at the end, finished at 26 s instead of the 16 s it takes
-  alone. So the Jobs worker runs extractions through `JobQueue`: a demand — the virtual server's
-  `need-job` — queues behind earlier demands and ahead of every prefetch; a repeated demand for a
-  queued entry moves it to the front, which the server's two-second dedupe keeps the boot burst
-  from doing to itself while a learner opening a later chapter is heard at once; a prefetch
-  (`extract` with `prefetch: true`, which is how `advancePrefetch` posts) goes to the back and
-  promotes nothing. The running job is never interrupted, since a deflate stream cannot resume.
-  Two things keep a queued entry's waiters honest: the Jobs worker announces it as `queued` on the
-  watermark channel every `INPUT_LIVENESS_MS`, which `waitForWatermark` counts as alive, and
-  `serveChunked` answers a queued entry at once with its headers and a body that follows, rather
-  than holding the request open until the first flush — behind a long queue that could be
-  minutes, longer than a fetch event may stay unanswered. Downloads and warming are not queued;
-  both happen before the frame boots. `job-queue.test.ts` pins the order, `jobs-worker.test.ts`
-  drives three extractions through the real worker and checks they never overlap.
+  video it instantiates at boot, not only the one on screen (H5P.Video creates a media element per
+  chapter, and a detached one loads its header all the same). Concurrent extractions share the
+  bandwidth, and a video whose `moov` is at the end plays nothing until its last byte, so the
+  first chapter's video would finish far later than alone. So the Jobs worker runs extractions
+  through `JobQueue`: a demand — the virtual server's `need-job` — queues behind earlier demands
+  and ahead of every prefetch; a repeated demand for a queued entry moves it to the front, which
+  the server's two-second dedupe keeps the boot burst from doing to itself while a learner opening
+  a later chapter is heard at once; a prefetch (`extract` with `prefetch: true`, which is how
+  `advancePrefetch` posts) goes to the back and promotes nothing. The running job is never
+  interrupted, since a deflate stream cannot resume. Two things keep a queued entry's waiters
+  honest: the Jobs worker announces it as `queued` on the watermark channel every
+  `INPUT_LIVENESS_MS`, which `waitForWatermark` counts as alive, and `serveChunked` answers a
+  queued entry at once with its headers and a body that follows, rather than holding the request
+  open until the first flush, which behind a long queue could be longer than a fetch event may
+  stay unanswered. Downloads and warming are not queued; both happen before the frame boots.
+  `job-queue.test.ts` pins the order, `jobs-worker.test.ts` drives three extractions through the
+  real worker and checks they never overlap.
 - **A chunk streams out of the cache; it is not materialised.** `readRange` pipes each chunk's
   body through, slicing a partial one as it flows, so the 64 kB a media element probes with costs
   64 kB rather than the 8 MB chunk around it.
@@ -70,12 +63,9 @@ Where extracted bytes are kept and how they are written: the chunk store and its
   the data's start for one the forward index named, plus sizes and method — on the `need-job`
   message and on each `PrefetchEntry`. The worker reads the thirty-byte local header
   (`local-header.ts`, the same parse the server and the warm use), streams the compressed span
-  through `streamSpan` and inflates with the native `DecompressionStream`. Before this the worker
-  opened its own zip.js reader per package, which was a round of ranged requests per worker —
-  five seconds on the fwu.de host — for an index the server already had, and put zip.js in the
-  element's bundle by way of the worker string: 159 kB of the worker's 193, 208 kB for the
-  element. Measured after: the worker is 24 kB, the element 40 kB minified (17 kB gzipped), the
-  Service Worker unchanged, since the index is its job. A chunked source is opened `partial` for
+  through `streamSpan` and inflates with the native `DecompressionStream`. A zip.js reader in the
+  worker would cost a round of ranged requests per worker for an index the server already has, and
+  put zip.js in the element's bundle by way of the worker string. A chunked source is opened `partial` for
   an extraction, because an entry the forward index named lies whole below the watermark of an
   archive still downloading. `tests/browser/jobs-worker.test.ts` builds the locations the way
   the server does, through `locationOf`.
@@ -84,13 +74,11 @@ Where extracted bytes are kept and how they are written: the chunk store and its
 - **Eviction empties a cache before it deletes it.** In Chromium `caches.delete()` frees nothing
   the write that triggered it can use: the bytes stay on the books until every `Cache` object
   anyone holds for that cache has been garbage-collected, and the virtual server makes one per
-  request. Measured against a simulated quota: with a handle alive the space never came back,
-  with handles dropped it took about 770 ms, with the entries deleted first it was back in 3 ms.
-  Before `emptyCache`, a write under pressure evicted every idle package in turn, found each
-  eviction had freed nothing yet, and gave up — while a reload seconds later found the room.
-  One cost that remains: a partial chunk is rewritten as it fills, and the Cache API holds the
-  old and the new copy together while the put lands, so an entry needs up to twice its last
-  partial — 16 MB at most — of spare room for a moment. A store within one chunk of full can
+  request. With the entries deleted first the space is back at once; without `emptyCache`, a write
+  under pressure evicts every idle package in turn, finds each eviction freed nothing yet, and
+  gives up. One cost that remains: a partial chunk is rewritten as it fills, and the Cache API
+  holds the old and the new copy together while the put lands, so an entry needs up to twice its
+  last partial — 16 MB at most — of spare room for a moment. A store within one chunk of full can
   therefore still refuse a write that would have fitted afterwards.
 - **Caching an inline entry is a convenience; a refused write is served around.** Everything
   under `INLINE_MAX_SIZE` — including a stored mp4 — is copied into the cache before it is
@@ -99,8 +87,8 @@ Where extracted bytes are kept and how they are written: the chunk store and its
   response alone, and the store is left untried for `FAILURE_BACKOFF_MS` so a media element
   probing a 10 MB entry with a burst of ranges does not copy 10 MB into a full store for each.
   Consequence: a package on a host that honours `Range`, or picked from disk, plays with no
-  storage at all. Before this, a refused write was a 507, and the runtime's script loader —
-  which waits on `load` alone — left the frame blank at `indexing` for ever, with no event.
+  storage at all. A refused write must not be a 507: the runtime's script loader waits on `load`
+  alone and would leave the frame blank at `indexing` for ever, with no event.
   The one place storage is a hard requirement is a host without `Range`: the archive has to
   land whole, and a package larger than the room is refused with its size and the reason.
 - **A failed extraction is recorded, not rediscovered.** The Jobs worker writes the failure into
@@ -111,7 +99,7 @@ Where extracted bytes are kept and how they are written: the chunk store and its
   entry tried again, because the space may have come back.
 - **Bookkeeping never takes a request down.** An origin filled to the last byte refuses a
   hundred-byte write as readily as a chunk: `setMeta` therefore goes through the same eviction
-  as the chunks (it once assumed tiny meant exempt), `touchPackage` and the `status` update are
+  as the chunks (tiny is not exempt), `touchPackage` and the `status` update are
   best-effort, and `register` keeps an existing row when the new one does not fit — the id is a
   hash of the source, so the row names the same package.
 - **The quota message carries the numbers.** Built where the write failed, in the Jobs worker,
@@ -128,5 +116,5 @@ Where extracted bytes are kept and how they are written: the chunk store and its
   long as a package is loaded. `busyPackages()` reads `navigator.locks.query()` and
   `coldestIdlePackage` skips anything held, so a write in one tab or a learner mid-video in
   another survives a quota squeeze caused by a third. Both workers install the same policy through
-  `installEvictionPolicy`; before that the Jobs worker — where the large writes, and so the quota
-  errors, actually are — had no policy and evicted whichever cache the browser listed first.
+  `installEvictionPolicy`, the Jobs worker included, since the large writes, and so the quota
+  errors, are there.

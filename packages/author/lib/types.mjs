@@ -23,7 +23,8 @@ import { stripTags } from './text.mjs'
  * (h5p/h5p-editor-branching-scenario at 8fcd92d0a5a5f6b855d9d03ce4d19ab31baa4b99) and
  * H5PEditor.GameMap 1.2.5 (otacke/h5p-editor-game-map at a1ad6b04abb00ef0c1fda5bd446e4f95b8434873).
  * Course Presentation's and Find the Hotspot's layouts are this package's own and take nothing
- * from their editors. AGENTS.md says how to move them to a newer editor.
+ * from their editors. design/author.md, *The editor is pinned, and not watched*, says how to move
+ * them to a newer editor.
  */
 
 /**

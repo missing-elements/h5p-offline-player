@@ -39,8 +39,8 @@ import { allowedTags, markupText, plainText, stripTags, takesMarkup } from './te
  * The editor is h5p-editor-php-library's form at commit 3bec2594356cf1be4e6401f7e7e557650720aa9b
  * (2026-10-08), and H5PEditor.ShowWhen 1.0.9 at 93678737300e084cb9390a691d3e1ad4e793fbaa for
  * `showWhen`. Each rule taken from them names the script it follows, here and in text.mjs,
- * translate.mjs, schema.mjs and media.mjs; AGENTS.md says how to move them to a newer editor. Where
- * this departs from that editor:
+ * translate.mjs, schema.mjs and media.mjs; design/author.md, *The editor is pinned, and not
+ * watched*, says how to move them to a newer editor. Where this departs from that editor:
  *
  * - An optional list nobody wrote stays empty. The editor starts every new list with `defaultNum`,
  *   `min` or one item, optional or not, for an author to fill or remove.
