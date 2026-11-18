@@ -109,8 +109,6 @@ npx @missing-elements/h5p-verify@latest course.h5p
 
 ## Agent skills
 
-[![skills.sh](https://skills.sh/b/missing-elements/h5p-offline-player)](https://skills.sh/missing-elements/h5p-offline-player)
-
 Five skills for Claude Code and other agents that can read files and run commands, installed
 with [skills](https://skills.sh/); add `--skill <name>` for one of them. None needs a provider API
 key or an H5P server.
