@@ -2,7 +2,7 @@ import { lstat, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { McpServer } from '@modelcontextprotocol/server'
 import { z } from 'zod'
 import { SourceError, buildPackage, contentTypes, inside, openPack, publicFetch, schemaOf, sourceType } from '@missing-elements/h5p-author'
 import { VerifyError, openBrowser, previewPackage, summarize, verifyPackage } from '@missing-elements/h5p-verify'
@@ -128,7 +128,7 @@ export async function createServer(options = {}) {
   server.registerTool('h5p_types', {
     title: 'H5P content types',
     description: TYPES,
-    inputSchema: { type: z.string().optional().describe('A content type, as H5P.MultiChoice or "multiple choice"') },
+    inputSchema: z.object({ type: z.string().optional().describe('A content type, as H5P.MultiChoice or "multiple choice"') }),
     annotations: { readOnlyHint: true, openWorldHint: false }
   }, async ({ type }) => {
     const list = await types()
@@ -150,11 +150,11 @@ export async function createServer(options = {}) {
   server.registerTool('h5p_build', {
     title: 'Build an H5P package',
     description: BUILD,
-    inputSchema: {
+    inputSchema: z.object({
       source: z.record(z.string(), z.unknown()).describe('The source, as h5p_types describes it for its type'),
       output: z.string().optional().describe('Leave it out unless the person named a place: a file name, or a path in a folder this server may use'),
       verify: z.boolean().optional().describe('Play it and report whether it works; default true')
-    },
+    }),
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true }
   }, async ({ source, output, verify = true }) => {
     const allowed = await folders()
@@ -213,7 +213,7 @@ export async function createServer(options = {}) {
   server.registerTool('h5p_preview', {
     title: 'Preview an H5P package',
     description: PREVIEW,
-    inputSchema: { package: z.string().describe('The .h5p to open, in a folder this server may use') },
+    inputSchema: z.object({ package: z.string().describe('The .h5p to open, in a folder this server may use') }),
     annotations: { readOnlyHint: true, openWorldHint: false }
   }, async ({ package: file }) => {
     const allowed = await folders()

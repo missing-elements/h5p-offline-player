@@ -13,5 +13,5 @@
     "skipLibCheck": true,
     "checkJs": true
   },
-  "include": ["bin/**/*.mjs", "lib/**/*.mjs", "scripts/**/*.mjs", "tests/**/*.ts"]
+  "include": ["bin/**/*.mjs", "lib/**/*.mjs", "tests/**/*.ts"]
 }

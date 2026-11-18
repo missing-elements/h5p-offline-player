@@ -17,13 +17,14 @@
   },
   "type": "module",
   "bin": {
-    "h5p-mcp": "./dist/h5p-mcp.mjs"
+    "h5p-mcp": "./bin/h5p-mcp.mjs"
   },
   "exports": {
     "./package.json": "./package.json"
   },
   "files": [
-    "dist"
+    "bin",
+    "lib"
   ],
   "keywords": [
     "h5p",
@@ -35,23 +36,22 @@
     "ai"
   ],
   "scripts": {
-    "build": "node scripts/build.mjs",
-    "test": "pnpm --filter @missing-elements/h5p-offline-player build && pnpm --filter @missing-elements/h5p-author exec node scripts/copy-skill.mjs && pnpm build && vitest run",
+    "test": "pnpm --filter @missing-elements/h5p-offline-player build && pnpm --filter @missing-elements/h5p-author exec node scripts/copy-skill.mjs && vitest run",
     "typecheck": "tsc -p tsconfig.json",
-    "prepack": "node -e \"require('node:fs').copyFileSync('../../LICENSE', 'LICENSE')\" && pnpm build",
+    "prepack": "node -e \"require('node:fs').copyFileSync('../../LICENSE', 'LICENSE')\"",
     "prepublishOnly": "node -e \"if (!/^pnpm\\//.test(process.env.npm_config_user_agent || '')) { console.error('Publish with pnpm publish: npm would ship the workspace:^ dependency ranges as they are, and the package would not install.'); process.exit(1) }\" && pnpm typecheck && pnpm test"
   },
   "dependencies": {
     "@missing-elements/h5p-author": "workspace:^",
-    "@missing-elements/h5p-verify": "workspace:^"
+    "@missing-elements/h5p-verify": "workspace:^",
+    "@modelcontextprotocol/server": "^2.4.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@modelcontextprotocol/client": "^2.4.0",
     "@types/node": "^26.6.6",
-    "esbuild": "^0.28.2",
     "typescript": "^7.0.2",
-    "vitest": "^5.1.0",
-    "zod": "^4.6.7"
+    "vitest": "^5.1.0"
   },
   "engines": {
     "node": ">=22"

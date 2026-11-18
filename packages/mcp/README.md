@@ -59,7 +59,6 @@ sends your conversation to its model, as it does without this server.
 ## Licence
 
 MIT. The H5P libraries a package carries are under their own licences, listed in it.
-`dist/NOTICE.txt` lists the packages bundled into the server.
 
 H5P is a trademark of H5P Group. This server is made by Missing Elements and is not affiliated with
 or endorsed by H5P Group.

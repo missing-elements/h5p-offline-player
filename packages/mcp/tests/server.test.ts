@@ -1,18 +1,18 @@
 import { access, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
-import { Client } from '@modelcontextprotocol/sdk/client/index.js'
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
+import { Client } from '@modelcontextprotocol/client'
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 /**
- * The server as an app runs it: the bundle the package ships, started over standard input and
+ * The server as an app runs it: the command the package ships, started over standard input and
  * output, given one folder, asked through the SDK's own client. The build's rules are the author
  * package's and tested there; these hold the server to calling them, to its folders, and to its
  * answers. Each test builds what it needs, under a title of its own.
  */
 
-const BUNDLE = resolve(import.meta.dirname, '../dist/h5p-mcp.mjs')
+const COMMAND = resolve(import.meta.dirname, '../bin/h5p-mcp.mjs')
 const SOURCE = {
   type: 'H5P.TrueFalse',
   title: 'Boiling point',
@@ -40,7 +40,7 @@ beforeAll(async () => {
   folder = await mkdtemp(join(tmpdir(), 'h5p-mcp-'))
   elsewhere = await mkdtemp(join(tmpdir(), 'h5p-mcp-elsewhere-'))
   client = new Client({ name: 'h5p-mcp-test', version: '0' })
-  await client.connect(new StdioClientTransport({ command: process.execPath, args: [BUNDLE, '--allow', folder, '--no-open'], stderr: 'pipe' }))
+  await client.connect(new StdioClientTransport({ command: process.execPath, args: [COMMAND, '--allow', folder, '--no-open'], stderr: 'pipe' }))
 })
 
 afterAll(async () => {

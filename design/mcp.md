@@ -42,18 +42,18 @@ web, is #210 and not this.
   in a temporary folder, with its screenshot as an image. Where neither Chrome, Edge nor
   Playwright's Chromium is found, the answer says "Not verified" and why. A source with problems
   is refused, every problem by its path, and nothing is written.
-- **The SDK is bundled.** `scripts/build.mjs` bundles the command with `@modelcontextprotocol/sdk`
-  and zod into `dist/h5p-mcp.mjs` with esbuild, the author package and the verifier left as
-  dependencies. `npx` then installs neither Express nor Hono nor the SDK's other HTTP dependencies,
-  which a server over standard input never loads. `dist/NOTICE.txt` lists what is bundled, with the
-  licences. Standard output is the protocol's, so the command sends `console.log` to standard error,
-  and loads the server only after `--help` and `--version` have had their turn.
-- **Tested as an app runs it.** `tests/server.test.ts` starts the bundle over standard input and
+- **The SDK is v2, and the package ships its source.** `@modelcontextprotocol/server` brings only
+  its core and zod, none of the HTTP frameworks v1 installed, so `bin/` and `lib/` are published as
+  written, with no bundle. `McpServer` on `StdioServerTransport` serves the 2025 protocol, which
+  every app speaks; protocol 2026-07-28 deprecates roots, so serving it would leave the folders to
+  `--allow` and the defaults. Standard output is the protocol's, so the command sends `console.log`
+  to standard error, and loads the server only after `--help` and `--version` have had their turn.
+- **Tested as an app runs it.** `tests/server.test.ts` starts the command over standard input and
   output with the SDK's own client, given one folder, and calls each tool: the list, a type by a
   loose name and one with no file, a build checked in Chromium, a taken name and a link at one,
   two builds at once, a source with a problem, an output outside the folder, a preview served and
   one refused. Each test builds what it needs, so each runs alone. The test script first copies
   the skill's type files into the author package, as the author's `prepack` does.
 
-Not built yet: reading a package back to a source (step 3 of #219), checking a video's bytes
-(#218), the MCP registry's `server.json` and Claude Desktop's one-click bundle.
+Not built yet: reading a package back to a source (step 3 of #219), the MCP registry's
+`server.json` and Claude Desktop's one-click bundle.
