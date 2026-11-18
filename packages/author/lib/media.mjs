@@ -87,6 +87,23 @@ const YOUTUBE_SHORT = /^https?:\/\/(?:[\w-]+\.)*youtube\.com\/(?:shorts|live)\/(
 /** The licences a file's copyright may name, as H5P lists them. */
 const COPYRIGHT_LICENSES = ['U', 'CC BY', 'CC BY-SA', 'CC BY-ND', 'CC BY-NC', 'CC BY-NC-SA', 'CC BY-NC-ND', 'GNU GPL', 'PD', 'C']
 
+/** The parts of a file's copyright a source writes, as H5P records them. */
+const COPYRIGHT_FIELDS = ['license', 'author', 'title', 'year', 'source', 'version']
+
+/**
+ * A saved file's copyright as a source writes it (#236): its parts that hold text, and nothing
+ * where that is the licence "U" alone, which a build gives a file with none. H5P's editor saves
+ * every part, empty where nobody wrote it, and a build refuses an empty one.
+ * @param {unknown} copyright
+ * @returns {Record<string, string> | undefined}
+ * @internal
+ */
+export function writtenCopyright(copyright) {
+  if (!copyright || typeof copyright !== 'object' || Array.isArray(copyright)) return undefined
+  const kept = Object.fromEntries(Object.entries(copyright).filter(([key, value]) => COPYRIGHT_FIELDS.includes(key) && typeof value === 'string' && value.trim() !== ''))
+  return Object.entries(kept).some(([key, value]) => key !== 'license' || value !== 'U') ? kept : undefined
+}
+
 /** The most a download may bring: a package of this size is already past what a learner waits for. */
 const MAX_DOWNLOAD = 1024 ** 3
 
@@ -327,7 +344,7 @@ export class MediaStore {
     /** @type {Record<string, string>} */
     const out = { license: 'U' }
     for (const [key, entry] of Object.entries(value)) {
-      if (!['license', 'author', 'title', 'year', 'source', 'version'].includes(key)) {
+      if (!COPYRIGHT_FIELDS.includes(key)) {
         report(`${at}.${key}`, 'is not part of a copyright; write license, author, title, year, source or version')
         continue
       }

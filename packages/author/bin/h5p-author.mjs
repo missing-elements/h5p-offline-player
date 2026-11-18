@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 import { readFile } from 'node:fs/promises'
-import { dirname, resolve } from 'node:path'
+import { dirname, relative, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
-import { buildPackage, schemaOf, SourceError, writeBundle, writeBundles } from '../lib/author.mjs'
+import { buildPackage, readPackage, schemaOf, SourceError, writeBundle, writeBundles } from '../lib/author.mjs'
 import { packVersion } from '../lib/node.mjs'
 
 const USAGE = `Usage:
   h5p-author build <source.json> <output.h5p> [--libraries <parts folder>]
   h5p-author build --check <source.json> [--libraries <parts folder>]
+  h5p-author read <package.h5p> <folder> [--libraries <parts folder>]
   h5p-author schema <machine name> [--markdown] [--all] [--libraries <parts folder>]
   h5p-author bundle <machine name> <output.zip> [--libraries <parts folder>]
   h5p-author bundle --all <folder> [--libraries <parts folder>]
@@ -16,6 +17,9 @@ build   Makes a playable .h5p from a source: { "type", "title", "language", "lic
         "authors", "params" }, or a quiz in the h5p-author skill's quiz format. Writes only
         when the whole source is right, and never over an existing file; --check lists the
         problems and notes and writes no package.
+read    Writes the source a build would take to make a package again into a folder,
+        with the package's media beside it: to change it and build it again. Reads
+        content made for the pack's versions of its libraries; never writes over a file.
 schema  Prints a content type's fields as a source writes them: --markdown as a skill's
         type file carries them, --all with the interface texts.
 bundle  Writes the libraries a build of one content type reads, as a zip of a parts/
@@ -112,6 +116,15 @@ try {
     }
     for (const { path, message } of result.notes) console.warn(`Note: ${path} ${message}`)
     if (!check) console.log('Not verified: run npx @missing-elements/h5p-verify@latest on it and look at its screenshot before handing it over.')
+  } else if (command === 'read') {
+    if (rest.length !== 2) throw new Error('read takes a package and a folder to write its source in: h5p-author read quiz.h5p quiz')
+    for (const flag of Object.keys(flags)) if (flag !== 'libraries') throw new Error(`read does not take --${flag}`)
+    const { output, source, files, notes } = await readPackage(rest[0], rest[1], { libraries: /** @type {string | undefined} */ (flags.libraries) })
+    const media = files.length ? `, and ${files.length} media file${files.length === 1 ? '' : 's'} beside it` : ''
+    console.log(`Read ${resolve(rest[0])}: ${source.type}. Wrote its source to ${output}${media}.`)
+    for (const { path, message } of notes) console.warn(`Note: ${path} ${message}`)
+    const near = relative(process.cwd(), output)
+    console.log(`Change it, then build it again: h5p-author build ${near.startsWith('..') ? output : near} <output.h5p>`)
   } else if (command === 'bundle') {
     for (const flag of Object.keys(flags)) if (flag !== 'all' && flag !== 'libraries') throw new Error(`bundle does not take --${flag}`)
     const libraries = /** @type {string | undefined} */ (flags.libraries)

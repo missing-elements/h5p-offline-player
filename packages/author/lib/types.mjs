@@ -10,6 +10,8 @@ import { stripTags } from './text.mjs'
  * - `before` adjusts the written parameters before generation;
  * - `after` sets the hidden fields on the generated ones, once the media are resolved, and checks
  *   what the editor's widget would not have let an author save;
+ * - `read` turns what the two wrote back into what a source writes, for a package read back
+ *   into a source (#236), run on that source's parameters;
  * - `sets` names the hidden fields the layout sets, which the schema leaves out;
  * - `optional` names fields the semantics call required that the content plays without, and the
  *   editor never asks for.
@@ -38,6 +40,7 @@ import { stripTags } from './text.mjs'
  * @typedef {{
  *   before?: (written: any, path: string, context: LayoutContext) => void,
  *   after?: (params: any, path: string, context: LayoutContext) => void,
+ *   read?: (written: any, path: string, context: LayoutContext) => void,
  *   sets?: string[],
  *   optional?: string[]
  * }} Layout
@@ -89,6 +92,14 @@ const questionSet = {
   after(params, path, context) {
     ;(params.questions ?? []).forEach((/** @type {any} */ question, /** @type {number} */ i) => {
       if (isObject(question?.metadata) && question.metadata.title === undefined) question.metadata.title = questionTitle(context.semantics, i)
+    })
+  },
+  // Such a title is the build's, and a source read back leaves it out.
+  read(written, path, context) {
+    ;(written?.questions ?? []).forEach((/** @type {any} */ question, /** @type {number} */ i) => {
+      if (!isObject(question?.metadata) || question.metadata.title !== questionTitle(context.semantics, i)) return
+      delete question.metadata.title
+      if (!Object.keys(question.metadata).length) delete question.metadata
     })
   }
 }
@@ -653,6 +664,14 @@ const gameMap = {
       if (!element.neighbors.length && elements.length > 1) context.note(`${path}.gamemapSteps.gamemap.elements[${i}]`, 'is joined to no other stage')
     })
     if (gamemap.paths === undefined) gamemap.paths = []
+  },
+  // A neighbour is stored as its index in text, which `before` would look for among the labels: a
+  // source read back writes the number.
+  read(written) {
+    for (const element of written?.gamemapSteps?.gamemap?.elements ?? []) {
+      if (!Array.isArray(element?.neighbors)) continue
+      element.neighbors = element.neighbors.map((/** @type {unknown} */ neighbor) => (typeof neighbor === 'string' && /^\d+$/.test(neighbor) ? Number(neighbor) : neighbor))
+    }
   }
 }
 

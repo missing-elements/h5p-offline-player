@@ -175,6 +175,38 @@ text to the content check's rules, and `apps/skills` plays every example untrust
   too, as the editor's `initSubContent` gives one, since Summary names a statement's statements by
   it. Of the owner's 88 real packages, 61 report nothing; the others hold what their editor let an
   author save, such as an empty alt text or styles pasted from Word.
+- **A package reads back into a source, by the generator's own rules walked back** (#236, step 3
+  of #219). `readPackage` and `h5p-author read` write the source a build would take to make the
+  package again, its media beside it at the paths the source names them by.
+  - Its own fields are `h5p.json`'s; a package with no author reads as "Unknown". `params` are
+    `content.json` as `checkContent` returns it, less what a build fills in, worked out by
+    `ContentGenerator.written`: of each field, what the generator writes there with nothing
+    written, at the field's own level with the saved values beside it taken as written, so a
+    `showWhen` reads them as it reads a source. The libraries are loaded in the content's
+    language, so an interface text equal to its translation drops out as any default does.
+  - Left out besides: a part's id, and its metadata but its title; a title the build gives, its
+    content type's or Question Set's own (the layout's `read`); and what H5P's editor saves for an
+    author who never touched it, as `checkContent` takes it: an empty text or choice, a list it
+    started whose items are only an item's defaults (Interactive Video's text track with no file),
+    and a default's content nobody opened (its summary task). Markup that is only the blocks a
+    build wraps typing in is written as the typing (`unwrapText`, held by `wrapText`); Game Map's
+    neighbours go back to numbers. Positions and sizes are kept as written.
+  - The source is then built in memory, the package's files standing for themselves, and held to
+    the content as checked: a text, a number, a flag or a title that comes back otherwise is
+    written as stored, anything else is a note, and so is what a build of it would refuse.
+  - Only content for the pack's major.minor of every library it names is read; any other is
+    refused with both versions named, since moving it is the library's own upgrade, the runtime's
+    (GPL). Of the owner's 88 real packages, 58 were refused so, mostly Interactive Video 1.27 and
+    Course Presentation 1.25 and 1.26. Of the other 30, 26 build as read; 4 need what their notes
+    name: pictures missing from the package, styles pasted from Word, a question with one answer,
+    and H5P.Row's column widths with decimals, which its editor sets and the number rule refuses.
+  - What a source has no field for is said and left out: the author's comments, the change log,
+    the licence's extra terms, and a part's own licence or authors, a build giving every part the
+    source's.
+  - An archive is untrusted: only the media the content names are written, under the folder; one
+    whose entry leads out of its folders is not read. Nothing is written over, and nothing at all
+    where a name is taken. Every type file's example, built, read and built again, is the same
+    content but for the ids, with no note (`read.test.ts`).
 - **A page builds too** (#108). The package has three entries: `.` for Node, `./core` for what
   needs neither Node nor a page, and `./browser`, the core and a page's `openPack` and
   `buildPackage`. They are subpaths and not the `browser` condition, which TypeScript ignores
@@ -416,6 +448,7 @@ text to the content check's rules, and `apps/skills` plays every example untrust
   errors, a sandbox that downloads only what a browsing tool has opened, a code tool that can be
   unavailable for hours.
 
-Not built: editing an existing package, which a tool beside it does with `checkContent` as its
-check; layout for Drag and Drop and Crossword; and any judgement of whether content is right, which
-stays the person's, in the verifier's preview.
+Not built: changing a package in place, which a tool beside it does with `checkContent` as its
+check (a package is changed by reading it into a source and building that); reading content made
+for another version of a library than the pack's; layout for Drag and Drop and Crossword; and any
+judgement of whether content is right, which stays the person's, in the verifier's preview.
