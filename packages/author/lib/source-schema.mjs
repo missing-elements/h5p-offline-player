@@ -59,8 +59,8 @@ export const sourceSchema = z.object({
   source: z.optional(z.string({ error: ADDRESS }).check(z.regex(/^https?:\/\/\S+$/i, { error: ADDRESS }))),
   yearFrom: z.optional(z.int({ error: YEAR })),
   yearTo: z.optional(z.int({ error: YEAR })),
-  params: z._default(z.record(z.string(), z.unknown(), { error: 'expected an object of the content type\'s fields' }), {})
-    .check(z.describe('The content\'s fields that differ from their defaults'))
+  params: z.optional(z.record(z.string(), z.unknown(), { error: 'expected an object of the content type\'s fields' })
+    .check(z.describe('The content type\'s fields that differ from their defaults')))
 })
 
 /**
