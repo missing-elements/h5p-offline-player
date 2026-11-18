@@ -4,7 +4,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { McpServer } from '@modelcontextprotocol/server'
 import { z } from 'zod'
-import { SourceError, buildPackage, contentTypes, inside, openPack, publicFetch, schemaOf, sourceType } from '@missing-elements/h5p-author'
+import { SourceError, buildPackage, contentTypes, inside, openPack, publicFetch, schemaOf, sourceSchema, sourceType } from '@missing-elements/h5p-author'
 import { VerifyError, openBrowser, previewPackage, summarize, verifyPackage } from '@missing-elements/h5p-verify'
 import { defaultFolders, fileStem, rootFolders } from './folders.mjs'
 
@@ -27,11 +27,20 @@ The author and the licence are what the person gave; otherwise the name you know
 
 const TYPES = `The H5P content types and how to write a source for one. With no type: the list, and how to write good content. With a type: its notes, a tested example and its fields. Read the type's answer before writing its source.`
 
-const BUILD = `Builds a .h5p package from a source, { type, title, language, license, authors, params }, params holding only what differs from the type's defaults. A file is { "path": ... }, in a folder this server may use or at a web address. Writes the package and its source (.source.json) to output, or under a new name in the first folder it may use. A source with problems is refused, each problem named by its path. With verify (the default), plays the package in a headless browser and reports whether it works.`
+const BUILD = `Builds a .h5p package from a source, its params holding only what differs from the type's defaults. A file is { "path": ... }, in a folder this server may use or at a web address. Writes the package and its source (.source.json) to output, or under a new name in the first folder it may use. A source with problems is refused, each problem named by its path. With verify (the default), plays the package in a headless browser and reports whether it works.`
 
 const PREVIEW = `Opens a .h5p package in the person's browser in the real player, served from this computer until its tab is closed. Answers with the address.`
 
 const LIST_HEAD = `The content types the library pack has, by the name a source's "type" takes. Those marked * have notes and a tested example; for the rest h5p_types gives their fields.`
+
+/**
+ * A source's own fields as the author package declares them (#230), shown to the app as the shape
+ * of `source`. The field itself takes any object: the build is the check, which says every problem
+ * at once and reads a source written another way as it is meant (#174), where the SDK would refuse
+ * it before the build looked.
+ */
+const SOURCE = z.toJSONSchema(sourceSchema, { io: 'input' })
+delete SOURCE.$schema
 
 /** @param {string} text */
 const answer = (text) => ({ content: [{ type: /** @type {const} */ ('text'), text }] })
@@ -151,7 +160,7 @@ export async function createServer(options = {}) {
     title: 'Build an H5P package',
     description: BUILD,
     inputSchema: z.object({
-      source: z.record(z.string(), z.unknown()).describe('The source, as h5p_types describes it for its type'),
+      source: z.record(z.string(), z.unknown()).meta({ ...SOURCE, description: 'The source, as h5p_types describes it for its type' }),
       output: z.string().optional().describe('Leave it out unless the person named a place: a file name, or a path in a folder this server may use'),
       verify: z.boolean().optional().describe('Play it and report whether it works; default true')
     }),

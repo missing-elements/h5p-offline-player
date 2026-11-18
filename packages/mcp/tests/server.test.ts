@@ -54,6 +54,11 @@ describe('the server', () => {
     const { tools } = await client.listTools()
     expect(tools.map((tool) => tool.name).sort()).toEqual(['h5p_build', 'h5p_preview', 'h5p_types'])
     expect(client.getInstructions()).toMatch(/h5p_types[\s\S]*h5p_build[\s\S]*h5p_preview/)
+    // A source's own fields as the author package declares them, before one is written (#230).
+    expect(tools.find((tool) => tool.name === 'h5p_build')?.inputSchema.properties?.source).toMatchObject({
+      required: ['type', 'title', 'language', 'license', 'authors'],
+      properties: { authors: { items: { required: ['name', 'role'] } } }
+    })
     // What an app sends the model with every message: under about 1,500 tokens at four characters each.
     expect(JSON.stringify(tools).length + (client.getInstructions()?.length ?? 0)).toBeLessThan(6_000)
   })
@@ -130,6 +135,10 @@ describe('h5p_build', () => {
     const answer = await call('h5p_build', { source: { ...SOURCE, title: 'Broken', params: { ...SOURCE.params, correct: 'maybe' } }, verify: false })
     expect(answer.isError).toBe(true)
     expect(textOf(answer)).toMatch(/params\.correct/)
+    // A source unlike the shape the app is shown reaches the build, which says all it finds at once (#230).
+    const loose = textOf(await call('h5p_build', { source: { ...SOURCE, title: 'Loose', authors: ['Unknown'], params: { ...SOURCE.params, correct: 'maybe' } }, verify: false }))
+    expect(loose).toContain('authors[0]: expected an author: write { "name": "Unknown", "role": "Author" }')
+    expect(loose).toMatch(/params\.correct/)
     expect(await readdir(folder)).toEqual(before)
   })
 
