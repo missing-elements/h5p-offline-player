@@ -74,9 +74,11 @@ The author package and the MCP server build packages from a source that a
 model may have written:
 
 - Given `within`, a build reads local files and writes its package only in
-  those folders, links followed. Given `publicFetch`, it refuses a web address
-  on a local network, redirects included; it resolves a name and then asks, so
-  it guards against a mistaken or planted address, not a hostile network.
+  those folders, links followed. Given `publicFetch`, it refuses to download
+  from a web address on a local network, redirects included; it resolves a
+  name and then asks, so it guards against a mistaken or planted address, not
+  a hostile network. A video on YouTube, Vimeo, Panopto or Echo360 is not
+  downloaded: its address is kept, and the player loads it wherever it points.
 - The MCP server always builds so, in the folders the person gave it, else the
   app's roots, as they are given. Given none, it uses Desktop, Documents and
   Downloads, and never the home folder whole. It never writes over a file, and

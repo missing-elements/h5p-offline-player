@@ -50,11 +50,11 @@ gets a number, and it says which.
 ## What leaves your computer
 
 The build downloads each picture, video, recording or other file your content names by web
-address, but for a video on YouTube, Vimeo, Panopto or Echo360, which stays an address and plays
-from there. It refuses an address on your local network: a guard against a mistaken or planted
-address, not against a hostile network. The check and the preview play the package from your
-computer; such a video, and math, load from the web, as H5P does anywhere. Your app sends your
-conversation to its model, as it does without this server.
+address, and refuses to download from an address on your local network: a guard against a mistaken
+or planted address, not against a hostile network. A video on YouTube, Vimeo, Panopto or Echo360 is
+not downloaded: it stays an address, which the player loads wherever it points, as H5P does
+anywhere, and so is math. The check and the preview play the package from your computer. Your app
+sends your conversation to its model, as it does without this server.
 
 ## Licence
 
