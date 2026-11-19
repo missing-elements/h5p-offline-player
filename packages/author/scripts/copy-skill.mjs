@@ -1,6 +1,7 @@
 // The h5p-author skill's text, copied into the package as `prepack` runs: `SKILL.md`, its brief,
-// `references/authoring.md`, its build routes, `references/build/`, one file a way to build, and
-// its type files, each content type's notes, an example and its fields, as the release has them.
+// `references/authoring.md`, how to change a package, `references/change.md`, its build routes,
+// `references/build/`, one file a way to build, and its type files, each content type's notes,
+// an example and its fields, as the release has them.
 // A page that builds, with no skill beside it, hands the type files to a chat whose source had
 // problems (#172), and a site builds the skill's zips from the package it pins. They are the
 // skill's, at the repository's root, where `npx skills add` looks; the copy is not in git.
@@ -21,4 +22,4 @@ await rm(fileURLToPath(new URL('../references/', import.meta.url)), { recursive:
 await rm(fileURLToPath(new URL('../SKILL.md', import.meta.url)), { force: true })
 await cp(references, fileURLToPath(new URL('../references/', import.meta.url)), { recursive: true })
 await cp(fileURLToPath(new URL('SKILL.md', skill)), fileURLToPath(new URL('../SKILL.md', import.meta.url)))
-console.log(`Copied SKILL.md, references/authoring.md, ${build} build files to references/build/ and ${types} type files to references/types/`)
+console.log(`Copied SKILL.md, references/authoring.md, references/change.md, ${build} build files to references/build/ and ${types} type files to references/types/`)

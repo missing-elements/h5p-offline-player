@@ -1,6 +1,6 @@
 ---
 name: h5p-author
-description: Create H5P content from a prompt, a lesson or supplied material, as a playable .h5p - quizzes, fill in the blanks, drag the words, flash cards, presentations, interactive books, branching scenarios, interactive video, image hotspots, memory games and more. Use when asked to generate, author or build H5P content or an .h5p file with AI. The content type is chosen with the user first; a short JSON source holds only what differs from its defaults. No H5P server or provider API needed.
+description: Create H5P content as a playable .h5p from a prompt, a lesson or supplied material, or change an .h5p the user has, such as adding questions to it - quizzes, fill in the blanks, drag the words, flash cards, presentations, interactive books, branching scenarios, interactive video, image hotspots, memory games and more. Use when asked to generate, author or build H5P content or an .h5p file with AI, and whenever the user gives an .h5p to add to, fix or change; never edit or zip one by hand. The content type is chosen with the user first; a short JSON source holds only what differs from its defaults. No H5P server or provider API needed.
 license: MIT
 ---
 
@@ -15,6 +15,9 @@ every field. Only it writes the `.h5p`: never put one together yourself from `h5
 Work fast. Ask the user one thing at most, the content type. Read the files you need together,
 and put commands that wait on nothing between them into one command line. Never end with commands
 for the user to run: step 3 always finds a way to build.
+
+To change an `.h5p` the user has, follow [Change a package](./references/change.md) in place of
+steps 1 and 2: the package names its type, so ask nothing.
 
 ## 1. Choose the content type with the user
 

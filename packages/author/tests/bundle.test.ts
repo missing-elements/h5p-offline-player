@@ -139,7 +139,7 @@ describe('writeBundle', () => {
     const squares = { ...META, type: 'H5P.Blanks', params: { questions: ['The square of 3, $$3^2$$, is *9*.'] } }
     const output = join(dir, 'squares.h5p')
     await expect(buildPackage(squares, output, { libraries: folder })).rejects.toThrow(
-      `The parts folder ${folder} has no ${addon.folder}.h5p, which this build needs: add it from the library pack's parts/`
+      `The parts folder ${folder} has no ${addon.folder}.h5p, which this package needs: add it from the library pack's parts/`
     )
     expect(await readdir(dir)).not.toContain('squares.h5p')
     await copyFile(join(parts, `${addon.folder}.h5p`), join(folder, `${addon.folder}.h5p`))
@@ -223,5 +223,6 @@ describe('the bundle command', () => {
 
     await expect(exec(process.execPath, [bin, 'bundle', 'H5P.TrueFalse'])).rejects.toMatchObject({ code: 1, stderr: expect.stringContaining('bundle takes a content type and an output') })
     await expect(exec(process.execPath, [bin, 'bundle', '--markdown', 'H5P.TrueFalse', 'x.zip'])).rejects.toMatchObject({ code: 1, stderr: expect.stringContaining('bundle does not take --markdown') })
-  })
+    // Every content type's bundle, written twice: 2.2 s here, past vitest's 5 s once on a slow runner (#242).
+  }, 20_000)
 })

@@ -48,7 +48,9 @@ agent to write builds and plays. For h5p-to-scorm that is its commands, run as i
 their zips, played as a learner under a stand-in LMS with real content. h5p-author's own code is
 the author package's, tested with it. The playback test plays the quiz in the verifier's preview,
 the page the skill hands a person to review it in, in Chromium only; the player's own suite covers
-the engines.
+the engines. Each skill's front matter is held to what a YAML parser reads, and its name and
+description to the Agent Skills limits (`front-matter.test.ts`): one that does not parse is a
+skill that skills.sh and a chat's upload do not list.
 
 The app's tests follow the same variable (`apps/demo/tests/engine.ts`; `tests/harness.ts`
 starts the dev server and the second-origin package host and waits on the element for all of

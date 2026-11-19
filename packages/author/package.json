@@ -35,6 +35,7 @@
     "./references/types/*.md": "./references/types/*.md",
     "./references/build/*.md": "./references/build/*.md",
     "./references/authoring.md": "./references/authoring.md",
+    "./references/change.md": "./references/change.md",
     "./SKILL.md": "./SKILL.md",
     "./package.json": "./package.json"
   },

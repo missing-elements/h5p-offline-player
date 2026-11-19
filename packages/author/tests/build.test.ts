@@ -283,6 +283,23 @@ describe('any content type in the pack', () => {
     expect(notes).toEqual([])
   })
 
+  it('takes a row\'s column widths with two decimals, and a column left empty, as H5P.com\'s editor writes them (#242)', async () => {
+    const column = (text: string, width: number) => ({ width, content: { library: 'H5P.RowColumn', params: { content: [{ library: 'H5P.AdvancedText', params: { text } }] } } })
+    const rowOf = (widths: number[]) => ({ ...META, type: 'H5P.Column', params: { content: [{ content: { library: 'H5P.Row', params: { columns: widths.map((width, i) => column(`Column ${i + 1}`, width)) } } }] } })
+    const { content, notes } = await build(rowOf([62.56, 37.44]))
+    expect(content.content[0].content.params.columns.map((each: { width: number }) => each.width)).toEqual([62.56, 37.44])
+    expect(notes).toEqual([])
+    expect(await problems(rowOf([33.333, 66.667]))).toEqual([
+      'params.content[0].content.params.columns[0].width: takes at most 2 decimals',
+      'params.content[0].content.params.columns[1].width: takes at most 2 decimals'
+    ])
+    // A spacer: a column whose content is left out, which the library plays as an empty column.
+    const spacer = { width: 25, content: { library: 'H5P.RowColumn', params: {} } }
+    const spaced = await build({ ...META, type: 'H5P.Column', params: { content: [{ content: { library: 'H5P.Row', params: { columns: [spacer, column('Middle', 50), spacer] } } }] } })
+    expect(spaced.content.content[0].content.params.columns.map((each: { content: { params: { content?: unknown[] } } }) => each.content.params.content?.length ?? 0)).toEqual([0, 1, 0])
+    expect(spaced.notes).toEqual([])
+  })
+
   it('stores a plain text box as plain text, though its field lists tags', async () => {
     // Question Set 1.21's intro title and result message list tags, but the editor gives both a
     // plain text box, and the set draws both with textContent: a <div> around them was shown.
@@ -867,7 +884,8 @@ describe('media', () => {
     expect(await problems(source(['a stray line', text(500, 600)], []), { base: dir })).toEqual([
       expect.stringMatching(/^params\.interactiveVideo\.assets\.interactions\[0\]: expected an object/)
     ])
-  })
+    // Several builds of a video: 1.3 s here, 2 to 3 s on CI, past vitest's 5 s once on a slow runner (#242).
+  }, 20_000)
 
   it('gives a download up once nothing has arrived for a while, however long a slow one takes', async () => {
     const reported: string[] = []
@@ -992,11 +1010,11 @@ describe('the package', () => {
     expect(names).toContain('H5P.InteractiveBook.md')
     const routes = (await readdir(join(skill, 'references/build'))).filter(name => name.endsWith('.md')).sort()
     expect(routes).toContain('browser.md')
-    expect(stdout).toContain(`Copied SKILL.md, references/authoring.md, ${routes.length} build files to references/build/ and ${names.length} type files`)
+    expect(stdout).toContain(`Copied SKILL.md, references/authoring.md, references/change.md, ${routes.length} build files to references/build/ and ${names.length} type files`)
     expect((await readdir(copied)).sort()).toEqual(names)
     for (const name of names) expect(await readFile(join(copied, name), 'utf8'), name).toBe(await readFile(join(skill, 'references/types', name), 'utf8'))
     // The skill's text beside them, as it is, for a site to serve to a chat given a link.
-    for (const name of ['SKILL.md', 'references/authoring.md', ...routes.map(route => `references/build/${route}`)]) {
+    for (const name of ['SKILL.md', 'references/authoring.md', 'references/change.md', ...routes.map(route => `references/build/${route}`)]) {
       expect(await readFile(resolve(import.meta.dirname, '..', name), 'utf8'), name).toBe(await readFile(join(skill, name), 'utf8'))
     }
     // Packed and found: in `files`, copied by `prepack`, and each one an export of its own.
@@ -1007,6 +1025,7 @@ describe('the package', () => {
     expect(require.resolve('@missing-elements/h5p-author/references/types/H5P.InteractiveBook.md')).toBe(join(copied, 'H5P.InteractiveBook.md'))
     expect(require.resolve('@missing-elements/h5p-author/SKILL.md')).toBe(resolve(import.meta.dirname, '../SKILL.md'))
     expect(require.resolve('@missing-elements/h5p-author/references/authoring.md')).toBe(resolve(import.meta.dirname, '../references/authoring.md'))
+    expect(require.resolve('@missing-elements/h5p-author/references/change.md')).toBe(resolve(import.meta.dirname, '../references/change.md'))
     expect(require.resolve('@missing-elements/h5p-author/references/build/browser.md')).toBe(resolve(import.meta.dirname, '../references/build/browser.md'))
   })
 })
