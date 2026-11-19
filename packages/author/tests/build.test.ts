@@ -185,6 +185,9 @@ describe('the quiz format', () => {
     // H5P reads a library that names none as asking for 1.0; library.json may write the numbers as strings.
     expect(coreApiOf([])).toEqual({ majorVersion: 1, minorVersion: 0 })
     expect(coreApiOf([{ coreApi: { majorVersion: '1', minorVersion: '27' } }, { coreApi: { majorVersion: 1, minorVersion: 9 } }, {}])).toEqual({ majorVersion: 1, minorVersion: 27 })
+    // A minor left out is 0, and what is not two whole numbers is passed over: never "2.NaN".
+    expect(coreApiOf([{ coreApi: { majorVersion: 2 } }])).toEqual({ majorVersion: 2, minorVersion: 0 })
+    expect(coreApiOf([{ coreApi: { majorVersion: 2, minorVersion: 'x' } }, { coreApi: { majorVersion: 1.5, minorVersion: 1 } }])).toEqual({ majorVersion: 1, minorVersion: 0 })
     expect(coreApiLine({ majorVersion: 1, minorVersion: 28 })).toBe('Needs H5P core 1.28 or newer on a site it is uploaded to: Moodle 4.5.11, 5.0.7 or 5.1.4 and later, or the WordPress H5P plugin 1.17 and later. An older site refuses it.')
     expect(coreApiLine({ majorVersion: 1, minorVersion: 29 })).toBe('Needs H5P core 1.29 or newer on a site it is uploaded to. An older site refuses it.')
   })

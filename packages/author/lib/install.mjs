@@ -82,8 +82,12 @@ export function missingForInstall(libraries) {
 export function coreApiOf(libraries) {
   let newest = { majorVersion: 1, minorVersion: 0 }
   for (const library of libraries) {
-    const major = Number(library?.coreApi?.majorVersion)
-    const minor = Number(library?.coreApi?.minorVersion)
+    const asked = library?.coreApi
+    if (!asked) continue
+    // A minor left out is 0; a version that is not two whole numbers is none.
+    const major = Number(asked.majorVersion)
+    const minor = Number(asked.minorVersion ?? 0)
+    if (!Number.isInteger(major) || !Number.isInteger(minor)) continue
     if (major > newest.majorVersion || (major === newest.majorVersion && minor > newest.minorVersion)) newest = { majorVersion: major, minorVersion: minor }
   }
   return newest
