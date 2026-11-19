@@ -11,7 +11,7 @@ export { bundleLibraries, contentTypes } from './bundle.mjs'
 export { checkContent } from './check.mjs'
 export { outlineOf } from './outline.mjs'
 export { ContentGenerator, librariesIn, libraryString } from './generator.mjs'
-export { missingForInstall } from './install.mjs'
+export { coreApiLine, coreApiOf, missingForInstall } from './install.mjs'
 export { loadLibraries, packageLibraries } from './libraries.mjs'
 export { sourceType } from './names.mjs'
 export { GENERATED_END, GENERATED_START } from './schema.mjs'
@@ -22,6 +22,7 @@ export { allowedTags, editorWidget, markupText, plainText, takesMarkup } from '.
 /**
  * @typedef {import('./build.mjs').Source} Source
  * @typedef {import('./check.mjs').CheckedContent} CheckedContent
+ * @typedef {import('./install.mjs').CoreApi} CoreApi
  * @typedef {import('./generator.mjs').GeneratorOptions} GeneratorOptions
  * @typedef {import('./generator.mjs').PackEntry} PackEntry
  * @typedef {import('./libraries.mjs').LibraryRecord} LibraryRecord

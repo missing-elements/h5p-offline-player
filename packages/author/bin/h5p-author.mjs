@@ -2,7 +2,7 @@
 import { readFile } from 'node:fs/promises'
 import { dirname, relative, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
-import { buildPackage, readPackage, schemaOf, SourceError, writeBundle, writeBundles } from '../lib/author.mjs'
+import { buildPackage, coreApiLine, readPackage, schemaOf, SourceError, writeBundle, writeBundles } from '../lib/author.mjs'
 import { packVersion } from '../lib/node.mjs'
 
 const USAGE = `Usage:
@@ -103,6 +103,7 @@ try {
     const from = flags.libraries ? `the pack in ${flags.libraries}` : `the library pack ${await packVersion()}`
     const install = result.install.length ? `, ${result.install.length} more for installing on an H5P site` : ''
     console.log(`${check ? 'Checked, no package written' : `Built ${result.output}`}: ${result.manifest.mainLibrary}, ${result.libraries.length} libraries from ${from}${install}${result.media.length ? `, ${result.media.length} media file${result.media.length === 1 ? '' : 's'}` : ''}.`)
+    if (!check) console.log(coreApiLine(result.coreApi))
     const language = String(result.manifest.language)
     if (!/^en(?:-|$)/i.test(language)) {
       for (const { library, translation, strings, english } of result.translations) {

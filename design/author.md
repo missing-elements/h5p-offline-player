@@ -273,6 +273,12 @@ text to the content check's rules, and `apps/skills` plays every example untrust
   `installOnly` parts the `pack` export leaves out; a page gives
   `@missing-elements/h5p-libraries/install`'s, and a build from a pack without them is refused,
   naming the first library and where the full pack is.
+- **A build says the H5P core a site needs** (#245). The upload check also refuses a package if
+  a library in it asks for a newer `coreApi` than the site's core, and its message names that
+  library. With pack 1.1.0, 50 of the 57 runnable libraries ask for 1.28. As checked on 2026-11-19,
+  Moodle has 1.28 from 4.5.11, 5.0.7 and 5.1.4 (2026-04-16), and the WordPress plugin from 1.17.
+  `coreApiOf` takes the newest over the parts a package carries. The command line and `h5p_build`
+  print `coreApiLine`, which names those releases for 1.28 and only the version for any other.
 - **Where `npx` cannot install, a page builds.** ChatGPT's sandbox reaches npm only through
   OpenAI's mirror, which refuses or hangs, and nothing in the skill can fix that. So the skill
   hands over the source for the build page, `https://missing-elements.github.io/h5p/build/`,

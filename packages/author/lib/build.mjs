@@ -2,7 +2,7 @@ import { TextReader } from '@zip.js/zip.js'
 import { librariesNamedIn, planPack } from '@missing-elements/h5p-offline-player/plan'
 import { checkContent, layoutContext, valueAt } from './check.mjs'
 import { ContentGenerator, libraryString } from './generator.mjs'
-import { installClosure } from './install.mjs'
+import { coreApiOf, installClosure } from './install.mjs'
 import { loadLibraries } from './libraries.mjs'
 import { CC_VERSIONS } from './metadata.mjs'
 import { machineNameOf, NAMING_KEYS, namingKey, nearestNames } from './names.mjs'
@@ -244,8 +244,9 @@ async function closure(pack, main, content) {
  * @param {import('./media.mjs').MediaStore<F>} media
  * @param {Problem[]} [said] the problems `sourceOf` found in the source's own fields, which come
  *   first among the content's: all of them in one round (#174)
- * @returns {Promise<{ manifest: Record<string, unknown>, content: Record<string, unknown>, selected: Map<string, import('./pack.mjs').PartLibrary>, install: Map<string, import('./pack.mjs').PartLibrary>, translations: TranslationReport[], notes: Problem[], outline: string }>}
- *   `selected`, the libraries the package plays with; `install`, those an H5P site's upload check wants with them; `outline`, the
+ * @returns {Promise<{ manifest: Record<string, unknown>, content: Record<string, unknown>, selected: Map<string, import('./pack.mjs').PartLibrary>, install: Map<string, import('./pack.mjs').PartLibrary>, coreApi: import('./install.mjs').CoreApi, translations: TranslationReport[], notes: Problem[], outline: string }>}
+ *   `selected`, the libraries the package plays with; `install`, those an H5P site's upload check wants with them; `coreApi`, the
+ *   newest H5P core any of them asks for (`coreApiOf`); `outline`, the
  *   content as text for a review (`outlineOf`), made when it is first read
  * @internal
  */
@@ -352,6 +353,7 @@ export async function composePackage(source, pack, media, said = []) {
   let outline
   return {
     manifest, content, selected, install, translations, notes,
+    coreApi: coreApiOf([...selected.values(), ...install.values()].map((part) => part.library)),
     // Made when it is first read: it is for a review, which only some callers make, and a build
     // that never reads it never runs it.
     get outline() { return (outline ??= outlineOf({ entries, main: mainLibrary }, { params: content })) }

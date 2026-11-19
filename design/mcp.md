@@ -46,7 +46,8 @@ server, for ChatGPT or Claude on the web, is #210 and not this.
   so builds at once take names of their own. The answer names the path written. Beside the package
   goes its source, `<name>.source.json`, which the build page opens to change and build again; it
   is made new, never written over or through a link, and where it cannot be, the answer says so.
-- **A build answers with the content, the check and a picture.** The build's line, its notes, the
+- **A build answers with the content, the check and a picture.** The build's line, the H5P core a
+  site needs (`coreApiLine`), its notes, the
   outline (80 lines at most) and, with `verify`, the default, the verifier's summary of a check run
   in a temporary folder, with its screenshot as an image. Where neither Chrome, Edge nor
   Playwright's Chromium is found, the answer says "Not verified" and why. A source with problems

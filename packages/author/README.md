@@ -29,15 +29,18 @@ npx @missing-elements/h5p-author@latest build rivers.json rivers.h5p
 
 ```
 Built /work/rivers.h5p: H5P.Blanks, 9 libraries from the library pack 1.1.0, 3 more for installing on an H5P site.
+Needs H5P core 1.28 or newer on a site it is uploaded to: Moodle 4.5.11, 5.0.7 or 5.1.4 and later, or the WordPress H5P plugin 1.17 and later. An older site refuses it.
 H5P.Blanks 1.14: interface texts from its translation language/de.json.
 Not verified: run npx @missing-elements/h5p-verify@latest on it and look at its screenshot before handing it over.
 ```
 
 The package plays in the player and carries the editor libraries an H5P site's upload check asks
-for, which the player never reads: a Moodle 4.5 with no library installed accepts
+for, which the player never reads: a Moodle 4.5.15 with no library installed accepts
 every type's example (Moodle was the one site tried; WordPress and Drupal run the same check). A
 Question Set gains 120 kB by them; a Course Presentation or a Branching Scenario several MB, as
 the same package exported from Moodle has, because their editors bring every type they can hold.
+A site also refuses a package if a library in it asks for a newer H5P core than the site has. The
+build's second line says which core that is: with pack 1.1.0, 1.28 for nearly every type.
 
 It is written for an AI agent and its tokens: the agent writes what only an author can know, and
 code writes everything that can be derived. The
@@ -208,7 +211,7 @@ Set's 2.6 MB, a container's up to 8.4 MB. `--all <folder>` writes one per conten
 ```js
 import { buildPackage, schemaOf, SourceError } from '@missing-elements/h5p-author'
 
-const { output, manifest, content, libraries, install, translations, notes, media, outline } =
+const { output, manifest, content, libraries, install, coreApi, translations, notes, media, outline } =
   await buildPackage(source, 'rivers.h5p', { base: process.cwd() })
 ```
 
@@ -248,7 +251,9 @@ not come back as it is, each `{ path, message }`. With `within`, the package and
 inside those folders, on their real paths.
 
 A result's `libraries` are the folders the package
-plays with, `install` those carried for an H5P site's upload check. `missingForInstall(libraries)`
+plays with, `install` those carried for an H5P site's upload check, and `coreApi` the newest H5P
+core they ask for, `{ majorVersion, minorVersion }`, which a site needs to take the package;
+`coreApiLine(coreApi)` says it as the command line does. `missingForInstall(libraries)`
 is that check, over a package's `library.json` files: what a site with no library installed would
 refuse it for, empty for a build. `schemaOf(machineName, { markdown, all,
 libraries })` returns the field list. `writeBundle(type, output, { libraries })` and
@@ -351,7 +356,7 @@ const { blob, notes } = await buildPackage(source, { libraries, files: { 'volga.
   Each part is fetched whole when a build first needs it, and checked against the index's SHA-256,
   as in Node. `close()` the pack when the page is done with it.
 - `buildPackage(source, { libraries, files, fetch })` throws a `SourceError` as in Node, and returns
-  `{ blob, manifest, content, libraries, install, translations, notes, media }`, as in Node. Its options:
+  `{ blob, manifest, content, libraries, install, coreApi, translations, notes, media }`, as in Node. Its options:
   - `libraries`: a pack `openPack` opened, or what to open one from for this build alone.
   - `files`: an object or a `Map` of the files a source names, by the names it gives them:
     `{ "path": "volga.png" }` takes `files['volga.png']`.
