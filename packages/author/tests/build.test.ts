@@ -14,6 +14,7 @@ import { buildPackage, librariesIn, missingForInstall, SourceError, sourceSchema
 import { readSource } from '../lib/build.mjs'
 import { LICENSES } from '../lib/metadata.mjs'
 import { MediaStore } from '../lib/media.mjs'
+import { ALT_TEXTS } from '../lib/mistakes.mjs'
 import { nodeMedia } from '../lib/node.mjs'
 import { quizProblems } from '../lib/quiz.mjs'
 import { jpeg, mp4, png } from './helpers/media'
@@ -575,6 +576,99 @@ describe('any content type in the pack', () => {
     const { manifest, notes } = await build({ ...META, type: 'H5P.TrueFalse', params: { question: 'Is \\(e^{i\\pi} + 1 = 0\\)?' } })
     expect(manifest.preloadedDependencies.map(({ machineName }: { machineName: string }) => machineName)).toContain('H5P.MathDisplay')
     expect(notes.map(({ message }) => message).join()).toContain('H5P.MathDisplay')
+  })
+})
+
+describe('notes for what builds and is almost surely a mistake (#241)', () => {
+  /** The notes a build of a source gives, writing nothing. */
+  async function notesOf(source: unknown, base?: string) {
+    return (await buildPackage(source, undefined, { check: true, ...(base ? { base } : {}) })).notes
+  }
+
+  it('says where no answer is marked correct, or two read alike, wherever the question sits', async () => {
+    const question = { question: 'Which river is the longest in Europe?', answers: [{ text: 'Volga' }, { text: '<strong>volga</strong> ' }, { text: 'Danube' }] }
+    expect(await notesOf({ ...META, type: 'H5P.MultiChoice', params: question })).toEqual([
+      { path: 'params.answers', message: 'marks no answer correct, so no learner can score: set "correct": true on the right one' },
+      { path: 'params.answers[1]', message: 'reads as answers[0] does, so a learner sees the same answer twice' }
+    ])
+    // In a set, by the sub-content's path; one marked correct is enough.
+    const fine = { question: 'Which river flows through Paris?', answers: [{ text: 'Seine', correct: true }, { text: 'Loire' }] }
+    expect(await notesOf({ ...META, type: 'H5P.QuestionSet', params: { questions: [{ library: 'H5P.MultiChoice', params: fine }, { library: 'H5P.MultiChoice', params: question }] } })).toEqual([
+      { path: 'params.questions[1].params.answers', message: 'marks no answer correct, so no learner can score: set "correct": true on the right one' },
+      { path: 'params.questions[1].params.answers[1]', message: 'reads as answers[0] does, so a learner sees the same answer twice' }
+    ])
+    // Entities and spacing read as a learner reads them.
+    expect(await notesOf({ ...META, type: 'H5P.SingleChoiceSet', params: { choices: [{ question: 'Which sea does the Danube reach?', answers: ['Black Sea', 'North Sea', 'Black  Sea'] }, { question: 'Which river flows through Paris?', answers: ['Seine', 'Loire'] }] } })).toEqual([
+      { path: 'params.choices[0].answers[2]', message: 'reads as answers[0] does, so a learner sees the same answer twice' }
+    ])
+    expect(await notesOf({ ...META, type: 'H5P.Summary', params: { summaries: [{ summary: ['Rivers flow downhill.', 'Rivers flow uphill.', 'Rivers flow downhill.'] }] } })).toEqual([
+      { path: 'params.summaries[0].summary[2]', message: 'reads as summary[0] does, so a learner sees the same statement twice' }
+    ])
+  })
+
+  it('says where a choice of pictures marks none correct', async () => {
+    const at = await mkdtemp(join(dir, 'pictures-'))
+    await writeFile(join(at, 'delta.png'), png(64, 48))
+    await writeFile(join(at, 'spring.png'), png(64, 48))
+    const option = (path: string, alt: string) => ({ media: { library: 'H5P.Image', params: { file: { path }, alt } } })
+    expect(await notesOf({ ...META, type: 'H5P.MultiMediaChoice', params: { question: 'Which picture shows a river delta?', options: [option('delta.png', 'A delta'), option('spring.png', 'A spring')] } }, at)).toEqual([
+      { path: 'params.options', message: 'marks no option correct, so no learner can score: set "correct": true on the right one' }
+    ])
+  })
+
+  it('says where a text has no gap to fill in, drag a word to or find', async () => {
+    expect(await notesOf({ ...META, type: 'H5P.Blanks', params: { questions: ['The Danube flows into the Black Sea.', 'Paris lies on the Seine.'] } })).toEqual([
+      { path: 'params.questions', message: 'has no gap, so a learner has nothing to fill in: put each answer between asterisks, as *Paris*' }
+    ])
+    // One text with a gap is enough: the others may lead in.
+    expect(await notesOf({ ...META, type: 'H5P.Blanks', params: { questions: ['Rivers of Europe.', 'The *Danube* flows into the Black Sea.'] } })).toEqual([])
+    expect(await notesOf({ ...META, type: 'H5P.DragText', params: { textField: 'The Danube flows into the Black Sea.' } })).toEqual([
+      { path: 'params.textField', message: 'has no gap, so a learner has no word to drag: put each word between asterisks, as *Paris*' }
+    ])
+    expect(await notesOf({ ...META, type: 'H5P.MarkTheWords', params: { taskDescription: 'Click every name of a river.', textField: 'The Danube rises in the Black Forest.' } })).toEqual([
+      { path: 'params.textField', message: 'marks no word, so a learner has none to find: put each word to find between asterisks, as *Paris*' }
+    ])
+  })
+
+  it('says where a picture has no alt text, where its field is optional', async () => {
+    const at = await mkdtemp(join(dir, 'alt-'))
+    await writeFile(join(at, 'river.png'), png(64, 48))
+    await writeFile(join(at, 'bridge.png'), png(64, 48))
+    expect(await notesOf({ ...META, type: 'H5P.Dialogcards', params: { dialogs: [
+      { text: 'the river', answer: 'der Fluss', image: { path: 'river.png' }, imageAltText: 'A river between hills' },
+      { text: 'the bridge', answer: 'die Brücke', image: { path: 'bridge.png' } },
+      { text: 'the bank', answer: 'das Ufer' }
+    ] } }, at)).toEqual([
+      { path: 'params.dialogs[1].imageAltText', message: 'is not written, so a screen reader has nothing to say of the picture in image: write what it shows' }
+    ])
+    // A card's matching picture: only where there is one.
+    expect(await notesOf({ ...META, type: 'H5P.MemoryGame', params: { cards: [
+      { image: { path: 'river.png' }, imageAlt: 'A river', match: { path: 'bridge.png' } },
+      { image: { path: 'bridge.png' }, imageAlt: 'A bridge' }
+    ] } }, at)).toEqual([
+      { path: 'params.cards[0].matchAlt', message: 'is not written, so a screen reader has nothing to say of the picture in match: write what it shows' }
+    ])
+  })
+
+  it('names, for each picture with an optional alt text, fields the pack has: a picture, and an optional text beside it', async () => {
+    type Semantic = { name: string, type: string, optional?: boolean, field?: Semantic, fields?: Semantic[] }
+    for (const [machineName, pictures] of Object.entries(ALT_TEXTS)) {
+      const library = pack.libraries.filter((each) => each.machineName === machineName).sort((a, b) => b.majorVersion - a.majorVersion || b.minorVersion - a.minorVersion)[0]
+      expect(library, machineName).toBeTruthy()
+      const { files } = await archive(new URL(library.url))
+      let fields: Semantic[] = JSON.parse(files.get(`${library.folder}/semantics.json`)!)
+      for (const [group, picture, alt] of pictures) {
+        let level = fields
+        for (const name of group ? group.replace(/\[\]/g, '').split('.') : []) {
+          const field = level.find((each) => each.name === name)
+          expect(field, `${machineName} ${group}`).toBeTruthy()
+          level = field!.type === 'list' ? (field!.field!.fields ?? []) : (field!.fields ?? [])
+        }
+        expect(level.find((each) => each.name === picture)?.type, `${machineName} ${group}.${picture}`).toBe('image')
+        expect(level.find((each) => each.name === alt), `${machineName} ${group}.${alt}`).toMatchObject({ type: 'text', optional: true })
+      }
+      fields = []
+    }
   })
 })
 

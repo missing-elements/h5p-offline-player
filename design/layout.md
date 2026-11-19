@@ -29,7 +29,8 @@ packages/verify/       a package played headless (lib/verify.mjs) and in a brows
                        (lib/preview.mjs); lib/serve.mjs what both share, which the extension bundles
 packages/author/       a playable .h5p from a short source: lib/build.mjs both builds, node.mjs
                        Node's, generator.mjs content from semantics, check.mjs, outline.mjs,
-                       types.mjs the editor widgets' rules, read.mjs a package back to a source;
+                       types.mjs the editor widgets' rules, mistakes.mjs the notes of what is
+                       almost surely a mistake, read.mjs a package back to a source;
                        scripts/ the skill's sync and copy
 packages/mcp/          the local MCP server: bin/h5p-mcp.mjs the command, lib/server.mjs its four
                        tools, lib/folders.mjs the folders it may use

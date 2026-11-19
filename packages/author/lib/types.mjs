@@ -713,7 +713,7 @@ const imageHotspotQuestion = {
  * @param {string} question
  * @returns {{ raw: string, content: string }[]} each gap as written, asterisks included, and what the library reads of it
  */
-function blanksGaps(question) {
+export function blanksGaps(question) {
   const gaps = []
   let start = question.indexOf('*')
   while (start !== -1) {
