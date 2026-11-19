@@ -237,10 +237,11 @@ text to the content check's rules, and `apps/skills` plays every example untrust
   tags, the sub-content the pack has, the editor's `important` syntax, `showWhen` conditions;
   interface texts and the fields a layout sets are left out. The weekly pack refresh runs
   `sync:skill`, and `apps/skills`' test fails on a file out of date and builds and plays every
-  example. 28 content types have files, and so do the parts other content holds (Text, Image,
-  Video); any other type's fields are one `h5p-author schema` away. Where npm cannot install,
-  `SKILL.md` names the one-file tool's command, `node h5p-author.mjs schema <Type> --libraries
-  parts`: given only the `npx` form, Haiku ran the tool without `--libraries` and failed.
+  example. 28 content types have files, and so do the parts other content holds (Text,
+  AdvancedText, Image, Video); any other type's fields are one `h5p-author schema` away. Where
+  npm cannot install, `SKILL.md` names the one-file tool's command, `node h5p-author.mjs schema
+  <Type> --libraries parts`: given only the `npx` form, Haiku ran the tool without `--libraries`
+  and failed.
 - **The editor is pinned, and not watched** (the owner's choice, as for the content check).
   Nothing the editor does decides whether a package plays: the libraries and the platforms'
   validator do, both pinned here too. A change in a library reaches the author with the weekly
@@ -320,9 +321,9 @@ text to the content check's rules, and `apps/skills` plays every example untrust
 - **The package carries the skill's type files** (#172, #178). With its type file handed back
   beside the first problems, a weak model writes any type right by the second round, and the
   build page, which has the package and no skill, can hand it back. So `prepack` copies all of the
-  skill's `references/` (`types/`, `build/`, `authoring.md`) and `SKILL.md` into the package, each
-  an export. They stay the skill's at the repository's root, where `npx skills add` looks; the
-  copy is not in git, and `build.test.ts` holds it to the skill file for file.
+  skill's `references/` (`types/`, `build/`, `authoring.md`, `change.md`) and `SKILL.md` into the
+  package, each an export. They stay the skill's at the repository's root, where `npx skills add`
+  looks; the copy is not in git, and `build.test.ts` holds it to the skill file for file.
 - **The skill says where a container holds its sub-content.** The one thing in `SKILL.md` that
   repeats a type file, for a chat that cannot read one: an item of H5P.Column's `content` is
   `{ "content": <sub-content> }`, a slide's element is `{ "action": <sub-content> }` in

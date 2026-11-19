@@ -22,7 +22,7 @@ changed, and plays every content type in the pack, trusted and untrusted.
 
 - **Plays the packages people have.** Large ones stream, and exports without their libraries, as
   h5p.com and h5p.org make them, play against a [library pack](https://github.com/missing-elements/h5p-toolkit/blob/main/docs/libraries.md)
-  of the 53 content types the H5P hub serves.
+  of every content type the H5P hub serves.
 - **Plays packages you did not make** with [`untrusted`](https://github.com/missing-elements/h5p-toolkit/blob/main/docs/untrusted.md): none of their
   code runs, and their content is checked by a port of H5P's own validator.
 - **Reports results you can audit:** xAPI statements that name the

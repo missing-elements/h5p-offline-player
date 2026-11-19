@@ -151,7 +151,7 @@ dependency scripts by itself. The build deletes `types/` and the TypeScript buil
 Use Node 22 LTS or 24 LTS. Vitest's `engines` covers `^22.12 || ^24 || >=26`, so an odd-numbered
 release such as Node 23 prints an engine warning on install. It is only a warning and the suite
 runs, and no patched Vitest accepts Node 23. The workspace's own `engines` is `>=22.12`, the floor
-of the tools it builds and tests with. The three commands (normalize, verify and embed) need
+of the tools it builds and tests with. The commands (normalize, verify, embed, author and mcp) need
 Node 22: Node 20 is past its end of life and CI runs 22, so `>=20` was a claim nothing tested. The
 browser packages (the player, the runtime, the libraries and cmi5) keep `>=20`: nothing in them
 runs on Node, and a higher floor would only fail the install of a host still building on 20 under

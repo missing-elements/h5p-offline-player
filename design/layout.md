@@ -24,7 +24,8 @@ packages/runtime/      the H5P core vendored at a commit (vendor/h5p-core/) and 
                        and the `finished` rule are bundled into it; l10n/ the core's strings
 packages/libraries/    the library pack: parts/ an archive per library and its index,
                        libraries.h5p the whole pack; committed, built by `pnpm libraries`
-packages/normalize/    the package rewriter: lib/normalize.mjs the policy, the remux, the zip writer
+packages/normalize/    the package rewriter: lib/normalize.mjs the policy, mp4-faststart.mjs the
+                       remux, zip-writer.mjs the zip writer, mp4.mjs what an MP4's index says
 packages/verify/       a package played headless (lib/verify.mjs) and in a browser
                        (lib/preview.mjs); lib/serve.mjs what both share, which the extension bundles
 packages/author/       a playable .h5p from a short source: lib/build.mjs both builds, node.mjs
@@ -42,7 +43,8 @@ packages/vscode/       H5P Preview: src/ the extension, the preview server and t
 apps/demo/             the dev server and the hosted site: index.html the player page, embed.html
                        /embed, demo/ the examples and integrator pages, app/ the installable app,
                        partials/ the shared markup, scripts/ the builds and the sweep, sweep/ its files
-apps/skills/           the skills' test project: author-verify, author-playback, to-scorm
+apps/skills/           the skills' test project: author-verify, author-playback, to-scorm,
+                       front-matter
 skills/                the agent skills, at the root, where `npx skills add` looks
 docs/                  the README's longer sections, for integrators
 api/, vercel.json      the hosted demo's Vercel function and deployment; at the root because that

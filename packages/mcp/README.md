@@ -1,7 +1,7 @@
 # H5P Author MCP by Missing Elements
 
 `@missing-elements/h5p-mcp` lets an AI app make H5P content on your computer: quizzes, fill in the
-blanks, flash cards, presentations, interactive books, branching scenarios and the rest of the 53
+blanks, flash cards, presentations, interactive books, branching scenarios and the rest of the
 content types the H5P hub serves. It writes a playable `.h5p` that carries its libraries, checks
 that it plays in a real H5P player, and opens it in your browser. It reads a `.h5p` you have back
 into its source too, to change it and build it again. No H5P site, server or account.
