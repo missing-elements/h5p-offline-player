@@ -44,7 +44,8 @@ gets a number, and it says which.
 
 - `h5p_types`: the content types, and how to write a source for one.
 - `h5p_build`: a package from a source, its source beside it as `.source.json`. A source with
-  problems is refused, each problem named. It checks the package and says what it holds.
+  problems is refused, each problem named. It checks the package, says what it holds, and which
+  H5P core a site needs to take it.
 - `h5p_preview`: opens a package in your browser, in the real player, served from your computer
   until its tab is closed.
 - `h5p_read`: a package back into its source, with its pictures and other files, in a new folder

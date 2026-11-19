@@ -101,6 +101,7 @@ describe('h5p_build', () => {
     const text = textOf(answer)
     expect(answer.isError).toBeFalsy()
     expect(text).toContain(`Built ${join(folder, 'boiling-point.h5p')}`)
+    expect(text).toMatch(/^Needs H5P core \d+\.\d+ or newer on a site it is uploaded to\b/m)
     expect(text).toContain('Water boils at 100 °C at sea level.')
     expect(text).toMatch(/^pass {2}boiling-point\.h5p/m)
     expect(text).not.toMatch(/screenshot:/)

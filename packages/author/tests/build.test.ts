@@ -10,7 +10,7 @@ import { BlobReader, TextWriter, Uint8ArrayWriter, ZipReader } from '@zip.js/zip
 import { pack } from '@missing-elements/h5p-libraries'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { toJSONSchema } from 'zod/mini'
-import { buildPackage, librariesIn, missingForInstall, SourceError, sourceSchema } from '../lib/author.mjs'
+import { buildPackage, coreApiLine, coreApiOf, librariesIn, missingForInstall, SourceError, sourceSchema } from '../lib/author.mjs'
 import { readSource } from '../lib/build.mjs'
 import { LICENSES } from '../lib/metadata.mjs'
 import { MediaStore } from '../lib/media.mjs'
@@ -175,6 +175,21 @@ describe('the quiz format', () => {
         expect(available, `${name}: ${dependency.machineName}`).toBeDefined()
       }
     }
+  })
+
+  it('says the newest H5P core a library it carries asks for, which a site needs to take it (#245)', async () => {
+    const built = await build(example)
+    const asked = [...built.files].filter(([name]) => /^[^/]+\/library\.json$/.test(name)).map(([, text]) => JSON.parse(text).coreApi)
+    const [newest] = asked.filter(Boolean).map(({ majorVersion, minorVersion }) => [Number(majorVersion), Number(minorVersion)]).sort((a, b) => b[0] - a[0] || b[1] - a[1])
+    expect(built.coreApi).toEqual({ majorVersion: newest[0], minorVersion: newest[1] })
+    // H5P reads a library that names none as asking for 1.0; library.json may write the numbers as strings.
+    expect(coreApiOf([])).toEqual({ majorVersion: 1, minorVersion: 0 })
+    expect(coreApiOf([{ coreApi: { majorVersion: '1', minorVersion: '27' } }, { coreApi: { majorVersion: 1, minorVersion: 9 } }, {}])).toEqual({ majorVersion: 1, minorVersion: 27 })
+    // A minor left out is 0, and what is not two whole numbers is passed over: never "2.NaN".
+    expect(coreApiOf([{ coreApi: { majorVersion: 2 } }])).toEqual({ majorVersion: 2, minorVersion: 0 })
+    expect(coreApiOf([{ coreApi: { majorVersion: 2, minorVersion: 'x' } }, { coreApi: { majorVersion: 1.5, minorVersion: 1 } }])).toEqual({ majorVersion: 1, minorVersion: 0 })
+    expect(coreApiLine({ majorVersion: 1, minorVersion: 28 })).toBe('Needs H5P core 1.28 or newer on a site it is uploaded to: Moodle 4.5.11, 5.0.7 or 5.1.4 and later, or the WordPress H5P plugin 1.17 and later. An older site refuses it.')
+    expect(coreApiLine({ majorVersion: 1, minorVersion: 29 })).toBe('Needs H5P core 1.29 or newer on a site it is uploaded to. An older site refuses it.')
   })
 
   it('builds standalone Multiple Choice, escapes markup, and preserves false and zero values', async () => {
@@ -979,7 +994,7 @@ describe('the build', () => {
     const project = await mkdtemp(join(dir, 'project-'))
     await writeFile(join(project, 'german.json'), JSON.stringify({ ...example, language: 'de' }))
     const german = await exec(process.execPath, [bin, 'build', 'german.json', 'german.h5p'], { cwd: project })
-    expect(german.stdout).toMatch(/^Built .*german\.h5p: H5P\.QuestionSet, \d+ libraries from the library pack \d+\.\d+\.\d+, \d+ more for installing on an H5P site\./)
+    expect(german.stdout).toMatch(/^Built .*german\.h5p: H5P\.QuestionSet, \d+ libraries from the library pack \d+\.\d+\.\d+, \d+ more for installing on an H5P site\.\nNeeds H5P core \d+\.\d+ or newer on a site it is uploaded to\b/)
     expect(german.stdout).toMatch(/H5P\.MultiChoice 1\.\d+: interface texts from its translation language\/de\.json\./)
     expect(german.stdout + german.stderr).toMatch(/H5P\.QuestionSet 1\.\d+: interface texts from its translation language\/de\.json/)
     expect(german.stdout).toContain('Not verified')

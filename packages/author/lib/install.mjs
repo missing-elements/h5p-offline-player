@@ -70,3 +70,44 @@ export function missingForInstall(libraries) {
   }
   return missing
 }
+
+/**
+ * The newest H5P core API that `libraries`, each given as its `library.json`, ask for in
+ * `coreApi`; one that asks for none asks for 1.0, as H5P reads it. H5P core's upload check
+ * (`H5PValidator::isValidH5pData`) refuses a package that carries a library asking for a newer core
+ * than the site has, and its message names that library, not the package.
+ * @param {Iterable<any>} libraries
+ * @returns {CoreApi}
+ */
+export function coreApiOf(libraries) {
+  let newest = { majorVersion: 1, minorVersion: 0 }
+  for (const library of libraries) {
+    const asked = library?.coreApi
+    if (!asked) continue
+    // A minor left out is 0; a version that is not two whole numbers is none.
+    const major = Number(asked.majorVersion)
+    const minor = Number(asked.minorVersion ?? 0)
+    if (!Number.isInteger(major) || !Number.isInteger(minor)) continue
+    if (major > newest.majorVersion || (major === newest.majorVersion && minor > newest.minorVersion)) newest = { majorVersion: major, minorVersion: minor }
+  }
+  return newest
+}
+
+/**
+ * The platforms' first releases with a core, by its version, as checked on 2026-11-19 (#245):
+ * Moodle's `h5plib_v128` (MDL-88092) and the WordPress plugin's bundled core. A version not here
+ * is said without them.
+ */
+const CORE_RELEASES = new Map([['1.28', 'Moodle 4.5.11, 5.0.7 or 5.1.4 and later, or the WordPress H5P plugin 1.17 and later']])
+
+/**
+ * The line a build says of the core a site needs to take its package (`coreApiOf`).
+ * @param {CoreApi} core
+ */
+export function coreApiLine(core) {
+  const version = `${core.majorVersion}.${core.minorVersion}`
+  const releases = CORE_RELEASES.get(version)
+  return `Needs H5P core ${version} or newer on a site it is uploaded to${releases ? `: ${releases}` : ''}. An older site refuses it.`
+}
+
+/** @typedef {{ majorVersion: number, minorVersion: number }} CoreApi a core API version, as a `library.json` names one */

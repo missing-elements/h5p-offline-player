@@ -4,7 +4,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { McpServer } from '@modelcontextprotocol/server'
 import { z } from 'zod'
-import { SourceError, buildPackage, contentTypes, inside, openPack, publicFetch, readPackage, schemaOf, sourceSchema, sourceType } from '@missing-elements/h5p-author'
+import { SourceError, buildPackage, contentTypes, coreApiLine, inside, openPack, publicFetch, readPackage, schemaOf, sourceSchema, sourceType } from '@missing-elements/h5p-author'
 import { VerifyError, openBrowser, previewPackage, summarize, verifyPackage } from '@missing-elements/h5p-verify'
 import { defaultFolders, fileStem, rootFolders } from './folders.mjs'
 
@@ -228,6 +228,7 @@ export async function createServer(options = {}) {
     const media = result.media.length ? `, ${result.media.length} media file${result.media.length === 1 ? '' : 's'}` : ''
     const lines = [
       `Built ${target} (${sized((await stat(target)).size)}): ${result.manifest.mainLibrary}, ${result.libraries.length} libraries${install}${media}.`,
+      coreApiLine(result.coreApi),
       unwritten
         ? `Its source was not written beside it: ${unwritten.message}`
         : `Its source is beside it, ${basename(sourceFile)}: https://missing-elements.github.io/h5p/build/ opens it under "Or open a file", to change and build again.`

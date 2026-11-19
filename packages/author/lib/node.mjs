@@ -27,10 +27,11 @@ import { SourceError } from './source-error.mjs'
  * @typedef {import('./translate.mjs').TranslationReport} TranslationReport
  * @typedef {{
  *   output: string, manifest: Record<string, unknown>, content: Record<string, unknown>,
- *   libraries: string[], install: string[], translations: TranslationReport[], notes: Problem[], media: string[], outline: string
+ *   libraries: string[], install: string[], coreApi: import('./install.mjs').CoreApi, translations: TranslationReport[], notes: Problem[], media: string[], outline: string
  * }} BuildResult what was written, and what is worth telling about it: `libraries`, the folders the
- *   package plays with; `install`, those carried for an H5P site's upload check; `outline`, the
- *   content as text for a review (`outlineOf`)
+ *   package plays with; `install`, those carried for an H5P site's upload check; `coreApi`, the
+ *   newest H5P core they ask for, which a site needs to take the package (`coreApiLine` says it);
+ *   `outline`, the content as text for a review (`outlineOf`)
  * @typedef {{ libraries?: string, base?: string, fetch?: typeof fetch, within?: string[], check?: boolean }} BuildOptions
  *   `libraries`, a library pack's parts folder in place of the pinned pack; `base`, the folder a
  *   source's file paths are read from; `fetch`, for media named by web address; `within`, the
@@ -393,6 +394,7 @@ export async function buildPackage(input, output, options = {}) {
         content: built.content,
         libraries: [...built.selected.keys()],
         install: [...built.install.keys()],
+        coreApi: built.coreApi,
         translations: built.translations,
         notes: built.notes,
         media: media.files.map((item) => item.name),
@@ -430,6 +432,7 @@ export async function buildPackage(input, output, options = {}) {
       content: built.content,
       libraries: [...built.selected.keys()],
       install: [...built.install.keys()],
+      coreApi: built.coreApi,
       translations: built.translations,
       notes: built.notes,
       media: media.files.map((item) => item.name),

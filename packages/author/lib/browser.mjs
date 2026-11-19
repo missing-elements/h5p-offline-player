@@ -27,10 +27,11 @@ export * from './core.mjs'
  *   library with its part's URL
  * @typedef {{
  *   blob: Blob, manifest: Record<string, unknown>, content: Record<string, unknown>, libraries: string[], install: string[],
- *   translations: import('./translate.mjs').TranslationReport[], notes: import('./build.mjs').Problem[], media: string[], outline: string
+ *   coreApi: import('./install.mjs').CoreApi, translations: import('./translate.mjs').TranslationReport[], notes: import('./build.mjs').Problem[], media: string[], outline: string
  * }} BuildResult the package, and what is worth telling about it: `libraries`, the folders it plays
- *   with; `install`, those it carries for an H5P site's upload check; `outline`, the content as text
- *   for a review (`outlineOf`)
+ *   with; `install`, those it carries for an H5P site's upload check; `coreApi`, the newest H5P core
+ *   they ask for, which a site needs to take the package (`coreApiLine` says it); `outline`, the
+ *   content as text for a review (`outlineOf`)
  * @typedef {{ libraries: Pack | PackIndex | string | URL, files?: Map<string, Blob> | Record<string, Blob>, fetch?: typeof fetch }} BuildOptions
  *   `libraries`, a pack `openPack` opened, which a page keeps for its builds, or what to open one
  *   from; `files`, the files a source names, by the names it gives them; `fetch`, for media named by
@@ -177,6 +178,7 @@ export async function buildPackage(input, options) {
       content: built.content,
       libraries: [...built.selected.keys()],
       install: [...built.install.keys()],
+      coreApi: built.coreApi,
       translations: built.translations,
       notes: built.notes,
       media: media.files.map((item) => item.name),
