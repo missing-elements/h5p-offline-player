@@ -28,10 +28,10 @@
     "@missing-elements/h5p-normalize": "workspace:*",
     "@types/node": "^26.6.6",
     "@zip.js/zip.js": "^2.25.0",
-    "playwright": "^1.65.0",
+    "playwright": "^1.65.1",
     "shiki": "4.6.0",
     "typescript": "^7.0.2",
-    "vite": "^8.3.6",
+    "vite": "^8.3.8",
     "vitest": "^5.1.0"
   }
 }
