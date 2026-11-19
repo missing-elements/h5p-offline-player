@@ -1,7 +1,8 @@
 import { execFile } from 'node:child_process'
-import { copyFile, cp, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { copyFile, cp, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { BlobReader, Uint8ArrayWriter, ZipReader } from '@zip.js/zip.js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -225,4 +226,34 @@ describe('the bundle command', () => {
     await expect(exec(process.execPath, [bin, 'bundle', '--markdown', 'H5P.TrueFalse', 'x.zip'])).rejects.toMatchObject({ code: 1, stderr: expect.stringContaining('bundle does not take --markdown') })
     // Every content type's bundle, written twice: 2.2 s here, past vitest's 5 s once on a slow runner (#242).
   }, 20_000)
+})
+
+describe('the command line as one file', () => {
+  // Route 3's two files (#247): the tool as the package ships it, and a bundle, unzipped in a
+  // folder with no package.json above it and nothing installed, as a chat's sandbox has them.
+  it('builds from a bundle where nothing is installed, and says its versions', async () => {
+    const built = join(dir, 'tool')
+    await exec(process.execPath, [resolve(import.meta.dirname, '../scripts/build-tool.mjs'), built])
+    expect(await readFile(join(built, 'h5p-author-LICENSES.txt'), 'utf8')).toMatch(/^## @zip\.js\/zip\.js - [\d.]+ \(BSD-3-Clause\)$/m)
+    const sandbox = await unzip((await writeBundle('H5P.QuestionSet', join(dir, 'route3.zip'))).output, 'route3')
+    await copyFile(join(built, 'h5p-author.mjs'), join(sandbox, 'h5p-author.mjs'))
+    const version = async (path: string) => JSON.parse(await readFile(path, 'utf8')).version
+    const { stdout: versions } = await exec(process.execPath, ['h5p-author.mjs', '--version'], { cwd: sandbox })
+    expect(versions).toBe(`@missing-elements/h5p-author ${await version(resolve(import.meta.dirname, '../package.json'))}, library pack ${await version(join(parts, '../package.json'))}\n`)
+    await writeFile(join(sandbox, 'quiz.json'), JSON.stringify(QUIZ))
+    const { stdout } = await exec(process.execPath, ['h5p-author.mjs', 'build', 'quiz.json', 'quiz.h5p', '--libraries', 'parts'], { cwd: sandbox })
+    expect(stdout).toMatch(/^Built \S+quiz\.h5p: H5P\.QuestionSet, \d+ libraries from the pack in parts, \d+ more for installing on an H5P site\.\n/)
+    expect((await stat(join(sandbox, 'quiz.h5p'))).size).toBeGreaterThan(0)
+
+    // Both files resolve by the package's name, through its exports, as a site that pins it reaches them.
+    const scope = join(dir, 'scope')
+    await mkdir(join(scope, 'dist'), { recursive: true })
+    await copyFile(resolve(import.meta.dirname, '../package.json'), join(scope, 'package.json'))
+    const files = ['h5p-author.mjs', 'h5p-author-LICENSES.txt']
+    for (const file of files) await copyFile(join(built, file), join(scope, 'dist', file))
+    const script = `for (const file of ${JSON.stringify(files)}) console.log(import.meta.resolve('@missing-elements/h5p-author/dist/' + file))`
+    const { stdout: resolved } = await exec(process.execPath, ['--input-type=module', '-e', script], { cwd: scope })
+    const real = await realpath(scope)
+    expect(resolved).toBe(files.map((file) => `${pathToFileURL(join(real, 'dist', file)).href}\n`).join(''))
+  }, 60_000)
 })

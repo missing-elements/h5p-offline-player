@@ -32,6 +32,8 @@
       "types": "./types/browser.d.mts",
       "default": "./lib/browser.mjs"
     },
+    "./dist/h5p-author.mjs": "./dist/h5p-author.mjs",
+    "./dist/h5p-author-LICENSES.txt": "./dist/h5p-author-LICENSES.txt",
     "./references/types/*.md": "./references/types/*.md",
     "./references/build/*.md": "./references/build/*.md",
     "./references/authoring.md": "./references/authoring.md",
@@ -41,6 +43,7 @@
   },
   "files": [
     "bin",
+    "dist",
     "lib",
     "references",
     "types",
@@ -60,8 +63,9 @@
     "test": "pnpm --filter @missing-elements/h5p-offline-player build && vitest run",
     "test:unit": "pnpm --filter @missing-elements/h5p-offline-player build:plan && vitest run --project node",
     "typecheck": "pnpm types && tsc -p tsconfig.json",
+    "build:tool": "pnpm --filter @missing-elements/h5p-offline-player build:plan && node scripts/build-tool.mjs",
     "sync:skill": "pnpm --filter @missing-elements/h5p-offline-player build:plan && node scripts/sync-skill.mjs",
-    "prepack": "node -e \"require('node:fs').copyFileSync('../../LICENSE', 'LICENSE')\" && node scripts/copy-skill.mjs && pnpm types",
+    "prepack": "node -e \"require('node:fs').copyFileSync('../../LICENSE', 'LICENSE')\" && node scripts/copy-skill.mjs && pnpm types && pnpm build:tool",
     "prepublishOnly": "node -e \"if (!/^pnpm\\//.test(process.env.npm_config_user_agent || '')) { console.error('Publish with pnpm publish: npm would ship the workspace: dependency ranges as they are, and the package would not install.'); process.exit(1) }\" && node scripts/check-pack-published.mjs && pnpm typecheck && pnpm test",
     "types": "pnpm --filter @missing-elements/h5p-offline-player exec tsc -b && node -e \"require('node:fs').rmSync('types', { recursive: true, force: true })\" && tsc -p tsconfig.types.json"
   },
@@ -79,6 +83,7 @@
     "@vitest/browser-playwright": "^5.1.0",
     "playwright": "^1.65.1",
     "typescript": "^7.0.2",
+    "vite": "^8.3.8",
     "vitest": "^5.1.0"
   },
   "engines": {
