@@ -1,10 +1,11 @@
 import { ContentGenerator, libraryString } from './generator.mjs'
+import { noteMistakes } from './mistakes.mjs'
 import { LAYOUTS, placesOf } from './types.mjs'
 
 /**
  * Content checked in the form H5P stores it, as the build checks what it writes: every value
- * against its field in the libraries' semantics, the hidden fields the editor's widgets set, and
- * what those widgets would not let an author save. A tool that changes a saved package runs it on
+ * against its field in the libraries' semantics, the hidden fields the editor's widgets set, what
+ * those widgets would not let an author save, and, as notes, what is almost surely a mistake. A tool that changes a saved package runs it on
  * what it is about to write, and the build runs it last, on what it is about to write, so that the
  * two hold content to one set of rules. No Node import of its own: the libraries are handed in.
  */
@@ -90,6 +91,8 @@ export function checkContent(libraries, { type, params }) {
   const layout = layoutContext(entries, report, note)
   const places = placesOf(main.library.machineName, content)
   for (const place of places) LAYOUTS[place.library]?.after?.(place.params, place.path, layout(place.library))
+  // What builds and is almost surely a mistake, which H5P allows: a note, never a problem (#241).
+  for (const place of places) noteMistakes(place.library, place.params, place.path, note)
   for (const place of places) {
     if (place.holder && isObject(place.holder.metadata) && place.holder.metadata.title === undefined) place.holder.metadata.title = place.holder.metadata.contentType
   }

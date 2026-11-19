@@ -318,8 +318,8 @@ checks every value against its field, as the build does, and takes what H5P save
 sub-content metadata, held to what the platforms keep of them, and each part's `subContentId`, which
 the core names the part's statements by, so a learner's record stays the part's after an edit; a part
 without one, or with another part's, gets a new one. It places what nobody placed and checks what a
-content type's editor would, as the build does, and returns the content as checked with `problems`
-and `notes`, each `{ path, message }`. Where the content names an older minor of a library than the
+content type's editor would, as the build does, notes what is almost surely a mistake, and returns
+the content as checked with `problems` and `notes`, each `{ path, message }`. Where the content names an older minor of a library than the
 one it is checked against, a field only that minor has is a note: the player upgrades such content as
 it plays. Content saved by the platforms can hold what their editor let an author save and the build
 does not, such as a required text left empty; a tool that changes one part keeps the problems under
@@ -375,8 +375,9 @@ the package's main export has them. A tool beside a build in either imports it f
 
 ## What it does not do
 
-It checks structure, not pedagogy: whether the answers are right, the questions fair, or the
-pictures placed well is for a person to judge, in
+It checks structure, not pedagogy. It notes what H5P allows and is almost surely a mistake: no
+answer marked correct, two answers alike, a text with no gap, a picture with no alt text. Whether
+the answers are right, the questions fair, or the pictures placed well is for a person to judge, in
 [h5p-verify](https://www.npmjs.com/package/@missing-elements/h5p-verify)'s `--preview`. It changes an
 existing package only by way of its source, read and built again; `checkContent` is the check for a
 tool that changes one in place. The licence of each library is in the pack's `libraries.txt`.

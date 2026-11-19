@@ -377,6 +377,18 @@ text to the content check's rules, and `apps/skills` plays every example untrust
 
   `*10:30*` as written is not refused: it is a tip to the library and may be one to its author.
   Over the 94 real packages of the owner's corpus and the demo, the two checks report nothing.
+- **What builds and is almost surely a mistake is a note** (#241, item 4 of #219). H5P allows
+  each, so none is a problem, and nothing is judged: no answer marked correct (Multiple Choice's
+  answers, Multimedia Choice's options; Find the Hotspot's areas are refused already), two
+  answers alike as a learner reads them, without tags or entities and in any case (Multiple
+  Choice, a Single Choice Set question, a Summary set), a text with no gap (Fill in the Blanks,
+  Drag the Words, Mark the Words), and a picture with no alt text where its field is optional
+  (`ALT_TEXTS`, held to the pack's fields by `build.test.ts`; H5P.Image's is required). Each says
+  what to write. `lib/mistakes.mjs` runs in `checkContent`, so a build says them and so does a
+  check of saved content, and every type file's example says none. Of the owner's 88 real
+  packages, the 79 checked against their own libraries give 36 notes of a picture with no alt
+  text in 8 packages, and 4 of answers alike in one, a test whose answers all read "Test"; no
+  question with no answer marked correct, and no text with no gap.
 - **The hand-over carries the source and one web address, the build page's plain one** (#190,
   #215, the owner's calls). Beside the package, the hand-over gives the source as a file named
   after the package with `.source.json`, and one fixed line saying to open that file on the build
@@ -454,4 +466,5 @@ text to the content check's rules, and `apps/skills` plays every example untrust
 Not built: changing a package in place, which a tool beside it does with `checkContent` as its
 check (a package is changed by reading it into a source and building that); reading content made
 for another version of a library than the pack's; layout for Drag and Drop and Crossword; and any
-judgement of whether content is right, which stays the person's, in the verifier's preview.
+judgement of whether content is right beyond those notes, which stays the person's, in the
+verifier's preview.
