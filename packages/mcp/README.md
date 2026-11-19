@@ -3,7 +3,8 @@
 `@missing-elements/h5p-mcp` lets an AI app make H5P content on your computer: quizzes, fill in the
 blanks, flash cards, presentations, interactive books, branching scenarios and the rest of the 53
 content types the H5P hub serves. It writes a playable `.h5p` that carries its libraries, checks
-that it plays in a real H5P player, and opens it in your browser. No H5P site, server or account.
+that it plays in a real H5P player, and opens it in your browser. It reads a `.h5p` you have back
+into its source too, to change it and build it again. No H5P site, server or account.
 
 It is a local [MCP](https://modelcontextprotocol.io) server: your app starts it on your computer,
 and it sends nothing to a server of ours. It needs Node 22 or newer, and for the check Chrome or
@@ -46,6 +47,9 @@ gets a number, and it says which.
   problems is refused, each problem named. It checks the package and says what it holds.
 - `h5p_preview`: opens a package in your browser, in the real player, served from your computer
   until its tab is closed.
+- `h5p_read`: a package back into its source, with its pictures and other files, in a new folder
+  beside it, to change and build again. It reads content made for the library pack's versions of
+  its libraries, and says what a source cannot hold, such as the author's comments.
 
 ## What leaves your computer
 

@@ -1,17 +1,18 @@
-import { constants, createReadStream, createWriteStream } from 'node:fs'
-import { copyFile, lstat, mkdir, mkdtemp, open, readFile, realpath, rm, stat } from 'node:fs/promises'
+import { constants, createReadStream, createWriteStream, openAsBlob } from 'node:fs'
+import { copyFile, lstat, mkdir, mkdtemp, open, readFile, realpath, rm, rmdir, stat } from 'node:fs/promises'
 import { lookup } from 'node:dns/promises'
 import { tmpdir } from 'node:os'
 import { BlockList, isIP } from 'node:net'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { Readable, Writable } from 'node:stream'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { Uint8ArrayReader, ZipWriter } from '@zip.js/zip.js'
+import { BlobReader, ERR_UNSAFE_FILENAME, TextWriter, Uint8ArrayReader, ZipReader, ZipWriter } from '@zip.js/zip.js'
 import { normalizeArchive } from '@missing-elements/h5p-normalize'
 import { composePackage, sourceOf, typeNames, writePackage } from './build.mjs'
 import { bundleLibraries, contentTypes } from './bundle.mjs'
 import { MediaStore } from './media.mjs'
 import { Pack } from './pack.mjs'
+import { readContent } from './read.mjs'
 import { SourceError } from './source-error.mjs'
 
 /**
@@ -38,6 +39,12 @@ import { SourceError } from './source-error.mjs'
  *   the result's `output` is empty, but a media file named by web address is still downloaded, to a
  *   temporary folder removed after, as the build checks it; a video on YouTube, Vimeo, Panopto or
  *   Echo360 stays an address, as in a build
+ * @typedef {{ output: string, source: import('./build.mjs').Source, files: string[], notes: Problem[] }} ReadResult
+ *   `output`, the source's path; `files`, the media written beside it, by the paths the source
+ *   names them by, from its folder; `notes`, what was left out or could not be read back as it is
+ * @typedef {{ libraries?: string, within?: string[] }} ReadOptions
+ *   `libraries`, a library pack's parts folder in place of the pinned pack; `within`, the folders
+ *   the package and the folder written in must be inside, on their real paths, a list even of one
  * @typedef {{ output: string, type: string, parts: string[], size: number }} BundleResult
  *   `type`, the content type with the version bundled, `H5P.QuestionSet 1.21`; `parts`, the
  *   folders of the parts it holds; `size`, the zip's in bytes
@@ -154,27 +161,36 @@ export function nodeMedia({ base, temporary, within }) {
 }
 
 /**
- * Whether a path, as the file system resolves it, a link followed, is in one of the folders.
- * A path that does not exist yet is judged by its nearest folder that does.
+ * A path as the file system resolves it, links followed; of a path that does not exist yet, its
+ * nearest folder that does, with the rest of the path after it. Undefined where nothing on it exists.
  * @param {string} path
- * @param {string[]} folders
  */
-export async function inside(path, folders) {
+async function resolved(path) {
   let real = resolve(path)
   const tail = []
   for (;;) {
     try {
-      real = join(await realpath(real), ...tail.reverse())
-      break
+      return join(await realpath(real), ...tail.reverse())
     } catch {
       const parent = dirname(real)
-      if (parent === real) return false
+      if (parent === real) return undefined
       tail.push(basename(real))
       real = parent
     }
   }
+}
+
+/**
+ * Whether a path, as the file system resolves it, a link followed, is in one of the folders.
+ * A path or a folder that does not exist yet is judged by its nearest folder that does.
+ * @param {string} path
+ * @param {string[]} folders
+ */
+export async function inside(path, folders) {
+  const real = await resolved(path)
+  if (real === undefined) return false
   for (const folder of folders) {
-    const root = await realpath(resolve(folder)).catch(() => resolve(folder))
+    const root = (await resolved(folder)) ?? resolve(folder)
     const from = relative(root, real)
     // `..notes.png` is a name in the folder; only `..` itself, or a path through it, leaves it.
     if (!isAbsolute(from) && from !== '..' && !from.startsWith(`..${sep}`)) return true
@@ -423,6 +439,166 @@ export async function buildPackage(input, output, options = {}) {
     await pack.close()
     if (temporary) await rm(temporary, { recursive: true, force: true })
   }
+}
+
+/**
+ * Whether a media path a package's content names is one a read writes a file at, under its folder:
+ * names joined by `/`, none of them empty, `.` or `..`, and none with a character a file name
+ * cannot have on Windows, macOS or Linux. An archive is untrusted, and its content names paths.
+ * @param {string} path
+ */
+function writable(path) {
+  return path.split('/').every((name) => name !== '' && name !== '.' && name !== '..' && !/[\\:*?"<>|\u0000-\u001f]/.test(name))
+}
+
+/**
+ * A package read back into the source a build would take to make it again (#236), to change it and
+ * build it again: written into `folder`, made where it is not there, as `<name>.source.json`, with
+ * the package's media beside it at the paths the source names them by. Only the media the content
+ * names are written, and only under the folder, since an archive is untrusted: a file whose path
+ * is no name a read writes is left out of the source, which so names no file outside the folder,
+ * and a read that a link in the folder would take outside it writes nothing. Nothing is written
+ * over: where a name is taken, nothing is written, and what was written is taken away again where
+ * a later write fails.
+ * @param {string} file the package, a .h5p
+ * @param {string} folder
+ * @param {ReadOptions} [options]
+ * @returns {Promise<ReadResult>}
+ */
+export async function readPackage(file, folder, options = {}) {
+  const within = foldersOf(options.within)
+  const input = resolve(file)
+  const target = resolve(folder)
+  if (within && !(await inside(input, within))) throw new Error(`${input} is outside the folders this read may use`)
+  if (within && !(await inside(target, within))) throw new Error(`${target} is outside the folders this read may write in`)
+  const blob = await openAsBlob(input).catch((error) => {
+    throw new Error(`${input} cannot be read: ${error?.code === 'ENOENT' ? 'there is no such file' : error instanceof Error ? error.message : error}`)
+  })
+  const reader = new ZipReader(new BlobReader(blob))
+  try {
+    /** @type {Map<string, import('@zip.js/zip.js').FileEntry>} */
+    const entries = new Map()
+    try {
+      for (const entry of await reader.getEntries()) if (!entry.directory) entries.set(entry.filename, entry)
+    } catch (error) {
+      // zip.js refuses a name that leads out of the archive's folders, as `../` does.
+      if (error instanceof Error && error.message === ERR_UNSAFE_FILENAME) {
+        throw new Error(`${input} has an entry named ${JSON.stringify(/** @type {{ filename?: unknown }} */ (error).filename)}, which leads out of its folders: an archive like that is not read`)
+      }
+      throw new Error(`${input} is not a zip, as a .h5p is`, { cause: error })
+    }
+    const json = async (/** @type {string} */ name) => {
+      const entry = entries.get(name)
+      if (!entry) throw new Error(`${input} has no ${name}: it is not an H5P package`)
+      try {
+        return JSON.parse(await entry.getData(new TextWriter()))
+      } catch (error) {
+        throw new Error(`${name} in ${input} is not JSON`, { cause: error })
+      }
+    }
+    const saved = { manifest: await json('h5p.json'), content: await json('content/content.json') }
+    const pack = await openPack(options.libraries)
+    let read
+    try {
+      read = await readContent(pack, saved)
+    } finally {
+      await pack.close()
+    }
+    const notes = [...read.notes]
+    const output = join(target, `${basename(input).replace(/\.h5p$/i, '') || 'package'}.source.json`)
+    /** @type {{ entry: import('@zip.js/zip.js').FileEntry, to: string, path: string }[]} */
+    const media = []
+    /** @type {Set<string>} */
+    const unwritable = new Set()
+    for (const path of read.files) {
+      if (!writable(path)) {
+        // Such a path may lead anywhere, which a build of the source would read from.
+        unwritable.add(path)
+        notes.push({ path: 'params', message: `names the file ${JSON.stringify(path)}, which is no path a read writes a file at: left out of the source` })
+        continue
+      }
+      let decoded = path
+      try {
+        decoded = decodeURIComponent(path)
+      } catch {
+        // Not encoded: the name as it is.
+      }
+      const entry = entries.get(`content/${path}`) ?? entries.get(`content/${decoded}`)
+      if (!entry) notes.push({ path: 'params', message: `names the file ${path}, which is not in the package: a build of this source asks for it` })
+      else media.push({ entry, to: join(target, ...path.split('/')), path })
+    }
+    const source = unwritable.size ? /** @type {import('./build.mjs').Source} */ (withoutFiles(read.source, unwritable)) : read.source
+    // Every name looked at before anything is made, so a read that cannot write all of it writes
+    // nothing: none taken, and none that a link on the way, which the folder may hold, takes out
+    // of it. The archive names the paths.
+    for (const to of [output, ...media.map((each) => each.to)]) {
+      if (await lstat(to).then(() => true, () => false)) throw exists(to, 'a read')
+      if (!(await inside(to, [target]))) throw new Error(`${to} leads out of ${target} through a link on its way: a read writes only in its folder`)
+    }
+    /** @type {{ path: string, made: Made }[]} */
+    const made = []
+    /** @type {{ first: string, last: string }[]} the folders made, each `mkdir`'s from the first it made to the last */
+    const folders = []
+    /** @param {string} path */
+    const makeFolder = async (path) => {
+      const first = await mkdir(path, { recursive: true })
+      if (first) folders.push({ first, last: path })
+    }
+    /** @param {string} to @param {(file: import('node:fs/promises').FileHandle) => Promise<void>} write */
+    const create = async (to, write) => {
+      await makeFolder(dirname(to))
+      const handle = await open(to, 'wx').catch((error) => {
+        throw error?.code === 'EEXIST' ? exists(to, 'a read') : error
+      })
+      try {
+        const { dev, ino } = await handle.stat({ bigint: true })
+        made.push({ path: to, made: { dev, ino } })
+        await write(handle)
+      } finally {
+        await handle.close()
+      }
+    }
+    try {
+      await makeFolder(target)
+      for (const { entry, to } of media) {
+        // Through the handle itself: a stream made from it would hold it open past the last byte.
+        await create(to, (handle) => entry.getData(new WritableStream({
+          async write(chunk) {
+            for (let done = 0; done < chunk.length;) done += (await handle.write(chunk, done, chunk.length - done)).bytesWritten
+          }
+        })).then(() => undefined))
+      }
+      await create(output, (handle) => handle.writeFile(`${JSON.stringify(source, null, 2)}\n`))
+    } catch (error) {
+      await Promise.all(made.map(({ path, made: file }) => removeIfMade(path, file)))
+      // Then the folders it made, the deepest first, where they are empty: what another process has
+      // put in one since keeps it.
+      for (const { first, last } of folders.reverse()) {
+        for (let path = last; ; path = dirname(path)) {
+          await rmdir(path).catch(() => {})
+          if (path === first || dirname(path) === path) break
+        }
+      }
+      throw error
+    }
+    return { output, source, files: media.map((each) => each.path), notes }
+  } finally {
+    await reader.close()
+  }
+}
+
+/**
+ * A source without the files at `paths`: one in a list is taken out of it, any other left unwritten.
+ * @param {unknown} value
+ * @param {Set<string>} paths
+ * @returns {unknown}
+ */
+function withoutFiles(value, paths) {
+  /** @param {unknown} each */
+  const named = (each) => each !== null && typeof each === 'object' && typeof (/** @type {any} */ (each).path) === 'string' && paths.has(/** @type {any} */ (each).path)
+  if (Array.isArray(value)) return value.filter((each) => !named(each)).map((each) => withoutFiles(each, paths))
+  if (value === null || typeof value !== 'object') return value
+  return Object.fromEntries(Object.entries(value).filter(([, each]) => !named(each)).map(([key, each]) => [key, withoutFiles(each, paths)]))
 }
 
 /** The date on every entry of a bundle, as on the pack's parts: a bundle of the same pack is the same bytes. */

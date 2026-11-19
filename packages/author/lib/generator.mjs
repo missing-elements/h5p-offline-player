@@ -1,7 +1,8 @@
+import { writtenCopyright } from './media.mjs'
 import { checkMetadata } from './metadata.mjs'
 import { machineNameOf, namingKey } from './names.mjs'
 import { isInterfaceText } from './schema.mjs'
-import { allowedTags, markupText, plainText, stripTags, takesMarkup } from './text.mjs'
+import { allowedTags, blockTag, escapeText, markupText, plainText, stripTags, takesMarkup, unwrapText } from './text.mjs'
 
 /**
  * Content for a content type, made from its own `semantics.json` as H5P's editor saves a form:
@@ -140,6 +141,10 @@ export class ContentGenerator {
      *   where the source has it, and where the content does, outermost first
      */
     this.moved = []
+    /** @type {Record<string, any>[]} the files saved content names, as saved, collected as `written` writes them */
+    this.stored = []
+    /** @type {string[]} what `written` left out as H5P's editor started it for nobody: a list (`#started`), a default's content (`#unopened`) */
+    this.unfilled = []
   }
 
   /**
@@ -263,6 +268,181 @@ export class ContentGenerator {
     } finally {
       this.#other = outer
     }
+  }
+
+  /**
+   * Saved parameters written as a source writes them: the generation walked back (#236). Of each
+   * field, what this generator would write there with nothing written is left out. That is worked
+   * out at the field's own level, with the saved values beside it taken as written, so that a
+   * `showWhen` reads them as it reads a source; and with the libraries loaded in the content's
+   * language, so that an interface text equal to its translation drops out as any default does. A
+   * group, a list and sub-content are written as what differs within them; sub-content as its
+   * library's machine name, its parameters and its title, unless that is its content type's, which a
+   * build gives a part with none; a file as its path, and its copyright where it gives one. Every
+   * other value is written as it is stored: text, numbers, positions, a layout's ids. A part's id and
+   * the rest of its metadata are left out, since a build gives each part a new id and every part the
+   * source's licence and authors. The files are kept, as saved, in `stored`.
+   * @param {PackEntry} entry the content type's, as loaded for the content
+   * @param {unknown} saved its parameters, as `checkContent` returned them
+   * @returns {Record<string, any>}
+   */
+  written(entry, saved) {
+    return this.#writtenFields(entry.semantics ?? [], saved, [entry.library.machineName], 'params')
+  }
+
+  /**
+   * A level's saved values, as a source writes them: each that is not what its field holds when
+   * nothing is written for it, as `written` says.
+   * @param {any[]} fields
+   * @param {unknown} saved
+   * @param {string[]} stack
+   * @param {string} path
+   * @returns {Record<string, any>}
+   */
+  #writtenFields(fields, saved, stack, path) {
+    /** @type {Record<string, any>} */
+    const out = {}
+    if (!isObject(saved)) return out
+    this.#level(fields, saved, () => {
+      for (const field of fields) {
+        const value = saved[field.name]
+        if (value === undefined) continue
+        const shown = this.#shown(field)
+        const at = `${path}.${field.name}`
+        // In a written level, as a build generates it: nothing in it is taken as left closed.
+        const unwritten = this.#quietly(() => this.field(shown, undefined, stack, false, at))
+        // An empty text or choice where nothing is written is what H5P's editor saves for a field
+        // nobody filled, as `checkContent` takes it.
+        if (sameContent(value, unwritten) || (value === '' && unwritten === undefined)) continue
+        if (this.#started(shown, value, stack, at) || this.#unopened(shown, value, stack, at)) {
+          this.unfilled.push(at)
+          continue
+        }
+        out[field.name] = this.#writtenValue(shown, value, stack, at)
+      }
+    })
+    return out
+  }
+
+  /**
+   * Whether a saved list is one H5P's editor started for an author who never filled it: optional,
+   * and every item what an item is with nothing written, as the text track an Interactive Video's
+   * editor starts with, which has no file. `checkContent` asks nothing of such an item; a build
+   * asks it for what it lacks, so a source leaves the list out.
+   * @param {any} field
+   * @param {unknown} value
+   * @param {string[]} stack
+   * @param {string} path
+   */
+  #started(field, value, stack, path) {
+    if (field.type !== 'list' || !field.optional || !Array.isArray(value) || !value.length) return false
+    const item = this.#copy(field.field, { optional: false })
+    return this.#level([], {}, () => value.every((each, index) => sameContent(each, this.#quietly(() => this.field(item, undefined, stack, false, `${path}[${index}]`)))))
+  }
+
+  /**
+   * Whether saved sub-content is the content a field gives as its default, as the editor started it
+   * for an author who never opened it: Interactive Video's summary task, whose parameters, written
+   * as a source writes them, are nothing but empty items. `checkContent` asks nothing of it, a build
+   * leaves it as the editor does where nothing is written, and a source leaves it out.
+   * @param {any} field
+   * @param {unknown} value
+   * @param {string[]} stack
+   * @param {string} path
+   */
+  #unopened(field, value, stack, path) {
+    if (field.type !== 'library' || !isObject(field.default) || typeof field.default.library !== 'string' || !isObject(value) || typeof value.library !== 'string') return false
+    if (value.library.trim().split(/\s+/)[0] !== field.default.library.trim().split(/\s+/)[0]) return false
+    const counts = [this.stored.length, this.unfilled.length, this.notes.length]
+    try {
+      const written = this.#writtenPart(field, value, stack, path)
+      return isObject(written) && vacant(written.params)
+    } finally {
+      this.stored.length = counts[0]
+      this.unfilled.length = counts[1]
+      this.notes.length = counts[2]
+    }
+  }
+
+  /**
+   * A saved value as a source writes it for its field: a group, a list and sub-content as what
+   * differs within them, a file as its path and copyright, anything else as it is.
+   * @param {any} field
+   * @param {unknown} value
+   * @param {string[]} stack
+   * @param {string} path
+   * @returns {unknown}
+   */
+  #writtenValue(field, value, stack, path) {
+    switch (field.type) {
+      case 'group': {
+        const children = field.fields ?? []
+        // A group of one field is saved as that field's value, and still a level for `showWhen`.
+        if (children.length === 1 && !field.isSubContent) {
+          const [only] = children
+          return this.#level(children, { [only.name]: value }, () => this.#writtenValue(this.#shown(only), value, stack, path))
+        }
+        if (!isObject(value)) return structuredClone(value)
+        if (field.widget && field.widget !== 'showWhen' && field.widget !== 'none') this.#draw(children)
+        return this.#writtenFields(children, value, stack, path)
+      }
+      case 'list': {
+        if (!Array.isArray(value)) return structuredClone(value)
+        const item = this.#copy(field.field, { optional: false })
+        // Every item is written, an item with its defaults alone as what makes it: `{}` for a group.
+        return this.#level([], {}, () => value.map((each, index) => this.#writtenValue(item, each, stack, `${path}[${index}]`)))
+      }
+      case 'library':
+        return this.#writtenPart(field, value, stack, path)
+      case 'image':
+      case 'file':
+      case 'video':
+      case 'audio':
+        return Array.isArray(value) ? value.map((each, index) => this.#writtenFile(each, `${path}[${index}]`)) : this.#writtenFile(value, path)
+      case 'text':
+        // Markup that is only the blocks a build wraps typing in is written as the typing.
+        return typeof value === 'string' && takesMarkup(field) ? unwrapText(value, blockTag(field)) ?? value : value
+      default:
+        return structuredClone(value)
+    }
+  }
+
+  /**
+   * Saved sub-content as a source writes it: its library by machine name, with its version only
+   * where the field takes more than one major of it; its parameters as what differs from their
+   * defaults; and its title, unless that is its content type's, which a build gives a part with
+   * none.
+   * @param {any} field
+   * @param {unknown} value
+   * @param {string[]} stack
+   * @param {string} path
+   */
+  #writtenPart(field, value, stack, path) {
+    if (!isObject(value) || typeof value.library !== 'string') return structuredClone(value)
+    const match = /^\s*(\S+)\s+(\d+)\.(\d+)\s*$/.exec(value.library)
+    const entry = match ? this.find(match[1], Number(match[2])) : null
+    if (!match || !entry) return { library: value.library, params: structuredClone(value.params ?? {}) }
+    const majors = new Set(libraryOptions(field).filter((option) => option.machineName === match[1]).map((option) => option.major))
+    const library = majors.size > 1 ? `${match[1]} ${match[2]}.${match[3]}` : match[1]
+    const params = this.#writtenFields(entry.semantics ?? [], value.params, [...stack, match[1]], `${path}.params`)
+    const title = isObject(value.metadata) ? value.metadata.title : undefined
+    const own = typeof title === 'string' && title.trim() !== '' && title !== escapeText(String(entry.library.title ?? match[1]))
+    return { library, params, ...(own ? { metadata: { title } } : {}) }
+  }
+
+  /**
+   * A saved file as a source writes it: its path, and its copyright where it gives one
+   * (`writtenCopyright`), less a part a build refuses, which is noted. Kept as saved in `stored`.
+   * @param {unknown} value
+   * @param {string} path
+   */
+  #writtenFile(value, path) {
+    if (!isObject(value) || typeof value.path !== 'string') return structuredClone(value)
+    this.stored.push(value)
+    const copyright = writtenCopyright(value.copyright, (key, kept) => this.note(`${path}.copyright.${key}`, key === 'license'
+      ? `${JSON.stringify(kept)} is no licence H5P lists for a file: left out, with any version, so a build gives the file "U"`
+      : `${JSON.stringify(kept)} is no web address: left out`))
+    return { path: value.path, ...(copyright ? { copyright } : {}) }
   }
 
   /** A sub-content id: random, or the caller's, numbered, where it wants the same bytes every run. */
@@ -1086,6 +1266,36 @@ function holds(field, value) {
   if (field.type !== 'group' || ((field.fields ?? []).length === 1 && !field.isSubContent)) return true
   return isObject(value) && (field.fields ?? []).some((/** @type {any} */ child) =>
     !child.optional && child.default === undefined && child.type !== 'boolean' && holds(child, value[child.name]))
+}
+
+/**
+ * Whether written content holds nothing but empty objects and lists: items an editor started and
+ * nobody filled.
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function vacant(value) {
+  if (Array.isArray(value)) return value.every(vacant)
+  return isObject(value) && Object.values(value).every(vacant)
+}
+
+/**
+ * Whether two values are the same content: equal, but for what a build gives each part anew, its
+ * id and its metadata. A key whose value is `undefined` is no key, and nor is one whose value is
+ * empty text, which H5P's editor saves for a field nobody filled.
+ * @param {unknown} a
+ * @param {unknown} b
+ * @returns {boolean}
+ */
+function sameContent(a, b) {
+  if (Object.is(a, b)) return true
+  if (Array.isArray(a) || Array.isArray(b)) return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((each, i) => sameContent(each, b[i]))
+  if (!isObject(a) || !isObject(b)) return false
+  const part = typeof a.library === 'string' || typeof b.library === 'string'
+  /** @param {Record<string, any>} object */
+  const keys = (object) => Object.keys(object).filter((key) => object[key] !== undefined && object[key] !== '' && key !== 'subContentId' && !(part && key === 'metadata'))
+  const own = keys(a)
+  return own.length === keys(b).length && own.every((key) => sameContent(a[key], b[key]))
 }
 
 /**

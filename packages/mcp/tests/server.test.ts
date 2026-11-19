@@ -1,4 +1,4 @@
-import { access, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { Client } from '@modelcontextprotocol/client'
@@ -50,10 +50,10 @@ afterAll(async () => {
 })
 
 describe('the server', () => {
-  it('offers three tools and the flow, in few words', async () => {
+  it('offers four tools and the flow, in few words', async () => {
     const { tools } = await client.listTools()
-    expect(tools.map((tool) => tool.name).sort()).toEqual(['h5p_build', 'h5p_preview', 'h5p_types'])
-    expect(client.getInstructions()).toMatch(/h5p_types[\s\S]*h5p_build[\s\S]*h5p_preview/)
+    expect(tools.map((tool) => tool.name).sort()).toEqual(['h5p_build', 'h5p_preview', 'h5p_read', 'h5p_types'])
+    expect(client.getInstructions()).toMatch(/h5p_types[\s\S]*h5p_build[\s\S]*h5p_preview[\s\S]*h5p_read/)
     // A source's own fields as the author package declares them, before one is written (#230),
     // with nothing required or forbidden, so no app refuses a source the build would read (#174).
     const source = tools.find((tool) => tool.name === 'h5p_build')?.inputSchema.properties?.source as Record<string, any>
@@ -148,6 +148,67 @@ describe('h5p_build', () => {
     expect(answer.isError).toBe(true)
     // A model cannot know the folders, so the refusal names them and the way out.
     expect(textOf(answer)).toContain(`outside the folders this server may write in: ${folder}. Give a file name alone, or leave output out.`)
+  })
+})
+
+describe('h5p_read', () => {
+  /** A picture of one pixel, which a build reads the size of. */
+  const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
+
+  it('reads a package back into its source in a new folder beside it, its files named where they were written, to build again', async () => {
+    await writeFile(join(folder, 'pixel.png'), PIXEL)
+    const picture = { library: 'H5P.Image', params: { file: { path: 'pixel.png' }, alt: 'A pixel' } }
+    const source = { ...SOURCE, type: 'H5P.Column', title: 'One pixel', params: { content: [{ content: picture }] } }
+    const built = builtOf(await call('h5p_build', { source, verify: false }))
+    expect(built).toBe(join(folder, 'one-pixel.h5p'))
+    const answer = await call('h5p_read', { package: 'one-pixel.h5p' })
+    const text = textOf(answer)
+    expect(answer.isError).toBeFalsy()
+    const beside = join(folder, 'one-pixel')
+    expect(text).toContain(`Read ${built}: H5P.Column. Its source is in ${join(beside, 'one-pixel.source.json')}, with its 1 media file beside it.`)
+    const read = JSON.parse(text.split('\n').at(-1)!)
+    expect(read).toMatchObject({ type: 'H5P.Column', title: 'One pixel', params: { content: [{ content: { library: 'H5P.Image', params: { alt: 'A pixel' } } }] } })
+    // Where it was written, read by a build wherever its package goes: the source file, written
+    // beside it, names it from there.
+    const written = JSON.parse(await readFile(join(beside, 'one-pixel.source.json'), 'utf8'))
+    const path = read.params.content[0].content.params.file.path
+    expect(path).toBe(join(beside, ...written.params.content[0].content.params.file.path.split('/')))
+    await access(path)
+    const again = builtOf(await call('h5p_build', { source: { ...read, title: 'One pixel, again' }, verify: false }))
+    expect(again).toBe(join(folder, 'one-pixel-again.h5p'))
+    // Read again, it takes a folder of its own: nothing is written over.
+    expect(textOf(await call('h5p_read', { package: 'one-pixel.h5p' }))).toContain(`Its source is in ${join(folder, 'one-pixel-2', 'one-pixel.source.json')}`)
+  })
+
+  it('names a file the package lacks in the folder it read into, so a build looks for it there and nowhere else', async () => {
+    await writeFile(join(folder, 'pixel.png'), PIXEL)
+    const picture = { library: 'H5P.Image', params: { file: { path: 'pixel.png' }, alt: 'A pixel' } }
+    const built = builtOf(await call('h5p_build', { source: { ...SOURCE, type: 'H5P.Column', title: 'Lost pixel', params: { content: [{ content: picture }] } }, verify: false }))!
+    // The picture's entry renamed, as a package made elsewhere may lack a file its content names.
+    const bytes = (await readFile(built)).toString('latin1')
+    const entry = /content\/(images\/[^/\0]+?)\.png/.exec(bytes)![1]
+    await writeFile(join(folder, 'lost.h5p'), Buffer.from(bytes.replaceAll(`content/${entry}.png`, `content/${entry}.pnx`), 'latin1'))
+    // Where a build given the package's path alone would look.
+    await mkdir(join(folder, 'images'), { recursive: true })
+    await writeFile(join(folder, `${entry}.png`), PIXEL)
+    const text = textOf(await call('h5p_read', { package: 'lost.h5p' }))
+    expect(text).toContain(`Note: params names the file ${entry}.png, which is not in the package: a build of this source asks for it`)
+    const read = JSON.parse(text.split('\n').at(-1)!)
+    expect(read.params.content[0].content.params.file.path).toBe(join(folder, 'lost', ...`${entry}.png`.split('/')))
+    const again = await call('h5p_build', { source: { ...read, title: 'Lost pixel, again' }, verify: false })
+    expect(builtOf(again)).toBeUndefined()
+    expect(textOf(again)).toContain('no such file in the folders this build may read')
+  })
+
+  it('refuses a package outside its folders, and says why one is refused', async () => {
+    await writeFile(join(elsewhere, 'outside.h5p'), 'not a package')
+    const outside = await call('h5p_read', { package: join(elsewhere, 'outside.h5p') })
+    expect(outside.isError).toBe(true)
+    expect(textOf(outside)).toContain('is not in a folder this server may use.')
+    await writeFile(join(folder, 'broken.h5p'), 'not a package')
+    const broken = await call('h5p_read', { package: 'broken.h5p' })
+    expect(broken.isError).toBe(true)
+    expect(textOf(broken)).toContain('is not a zip, as a .h5p is')
   })
 })
 

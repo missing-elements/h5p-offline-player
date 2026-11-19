@@ -182,6 +182,32 @@ export function hasMarkup(value) {
 }
 
 /**
+ * Plain text as a markup field's editor stores what an author types: escaped, in a block per
+ * paragraph, a blank line between two, and a `<br>` for each other line break.
+ * @param {string} value
+ * @param {string} block `p` or `div`, as `blockTag` says for the field
+ */
+export function wrapText(value, block) {
+  const paragraphs = value.trim().split(/\r?\n[ \t]*(?:\r?\n)+/).filter((paragraph) => paragraph.trim())
+  return paragraphs.map((paragraph) => `<${block}>${escapeText(paragraph.trim()).replace(/\r?\n/g, '<br>')}</${block}>`).join('')
+}
+
+/**
+ * Stored markup as the plain text an author would type for it, where `wrapText` makes exactly that
+ * markup of it again: blocks and line breaks alone, entities kept, which a build keeps. Otherwise
+ * `undefined`: the markup is what a source writes.
+ * @param {string} value
+ * @param {string} block the field's, as `blockTag` says
+ * @returns {string | undefined}
+ */
+export function unwrapText(value, block) {
+  const blocks = value.match(new RegExp(`^(?:<${block}>[^<]*(?:<br>[^<]*)*</${block}>)+$`)) && value.split(`</${block}>`).slice(0, -1)
+  if (!blocks) return undefined
+  const plain = blocks.map((each) => each.slice(block.length + 2).replaceAll('<br>', '\n')).join('\n\n')
+  return wrapText(plain, block) === value ? plain : undefined
+}
+
+/**
  * A markup field's value as it is stored. Plain text is escaped and wrapped in the field's block,
  * a paragraph per blank line and a `<br>` per other line break. Markup is checked: a tag the field
  * does not take, an event handler, a style the field does not allow, a script URL or a comment is
@@ -194,12 +220,7 @@ export function hasMarkup(value) {
  */
 export function markupText(value, field, report, { saved = false } = {}) {
   const tags = allowedTags(field) ?? new Set()
-  if (!hasMarkup(value) && !saved) {
-    const block = blockTag(field)
-    const paragraphs = value.trim().split(/\n[ \t]*\n+/).filter((paragraph) => paragraph.trim())
-    if (!paragraphs.length) return ''
-    return paragraphs.map((paragraph) => `<${block}>${escapeText(paragraph.trim()).replace(/\r?\n/g, '<br>')}</${block}>`).join('')
-  }
+  if (!hasMarkup(value) && !saved) return wrapText(value, blockTag(field))
   const styles = stylePatterns(field)
   // Each thing said once, however often the value repeats it: an opening tag and its closing one.
   const said = new Set()

@@ -5,8 +5,9 @@ type, and only the fields that differ from its defaults. The rest comes from the
 `semantics.json` and their translations for the content's language; the libraries come from
 [@missing-elements/h5p-libraries](https://www.npmjs.com/package/@missing-elements/h5p-libraries),
 the pack this release pins, each checked against the pack's SHA-256 index. No H5P server, no
-editor, no network but for media named by web address. Needs Node 22 or later; write `@latest`,
-since without it npm on an older Node quietly installs an older release.
+editor, no network but for media named by web address. `read` turns a package back into its
+source, to change it and build it again. Needs Node 22 or later; write `@latest`, since without it
+npm on an older Node quietly installs an older release.
 
 ```bash
 npx @missing-elements/h5p-author@latest build rivers.json rivers.h5p
@@ -147,6 +148,33 @@ packs them as the zips chat apps install, and lists the build tool and each bund
 skill's route 3, from two files, fetches at
 [missing-elements.github.io/h5p/skill/](https://missing-elements.github.io/h5p/skill/).
 
+## A package back to its source
+
+```bash
+npx @missing-elements/h5p-author@latest read rivers.h5p rivers
+```
+
+```
+Read /work/rivers.h5p: H5P.Blanks. Wrote its source to /work/rivers/rivers.source.json.
+Change it, then build it again: h5p-author build rivers/rivers.source.json <output.h5p>
+```
+
+The source holds what a build takes to make the package again: the content type and the metadata
+from its `h5p.json`, and of its content only what differs from the defaults, interface texts in the
+content's language included. Its pictures, videos and other files go beside the source, at the
+paths it names them by. Positions and sizes are kept, so a slide or a video keeps its layout. Each
+part gets a new id when it is built again.
+
+It reads content made for the pack's versions of its libraries, and refuses any other, naming both
+versions. H5P moves content to a newer version as it plays it, so a package saved again on a site
+that has the pack's versions reads. What a source has no field for, or no form of, is said and left
+out: the author's comments, the change log, a part's own licence or authors (a build gives every
+part the source's), a file's licence that H5P does not list. The source is built again in memory
+before it is written, and what would not come back as it is, or what a build would refuse, such as
+styles pasted from Word, is said, to fix before building. It never writes over a file. An archive
+is untrusted: only the files its content names are written, only under the folder, and a file
+named by a path that could lead out of it is left out of the source.
+
 ## A content type's bundle
 
 ```bash
@@ -211,6 +239,12 @@ const folder = resolve('work')
 const source = JSON.parse(await readFile(join(folder, 'rivers.json'), 'utf8'))
 const { outline } = await buildPackage(source, join(folder, 'rivers.h5p'), { base: folder, within: [folder], fetch: publicFetch })
 ```
+
+`readPackage(file, folder, { libraries, within })` reads a package back into its source, as
+`h5p-author read` does, and returns `{ output, source, files, notes }`: the source's path, the
+source, the media written beside it by the paths it names them by, and what was left out or would
+not come back as it is, each `{ path, message }`. With `within`, the package and the folder must be
+inside those folders, on their real paths.
 
 A result's `libraries` are the folders the package
 plays with, `install` those carried for an H5P site's upload check. `missingForInstall(libraries)`
@@ -343,8 +377,8 @@ the package's main export has them. A tool beside a build in either imports it f
 
 It checks structure, not pedagogy: whether the answers are right, the questions fair, or the
 pictures placed well is for a person to judge, in
-[h5p-verify](https://www.npmjs.com/package/@missing-elements/h5p-verify)'s `--preview`. It does not
-edit an existing package itself: `checkContent` is the check for a tool that does. The licence of
-each library is in the pack's `libraries.txt`.
+[h5p-verify](https://www.npmjs.com/package/@missing-elements/h5p-verify)'s `--preview`. It changes an
+existing package only by way of its source, read and built again; `checkContent` is the check for a
+tool that changes one in place. The licence of each library is in the pack's `libraries.txt`.
 
 MIT.
