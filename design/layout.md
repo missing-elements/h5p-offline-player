@@ -32,7 +32,8 @@ packages/author/       a playable .h5p from a short source: lib/build.mjs both b
                        Node's, generator.mjs content from semantics, check.mjs, outline.mjs,
                        types.mjs the editor widgets' rules, mistakes.mjs the notes of what is
                        almost surely a mistake, read.mjs a package back to a source;
-                       scripts/ the skill's sync and copy
+                       scripts/ the skill's sync and copy, and build-tool.mjs the command line
+                       as one file (dist/)
 packages/mcp/          the local MCP server: bin/h5p-mcp.mjs the command, lib/server.mjs its four
                        tools, lib/folders.mjs the folders it may use
 packages/cmi5/         the element as a cmi5 AU: src/index.ts startCmi5, src/client.ts the protocol

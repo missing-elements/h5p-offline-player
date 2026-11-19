@@ -38,8 +38,9 @@ const sized = (bytes) => (bytes < 1_000_000 ? `${Math.max(1, Math.round(bytes / 
 
 /**
  * This package's version, from its package.json where the package is installed. The command line
- * as one file, which the organisation's site bundles, has no package.json of its own beside it, and
- * the one above it may be another's: there it is the copy its bundler wrote in from the import.
+ * as one file (`scripts/build-tool.mjs`), copied out of the package, has no package.json of its own
+ * beside it, and the one above it may be another's: there it is the copy its bundler wrote in from
+ * the import.
  * The file comes first, since Node before 22.12 warns on a JSON import.
  */
 async function ownVersion() {

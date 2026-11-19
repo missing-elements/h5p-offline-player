@@ -226,3 +226,22 @@ describe('the bundle command', () => {
     // Every content type's bundle, written twice: 2.2 s here, past vitest's 5 s once on a slow runner (#242).
   }, 20_000)
 })
+
+describe('the command line as one file', () => {
+  // Route 3's two files (#247): the tool as the package ships it, and a bundle, unzipped in a
+  // folder with no package.json above it and nothing installed, as a chat's sandbox has them.
+  it('builds from a bundle where nothing is installed, and says its versions', async () => {
+    const built = join(dir, 'tool')
+    await exec(process.execPath, [resolve(import.meta.dirname, '../scripts/build-tool.mjs'), built])
+    expect(await readFile(join(built, 'h5p-author-LICENSES.txt'), 'utf8')).toMatch(/^## @zip\.js\/zip\.js - [\d.]+ \(BSD-3-Clause\)$/m)
+    const sandbox = await unzip((await writeBundle('H5P.QuestionSet', join(dir, 'route3.zip'))).output, 'route3')
+    await copyFile(join(built, 'h5p-author.mjs'), join(sandbox, 'h5p-author.mjs'))
+    const version = async (path: string) => JSON.parse(await readFile(path, 'utf8')).version
+    const { stdout: versions } = await exec(process.execPath, ['h5p-author.mjs', '--version'], { cwd: sandbox })
+    expect(versions).toBe(`@missing-elements/h5p-author ${await version(resolve(import.meta.dirname, '../package.json'))}, library pack ${await version(join(parts, '../package.json'))}\n`)
+    await writeFile(join(sandbox, 'quiz.json'), JSON.stringify(QUIZ))
+    const { stdout } = await exec(process.execPath, ['h5p-author.mjs', 'build', 'quiz.json', 'quiz.h5p', '--libraries', 'parts'], { cwd: sandbox })
+    expect(stdout).toMatch(/^Built \S+quiz\.h5p: H5P\.QuestionSet, \d+ libraries from the pack in parts, \d+ more for installing on an H5P site\.\n/)
+    expect((await stat(join(sandbox, 'quiz.h5p'))).size).toBeGreaterThan(0)
+  }, 60_000)
+})

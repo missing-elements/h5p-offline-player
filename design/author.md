@@ -294,11 +294,19 @@ text to the content check's rules, and `apps/skills` plays every example untrust
   in a bundle: H5P.MathDisplay, 2.8 MB, is fetched where text holds math. With pack 1.1.0 a
   question type's bundle is 0.6 to 1.5 MB, a Question Set's 2.6, a container's 4.3 to 8.4, and
   the 55 types' 99 MB in all, more than jsDelivr's 50 MB cap, so the organisation's site serves
-  them at `/h5p/bundles/`. The build tool beside them is the command line as one file, 575 kB,
+  them at `/h5p/bundles/`. The build tool beside them is the command line as one file, 756 kB,
   which builds from an unzipped bundle with nothing installed. Its version is an import the
   bundler writes into the file; where the packages are installed their `package.json` files are
   read first, since Node before 22.12 warns on a JSON import, and a `package.json` above the one
   file that is not this package's is passed over.
+- **This package builds the one-file tool, and the site serves it as shipped** (#247). `prepack`
+  runs `scripts/build-tool.mjs`. It bundles the command line and everything it imports with Vite
+  into `dist/h5p-author.mjs`, writes `dist/h5p-author-LICENSES.txt` beside it, and checks that its
+  `--version` names this package's and its pack's. Up to author 0.13.0 the site's own Vite built
+  it, so the site's build tools and their updates were in the path of every byte route 3 runs, and
+  nothing published covered them. Now the npm package does, with its provenance once publishing
+  moves to CI (#246). The skill names no hash of the file: checking one would add a command to
+  every run of route 3, and copies of the skill installed earlier would stop at each release.
 - **A preview inside Claude is the desktop app's browser panel, not a card.** A connector's card
   in Claude is an iframe under Claude's policy: it can register no worker, and Claude drops
   `frameDomains`, so neither the player's page nor a YouTube frame opens in it. The desktop app's

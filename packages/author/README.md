@@ -147,7 +147,10 @@ serve the skill from the release it pins:
 [missing-elements.github.io](https://missing-elements.github.io/h5p/create-with-ai/#install)
 packs them as the zips chat apps install, and lists the build tool and each bundle that the
 skill's route 3, from two files, fetches at
-[missing-elements.github.io/h5p/skill/](https://missing-elements.github.io/h5p/skill/).
+[missing-elements.github.io/h5p/skill/](https://missing-elements.github.io/h5p/skill/). The build
+tool is in the package too: `dist/h5p-author.mjs` is the command line as one file, everything it
+imports bundled in, and `dist/h5p-author-LICENSES.txt` lists those packages' licences. The site
+serves both as the release has them.
 
 ## A package back to its source
 
