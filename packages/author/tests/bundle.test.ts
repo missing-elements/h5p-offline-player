@@ -223,5 +223,6 @@ describe('the bundle command', () => {
 
     await expect(exec(process.execPath, [bin, 'bundle', 'H5P.TrueFalse'])).rejects.toMatchObject({ code: 1, stderr: expect.stringContaining('bundle takes a content type and an output') })
     await expect(exec(process.execPath, [bin, 'bundle', '--markdown', 'H5P.TrueFalse', 'x.zip'])).rejects.toMatchObject({ code: 1, stderr: expect.stringContaining('bundle does not take --markdown') })
-  })
+    // Every content type's bundle, written twice: 2.2 s here, past vitest's 5 s once on a slow runner (#242).
+  }, 20_000)
 })

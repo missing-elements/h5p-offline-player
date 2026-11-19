@@ -29,6 +29,7 @@ describe("the skills' front matter", () => {
     }
     expect(fields.get('name')).toBe(name)
     expect(name).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+    expect(name.length).toBeLessThanOrEqual(64)
     expect(fields.get('description')?.length).toBeGreaterThan(0)
     expect(fields.get('description')!.length).toBeLessThanOrEqual(1024)
   })
