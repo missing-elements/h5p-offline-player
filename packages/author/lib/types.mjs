@@ -13,11 +13,13 @@ import { stripTags } from './text.mjs'
  * - `read` turns what the two wrote back into what a source writes, for a package read back
  *   into a source (#236), run on that source's parameters;
  * - `sets` names the hidden fields the layout sets, which the schema leaves out;
- * - `optional` names fields the semantics call required that the content plays without, and the
- *   editor never asks for.
+ * - `optional` names fields the semantics call required that the content plays without, which the
+ *   editor never asks for or an editor other than the pinned one leaves out;
+ * - `decimals` names number fields that take decimals their semantics do not give, and how many,
+ *   where an editor other than the pinned one writes them and the content plays them.
  *
- * Paths in `sets` and `optional` are dotted, `[]` for a list's item, relative to the type's own
- * parameters.
+ * Paths in `sets`, `optional` and `decimals` are dotted, `[]` for a list's item, relative to the
+ * type's own parameters.
  *
  * The widgets followed are the newest release of the minor each content type in the pack names in
  * its `editorDependencies`: H5PEditor.InteractiveVideo 1.26.3 (h5p/h5p-editor-interactive-video at
@@ -42,7 +44,8 @@ import { stripTags } from './text.mjs'
  *   after?: (params: any, path: string, context: LayoutContext) => void,
  *   read?: (written: any, path: string, context: LayoutContext) => void,
  *   sets?: string[],
- *   optional?: string[]
+ *   optional?: string[],
+ *   decimals?: Record<string, number>
  * }} Layout
  */
 
@@ -821,6 +824,27 @@ const dragText = {
 /** @type {Layout} */
 const video = { optional: ['visuals.poster'] }
 
+/* ---------------------------------------------------------------- Row */
+
+/**
+ * A row's columns, each a share of its width in percent. The standard form refuses a decimal typed
+ * into one, the field giving no `decimals`, and no editor in the pack sets them; but H5P.com's own
+ * editor writes them in hundredths, as the owner's package from there holds (24.76, 62.56), H5P's
+ * content check keeps them, and the library plays one as a CSS width. So a share takes two
+ * decimals, and such a package builds again after a read (#242).
+ * @type {Layout}
+ */
+const row = { decimals: { 'columns[].width': 2 } }
+
+/**
+ * A row's column with nothing in it, which H5P.com's editor leaves as a spacer, as the owner's
+ * package from there holds (two of three columns empty, the third between them). H5P's content
+ * check takes the empty list out, and the library plays a column with no content as an empty one
+ * (`params.content === undefined` becomes `[]`), so a source may leave it out (#242).
+ * @type {Layout}
+ */
+const rowColumn = { optional: ['content'] }
+
 /** @type {Record<string, Layout>} */
 export const LAYOUTS = {
   'H5P.QuestionSet': questionSet,
@@ -832,11 +856,14 @@ export const LAYOUTS = {
   'H5P.BranchingScenario': branchingScenario,
   'H5P.GameMap': gameMap,
   'H5P.ImageHotspotQuestion': imageHotspotQuestion,
-  'H5P.Video': video
+  'H5P.Video': video,
+  'H5P.Row': row,
+  'H5P.RowColumn': rowColumn
 }
 
 /**
- * Semantics with the fields a layout makes optional marked so, for a copy the generator reads.
+ * Semantics with the fields a layout makes optional marked so, and those it gives decimals given
+ * them, for a copy the generator reads.
  * @param {string} machineName
  * @param {any[]} semantics
  */
@@ -845,6 +872,10 @@ export function patchSemantics(machineName, semantics) {
   for (const path of layout?.optional ?? []) {
     const field = fieldAt(semantics, path.replace(/\[\]/g, '').split('.'))
     if (field) field.optional = true
+  }
+  for (const [path, decimals] of Object.entries(layout?.decimals ?? {})) {
+    const field = fieldAt(semantics, path.replace(/\[\]/g, '').split('.'))
+    if (field) field.decimals = decimals
   }
   return semantics
 }

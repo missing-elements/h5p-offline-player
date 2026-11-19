@@ -197,9 +197,9 @@ text to the content check's rules, and `apps/skills` plays every example untrust
   - Only content for the pack's major.minor of every library it names is read; any other is
     refused with both versions named, since moving it is the library's own upgrade, the runtime's
     (GPL). Of the owner's 88 real packages, 58 were refused so, mostly Interactive Video 1.27 and
-    Course Presentation 1.25 and 1.26. Of the other 30, 26 build as read; 4 need what their notes
-    name: pictures missing from the package, styles pasted from Word, a question with one answer,
-    and H5P.Row's column widths with decimals, which its editor sets and the number rule refuses.
+    Course Presentation 1.25 and 1.26. Of the other 30, 27 build as read; 3 need what their notes
+    name: pictures missing from the package, styles pasted from Word, and a question with one
+    answer.
   - What a source has no field for is said and left out: the author's comments, the change log,
     the licence's extra terms, and a part's own licence or authors, a build giving every part the
     source's.
@@ -253,7 +253,10 @@ text to the content check's rules, and `apps/skills` plays every example untrust
   each rule's script. To move to a newer editor: diff those scripts between the pinned version and
   the new one, port what changed, move the commits named in the two files, and run the author's
   tests and `apps/skills`'. One departure (#162): a multiple of a fractional step is taken within a
-  rounding error, where the editor's `%` refuses 0.3 in steps of 0.1.
+  rounding error, where the editor's `%` refuses 0.3 in steps of 0.1. Two more (#242), for what
+  H5P.com's own editor writes, H5P's content check keeps and the library plays: H5P.Row's column
+  widths take two decimals, and a row's column may be left empty, a spacer (a layout's `decimals`
+  and `optional`); the owner's package from H5P.com builds again after a read.
 - **A package installs on an H5P site** (#146). H5P core's upload check wants every library a
   package carries to have its preloaded, dynamic and editor dependencies with it at the exact
   major.minor, or installed on the site; a fresh Moodle refused 28 of 32 examples without them (see
@@ -423,6 +426,15 @@ text to the content check's rules, and `apps/skills` plays every example untrust
     the build archive attached (route 1, `references/build/archive.md`), npm (route 2, `npm.md`),
     Node (route 3, `two-files.md`), anything else (route 4, `browser.md`). Routes 1 to 3 hand over
     by `built-here.md`: the build's problems, the verifier where npm answered, and the hand-over.
+  - A package the user has is changed by `references/change.md` (#242), in place of steps 1 and 2,
+    asking nothing: read by the tool of the first route that holds (route 3 fetches the bundle of
+    the type the package's `h5p.json` names; route 4 cannot read one), the source changed as asked,
+    built by the same route from the read folder, and handed over as any build. The description
+    leads with it. Given a quiz.h5p and the build archive and asked for two harder questions,
+    Haiku in Claude Code opened the skill in 1 of 3 runs with "or change an .h5p" at the
+    description's end, and in the other 2 edited `content.json` and zipped it by hand; with it
+    first, and "never edit or zip one by hand", in 3 of 3, each reading, changing and building
+    with the tool, at about $0.014 a run.
 
   A chat reads `SKILL.md` and its route's file, where every chat read all four routes, 18.9 KB,
   before.

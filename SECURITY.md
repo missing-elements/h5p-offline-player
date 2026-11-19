@@ -83,6 +83,12 @@ model may have written:
   app's roots, as they are given. Given none, it uses Desktop, Documents and
   Downloads, and never the home folder whole. It never writes over a file, and
   its preview serves one package on `127.0.0.1` until its tab is closed.
+- A read (`readPackage`, `h5p-author read`, the MCP server's `h5p_read`) takes
+  the archive as untrusted. It writes only the files the content names, only in
+  its folder, with every path checked before anything is made, so a link in the
+  folder that leads out of it stops the read; never over a file; and it leaves
+  out of the source a file named by a path that could lead out of the folder.
+  An archive with an entry leading out of its folders is not read.
 
 Reports are particularly helpful for issues such as:
 
@@ -100,7 +106,8 @@ Reports are particularly helpful for issues such as:
   lifecycle safeguards;
 - a build confined by `within` that reads or writes outside its folders or
   writes over a file, `publicFetch` reaching a local network by an address it
-  should refuse, or the MCP server reaching a file outside its folders;
+  should refuse, a read that writes outside its folder or over a file, or the
+  MCP server reaching a file outside its folders;
 - vulnerabilities in the published player, runtime, library bundle, normalizer,
   verifier, author package, MCP server, cmi5 package, embed site writer, demo,
   or installable app.
