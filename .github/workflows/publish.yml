@@ -59,10 +59,11 @@ jobs:
       # The author, verify, mcp and embed packages' prepublishOnly run browser tests, as ci.yml's
       # test jobs do, and install Chromium the same way.
       - run: pnpm --filter @missing-elements/h5p-offline-player exec playwright install chromium
-      # One package at a time, as ci.yml's test jobs run them. Without git checks: prepack writes
-      # files into the tree (types/, the licence, the skill), and the environment already holds
-      # the run to main.
-      - run: pnpm -r --workspace-concurrency=1 publish --access public --no-git-checks $DRY_RUN
+      # A recursive publish goes one package at a time, in dependency order, and `publish` takes no
+      # --workspace-concurrency: given it, pnpm stopped on the unknown option before publishing
+      # anything (the first run). Without git checks: prepack writes files into the tree (types/,
+      # the licence, the skill), and the environment already holds the run to main.
+      - run: pnpm -r publish --access public --no-git-checks $DRY_RUN
         env:
           NPM_CONFIG_PROVENANCE: true
           DRY_RUN: ${{ inputs.dry-run && '--dry-run' || '' }}
