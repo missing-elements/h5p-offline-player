@@ -1,6 +1,6 @@
 {
   "name": "@missing-elements/h5p-libraries",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "The H5P hub's runtime libraries for every content type it serves, for <h5p-player>'s `libraries` attribute: one archive per library, which the player fetches as a package needs them, and the whole pack as one .h5p. With them, the editor libraries an H5P site's upload check wants, for h5p-author.",
   "license": "SEE LICENSE IN libraries.txt",
   "repository": {

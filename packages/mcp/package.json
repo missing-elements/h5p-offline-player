@@ -1,6 +1,6 @@
 {
   "name": "@missing-elements/h5p-mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "H5P Author MCP by Missing Elements: a local MCP server that builds playable H5P packages of any content type from a short source, checks them in a real player and opens them in the person's browser. No H5P server needed.",
   "license": "MIT",
   "repository": {
