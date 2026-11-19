@@ -144,7 +144,10 @@ publishes every package whose version npm lacks, as `pnpm -r publish` finds them
 order, one at a time, passing over a version npm has. npm takes the ID token GitHub gives the run
 in place of an access token, so none is stored, and records each package's provenance, the run and
 the commit its tarball came from. Each package's trusted publisher on npmjs.com names the file and
-the environment. pnpm publishes through npm, which takes that token from 11.5.1, so the job runs
+the environment, and ticks `npm publish` under Allowed actions: one created after 2026-09-03
+allows only `npm stage publish` until it is ticked, and the registry refuses a publish with "403
+OIDC permission denied for this action" after the token exchange has worked (the second run, on
+2026-11-19). A new one expires unless a publish through it succeeds within 2 days. pnpm publishes through npm, which takes that token from 11.5.1, so the job runs
 Node 24. A publish by hand, with a one-time password, still works and records no provenance.
 
 A publish of the player runs its `prepublishOnly` (a check that the pack it names is on npm,
