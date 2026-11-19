@@ -430,11 +430,11 @@ text to the content check's rules, and `apps/skills` plays every example untrust
     asking nothing: read by the tool of the first route that holds (route 3 fetches the bundle of
     the type the package's `h5p.json` names; route 4 cannot read one), the source changed as asked,
     built by the same route from the read folder, and handed over as any build. The description
-    leads with it. Given a quiz.h5p and the build archive and asked for two harder questions,
-    Haiku in Claude Code opened the skill in 1 of 3 runs with "or change an .h5p" at the
-    description's end, and in the other 2 edited `content.json` and zipped it by hand; with it
-    first, and "never edit or zip one by hand", in 3 of 3, each reading, changing and building
-    with the tool, at about $0.014 a run.
+    names it in its first sentence. Given a quiz.h5p and the build archive and asked for two
+    harder questions, Haiku in Claude Code opened the skill in 1 of 3 runs with "or change an
+    .h5p" at the description's end, and in the other 2 edited `content.json` and zipped it by
+    hand; with it in the first sentence, and "never edit or zip one by hand", in 3 of 3, each
+    reading, changing and building with the tool, at about $0.014 a run.
 
   A chat reads `SKILL.md` and its route's file, where every chat read all four routes, 18.9 KB,
   before.

@@ -5,8 +5,8 @@ type, and only the fields that differ from its defaults. The rest comes from the
 `semantics.json` and their translations for the content's language; the libraries come from
 [@missing-elements/h5p-libraries](https://www.npmjs.com/package/@missing-elements/h5p-libraries),
 the pack this release pins, each checked against the pack's SHA-256 index. No H5P server, no
-editor, no network but for media named by web address, and nothing reported anywhere: a build
-reads the source, the files it names and the pack, and writes the package. `read` turns a package
+editor, no network but for media named by web address, and no telemetry: a build reads the
+source, the files it names and the pack, and writes the package. `read` turns a package
 back into its source, to change it and build it again. Needs Node 22 or later; write `@latest`,
 since without it npm on an older Node quietly installs an older release.
 

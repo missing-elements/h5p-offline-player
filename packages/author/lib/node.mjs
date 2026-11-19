@@ -85,7 +85,7 @@ export async function openPack(folder) {
       // A content type's bundle holds what the type can hold, and no addon: a source whose text
       // calls for one, or another type's library, needs its part added.
       if (folder && /** @type {{ code?: unknown }} */ (error)?.code === 'ENOENT') {
-        throw new Error(`The parts folder ${directory} has no ${entry.folder}.h5p, which this build needs: add it from the library pack's parts/`)
+        throw new Error(`The parts folder ${directory} has no ${entry.folder}.h5p, which this package needs: add it from the library pack's parts/`)
       }
       throw new Error(`Cannot read the library part ${entry.folder} from ${origin}`, { cause: error })
     }

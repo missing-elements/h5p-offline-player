@@ -139,7 +139,7 @@ describe('writeBundle', () => {
     const squares = { ...META, type: 'H5P.Blanks', params: { questions: ['The square of 3, $$3^2$$, is *9*.'] } }
     const output = join(dir, 'squares.h5p')
     await expect(buildPackage(squares, output, { libraries: folder })).rejects.toThrow(
-      `The parts folder ${folder} has no ${addon.folder}.h5p, which this build needs: add it from the library pack's parts/`
+      `The parts folder ${folder} has no ${addon.folder}.h5p, which this package needs: add it from the library pack's parts/`
     )
     expect(await readdir(dir)).not.toContain('squares.h5p')
     await copyFile(join(parts, `${addon.folder}.h5p`), join(folder, `${addon.folder}.h5p`))
