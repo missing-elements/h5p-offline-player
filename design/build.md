@@ -147,8 +147,8 @@ the commit its tarball came from. Each package's trusted publisher on npmjs.com 
 the environment. pnpm publishes through npm, which takes that token from 11.5.1, so the job runs
 Node 24. A publish by hand, with a one-time password, still works and records no provenance.
 
-A publish of the player runs its `prepublishOnly` (typecheck, the unit suite and the
-build) so a broken tree cannot ship; the browser suite is left out because it needs an installed
+A publish of the player runs its `prepublishOnly` (a check that the pack it names is on npm,
+typecheck, the unit suite and the build) so a broken tree cannot ship; the browser suite is left out because it needs an installed
 Chromium. Firefox, WebKit and the slow browser files run only in CI's weekly run and a run by hand,
 so before publishing the player, run CI by hand on main (`gh workflow run ci.yml`) and wait for
 green. Then `prepack` copies the root LICENSE into the package, which is where npm takes it

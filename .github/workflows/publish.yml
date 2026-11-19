@@ -39,11 +39,12 @@ jobs:
       - uses: pnpm/action-setup@v6
       # No cache, as in vscode-publish.yml: a job that publishes installs from the registry against
       # the lockfile's hashes, not from a store another run wrote. Node 24: pnpm publishes through
-      # npm, and npm takes a trusted publisher's token from 11.5.1, which Node 22's npm is not.
+      # npm, and npm takes a trusted publisher's token from 11.5.1, which Node 22's npm is not. No
+      # registry-url: npm's default is npm's registry, and setup-node would write a placeholder token
+      # for it, which nothing here needs.
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-          registry-url: https://registry.npmjs.org
           package-manager-cache: false
       - name: Check that npm can publish by trusted publishing
         run: |
