@@ -302,10 +302,13 @@ text to the content check's rules, and `apps/skills` plays every example untrust
 - **This package builds the one-file tool, and the site serves it as shipped** (#247). `prepack`
   runs `scripts/build-tool.mjs`. It bundles the command line and everything it imports with Vite
   into `dist/h5p-author.mjs`, writes `dist/h5p-author-LICENSES.txt` beside it, and checks that its
-  `--version` names this package's and its pack's. Up to author 0.13.0 the site's own Vite built
-  it, so the site's build tools and their updates were in the path of every byte route 3 runs, and
-  nothing published covered them. Now the npm package does, with its provenance once publishing
-  moves to CI (#246). The skill names no hash of the file: checking one would add a command to
+  `--version` names this package's and its pack's. Both are exported by those paths. The site's
+  own Vite has built the file so far, so the site's build tools and their updates are in the path
+  of every byte route 3 runs, and nothing published covers them. From the first release that ships
+  the two files, the site's pin copies them instead, and the npm package covers them, with its
+  provenance once publishing moves to CI (#246). Packing runs Vite 8 and needs the workspace's
+  Node, 22.12 or later, and says so on an older one; the package's `engines` stays `>=22`, since
+  installing it runs none of this. The skill names no hash of the file: checking one would add a command to
   every run of route 3, and copies of the skill installed earlier would stop at each release.
 - **A preview inside Claude is the desktop app's browser panel, not a card.** A connector's card
   in Claude is an iframe under Claude's policy: it can register no worker, and Claude drops

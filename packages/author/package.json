@@ -32,6 +32,8 @@
       "types": "./types/browser.d.mts",
       "default": "./lib/browser.mjs"
     },
+    "./dist/h5p-author.mjs": "./dist/h5p-author.mjs",
+    "./dist/h5p-author-LICENSES.txt": "./dist/h5p-author-LICENSES.txt",
     "./references/types/*.md": "./references/types/*.md",
     "./references/build/*.md": "./references/build/*.md",
     "./references/authoring.md": "./references/authoring.md",

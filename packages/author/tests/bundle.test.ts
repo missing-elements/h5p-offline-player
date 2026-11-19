@@ -1,7 +1,8 @@
 import { execFile } from 'node:child_process'
-import { copyFile, cp, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { copyFile, cp, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { BlobReader, Uint8ArrayWriter, ZipReader } from '@zip.js/zip.js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -243,5 +244,16 @@ describe('the command line as one file', () => {
     const { stdout } = await exec(process.execPath, ['h5p-author.mjs', 'build', 'quiz.json', 'quiz.h5p', '--libraries', 'parts'], { cwd: sandbox })
     expect(stdout).toMatch(/^Built \S+quiz\.h5p: H5P\.QuestionSet, \d+ libraries from the pack in parts, \d+ more for installing on an H5P site\.\n/)
     expect((await stat(join(sandbox, 'quiz.h5p'))).size).toBeGreaterThan(0)
+
+    // Both files resolve by the package's name, through its exports, as a site that pins it reaches them.
+    const scope = join(dir, 'scope')
+    await mkdir(join(scope, 'dist'), { recursive: true })
+    await copyFile(resolve(import.meta.dirname, '../package.json'), join(scope, 'package.json'))
+    const files = ['h5p-author.mjs', 'h5p-author-LICENSES.txt']
+    for (const file of files) await copyFile(join(built, file), join(scope, 'dist', file))
+    const script = `for (const file of ${JSON.stringify(files)}) console.log(import.meta.resolve('@missing-elements/h5p-author/dist/' + file))`
+    const { stdout: resolved } = await exec(process.execPath, ['--input-type=module', '-e', script], { cwd: scope })
+    const real = await realpath(scope)
+    expect(resolved).toBe(files.map((file) => `${pathToFileURL(join(real, 'dist', file)).href}\n`).join(''))
   }, 60_000)
 })

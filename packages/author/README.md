@@ -149,8 +149,8 @@ packs them as the zips chat apps install, and lists the build tool and each bund
 skill's route 3, from two files, fetches at
 [missing-elements.github.io/h5p/skill/](https://missing-elements.github.io/h5p/skill/). The build
 tool is in the package too: `dist/h5p-author.mjs` is the command line as one file, everything it
-imports bundled in, and `dist/h5p-author-LICENSES.txt` lists those packages' licences. The site
-serves both as the release has them.
+imports bundled in, and `dist/h5p-author-LICENSES.txt` lists those packages' licences. Both are
+exported by those paths.
 
 ## A package back to its source
 
