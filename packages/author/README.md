@@ -375,8 +375,9 @@ the package's main export has them. A tool beside a build in either imports it f
 
 ## What it does not do
 
-It checks structure, not pedagogy. It notes what H5P allows and is almost surely a mistake: no
-answer marked correct, two answers alike, a text with no gap, a picture with no alt text. Whether
+It checks structure, not pedagogy. In the content types where it looks for them, it notes what H5P
+allows and is almost surely a mistake: no answer marked correct, two answers or statements alike, a
+text with no gap, an optional alt text left blank beside a picture. Whether
 the answers are right, the questions fair, or the pictures placed well is for a person to judge, in
 [h5p-verify](https://www.npmjs.com/package/@missing-elements/h5p-verify)'s `--preview`. It changes an
 existing package only by way of its source, read and built again; `checkContent` is the check for a

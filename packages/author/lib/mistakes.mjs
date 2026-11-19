@@ -20,7 +20,7 @@ const isObject = (value) => value !== null && typeof value === 'object' && !Arra
  * @param {unknown} value
  */
 function plain(value) {
-  return typeof value === 'string' ? decodeEntities(stripTags(value)).replace(/\s+/g, ' ').trim().toLocaleLowerCase() : ''
+  return typeof value === 'string' ? decodeEntities(stripTags(value)).replace(/\s+/g, ' ').trim().toLowerCase() : ''
 }
 
 /**
