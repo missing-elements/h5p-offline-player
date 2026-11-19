@@ -13,7 +13,7 @@
     "@missing-elements/h5p-verify": "workspace:*",
     "@types/node": "^26.6.6",
     "@zip.js/zip.js": "^2.25.0",
-    "playwright": "^1.65.0",
+    "playwright": "^1.65.1",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
   }
