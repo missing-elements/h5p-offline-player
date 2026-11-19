@@ -138,8 +138,17 @@ went; `typecheck` and `prepack` both run it. Three rules, with TypeScript 7:
 
 ## Publishing and Node versions
 
-`pnpm publish` in `packages/player` runs `prepublishOnly` (typecheck, the unit suite and the
-build) so a broken tree cannot ship; the browser suite is left out because it needs an installed
+**The packages are published from CI, by trusted publishing** (#246). `publish.yml` is run by hand
+from main, in the `npm` environment, once the bump is pushed (`gh workflow run publish.yml`). It
+publishes every package whose version npm lacks, as `pnpm -r publish` finds them: in dependency
+order, one at a time, passing over a version npm has. npm takes the ID token GitHub gives the run
+in place of an access token, so none is stored, and records each package's provenance, the run and
+the commit its tarball came from. Each package's trusted publisher on npmjs.com names the file and
+the environment. pnpm publishes through npm, which takes that token from 11.5.1, so the job runs
+Node 24. A publish by hand, with a one-time password, still works and records no provenance.
+
+A publish of the player runs its `prepublishOnly` (a check that the pack it names is on npm,
+typecheck, the unit suite and the build) so a broken tree cannot ship; the browser suite is left out because it needs an installed
 Chromium. Firefox, WebKit and the slow browser files run only in CI's weekly run and a run by hand,
 so before publishing the player, run CI by hand on main (`gh workflow run ci.yml`) and wait for
 green. Then `prepack` copies the root LICENSE into the package, which is where npm takes it

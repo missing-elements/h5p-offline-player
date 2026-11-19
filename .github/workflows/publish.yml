@@ -1,0 +1,68 @@
+name: Publish to npm
+
+# Publishes every package whose version npm does not have yet, by trusted publishing. npm trusts
+# this file in this repository, run in the `npm` environment, and takes the ID token GitHub gives
+# the run in place of an access token, so none is stored anywhere. It then records each package's
+# provenance: the run and the commit its tarball was built from. Each package's registration on
+# npmjs.com names the file and the environment: renamed, they have to be registered again.
+#
+# Run it by hand, from main, once the bump is committed and pushed; before a player release, run
+# ci.yml by hand first and wait for green (design/build.md). `pnpm -r publish` publishes in
+# dependency order and passes over a version npm has, and each package's prepublishOnly runs
+# first, as on a publish by hand. A dry run packs and checks each package and publishes none; a
+# package's check that its pinned dependency is on npm then stops at one this release would
+# publish.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Pack and check every package that would be published, and publish none
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  npm:
+    name: npm
+    runs-on: ubuntu-latest
+    # The environment deploys from main alone, and each registration names it, so a run from any
+    # other branch is not trusted.
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v6
+      # No cache, as in vscode-publish.yml: a job that publishes installs from the registry against
+      # the lockfile's hashes, not from a store another run wrote. Node 24: pnpm publishes through
+      # npm, and npm takes a trusted publisher's token from 11.5.1, which Node 22's npm is not. No
+      # registry-url: npm's default is npm's registry, and setup-node would write a placeholder token
+      # for it, which nothing here needs.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Check that npm can publish by trusted publishing
+        run: |
+          node -e '
+            const [major, minor, patch] = process.argv[1].split(".").map(Number)
+            if (major < 11 || (major === 11 && (minor < 5 || (minor === 5 && patch < 1)))) {
+              console.error(`npm ${process.argv[1]} cannot publish by trusted publishing: it needs 11.5.1 or later`)
+              process.exit(1)
+            }
+          ' "$(npm --version)"
+      - run: pnpm install --frozen-lockfile
+      # The author, verify, mcp and embed packages' prepublishOnly run browser tests, as ci.yml's
+      # test jobs do, and install Chromium the same way.
+      - run: pnpm --filter @missing-elements/h5p-offline-player exec playwright install chromium
+      # One package at a time, as ci.yml's test jobs run them. Without git checks: prepack writes
+      # files into the tree (types/, the licence, the skill), and the environment already holds
+      # the run to main.
+      - run: pnpm -r --workspace-concurrency=1 publish --access public --no-git-checks $DRY_RUN
+        env:
+          NPM_CONFIG_PROVENANCE: true
+          DRY_RUN: ${{ inputs.dry-run && '--dry-run' || '' }}

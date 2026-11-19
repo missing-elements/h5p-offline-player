@@ -71,5 +71,6 @@ the installable app; the demo's pages are checked by hand, and the skills are te
 the content-type sweep.
 
 Node 22 LTS or 24 LTS: the commands the packages ship need 22, and the browser packages keep
-`>=20`. Packages are published with pnpm, which rewrites the `workspace:` ranges, and each one's
-`prepublishOnly` is its guard: [`design/build.md`](build.md).
+`>=20`. Packages are published with pnpm, which rewrites the `workspace:` ranges, from CI
+(`gh workflow run publish.yml` on main), and each one's `prepublishOnly` is its guard:
+[`design/build.md`](build.md).
