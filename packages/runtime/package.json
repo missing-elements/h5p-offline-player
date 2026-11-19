@@ -49,7 +49,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
-    "@zip.js/zip.js": "^2.24.0",
+    "@zip.js/zip.js": "^2.25.0",
     "esbuild": "^0.28.2",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
