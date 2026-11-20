@@ -105,8 +105,9 @@ text to the content check's rules, and `apps/skills` plays every example untrust
   - **Only the host's own answer counts.** A sandbox's proxy or a school's filter answers for the
     host, and would otherwise refuse a build with no way round, or put a note on every video.
     Both hosts send a status that is no video in a way of their own (`sends`): YouTube that
-    status's words alone ("Bad Request", "Not Found", "Forbidden") under its JSON type, Vimeo a
-    page of them ("404 Not Found", `text/html`). A status that means something counts only when
+    status's words alone ("Bad Request", "Forbidden", "Not Found", and "Unauthorized" expected
+    of the 401 that was not seen) under its JSON type, Vimeo a page of them ("404 Not Found",
+    `text/html`). A status that means something counts only when
     it comes so, its own words and the host's type; a page of the box's own, the words under
     another type as a small proxy sends them, or another status's words say nothing, as do any
     other status, no network, and no answer in ten seconds, and the build goes on. A box that
