@@ -37,7 +37,7 @@
   ],
   "scripts": {
     "test": "pnpm --filter @missing-elements/h5p-offline-player build && pnpm --filter @missing-elements/h5p-author exec node scripts/copy-skill.mjs && vitest run",
-    "typecheck": "tsc -p tsconfig.json",
+    "typecheck": "pnpm --filter @missing-elements/h5p-verify --filter @missing-elements/h5p-author run types && tsc -p tsconfig.json",
     "prepack": "node -e \"require('node:fs').copyFileSync('../../LICENSE', 'LICENSE')\"",
     "prepublishOnly": "node -e \"if (!/^pnpm\\//.test(process.env.npm_config_user_agent || '')) { console.error('Publish with pnpm publish: npm would ship the workspace:^ dependency ranges as they are, and the package would not install.'); process.exit(1) }\" && node ../../scripts/published.mjs && pnpm typecheck && pnpm test"
   },
