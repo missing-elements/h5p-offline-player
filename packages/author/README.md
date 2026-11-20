@@ -88,9 +88,9 @@ What `params` takes is what H5P's editor would let an author save in the same fo
   Panopto or Echo360 address stays where it is, if it is one H5P.Video plays: a Short's is taken
   as its video's, and another address on those sites is refused. A YouTube or Vimeo video is
   asked of the site's oEmbed, which is sent the video's address: one the site has no video at is
-  refused, one YouTube says is private or not to be embedded is a note, and with no answer of the
-  site's own in ten seconds, behind a proxy that answers for it or with no network, the build goes
-  on without one. A download is given up once
+  refused, one YouTube says is private is a note, as is its 401, taken to mean that embedding is
+  turned off (not seen yet), and with no answer of the site's own in ten seconds, behind a proxy
+  that answers for it or with no network, the build goes on without one. A download is given up once
   nothing has arrived for a minute, however long it runs.
 - **Interface texts** (Check, Retry…): leave them out; they come from the libraries' translations,
   and the command lists what stayed English. A source may still set one by name.
