@@ -372,15 +372,20 @@ text to the content check's rules, and `apps/skills` plays every example untrust
   fields in the wrong place. Every problem of an author is said at once, and an author written as
   a name alone is said with the object to write. It is zod/mini, 23 kB minified, since a build
   runs in a page too, where zod's chained API takes 93 kB; JSON Schema is made where it is shown.
-- **The skill is installed, and its page lists what step 3 fetches.** Claude and ChatGPT install
-  the skill as a zip, and Grok reads the zip attached to a message; reading it by its link was
-  dropped (missing-elements.github.io#42). Since the 0.10.0 pin the organisation's site serves the
+- **The skill is installed, and its page lists what step 3 fetches.** A chat with a place for
+  skills or plugins installs the skill from a zip, and one with neither reads the zip attached to a
+  message; reading it by its link was dropped (missing-elements.github.io#42). Since the 0.10.0 pin the organisation's site serves the
   skill only as zips (missing-elements.github.io#52). Its page at `/h5p/skill/` lists the build
   tool and every bundle at full address, by the author package's `contentTypes`, because route 3
   (`references/build/two-files.md`) fetches "at the addresses
   `https://missing-elements.github.io/h5p/skill/` lists": a fetch tool that opens only addresses it
   has seen whole refuses one put together from a pattern. So the page must keep the bundles.
   Copies at 0.9.7 or older, which read the skill's text from that page, find no file there now.
+- **The organisation's guide goes by what a chat has, not by its name**
+  (missing-elements.github.io#80): a place for skills, plugins, projects, code that runs. What one
+  chat does changes within weeks, as Grok's place for skills did in two days, so no page says what
+  a product does or lacks, and each step says what to do with a thing and without it. The skill's
+  routes already go by what its sandbox can do.
 - **A text's own marks are said where a chat reads, and what a library cannot take apart is a
   problem** (#187). In Fill in the Blanks a gap's first colon starts its tip and what is before it
   is split at every slash (`parseSolution`, H5P.Blanks 1.14), so `*10:30*` is the answer 10 with
@@ -434,10 +439,11 @@ text to the content check's rules, and `apps/skills` plays every example untrust
   through a server of the organisation's this way, which is what the guide leads with: privacy
   first. Step 3 builds from an attached archive first. The offer of the archive
   is one fixed line in the route, but a weak model drops some of what it is asked to write, so the
-  organisation's guide, not the skill, tells people using ChatGPT to attach it, or to keep it in a
-  ChatGPT Project (missing-elements.github.io#49). There a `path` names a file in the sandbox,
-  since a web address cannot be downloaded.
-  - **The archive kept in a ChatGPT Project builds too**, without an upload per message.
+  organisation's guide, not the skill, tells people whose chat hands over the source to attach it,
+  or to keep it in a project where the chat has projects (missing-elements.github.io#49, #80).
+  There a `path` names a file in the sandbox, since a web address cannot be downloaded.
+  - **The archive kept in a chat's project builds too**, without an upload per message: seen in a
+    ChatGPT Project, and in no other chat's yet.
   - **The verifier is asked for, not waited for** (#202). Step 4 asks npm for the verifier's
     version first (`npm view … --fetch-timeout=10000 --fetch-retries=0 &&`) and runs it only
     where npm answers: against a registry that never answers, it gives up after 10.5 seconds.
