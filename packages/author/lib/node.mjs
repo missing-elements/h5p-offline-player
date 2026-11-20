@@ -41,7 +41,8 @@ import { SourceError } from './source-error.mjs'
  *   list even of one; `check`, to build and write no package: no output is needed or looked at, and
  *   the result's `output` is empty, but a media file named by web address is still downloaded, to a
  *   temporary folder removed after, as the build checks it; a video on YouTube, Vimeo, Panopto or
- *   Echo360 stays an address, as in a build
+ *   Echo360 stays an address, as in a build, a YouTube or Vimeo one asked of the site's oEmbed with
+ *   `fetch` as a build asks it
  * @typedef {{ output: string, source: import('./build.mjs').Source, files: string[], notes: Problem[] }} ReadResult
  *   `output`, the source's path; `files`, the media written beside it, by the paths the source
  *   names them by, from its folder; `notes`, what was left out or could not be read back as it is
