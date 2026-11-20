@@ -224,8 +224,7 @@ describe('the bundle command', () => {
 
     await expect(exec(process.execPath, [bin, 'bundle', 'H5P.TrueFalse'])).rejects.toMatchObject({ code: 1, stderr: expect.stringContaining('bundle takes a content type and an output') })
     await expect(exec(process.execPath, [bin, 'bundle', '--markdown', 'H5P.TrueFalse', 'x.zip'])).rejects.toMatchObject({ code: 1, stderr: expect.stringContaining('bundle does not take --markdown') })
-    // Every content type's bundle, written twice: 2.2 s here, past vitest's 5 s once on a slow runner (#242).
-  }, 20_000)
+  })
 })
 
 describe('the command line as one file', () => {
@@ -255,5 +254,5 @@ describe('the command line as one file', () => {
     const { stdout: resolved } = await exec(process.execPath, ['--input-type=module', '-e', script], { cwd: scope })
     const real = await realpath(scope)
     expect(resolved).toBe(files.map((file) => `${pathToFileURL(join(real, 'dist', file)).href}\n`).join(''))
-  }, 60_000)
+  })
 })

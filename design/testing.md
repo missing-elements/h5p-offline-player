@@ -22,6 +22,16 @@ which also runs when `packages/vscode` changes. The slow files are `stalling-hos
 publishing the player, run CI by hand on main (`gh workflow run ci.yml`) and publish once it is
 green.
 
+**A test's time limit is its package's, set once in its config for a slow runner** (#255). A
+limit stops a hang; it does not time a test. The author's Node tests ran on vitest's 5 s a test,
+and a CI runner builds packages and writes bundles two to four times slower than a laptop: three
+tests failed there in three days, each at 5.0 s, each after the one before it got a number of its
+own. So embed, mcp, the demo, the skills project, the author's Node project and the verifier each
+set `testTimeout` and `hookTimeout` to 120 s in their config, and the author's browser project sets
+both to 180 s, for a build in Chromium and a play in the verifier. A test names its own only to ask
+for more, or where the time is what it tests. A package whose tests run in milliseconds keeps the
+default, until one of them needs a number: then the package gets its limit, not the test.
+
 The `browser` project runs in Chromium unless `H5P_TEST_BROWSER` names `firefox` or `webkit`.
 `pnpm test:engine` runs it, then the app's tests, which is what the `engines` job does in those two.
 One engine per run, never a list: the dev server's switches (a host's outage, the worker version it

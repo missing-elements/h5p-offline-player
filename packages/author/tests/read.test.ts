@@ -122,7 +122,7 @@ describe.concurrent('every type file', () => {
     for (const path of read.files) expect(new Uint8Array(await readFile(join(at, 'read', path))), path).toEqual(await entryOf(join(at, 'example.h5p'), `content/${path}`))
     const again = await buildPackage(read.source, undefined, { base: join(at, 'read'), check: true })
     expect(withoutIds(again.content)).toEqual(withoutIds(first.content))
-  }, 60_000)
+  })
 })
 
 describe('a package read back', () => {

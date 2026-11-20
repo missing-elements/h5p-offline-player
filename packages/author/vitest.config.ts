@@ -34,7 +34,13 @@ export default defineConfig({
           name: 'node',
           environment: 'node',
           include: ['tests/**/*.test.ts'],
-          exclude: [...configDefaults.exclude, 'tests/browser/**']
+          exclude: [...configDefaults.exclude, 'tests/browser/**'],
+          // The package's limit, and no test's own (design/testing.md, #255). These tests build
+          // packages from the library pack and write every content type's bundle, which a CI
+          // runner does two to four times slower than a laptop: on vitest's 5 s a test, three
+          // of them failed there in three days, each after the one before it got its own number.
+          testTimeout: 120_000,
+          hookTimeout: 120_000
         }
       },
       {
@@ -44,7 +50,11 @@ export default defineConfig({
         test: {
           name: 'browser',
           include: ['tests/browser/**/*.test.ts'],
+          // This project's limit, longer than the Node one: a test here builds in Chromium and
+          // plays the result in the verifier. Named here because a project takes nothing from
+          // the other.
           testTimeout: 180_000,
+          hookTimeout: 180_000,
           browser: {
             enabled: true,
             headless: true,

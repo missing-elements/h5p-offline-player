@@ -10,7 +10,7 @@ import { contentChanges, summarize, verifyPackage } from '../lib/verify.mjs'
 
 /**
  * The real thing end to end: a browser, the player's Service Worker, the demo's committed
- * content. Each case launches a browser, so the timeouts are generous.
+ * content. Each case launches a browser, so the package's limit is generous (vitest.config.ts).
  */
 
 const bin = resolve(import.meta.dirname, '../bin/h5p-verify.mjs')
@@ -181,7 +181,7 @@ describe('h5p-verify', () => {
     expect(report.verdict).toBe('fail')
     expect(report.reasons).toEqual(['1 uncaught error while booting: Uncaught ReferenceError: H5PEditor is not defined'])
     expect(report.screenshot).not.toBeNull()
-  }, 120_000)
+  })
 
   it('passes a complete package, with its revision and a screenshot', async () => {
     const out = join(dir, 'quiz')
@@ -201,7 +201,7 @@ describe('h5p-verify', () => {
     expect(report.screenshot).toBe(join(out, 'screenshot.png'))
     expect(existsSync(report.screenshot!)).toBe(true)
     expect(summarize(report)).toMatch(/^pass {2}quiz\.h5p {2}ready in \d+\.\d\d s {2}revision sha256:/)
-  }, 120_000)
+  })
 
   it('fails a package without its libraries, naming them', async () => {
     const report = await verifyPackage({ file: await strippedQuiz(), out: join(dir, 'stripped') })
@@ -214,7 +214,7 @@ describe('h5p-verify', () => {
     expect(report.reasons[0]).toMatch(/^bad-archive: /)
     expect(report.screenshot).toBeNull()
     expect(summarize(report)).toContain('--libraries pack')
-  }, 120_000)
+  })
 
   it('warns of a video that does not play, as a web page saved under its name (#218)', async () => {
     const page = await rewritten(video, 'page-video.h5p', async (entry, bytes, writer) => {
@@ -234,7 +234,7 @@ describe('h5p-verify', () => {
       else await writer.add(entry.filename, new Uint8ArrayReader(bytes))
     })
     expect((await verifyPackage({ file: odd })).warnings).toContainEqual(expect.stringMatching(/^video (?:does not play|not checked): videos\/odd%zz\.mp4: /))
-  }, 120_000)
+  })
 
   it('fails a file that is not an archive', async () => {
     const path = join(dir, 'not-a-zip.h5p')
@@ -243,7 +243,7 @@ describe('h5p-verify', () => {
 
     expect(report.verdict).toBe('fail')
     expect(report.errors[0]?.code).toBe('bad-archive')
-  }, 120_000)
+  })
 
   it('played untrusted, reports what the content check removed and the notes it wrote, and still passes', async () => {
     const file = await quizWithContent('hostile.h5p', (params) => {
@@ -262,7 +262,7 @@ describe('h5p-verify', () => {
       ])
     )
     expect(report.warnings).toContain('content check: questions[0].params.question: markup removed: <form>, <input>')
-  }, 120_000)
+  })
 
   it('prints a report larger than a pipe holds whole to a program that reads it through one (#117)', async () => {
     // Each field the semantics do not name is removed and reported: a report of tens of kilobytes.
@@ -274,7 +274,7 @@ describe('h5p-verify', () => {
 
     expect(Buffer.byteLength(stdout)).toBeGreaterThan(16 * 1024)
     expect(JSON.parse(stdout)).toEqual(JSON.parse(await readFile(join(out, 'report.json'), 'utf8')))
-  }, 120_000)
+  })
 
   it('played untrusted, passes the quiz unchanged', async () => {
     const report = await verifyPackage({ file: quiz, untrusted: true, libraries: pack })
@@ -283,7 +283,7 @@ describe('h5p-verify', () => {
     expect(report.untrusted).toBe(true)
     expect(report.contentCheck).toEqual({ notes: [], changes: [] })
     expect(report.warnings).toEqual([])
-  }, 120_000)
+  })
 
   it('played untrusted, plays a package made for a newer minor than the pack has at the pack\'s, with a warning (#85)', async () => {
     const report = await verifyPackage({ file: await quizNeedingNewerLibrary(), untrusted: true, libraries: pack })
@@ -292,7 +292,7 @@ describe('h5p-verify', () => {
     expect(report.downgraded).toEqual([{ library: 'H5P.QuestionSet', from: '1.99', to: expect.stringMatching(/^1\.21\.\d+$/) }])
     expect(report.warnings.some((warning) => warning.startsWith('H5P.QuestionSet played at 1.21.') && warning.includes('1.99'))).toBe(true)
     expect(summarize(report)).toContain('warning: H5P.QuestionSet played at 1.21.')
-  }, 120_000)
+  })
 
   it('played trusted with no library source, warns of a library played at the older minor the package carries (#85)', async () => {
     // Nothing supplied anything, so there is no library bundle. The report took the list from it
@@ -302,7 +302,7 @@ describe('h5p-verify', () => {
     expect(report.verdict).toBe('pass')
     expect(report.downgraded).toEqual([{ library: 'H5P.QuestionSet', from: '1.99', to: expect.stringMatching(/^1\.\d+\.\d+$/) }])
     expect(report.warnings.some((warning) => warning.startsWith('H5P.QuestionSet played at 1.') && warning.includes('1.99'))).toBe(true)
-  }, 120_000)
+  })
 
   it('played untrusted with --no-downgrade-libraries, refuses a package that needs its own copy of a library, and says what to do', async () => {
     const report = await verifyPackage({ file: await quizNeedingNewerLibrary(), untrusted: true, libraries: pack, downgradeLibraries: false })
