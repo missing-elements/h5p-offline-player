@@ -110,7 +110,7 @@ their documented API ships with declarations generated from it: `tsconfig.json` 
 `site/embed.js`) with `checkJs`, `tsconfig.types.json` emits the entries' declarations into
 `types/` with `stripInternal`, and each `exports` entry names them under `types`. `pnpm types`
 writes them, deleting the folder first, since `tsc` never removes a declaration whose source
-went; `typecheck` and `prepack` both run it. Three rules, with TypeScript 7:
+went; `typecheck` and `prepack` both run it. Four rules, with TypeScript 7:
 
 - **A top-level `@typedef` is always exported**, and `@internal` on one does not strip it. Worse,
   its comment counts among the leading comments of the next declaration, which `stripInternal`
@@ -123,6 +123,15 @@ went; `typecheck` and `prepack` both run it. Three rules, with TypeScript 7:
   `types` condition. Without `types/`, TypeScript falls back to the JavaScript through `default`
   and finds the internal helper, so the file's `@ts-expect-error` on that import fails: the check
   cannot pass on anything but the published declarations.
+- **A package's `typecheck` writes the declarations it reads first** (#261). The workspace
+  links a package to its neighbours' folders, where `types/` exists only once something wrote it.
+  Without it, TypeScript falls back to their JavaScript and checks it under this package's own
+  `lib`, so the verifier's page code fails mcp's Node-only check for `window` and `document`.
+  `pnpm -r typecheck` and CI run in dependency order and never showed it; a publish runs only the
+  packages it releases, and mcp 0.4.0 stopped there when verify was not among them. So mcp's
+  `typecheck` runs the author's and the verifier's `types` before `tsc`, and every `types` that
+  reads the player's declarations builds them first (`tsc -b` in packages/player), as the
+  author's always has. Each package's `typecheck` passes alone with no `types/` anywhere.
 - **The player's relative imports name their file, `./shared/protocol.js`**, as cmi5's do.
   `tsc` copies a specifier into the declarations as written, and `node16`/`nodenext` resolution
   follows only one that names its file, so a specifier without `.js` leaves what came through
