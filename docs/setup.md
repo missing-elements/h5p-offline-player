@@ -111,9 +111,9 @@ Or load the element and the runtime from jsDelivr, and copy only the Service Wor
 
 ```html
 <script type="module"
-  src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@1.6.0/dist/h5p-player.js"></script>
+  src="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-offline-player@1.7.0/dist/h5p-player.js"></script>
 <h5p-player src="https://host.example/course.h5p" sw="/h5p-sw.js"
-            assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-runtime@1.0.1/dist/"></h5p-player>
+            assets-base="https://cdn.jsdelivr.net/npm/@missing-elements/h5p-runtime@1.0.2/dist/"></h5p-player>
 ```
 
 Copy `dist/h5p-sw.js` of the same version onto your own site: browsers register a Service Worker
