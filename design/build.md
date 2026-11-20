@@ -147,8 +147,28 @@ the commit its tarball came from. Each package's trusted publisher on npmjs.com 
 the environment, and ticks `npm publish` under Allowed actions: one created after 2026-09-03
 allows only `npm stage publish` until it is ticked, and the registry refuses a publish with "403
 OIDC permission denied for this action" after the token exchange has worked (the second run, on
-2026-11-19). A new one expires unless a publish through it succeeds within 2 days. pnpm publishes through npm, which takes that token from 11.5.1, so the job runs
-Node 24. A publish by hand, with a one-time password, still works and records no provenance.
+2026-11-19). A new one expires unless a publish through it succeeds within 2 days. pnpm publishes
+through npm, which takes that token from 11.5.1, so the job runs Node 24. A publish by hand, with a
+one-time password, still works and records no provenance.
+
+**A package is published only once npm serves what it depends on** (#253). npm takes a version in,
+then processes it before it serves it. In release 1.7.0 that took 1 to 4 minutes for most packages
+and 14 for the 31 MB library pack. The release took four runs, since each check that a dependency
+is on npm failed on one published moments before. Two kinds of check now wait while npm processes:
+- `scripts/published.mjs`, in the `prepublishOnly` of every published package that names another
+  by `workspace:` outside `devDependencies` (verify, embed, author and mcp), checks each at the
+  version the workspace has;
+- the three checks of what a package pins, the player's pack and embed's and the author's, use its
+  `served()`.
+
+Both ask again every 30 s after a 404, a server error, or a request that failed, timed out or
+could not be read. The checks in one script share one wait of `H5P_PUBLISH_WAIT` minutes, which
+`publish.yml` sets to 30, twice the longest seen. By hand and in a dry run it is 0, and the check
+says at once what a 404 means. From npm, it does not serve the version: not published, or still
+being processed. From jsDelivr, the pack there has no `parts/index.json`. After any other failure
+the check stops and prints that the version could not be checked, which says nothing about whether
+it is there, and to run the publish again. Each request, its body included, is cut at 30 s: one to
+npm hung for over 5 minutes.
 
 A publish of the player runs its `prepublishOnly` (a check that the pack it names is on npm,
 typecheck, the unit suite and the build) so a broken tree cannot ship; the browser suite is left out because it needs an installed

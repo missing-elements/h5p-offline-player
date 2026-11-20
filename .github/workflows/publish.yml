@@ -63,7 +63,13 @@ jobs:
       # --workspace-concurrency: given it, pnpm stopped on the unknown option before publishing
       # anything (the first run). Without git checks: prepack writes files into the tree (types/,
       # the licence, the skill), and the environment already holds the run to main.
+      # Each package's checks that what it depends on is on npm wait up to H5P_PUBLISH_WAIT
+      # minutes, one wait per script, for npm to serve a version published earlier in this run:
+      # npm processes a new one first, 1 to 4 minutes for most packages and 14 for the 31 MB
+      # library pack in release 1.7.0 (#253). A dry run publishes nothing, so there it fails at
+      # once, as by hand.
       - run: pnpm -r publish --access public --no-git-checks $DRY_RUN
         env:
           NPM_CONFIG_PROVENANCE: true
           DRY_RUN: ${{ inputs.dry-run && '--dry-run' || '' }}
+          H5P_PUBLISH_WAIT: ${{ inputs.dry-run && '0' || '30' }}
