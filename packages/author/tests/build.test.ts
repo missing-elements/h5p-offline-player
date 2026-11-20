@@ -842,41 +842,57 @@ describe('media', () => {
 
   it('asks YouTube and Vimeo whether they have a hosted video, once each, and says what they answered (#218)', async () => {
     const video = (path: string) => ({ content: { library: 'H5P.Video', params: { sources: { path } } } })
+    const column = (paths: string[]) => ({ ...META, type: 'H5P.Column', params: { content: paths.map(video) } })
+    const at = (i: number) => `params.content[${i}].content.params.sources.path`
     const asked: string[] = []
-    const answers: Record<string, number> = { aaaaaaaaaaa: 400, '999999999': 404, bbbbbbbbbbb: 401, '888888888': 403, ccccccccccc: 500 }
+    // Each host's own words for a status, as it sent them on 2026-11-20, by the video asked of.
+    const answers: Record<string, [status: number, body: string]> = {
+      aaaaaaaaaaa: [400, 'Bad Request'], bbbbbbbbbbb: [404, 'Not Found'], ccccccccccc: [403, 'Forbidden'], ddddddddddd: [401, 'Unauthorized'],
+      eeeeeeeeeee: [500, 'Internal Server Error'], '999999999': [404, '404 Not Found'], '888888888': [403, 'Forbidden'],
+      // A box between the build and the host, answering for it with a page of its own.
+      fffffffffff: [403, '<html><title>Blocked</title>This site is not allowed on this network.</html>'], '777777777': [404, '<html>Not Found on this proxy</html>']
+    }
     const fetch = async (input: string | URL | Request) => {
       const url = String(input)
       asked.push(url)
-      const status = Object.entries(answers).find(([id]) => url.includes(id))?.[1] ?? 200
-      return new Response(status === 200 ? '{}' : 'Not Found', { status })
+      const [status, body] = Object.entries(answers).find(([id]) => url.includes(id))?.[1] ?? [200, '{}']
+      return new Response(body, { status })
     }
-    const paths = [
+    const youtube = (id: string) => `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}`
+    const vimeo = (address: string) => `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(address)}`
+
+    const { notes } = await build(column([
       'https://www.youtube.com/embed/dQw4w9WgXcQ', 'https://youtu.be/dQw4w9WgXcQ', 'https://vimeo.com/channels/staffpicks/76979871',
-      'https://video.example.edu/Panopto/Pages/Viewer.aspx?id=0b6d3a5e', 'https://www.youtube.com/watch?v=bbbbbbbbbbb',
-      'https://vimeo.com/888888888', 'https://www.youtube.com/watch?v=ccccccccccc'
-    ]
-    const { notes } = await build({ ...META, type: 'H5P.Column', params: { content: paths.map(video) } }, { fetch })
+      'https://video.example.edu/Panopto/Pages/Viewer.aspx?id=0b6d3a5e', 'https://www.youtube.com/watch?v=ccccccccccc', 'https://www.youtube.com/watch?v=ddddddddddd',
+      'https://www.youtube.com/watch?v=eeeeeeeeeee', 'https://www.youtube.com/watch?v=fffffffffff', 'https://vimeo.com/888888888', 'https://vimeo.com/777777777'
+    ]), { fetch })
     // A YouTube video by its watch address, which its oEmbed answers for any form; once for the two
     // forms of one video; Vimeo's as written; Panopto's not, since it answers no one.
     expect(asked).toEqual([
-      `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent('https://www.youtube.com/watch?v=dQw4w9WgXcQ')}`,
-      `https://vimeo.com/api/oembed.json?url=${encodeURIComponent('https://vimeo.com/channels/staffpicks/76979871')}`,
-      `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent('https://www.youtube.com/watch?v=bbbbbbbbbbb')}`,
-      `https://vimeo.com/api/oembed.json?url=${encodeURIComponent('https://vimeo.com/888888888')}`,
-      `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent('https://www.youtube.com/watch?v=ccccccccccc')}`
+      youtube('dQw4w9WgXcQ'), vimeo('https://vimeo.com/channels/staffpicks/76979871'), youtube('ccccccccccc'), youtube('ddddddddddd'),
+      youtube('eeeeeeeeeee'), youtube('fffffffffff'), vimeo('https://vimeo.com/888888888'), vimeo('https://vimeo.com/777777777')
     ])
-    // One it will not say anything of is a note; an answer that says nothing either way, nothing.
+    // A video nobody else can play yet is a note. Nothing is said of a status that means nothing
+    // for the host (a 500; Vimeo's 403, which refuses the asker's network), nor of one that comes
+    // with other words than the host's own.
     expect(notes).toEqual([
-      { path: 'params.content[4].content.params.sources.path', message: 'https://www.youtube.com/watch?v=bbbbbbbbbbb: YouTube would not say it may be played elsewhere (it answered 401): it may be private, or its owner may let only some sites embed it, so play it where it will be used' },
-      { path: 'params.content[5].content.params.sources.path', message: 'https://vimeo.com/888888888: Vimeo would not say it may be played elsewhere (it answered 403): it may be private, or its owner may let only some sites embed it, so play it where it will be used' }
+      { path: at(4), message: 'https://www.youtube.com/watch?v=ccccccccccc: YouTube says the video is private: nobody but its owner can play it until it is made public or unlisted (it answered 403)' },
+      { path: at(5), message: 'https://www.youtube.com/watch?v=ddddddddddd: YouTube would not say the video may be embedded: its owner may have turned embedding off, so play it where it will be used (it answered 401)' }
     ])
-    expect(await problems({ ...META, type: 'H5P.Column', params: { content: ['https://youtu.be/aaaaaaaaaaa', 'https://vimeo.com/999999999'].map(video) } }, { fetch })).toEqual([
-      'params.content[0].content.params.sources.path: https://youtu.be/aaaaaaaaaaa: YouTube has no video there (it answered 400): give https://www.youtube.com/watch?v= and the video\'s id of a public or unlisted video',
-      'params.content[1].content.params.sources.path: https://vimeo.com/999999999: Vimeo has no video there (it answered 404): give https://vimeo.com/ and the video\'s number of a public or unlisted video'
+    expect(await problems(column(['https://youtu.be/aaaaaaaaaaa', 'https://www.youtube.com/watch?v=bbbbbbbbbbb', 'https://vimeo.com/999999999']), { fetch })).toEqual([
+      `${at(0)}: https://youtu.be/aaaaaaaaaaa: YouTube has no video there: give https://www.youtube.com/watch?v= and the id of a public or unlisted video (it answered 400)`,
+      `${at(1)}: https://www.youtube.com/watch?v=bbbbbbbbbbb: YouTube has no video there any more: give https://www.youtube.com/watch?v= and the id of a public or unlisted video (it answered 404)`,
+      `${at(2)}: https://vimeo.com/999999999: Vimeo has no video there that others can play: give https://vimeo.com/ and the number of a public video, or all of an unlisted video's link, which has more after the number (it answered 404)`
     ])
-    // With no network the build goes on without asking.
-    const offline = async () => { throw new TypeError('fetch failed') }
-    expect((await build({ ...META, type: 'H5P.Column', params: { content: [video('https://youtu.be/aaaaaaaaaaa')] } }, { fetch: offline })).notes).toEqual([])
+
+    // With no network the build goes on, and asks once, not once a video.
+    let tries = 0
+    const offline = async () => {
+      tries++
+      throw new TypeError('fetch failed')
+    }
+    expect((await build(column(['https://youtu.be/aaaaaaaaaaa', 'https://vimeo.com/999999999', 'https://youtu.be/bbbbbbbbbbb']), { fetch: offline })).notes).toEqual([])
+    expect(tries).toBe(1)
   })
 
   it('reads a video\'s and a recording\'s first bytes, and refuses one that is not what the field takes (#218)', async () => {
