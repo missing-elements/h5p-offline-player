@@ -8,7 +8,7 @@
  */
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { served } from '../../../scripts/published.mjs'
+import { served, stopUnlessAnswered, waitUntil } from '../../../scripts/published.mjs'
 
 const constants = await readFile(resolve(import.meta.dirname, '..', 'src', 'shared', 'constants.ts'), 'utf8')
 const version = /export const LIBRARY_PACK_VERSION = '([^']+)'/.exec(constants)?.[1]
@@ -17,8 +17,10 @@ if (!version) {
   process.exit(1)
 }
 
-// Waited for in CI, where the pack was published moments before in the same run (#253).
-const response = await served(`https://registry.npmjs.org/@missing-elements%2fh5p-libraries/${version}`, `@missing-elements/h5p-libraries@${version}`)
+// One wait for both, in CI, where the pack was published moments before in the same run (#253).
+const until = waitUntil()
+const response = await served(`https://registry.npmjs.org/@missing-elements%2fh5p-libraries/${version}`, `@missing-elements/h5p-libraries@${version}`, { until })
+stopUnlessAnswered(response, `@missing-elements/h5p-libraries@${version} on npm`)
 if (!response.ok) {
   console.error(
     `[library-pack] @missing-elements/h5p-libraries@${version} is not on npm (${response.status}). ` +
@@ -28,7 +30,8 @@ if (!response.ok) {
 }
 
 // From jsDelivr, where `pack` fetches the parts from.
-const index = await served(`https://cdn.jsdelivr.net/npm/@missing-elements/h5p-libraries@${version}/parts/index.json`, `h5p-libraries@${version}/parts/index.json on jsDelivr`)
+const index = await served(`https://cdn.jsdelivr.net/npm/@missing-elements/h5p-libraries@${version}/parts/index.json`, `h5p-libraries@${version}/parts/index.json on jsDelivr`, { until })
+stopUnlessAnswered(index, `h5p-libraries@${version}/parts/index.json on jsDelivr`)
 const local = await readFile(resolve(import.meta.dirname, '..', '..', 'libraries', 'parts', 'index.json'), 'utf8')
 const same = index.ok && JSON.stringify((await index.json()).libraries) === JSON.stringify(JSON.parse(local).libraries)
 if (!same) {

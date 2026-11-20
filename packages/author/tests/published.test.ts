@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { dependenciesServed, served } from '../../../scripts/published.mjs'
+import { dependenciesServed, served, stopUnlessAnswered } from '../../../scripts/published.mjs'
 
 /*
  * The check, before a package is published, that npm serves what it depends on (#253): in CI it
@@ -64,6 +64,20 @@ describe('waiting for npm to serve a version', () => {
     expect(calls).toBe(2)
   })
 
+  it('reads the body of a success, and asks again when it cannot be read', async () => {
+    let calls = 0
+    const cut = async () => {
+      calls++
+      const body = calls > 1 ? { exports: { './plan': './plan.js' } } : undefined
+      return { ok: true, status: 200, json: async () => body ?? Promise.reject(new TypeError('terminated')) }
+    }
+    expect(await served('u', 'x', { minutes: 0, poll: 1, fetch: cut })).toMatchObject({ ok: false, status: 'terminated' })
+    calls = 0
+    const response = await served('u', 'x', { minutes: 1, poll: 1, fetch: cut })
+    expect(await response.json()).toEqual({ exports: { './plan': './plan.js' } })
+    expect(calls).toBe(2)
+  })
+
   it('waits as long as H5P_PUBLISH_WAIT says, and no longer', async () => {
     vi.stubEnv('H5P_PUBLISH_WAIT', '1')
     const late = answers(404, 404, 200)
@@ -76,9 +90,34 @@ describe('waiting for npm to serve a version', () => {
   })
 })
 
+describe('a check whose request failed', () => {
+  it('goes on after a success or a 404, and stops on anything else, which says nothing about the version', () => {
+    const exit = vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+      throw new Error(`exit ${code}`)
+    }) as never)
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const response = (ok: boolean, status: number | string) => ({ ok, status, json: async () => undefined })
+    stopUnlessAnswered(response(true, 200), 'x@1.0.0 on npm')
+    stopUnlessAnswered(response(false, 404), 'x@1.0.0 on npm')
+    for (const status of [403, 503, 'ENOTFOUND', 'no answer in time']) {
+      expect(() => stopUnlessAnswered(response(false, status), 'x@1.0.0 on npm')).toThrow('exit 1')
+    }
+    expect(error.mock.calls.map(([line]) => line)).toEqual([
+      expect.stringContaining('x@1.0.0 on npm could not be checked (403)'),
+      expect.stringContaining('(503)'),
+      expect.stringContaining('(ENOTFOUND)'),
+      expect.stringContaining('(no answer in time)')
+    ])
+    expect(error.mock.calls[0][0]).not.toMatch(/publish it/i)
+    exit.mockRestore()
+    error.mockRestore()
+  })
+})
+
 describe('the dependencies a package names by workspace:', () => {
-  it('are each asked for at the version the workspace has, and only those', async () => {
-    const packages = join(dir, 'packages')
+  let packages: string
+  beforeAll(async () => {
+    packages = join(dir, 'packages')
     const write = async (folder: string, manifest: object) => {
       await mkdir(join(packages, folder), { recursive: true })
       await writeFile(join(packages, folder, 'package.json'), JSON.stringify(manifest))
@@ -93,12 +132,23 @@ describe('the dependencies a package names by workspace:', () => {
     await write('b', { name: '@scope/b', version: '2.3.4' })
     await write('c', { name: '@scope/c', version: '0.5.0' })
     await write('d', { name: '@scope/d', version: '9.9.9' })
+  })
+
+  it('are each asked for at the version the workspace has, and only those', async () => {
     const { fetch, asked } = answers(200, 404)
     expect(await dependenciesServed(join(packages, 'a'), { minutes: 0, fetch })).toEqual([
       { name: '@scope/c', version: '0.5.0', status: 200, ok: true },
       { name: '@scope/b', version: '2.3.4', status: 404, ok: false }
     ])
     expect(asked).toEqual(['https://registry.npmjs.org/@scope%2fc/0.5.0', 'https://registry.npmjs.org/@scope%2fb/2.3.4'])
+  })
+
+  it('share one wait: one that is missing leaves the next none of its own', async () => {
+    const { fetch, asked } = answers(404)
+    const results = await dependenciesServed(join(packages, 'a'), { until: Date.now() + 30, poll: 1, fetch })
+    expect(results.map(({ ok }) => ok)).toEqual([false, false])
+    expect(asked.filter((url) => url.includes('%2fc/')).length).toBeGreaterThan(1)
+    expect(asked.filter((url) => url.includes('%2fb/'))).toHaveLength(1)
   })
 
   it('for the MCP server, are the author and the verifier at their versions here', async () => {

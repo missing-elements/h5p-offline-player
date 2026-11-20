@@ -9,7 +9,10 @@
  */
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { served } from '../../../scripts/published.mjs'
+import { served, stopUnlessAnswered, waitUntil } from '../../../scripts/published.mjs'
+
+// One wait for both, in CI, where each was published moments before in the same run (#253).
+const until = waitUntil()
 
 /**
  * @param {string} folder the package's folder under packages/
@@ -19,8 +22,8 @@ import { served } from '../../../scripts/published.mjs'
  */
 async function published(folder, name, subpath, why) {
   const { version } = JSON.parse(await readFile(resolve(import.meta.dirname, '..', '..', folder, 'package.json'), 'utf8'))
-  // Waited for in CI, where it was published moments before in the same run (#253).
-  const response = await served(`https://registry.npmjs.org/${name.replaceAll('/', '%2f')}/${version}`, `${name}@${version}`)
+  const response = await served(`https://registry.npmjs.org/${name.replaceAll('/', '%2f')}/${version}`, `${name}@${version}`, { until })
+  stopUnlessAnswered(response, `${name}@${version} on npm`)
   if (!response.ok) {
     console.error(`[${folder}] ${name}@${version} is not on npm (${response.status}). Publish it from packages/${folder} first: the embed package depends on it, for its ${subpath}.`)
     process.exit(1)
