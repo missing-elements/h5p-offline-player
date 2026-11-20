@@ -48,6 +48,8 @@ apps/skills/           the skills' test project: author-verify, author-playback,
                        front-matter
 skills/                the agent skills, at the root, where `npx skills add` looks
 docs/                  the README's longer sections, for integrators
+scripts/               published.mjs, the check before a package is published that npm serves what
+                       it depends on (design/build.md)
 api/, vercel.json      the hosted demo's Vercel function and deployment; at the root because that
                        is the Vercel project's root, which only the dashboard can move
 ```

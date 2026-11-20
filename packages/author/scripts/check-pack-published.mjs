@@ -11,18 +11,20 @@
  */
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import { served } from '../../../scripts/published.mjs'
 
 const packages = resolve(import.meta.dirname, '..', '..')
 /** @param {string} directory */
 const versionOf = async (directory) => JSON.parse(await readFile(resolve(packages, directory, 'package.json'), 'utf8')).version
 
+// Each waited for in CI, where it was published moments before in the same run (#253).
 const version = await versionOf('libraries')
-const response = await fetch(`https://registry.npmjs.org/@missing-elements%2fh5p-libraries/${version}`)
+const response = await served(`https://registry.npmjs.org/@missing-elements%2fh5p-libraries/${version}`, `@missing-elements/h5p-libraries@${version}`)
 if (!response.ok) {
   console.error(`[library-pack] @missing-elements/h5p-libraries@${version} is not on npm (${response.status}). Publish it from packages/libraries first: the author package pins it.`)
   process.exit(1)
 }
-const index = await fetch(`https://cdn.jsdelivr.net/npm/@missing-elements/h5p-libraries@${version}/parts/index.json`)
+const index = await served(`https://cdn.jsdelivr.net/npm/@missing-elements/h5p-libraries@${version}/parts/index.json`, `h5p-libraries@${version}/parts/index.json on jsDelivr`)
 const local = await readFile(resolve(packages, 'libraries', 'parts', 'index.json'), 'utf8')
 const same = index.ok && JSON.stringify((await index.json()).libraries) === JSON.stringify(JSON.parse(local).libraries)
 if (!same) {
@@ -32,7 +34,7 @@ if (!same) {
 console.log(`[library-pack] @missing-elements/h5p-libraries@${version} is published, with this checkout's index`)
 
 const player = await versionOf('player')
-const published = await fetch(`https://registry.npmjs.org/@missing-elements%2fh5p-offline-player/${player}`)
+const published = await served(`https://registry.npmjs.org/@missing-elements%2fh5p-offline-player/${player}`, `@missing-elements/h5p-offline-player@${player}`)
 if (!published.ok) {
   console.error(`[player] @missing-elements/h5p-offline-player@${player} is not on npm (${published.status}). Publish it from packages/player first: the author package pins it, for its ./plan.`)
   process.exit(1)
@@ -44,7 +46,7 @@ if (!(await published.json()).exports?.['./plan']) {
 console.log(`[player] @missing-elements/h5p-offline-player@${player} is published, and exports ./plan`)
 
 const normalize = await versionOf('normalize')
-const normalizer = await fetch(`https://registry.npmjs.org/@missing-elements%2fh5p-normalize/${normalize}`)
+const normalizer = await served(`https://registry.npmjs.org/@missing-elements%2fh5p-normalize/${normalize}`, `@missing-elements/h5p-normalize@${normalize}`)
 if (!normalizer.ok) {
   console.error(`[normalize] @missing-elements/h5p-normalize@${normalize} is not on npm (${normalizer.status}). Publish it from packages/normalize first: the author package depends on it, for its ./crc32.`)
   process.exit(1)
