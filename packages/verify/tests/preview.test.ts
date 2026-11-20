@@ -143,7 +143,7 @@ describe('h5p-verify --preview', () => {
       preview.close()
       await browser.close()
     }
-  }, 120_000)
+  })
 
   it('offers the package for download, until its server has gone', async () => {
     const preview = await previewPackage({ file: quiz, port: 0 })
@@ -174,7 +174,7 @@ describe('h5p-verify --preview', () => {
       preview.close()
       await browser.close()
     }
-  }, 60_000)
+  })
 
   it('follows a theme switched in another tab of the same preview', async () => {
     const preview = await previewPackage({ file: quiz, port: 0 })
@@ -193,7 +193,7 @@ describe('h5p-verify --preview', () => {
       preview.close()
       await browser.close()
     }
-  }, 60_000)
+  })
 
   it('ends by itself when no tab opens it in time', async () => {
     const preview = await previewPackage({ file: quiz, port: 0, openWait: 100 })
@@ -222,7 +222,7 @@ describe('h5p-verify --preview', () => {
     } finally {
       if (child.exitCode === null) child.kill()
     }
-  }, 30_000)
+  })
 
   // npm runs the command as its child and passes on the signals it gets, while a terminal sends
   // Ctrl+C to the whole process group, so through npx the command gets SIGINT twice (#79). The
@@ -248,11 +248,11 @@ describe('h5p-verify --preview', () => {
     } finally {
       if (group.exitCode === null) process.kill(-group.pid!, 'SIGKILL')
     }
-  }, 30_000)
+  })
 
   it("refuses the check's own options, and --no-open without --preview", async () => {
     expect(await run(quiz, '--preview', '--json', '--out', dir)).toEqual({ code: 2, stderr: '--preview does not take --out, --json\n' })
     expect(await run(quiz, '--no-open')).toEqual({ code: 2, stderr: '--no-open goes with --preview\n' })
     expect((await run(join(dir, 'missing.h5p'), '--preview', '--no-open')).code).toBe(2)
-  }, 30_000)
+  })
 })

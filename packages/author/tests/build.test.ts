@@ -899,8 +899,7 @@ describe('media', () => {
     expect(await problems(source(['a stray line', text(500, 600)], []), { base: dir })).toEqual([
       expect.stringMatching(/^params\.interactiveVideo\.assets\.interactions\[0\]: expected an object/)
     ])
-    // Several builds of a video: 1.3 s here, 2 to 3 s on CI, past vitest's 5 s once on a slow runner (#242).
-  }, 20_000)
+  })
 
   it('gives a download up once nothing has arrived for a while, however long a slow one takes', async () => {
     const reported: string[] = []
@@ -1013,7 +1012,7 @@ describe('the build', () => {
     expect((await exec(process.execPath, [bin, '-h'])).stdout).toMatch(/^Usage:\n {2}h5p-author build/)
     expect((await exec(process.execPath, [bin, '-v'])).stdout).toMatch(/^@missing-elements\/h5p-author \d+\.\d+\.\d+, library pack \d+\.\d+\.\d+\n$/)
     await expect(exec(process.execPath, [bin, 'build', 'a.json', 'a.h5p', '--markdown'])).rejects.toMatchObject({ code: 1, stderr: 'h5p-author: build does not take --markdown\n' })
-  }, 120_000)
+  })
 })
 
 describe('the package', () => {
