@@ -7,7 +7,9 @@
  * not install either, and one pinned to a player published before `./plan` existed would install
  * and fail on its first import, so the version on npm has to export it. And the normalizer, a
  * range from the version packages/normalize has, whose `./crc32` the page's build imports (#108):
- * that version has to be on npm with it, or a page's build fails on its first import.
+ * that version has to be on npm with it, or a page's build fails on its first import. The page's
+ * build also imports `faststartPlan` from its `./mp4` (#218), which npm's record of a version does
+ * not list, so the version itself is held to the first that has it.
  */
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
@@ -54,6 +56,14 @@ if (!(await published.json()).exports?.['./plan']) {
 console.log(`[player] @missing-elements/h5p-offline-player@${player} is published, and exports ./plan`)
 
 const normalize = await versionOf('normalize')
+// The first with `faststartPlan` in `./mp4`. The range published is from packages/normalize's
+// version, so one below this would let the author install beside a normalizer without it.
+const NORMALIZER_FLOOR = [1, 5, 0]
+const [major, minor, patch] = normalize.split('.').map(Number)
+if (major === NORMALIZER_FLOOR[0] && (minor < NORMALIZER_FLOOR[1] || (minor === NORMALIZER_FLOOR[1] && patch < NORMALIZER_FLOOR[2]))) {
+  console.error(`[normalize] packages/normalize is ${normalize}, and the page's build imports faststartPlan from its ./mp4, new in ${NORMALIZER_FLOOR.join('.')}: bump the normalizer to that, publish it, and publish the author package against it.`)
+  process.exit(1)
+}
 const normalizer = await served(`https://registry.npmjs.org/@missing-elements%2fh5p-normalize/${normalize}`, `@missing-elements/h5p-normalize@${normalize}`, { until })
 stopUnlessAnswered(normalizer, `@missing-elements/h5p-normalize@${normalize} on npm`)
 if (!normalizer.ok) {

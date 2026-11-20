@@ -9,14 +9,9 @@ import { faststartPlan } from './mp4.mjs'
 const READ_CHUNK = 1024 * 1024
 
 /**
- * @typedef {{ start: number, end: number } | { bytes: Uint8Array }} Piece
- *   Either a range of the source file — absolute positions, end exclusive — or literal bytes.
- *
- * @typedef {object} FaststartPlan
- * @property {'moved' | 'already' | 'skipped'} status
- * @property {string} detail why, in words
- * @property {Piece[]} pieces the output in order; the input itself when nothing moved
- * @property {number} size the output length, always equal to the input length
+ * @typedef {import('./mp4.mjs').Piece} Piece here a range of the source file, absolute positions,
+ *   or literal bytes
+ * @typedef {import('./mp4.mjs').FaststartPlan} FaststartPlan
  */
 
 /**

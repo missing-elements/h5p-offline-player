@@ -7,7 +7,6 @@
  */
 import { formatBytes } from './format.mjs'
 
-
 /**
  * @typedef {(offset: number, length: number) => Promise<Uint8Array>} Read the file's bytes from an
  *   offset, fewer at its end
@@ -177,6 +176,13 @@ const CONTAINERS = new Set(['trak', 'mdia', 'minf', 'stbl'])
 const MAX_MOOV_SIZE = 256 * 1024 * 1024
 
 /**
+ * Deeper than the containers of a real index nest, which is four, `trak` to `stbl`: an index made
+ * of containers inside containers, as only a crafted file has, is left alone before the walk
+ * through it runs out of stack.
+ */
+const MAX_DEPTH = 8
+
+/**
  * @typedef {{ start: number, end: number } | { bytes: Uint8Array }} Piece a range of the media
  *   file, end exclusive, or literal bytes
  *
@@ -262,9 +268,11 @@ export async function faststartPlan(read, size) {
  * @param {number} start
  * @param {number} end
  * @param {(position: number) => number} shift
+ * @param {number} [depth] how many containers deep `start` is
  * @returns {string | null}
  */
-function patchChunkOffsets(moov, start, end, shift) {
+function patchChunkOffsets(moov, start, end, shift, depth = 0) {
+  if (depth > MAX_DEPTH) return 'containers nested deeper than an index has'
   const view = new DataView(moov.buffer, moov.byteOffset, moov.byteLength)
   let position = start
 
@@ -290,7 +298,7 @@ function patchChunkOffsets(moov, start, end, shift) {
     if (type === 'saio') return 'encrypted sample data (saio) is not supported'
 
     if (CONTAINERS.has(type)) {
-      const problem = patchChunkOffsets(moov, position + headerSize, position + atomSize, shift)
+      const problem = patchChunkOffsets(moov, position + headerSize, position + atomSize, shift, depth + 1)
       if (problem) return problem
     } else if (type === 'stco' || type === 'co64') {
       const body = position + headerSize

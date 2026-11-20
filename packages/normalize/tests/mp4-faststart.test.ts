@@ -120,6 +120,24 @@ describe('planFaststart', () => {
 })
 
 describe('faststartPlan', () => {
+  it('leaves alone an index of containers nested deeper than a real one, however deep, and one just as deep as a real one is moved', async () => {
+    // A hundred thousand `trak` atoms, each holding the next: a walk into every one runs out of stack.
+    const levels = 100_000
+    const nested = new Uint8Array(levels * 8)
+    const view = new DataView(nested.buffer)
+    for (let level = 0; level < levels; level++) {
+      view.setUint32(level * 8, nested.length - level * 8)
+      nested.set(new TextEncoder().encode('trak'), level * 8 + 4)
+    }
+    const crafted = concat([atom('ftyp', u32s(1)), atom('mdat', new Uint8Array(8)), atom('moov', nested)])
+    const plan = await faststartPlan(async (offset, length) => crafted.subarray(offset, offset + length), crafted.length)
+    expect(plan).toMatchObject({ status: 'skipped', detail: 'containers nested deeper than an index has', pieces: [{ start: 0, end: crafted.length }] })
+
+    const real = concat([atom('ftyp', u32s(1)), atom('mdat', new Uint8Array(8)), atom('moov', atom('trak', atom('mdia', atom('minf', atom('stbl', stco([16]))))))])
+    expect((await faststartPlan(async (offset, length) => real.subarray(offset, offset + length), real.length)).status).toBe('moved')
+  })
+
+
   it('lays out bytes held in memory as the faststart lays out a file, and leaves the bytes it read as they were', async () => {
     const sample = sampleMp4()
     const original = sample.bytes.slice()

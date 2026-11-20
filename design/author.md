@@ -145,7 +145,8 @@ text to the content check's rules, and `apps/skills` plays every example untrust
   needs no project set up; `--libraries` names another `parts/` folder. Each part is checked against
   the index's SHA-256 before it is read. `prepublishOnly` refuses while that version is not on npm
   with this checkout's index (`scripts/check-pack-published.mjs`, which checks the player it pins
-  and the normalizer's `./crc32` too).
+  and the normalizer's `./crc32` too, and holds the normalizer's version to 1.5.0, the first with
+  the `faststartPlan` the page's build imports, #218).
 - **The player's library rules, not copies of them** (#106, the owner's rule: reuse what another
   package has). Which libraries content names, an addon's patterns and which parts of the pack a
   package needs are the player's: the build plans with `planPack` from the player's `./plan`. Two

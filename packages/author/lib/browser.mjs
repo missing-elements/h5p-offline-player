@@ -127,20 +127,17 @@ function pageMedia(files) {
   }
 }
 
-/** The files the normalizer lays out with their index first, by extension, as it tells them. */
-const ISO_MEDIA = /\.(?:mp4|m4v|m4a|mov)$/i
-
 /**
  * A stored video or recording laid out to stream, its index (`moov`) in front of its media, as
  * Node's build lays it out through the normalizer (#218): by the normalizer's own plan
  * (`faststartPlan`), made of the given file's slices and the rewritten index, so that no byte of
- * the media is copied. A file of another kind, or one the plan leaves as it is, is the file given.
+ * the media is copied. Every file is asked of the plan, which tells an mp4 or an m4a by its first
+ * eight bytes and leaves any other file, and one with its index first already, as it is: no list
+ * of extensions is kept here beside the normalizer's.
  * @param {Blob} blob
- * @param {string} name its name in the package
  * @returns {Promise<Blob>}
  */
-async function laidOut(blob, name) {
-  if (!ISO_MEDIA.test(name)) return blob
+async function laidOut(blob) {
   const read = async (/** @type {number} */ offset, /** @type {number} */ length) => new Uint8Array(await blob.slice(offset, offset + length).arrayBuffer())
   const plan = await faststartPlan(read, blob.size)
   if (plan.status !== 'moved') return blob
@@ -194,7 +191,7 @@ export async function buildPackage(input, options) {
     await writePackage(writer, built, pack, async () => {
       for (const item of media.files) {
         // Stored, its size and CRC in its local header: written into a stream, zip.js would put them in a descriptor after it.
-        const file = await laidOut(item.from, item.name)
+        const file = await laidOut(item.from)
         await writer.add(`content/${item.name}`, new BlobReader(file), { passThrough: true, compressionMethod: 0, uncompressedSize: file.size, crc32: await crcOf(file) })
       }
     })
