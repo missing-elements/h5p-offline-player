@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { cp, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { cp, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises'
 import { createServer, type Server } from 'node:http'
 import { createRequire } from 'node:module'
 import type { AddressInfo } from 'node:net'
@@ -1012,6 +1012,78 @@ describe('the build', () => {
     expect((await exec(process.execPath, [bin, '-h'])).stdout).toMatch(/^Usage:\n {2}h5p-author build/)
     expect((await exec(process.execPath, [bin, '-v'])).stdout).toMatch(/^@missing-elements\/h5p-author \d+\.\d+\.\d+, library pack \d+\.\d+\.\d+\n$/)
     await expect(exec(process.execPath, [bin, 'build', 'a.json', 'a.h5p', '--markdown'])).rejects.toMatchObject({ code: 1, stderr: 'h5p-author: build does not take --markdown\n' })
+  })
+})
+
+describe('what a source was built with (#219)', () => {
+  const entry = pack.libraries.find(library => library.machineName === 'H5P.TrueFalse')!
+  const now = `H5P.TrueFalse ${entry.majorVersion}.${entry.minorVersion}`
+  const before = `H5P.TrueFalse ${entry.majorVersion}.${entry.minorVersion - 1}`
+  const source = { ...META, type: 'H5P.TrueFalse', params: { question: 'Is the Nile a river?', correct: 'true' } }
+
+  it('hands back the source naming the content type and the pack\'s version of it, beside its type', async () => {
+    const result = await build(source)
+    expect(result.builtWith).toBe(now)
+    expect(result.source).toEqual({ ...source, builtWith: now })
+    expect(Object.keys(result.source).slice(0, 2)).toEqual(['type', 'builtWith'])
+    // Built again as handed back: the same content, and nothing said.
+    const again = await build(result.source)
+    expect(again.content).toEqual(result.content)
+    expect(again.notes).toEqual([])
+    expect((await buildPackage(source, undefined, { check: true })).builtWith).toBe(now)
+  })
+
+  it('says so where the pack has another version of the type: a note where it builds, beside the problems where it does not', async () => {
+    const { notes, source: kept } = await build({ ...source, builtWith: before })
+    expect(notes).toEqual([{ path: 'builtWith', message: `was ${before} and this pack has ${now}: its fields may have changed since, so play it through before handing it over` }])
+    expect(kept.builtWith).toBe(now)
+    expect(await problems({ ...source, builtWith: before, params: { ...source.params, corect: 'true' } })).toEqual([
+      expect.stringMatching(/^params\.corect: is not a field here/),
+      `builtWith: this source was last built with ${before} and this pack has ${now}: a field named here may have changed since, and the type's fields as they are now say what to write`
+    ])
+    // Alone it is no problem, and another type's is the type changed by hand: named anew, nothing said.
+    expect((await build({ ...source, builtWith: 'H5P.Blanks 1.14' })).notes).toEqual([])
+  })
+
+  it('refuses one that is not a type and a version, saying to leave it out', async () => {
+    for (const builtWith of ['yes', 'H5P.TrueFalse', 1.8, 'H5P.TrueFalse 1.8.2']) {
+      expect(await problems({ ...source, builtWith })).toEqual(['builtWith: is written by a build, the content type and its version then, as "H5P.Blanks 1.14": leave it out'])
+    }
+  })
+
+  it('as a command writes it beside the package, never over a file but the one it builds from', async () => {
+    const project = await realpath(await mkdtemp(join(dir, 'built-with-')))
+    const run = (...args: string[]) => exec(process.execPath, [bin, 'build', ...args], { cwd: project })
+    const read = async (name: string) => JSON.parse(await readFile(join(project, name), 'utf8'))
+    await writeFile(join(project, 'source.json'), JSON.stringify(source))
+    const { stdout } = await run('source.json', 'rivers.h5p')
+    expect(stdout).toContain(`Its source, naming ${now} as what it was built with, is ${join(project, 'rivers.source.json')}: hand it over with the package.`)
+    expect(await read('rivers.source.json')).toEqual({ ...source, builtWith: now })
+
+    // A name that is taken stops the build before it writes a package; a check writes neither.
+    await writeFile(join(project, 'taken.source.json'), 'mine')
+    await expect(run('source.json', 'taken.h5p')).rejects.toMatchObject({ stderr: expect.stringContaining('taken.source.json exists, and a build writes its source there and never over a file: name a new package') })
+    await run('--check', 'source.json')
+    expect((await readdir(project)).sort()).toEqual(['rivers.h5p', 'rivers.source.json', 'source.json', 'taken.source.json'])
+    expect(await readFile(join(project, 'taken.source.json'), 'utf8')).toBe('mine')
+
+    // The file it builds from is kept up to date, and left as it is where it says so already.
+    await writeFile(join(project, 'old.source.json'), JSON.stringify({ ...source, builtWith: before }))
+    const old = await run('old.source.json', 'old.h5p')
+    expect(old.stderr).toContain(`Note: builtWith was ${before} and this pack has ${now}`)
+    expect(await read('old.source.json')).toEqual({ ...source, builtWith: now })
+    const written = `${JSON.stringify({ ...source, builtWith: now })}\n\n`
+    await writeFile(join(project, 'same.source.json'), written)
+    await run('same.source.json', 'same.h5p')
+    expect(await readFile(join(project, 'same.source.json'), 'utf8')).toBe(written)
+
+    // A quiz in the quiz format has no field for it, and stays as written.
+    const quiz = JSON.stringify(example)
+    await writeFile(join(project, 'quiz.source.json'), quiz)
+    const { stdout: said } = await run('quiz.source.json', 'quiz.h5p')
+    expect(said).not.toContain('Its source')
+    expect(await readFile(join(project, 'quiz.source.json'), 'utf8')).toBe(quiz)
+    expect((await readdir(project)).filter(name => name.endsWith('.tmp'))).toEqual([])
   })
 })
 

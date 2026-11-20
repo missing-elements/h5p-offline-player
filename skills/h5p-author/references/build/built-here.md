@@ -44,9 +44,9 @@ do it: the person's own play is the check, and a script of your own costs more t
 
 Deliver:
 
-- the `.h5p`, and its source beside it, under the package's name with `.source.json`
-  (`course.source.json`), copied as the package was. Name the files it names, if any: a build
-  reads them beside it;
+- the `.h5p`, and its source, which the build wrote beside it under the package's name with
+  `.source.json` (`course.source.json`): hand over that file, not the one you wrote, copied as
+  the package was. Name the files it names, if any: a build reads them beside it;
 - this line, as it is but for the source file's name, the only web address you give:
 
   ```text
