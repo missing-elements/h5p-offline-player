@@ -217,7 +217,8 @@ export async function createServer(options = {}) {
     try {
       result = await buildPackage(source, target, { base: dirname(target), within: allowed, fetch: publicFetch, libraries: options.libraries })
       // Made new: a file or a link put at its name since the name was found free is not written through.
-      unwritten = await writeFile(sourceFile, `${JSON.stringify(source, null, 2)}\n`, { flag: 'wx' }).then(() => undefined, (error) => error)
+      // As the build took it, naming the content type's version it was built with (author's #219).
+      unwritten = await writeFile(sourceFile, `${JSON.stringify(result.source, null, 2)}\n`, { flag: 'wx' }).then(() => undefined, (error) => error)
     } catch (error) {
       if (error instanceof SourceError) return refusal(`${error.message}\nFix each at its path and build again.${/outside the folders/.test(error.message) ? ` ${whereFiles(allowed)}` : ''}`)
       return refusal(error instanceof Error ? error.message : String(error))

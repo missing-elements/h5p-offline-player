@@ -106,7 +106,10 @@ describe('h5p_build', () => {
     expect(text).toMatch(/^pass {2}boiling-point\.h5p/m)
     expect(text).not.toMatch(/screenshot:/)
     expect(answer.content.some((part) => part.type === 'image' && part.mimeType === 'image/png')).toBe(true)
-    expect(JSON.parse(await readFile(join(folder, 'boiling-point.source.json'), 'utf8'))).toEqual(SOURCE)
+    // As the build took it, naming the content type's version it was built with, beside its type.
+    const kept = JSON.parse(await readFile(join(folder, 'boiling-point.source.json'), 'utf8'))
+    expect(kept).toEqual({ ...SOURCE, builtWith: expect.stringMatching(/^H5P\.TrueFalse \d+\.\d+$/) })
+    expect(Object.keys(kept).slice(0, 2)).toEqual(['type', 'builtWith'])
   })
 
   it('takes the next number rather than write over a file', async () => {

@@ -417,6 +417,28 @@ text to the content check's rules, and `apps/skills` plays every example untrust
   packages, the 79 checked against their own libraries give 36 notes of a picture with no alt
   text in 8 packages, and 4 of answers alike in one, a test whose answers all read "Test"; no
   question with no answer marked correct, and no text with no gap.
+- **A source names the version of its type it was built with, and the build writes that** (#219,
+  the owner's calls). A source handed over beside a package is built again later, on the build
+  page or by a newer release, with a newer pack. So a build hands back the source with
+  `builtWith`, the content type and the pack's major.minor of it (`H5P.Blanks 1.14`), beside its
+  `type` (`result.source`, `result.builtWith`), and a build of a source that names another
+  version of the same type says so: a note where it builds, and one more line with the problems
+  where it does not, since a field that changed since may have made them. Alone it is never a
+  problem, and another type's is the type changed by hand, named anew with nothing said.
+  - **The type's version, not the pack's.** Every route knows it, a build from a `parts/` folder
+    too, whose index names no pack; and it says what moved, where two pack versions say only
+    that something did.
+  - **The build writes it, since a model writes the source before there is a build.** The
+    command line writes `<package>.source.json` beside the package, as the MCP server does, both
+    from `result.source`; `buildPackage` itself writes the package alone. The skill's hand-over
+    gives that file, not the one the chat wrote. It is never written over: a name that is taken
+    stops the build before a package is made. The one exception is the file being built, the
+    usual name of a source that was handed over, which is rewritten by a rename, and only where
+    what it names has changed. A quiz in the quiz format has no field for it and stays as written.
+  - `builtWith` is a field of `sourceSchema`, described as a build's to write, and left out of
+    the fields a problem lists as a source's; one that is not a name and a version is a problem
+    saying to leave it out. A read leaves it out: the next build writes it.
+  - The build page shows it once the organisation's site pins a release with it (not done yet).
 - **The hand-over carries the source and one web address, the build page's plain one** (#190,
   #215, the owner's calls). Beside the package, the hand-over gives the source as a file named
   after the package with `.source.json`, and one fixed line saying to open that file on the build

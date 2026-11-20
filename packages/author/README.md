@@ -30,6 +30,7 @@ npx @missing-elements/h5p-author@latest build rivers.json rivers.h5p
 ```
 Built /work/rivers.h5p: H5P.Blanks, 9 libraries from the library pack 1.1.0, 3 more for installing on an H5P site.
 Needs H5P core 1.28 or newer on a site it is uploaded to: Moodle 4.5.11, 5.0.7 or 5.1.4 and later, or the WordPress H5P plugin 1.17 and later. An older site refuses it.
+Its source, naming H5P.Blanks 1.14 as what it was built with, is /work/rivers.source.json: hand it over with the package.
 H5P.Blanks 1.14: interface texts from its translation language/de.json.
 Not verified: run npx @missing-elements/h5p-verify@latest on it and look at its screenshot before handing it over.
 ```
@@ -41,6 +42,13 @@ Question Set gains 120 kB by them; a Course Presentation or a Branching Scenario
 the same package exported from Moodle has, because their editors bring every type they can hold.
 A site also refuses a package if a library in it asks for a newer H5P core than the site has. The
 build's second line says which core that is: with pack 1.1.0, 1.28 for nearly every type.
+
+Beside the package the command writes the source again, as `rivers.source.json`, with one field
+more: `builtWith`, the content type and the pack's version of it. A source is built again later,
+often with a newer pack, and a build of one that names another version of its type says so: as a
+note where it builds, and with the problems where it does not, since a field may have changed
+since. That file is never written over either, but where it is the file being built, which is
+kept up to date.
 
 It is written for an AI agent and its tokens: the agent writes what only an author can know, and
 code writes everything that can be derived. The
@@ -58,6 +66,7 @@ an example and the fields, then the check and the preview.
 | `license` | An H5P licence code: `U` (undisclosed), `CC BY`, `CC BY-SA`, `CC BY-ND`, `CC BY-NC`, `CC BY-NC-SA`, `CC BY-NC-ND`, `CC0 1.0`, `CC PDM`, `GNU GPL`, `PD`, `ODC PDDL`, `C`; `licenseVersion` for a CC BY one |
 | `authors` | `[{ "name": "…", "role": "Author" }]`, the role one of Author, Editor, Licensee, Originator |
 | `params` | The content type's fields that differ from their defaults |
+| `builtWith` | Written by a build, never by hand: the content type and its version when the source was last built, `H5P.Blanks 1.14` |
 
 What `params` takes is what H5P's editor would let an author save in the same form:
 
@@ -214,7 +223,7 @@ Set's 2.6 MB, a container's up to 8.4 MB. `--all <folder>` writes one per conten
 ```js
 import { buildPackage, schemaOf, SourceError } from '@missing-elements/h5p-author'
 
-const { output, manifest, content, libraries, install, coreApi, translations, notes, media, outline } =
+const { output, source: built, builtWith, manifest, content, libraries, install, coreApi, translations, notes, media, outline } =
   await buildPackage(source, 'rivers.h5p', { base: process.cwd() })
 ```
 
@@ -253,7 +262,9 @@ source, the media written beside it by the paths it names them by, and what was 
 not come back as it is, each `{ path, message }`. With `within`, the package and the folder must be
 inside those folders, on their real paths.
 
-A result's `libraries` are the folders the package
+A result's `builtWith` is the content type and the pack's version of it, `H5P.Blanks 1.14`, and
+its `source` the source as built, naming it: what to keep with the package, as the command line
+writes it beside one. `buildPackage` writes the package alone. Its `libraries` are the folders the package
 plays with, `install` those carried for an H5P site's upload check, and `coreApi` the newest H5P
 core they ask for, `{ majorVersion, minorVersion }`, which a site needs to take the package;
 `coreApiLine(coreApi)` says it as the command line does. `missingForInstall(libraries)`
@@ -359,7 +370,7 @@ const { blob, notes } = await buildPackage(source, { libraries, files: { 'volga.
   Each part is fetched whole when a build first needs it, and checked against the index's SHA-256,
   as in Node. `close()` the pack when the page is done with it.
 - `buildPackage(source, { libraries, files, fetch })` throws a `SourceError` as in Node, and returns
-  `{ blob, manifest, content, libraries, install, coreApi, translations, notes, media }`, as in Node. Its options:
+  `{ blob, source, builtWith, manifest, content, libraries, install, coreApi, translations, notes, media }`, as in Node. Its options:
   - `libraries`: a pack `openPack` opened, or what to open one from for this build alone.
   - `files`: an object or a `Map` of the files a source names, by the names it gives them:
     `{ "path": "volga.png" }` takes `files['volga.png']`.

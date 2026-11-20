@@ -38,7 +38,7 @@ const isObject = (value) => value !== null && typeof value === 'object' && !Arra
 /** A source's fields, as `sourceSchema` declares them. */
 const FIELDS = Object.keys(sourceSchema.shape)
 /** Those a source says of itself, which H5P keeps in an object of their own, `metadata`. */
-const OWN = FIELDS.filter((name) => name !== 'type' && name !== 'params')
+const OWN = FIELDS.filter((name) => name !== 'type' && name !== 'params' && name !== 'builtWith')
 
 /**
  * The machine names a source's `type` may be: the pack's libraries but those carried only for an
@@ -169,7 +169,7 @@ export function sourceOf(input, names) {
   // The authors that hold are kept, so the content is checked with them.
   const authorsHold = holds(field.authors, given.authors, at.authors, report)
   if (Array.isArray(given.authors)) source.authors = authorsHold ? given.authors : given.authors.filter(authorHolds)
-  for (const key of /** @type {const} */ (['source', 'yearFrom', 'yearTo', 'params'])) {
+  for (const key of /** @type {const} */ (['source', 'yearFrom', 'yearTo', 'params', 'builtWith'])) {
     if (given[key] !== undefined && holds(field[key], given[key], at[key], report)) source[key] = given[key]
   }
   return { source: /** @type {Source} */ (source), problems, typed }
@@ -235,6 +235,19 @@ async function closure(pack, main, content) {
 }
 
 /**
+ * A source naming what it was built with, the content type and the pack's version of it, beside
+ * its `type`: what a build hands back to be kept with the package (#219), so that a build of it
+ * with a later pack can say the type has moved.
+ * @param {Source} source
+ * @param {string} builtWith as `libraryString` writes it, "H5P.Blanks 1.14"
+ * @returns {Source}
+ */
+function stamped(source, builtWith) {
+  const { type, builtWith: _before, ...rest } = source
+  return { type, builtWith, ...rest }
+}
+
+/**
  * A source made what a package holds, its media resolved through `media`: the manifest, the content,
  * the libraries' parts in the order the package lists them, and what is worth telling. Nothing is
  * written: the caller writes the package (`writePackage`) and its media.
@@ -244,10 +257,11 @@ async function closure(pack, main, content) {
  * @param {import('./media.mjs').MediaStore<F>} media
  * @param {Problem[]} [said] the problems `sourceOf` found in the source's own fields, which come
  *   first among the content's: all of them in one round (#174)
- * @returns {Promise<{ manifest: Record<string, unknown>, content: Record<string, unknown>, selected: Map<string, import('./pack.mjs').PartLibrary>, install: Map<string, import('./pack.mjs').PartLibrary>, coreApi: import('./install.mjs').CoreApi, translations: TranslationReport[], notes: Problem[], outline: string }>}
+ * @returns {Promise<{ source: Source, builtWith: string, manifest: Record<string, unknown>, content: Record<string, unknown>, selected: Map<string, import('./pack.mjs').PartLibrary>, install: Map<string, import('./pack.mjs').PartLibrary>, coreApi: import('./install.mjs').CoreApi, translations: TranslationReport[], notes: Problem[], outline: string }>}
  *   `selected`, the libraries the package plays with; `install`, those an H5P site's upload check wants with them; `coreApi`, the
  *   newest H5P core any of them asks for (`coreApiOf`); `outline`, the
- *   content as text for a review (`outlineOf`), made when it is first read
+ *   content as text for a review (`outlineOf`), made when it is first read; `builtWith`, the
+ *   content type and the version the pack has of it, and `source`, the source naming it (`stamped`)
  * @internal
  */
 export async function composePackage(source, pack, media, said = []) {
@@ -323,7 +337,15 @@ export async function composePackage(source, pack, media, said = []) {
   for (const place of placesOf(main, checked.params)) {
     if (place.library === 'H5P.InteractiveVideo') videoTimes(place.params, inSource(place.path), (file) => media.lengthOf(file), timed)
   }
+  // What the source was last built with, where this pack has another version of the type: said
+  // with the problems, which a field that changed since may have made, and a note where it builds.
+  const builtWith = libraryString(mainLibrary.library)
+  const before = source.builtWith !== undefined && source.builtWith !== builtWith && source.builtWith.split(' ')[0] === main ? source.builtWith : ''
+  if (before && (said.length || problems.length)) {
+    report('builtWith', `this source was last built with ${before} and this pack has ${builtWith}: a field named here may have changed since, and the type's fields as they are now say what to write`)
+  }
   if (said.length || problems.length) throw new SourceError([...said, ...problems])
+  if (before) note('builtWith', `was ${before} and this pack has ${builtWith}: its fields may have changed since, so play it through before handing it over`)
   const content = checked.params
 
   const { selected, addons } = await closure(pack, mainLibrary.library, content)
@@ -352,6 +374,7 @@ export async function composePackage(source, pack, media, said = []) {
   /** @type {string | undefined} */
   let outline
   return {
+    source: stamped(source, builtWith), builtWith,
     manifest, content, selected, install, translations, notes,
     coreApi: coreApiOf([...selected.values(), ...install.values()].map((part) => part.library)),
     // Made when it is first read: it is for a review, which only some callers make, and a build

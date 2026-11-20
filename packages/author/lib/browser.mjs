@@ -26,12 +26,14 @@ export * from './core.mjs'
  *   the `pack` export of `@missing-elements/h5p-libraries` as a bundler emits it: the index, each
  *   library with its part's URL
  * @typedef {{
- *   blob: Blob, manifest: Record<string, unknown>, content: Record<string, unknown>, libraries: string[], install: string[],
+ *   blob: Blob, source: import('./build.mjs').Source, builtWith: string, manifest: Record<string, unknown>, content: Record<string, unknown>, libraries: string[], install: string[],
  *   coreApi: import('./install.mjs').CoreApi, translations: import('./translate.mjs').TranslationReport[], notes: import('./build.mjs').Problem[], media: string[], outline: string
  * }} BuildResult the package, and what is worth telling about it: `libraries`, the folders it plays
  *   with; `install`, those it carries for an H5P site's upload check; `coreApi`, the newest H5P core
  *   they ask for, which a site needs to take the package (`coreApiLine` says it); `outline`, the
- *   content as text for a review (`outlineOf`)
+ *   content as text for a review (`outlineOf`); `builtWith`, the content type and the pack's version
+ *   of it, "H5P.Blanks 1.14", and `source`, the source as built, naming it: what to keep with the
+ *   package, so that a build with a later pack can say the type has moved
  * @typedef {{ libraries: Pack | PackIndex | string | URL, files?: Map<string, Blob> | Record<string, Blob>, fetch?: typeof fetch }} BuildOptions
  *   `libraries`, a pack `openPack` opened, which a page keeps for its builds, or what to open one
  *   from; `files`, the files a source names, by the names it gives them; `fetch`, for media named by
@@ -174,6 +176,8 @@ export async function buildPackage(input, options) {
     })
     return {
       blob: await writer.close(),
+      source: built.source,
+      builtWith: built.builtWith,
       manifest: built.manifest,
       content: built.content,
       libraries: [...built.selected.keys()],

@@ -17,6 +17,7 @@ const NAME = 'expected the author\'s name'
 const AUTHORS = 'name at least one author: [{ "name": "…", "role": "Author" }]'
 const ADDRESS = 'expected the address the content comes from'
 const YEAR = 'expected a year'
+const BUILT_WITH = 'is written by a build, the content type and its version then, as "H5P.Blanks 1.14": leave it out'
 
 /** @param {string} text */
 const written = (text) => text.trim() !== ''
@@ -56,11 +57,13 @@ const fields = {
   yearFrom: z.optional(z.int({ error: YEAR })),
   yearTo: z.optional(z.int({ error: YEAR })),
   params: z.optional(z.record(z.string(), z.unknown(), { error: 'expected an object of the content type\'s fields' })
-    .check(z.describe('The content type\'s fields that differ from their defaults')))
+    .check(z.describe('The content type\'s fields that differ from their defaults'))),
+  builtWith: z.optional(z.string({ error: BUILT_WITH }).check(z.regex(/^\S+ \d+\.\d+$/, { error: BUILT_WITH }),
+    z.describe('Written by a build, never by hand: the content type and its version when the source was last built')))
 }
 
-/** @internal What is said of a key that is no field of a source. */
-export const NO_FIELD = `is not a field of a source; the fields are ${Object.keys(fields).join(', ')}`
+/** @internal What is said of a key that is no field of a source: those one writes, so not what a build writes in it. */
+export const NO_FIELD = `is not a field of a source; the fields are ${Object.keys(fields).filter((name) => name !== 'builtWith').join(', ')}`
 /** @internal What is said of a source that is no object. */
 export const NO_SOURCE = 'expected an object: { "type", "title", "language", "license", "authors", "params" }'
 

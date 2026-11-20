@@ -26,12 +26,14 @@ import { SourceError } from './source-error.mjs'
  * @typedef {import('./build.mjs').Problem} Problem
  * @typedef {import('./translate.mjs').TranslationReport} TranslationReport
  * @typedef {{
- *   output: string, manifest: Record<string, unknown>, content: Record<string, unknown>,
+ *   output: string, source: import('./build.mjs').Source, builtWith: string, manifest: Record<string, unknown>, content: Record<string, unknown>,
  *   libraries: string[], install: string[], coreApi: import('./install.mjs').CoreApi, translations: TranslationReport[], notes: Problem[], media: string[], outline: string
  * }} BuildResult what was written, and what is worth telling about it: `libraries`, the folders the
  *   package plays with; `install`, those carried for an H5P site's upload check; `coreApi`, the
  *   newest H5P core they ask for, which a site needs to take the package (`coreApiLine` says it);
- *   `outline`, the content as text for a review (`outlineOf`)
+ *   `outline`, the content as text for a review (`outlineOf`); `builtWith`, the content type and
+ *   the pack's version of it, "H5P.Blanks 1.14", and `source`, the source as built, naming it: what
+ *   to keep with the package, so that a build with a later pack can say the type has moved
  * @typedef {{ libraries?: string, base?: string, fetch?: typeof fetch, within?: string[], check?: boolean }} BuildOptions
  *   `libraries`, a library pack's parts folder in place of the pinned pack; `base`, the folder a
  *   source's file paths are read from; `fetch`, for media named by web address; `within`, the
@@ -390,6 +392,8 @@ export async function buildPackage(input, output, options = {}) {
     if (check) {
       return {
         output: '',
+        source: built.source,
+        builtWith: built.builtWith,
         manifest: built.manifest,
         content: built.content,
         libraries: [...built.selected.keys()],
@@ -428,6 +432,8 @@ export async function buildPackage(input, output, options = {}) {
     })
     return {
       output: target,
+      source: built.source,
+      builtWith: built.builtWith,
       manifest: built.manifest,
       content: built.content,
       libraries: [...built.selected.keys()],

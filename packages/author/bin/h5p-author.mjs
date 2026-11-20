@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFile } from 'node:fs/promises'
+import { lstat, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, relative, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { buildPackage, coreApiLine, readPackage, schemaOf, SourceError, writeBundle, writeBundles } from '../lib/author.mjs'
@@ -16,7 +16,8 @@ const USAGE = `Usage:
 build   Makes a playable .h5p from a source: { "type", "title", "language", "license",
         "authors", "params" }, or a quiz in the h5p-author skill's quiz format. Writes only
         when the whole source is right, and never over an existing file; --check lists the
-        problems and notes and writes no package.
+        problems and notes and writes no package. Beside the package it writes the source
+        as <output>.source.json, naming the content type's version it was built with.
 read    Writes the source a build would take to make a package again into a folder,
         with the package's media beside it: to change it and build it again. Reads
         content made for the pack's versions of its libraries; never writes over a file.
@@ -77,6 +78,16 @@ function parse(argv) {
   return { positional: positionals, flags }
 }
 
+/**
+ * Whether two paths are one file, a link followed; false where either is not there.
+ * @param {string} one
+ * @param {string} other
+ */
+async function sameFile(one, other) {
+  const [first, second] = await Promise.all([one, other].map((path) => realpath(path).catch(() => null)))
+  return first !== null && first === second
+}
+
 try {
   const { positional, flags } = parse(process.argv.slice(2))
   const [command, ...rest] = positional
@@ -100,11 +111,43 @@ try {
     } catch (error) {
       throw new Error(`${rest[0]} is not a readable JSON file: ${error instanceof Error ? error.message : error}`)
     }
+    // The source a build keeps beside its package, naming what it was built with (#219): the
+    // package's name with `.source.json`. Looked at before any work, as the package's own name
+    // is: never written over, but where it is the file being built, which is kept up to date.
+    const beside = check ? '' : resolve(rest[1]).replace(/\.h5p$/i, '') + '.source.json'
+    const same = !check && await sameFile(beside, sourcePath)
+    const there = (/** @type {string} */ path) => lstat(path).then(() => true, () => false)
+    // A package that is there already is the build's to refuse, in its own words.
+    if (!check && !same && await there(beside) && !(await there(resolve(rest[1])))) {
+      throw new Error(`${beside} exists, and a build writes its source there and never over a file: name a new package`)
+    }
     const result = await buildPackage(source, check ? undefined : rest[1], { base: dirname(sourcePath), libraries: /** @type {string | undefined} */ (flags.libraries), check })
+    /** @type {string} */
+    let kept = ''
+    if (!check) {
+      const text = `${JSON.stringify(result.source, null, 2)}\n`
+      if (!same) await writeFile(beside, text, { flag: 'wx' }).then(() => { kept = beside }, (error) => console.warn(`Its source was not written beside it: ${error instanceof Error ? error.message : error}`))
+      else {
+        // The file being built, given what it was built with: all of it or none, by a rename.
+        // A quiz in the quiz format stays one: it has no field for it.
+        kept = 'kind' in source ? '' : beside
+        if (kept && source.builtWith !== result.builtWith) {
+          // By its real path, so that a link to it stays a link.
+          const real = await realpath(beside)
+          const next = `${real}.${process.pid}.tmp`
+          await writeFile(next, text, { flag: 'wx' }).then(() => rename(next, real)).catch(async (error) => {
+            await rm(next, { force: true })
+            kept = ''
+            console.warn(`${beside} was not given what it was built with: ${error instanceof Error ? error.message : error}`)
+          })
+        }
+      }
+    }
     const from = flags.libraries ? `the pack in ${flags.libraries}` : `the library pack ${await packVersion()}`
     const install = result.install.length ? `, ${result.install.length} more for installing on an H5P site` : ''
     console.log(`${check ? 'Checked, no package written' : `Built ${result.output}`}: ${result.manifest.mainLibrary}, ${result.libraries.length} libraries from ${from}${install}${result.media.length ? `, ${result.media.length} media file${result.media.length === 1 ? '' : 's'}` : ''}.`)
     if (!check) console.log(coreApiLine(result.coreApi))
+    if (kept) console.log(`Its source, naming ${result.builtWith} as what it was built with, is ${kept}: hand it over with the package.`)
     const language = String(result.manifest.language)
     if (!/^en(?:-|$)/i.test(language)) {
       for (const { library, translation, strings, english } of result.translations) {
