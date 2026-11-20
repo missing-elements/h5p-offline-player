@@ -58,7 +58,8 @@ The build downloads each picture, video, recording or other file your content na
 address, and refuses to download from an address on your local network: a guard against a mistaken
 or planted address, not against a hostile network. A video on YouTube, Vimeo, Panopto or Echo360 is
 not downloaded: it stays an address, which the player loads wherever it points, as H5P does
-anywhere. Math is drawn by the package's own copy of MathJax, which loads nothing from elsewhere.
+anywhere. A YouTube or Vimeo address is sent to that site's oEmbed, to ask whether it has the
+video. Math is drawn by the package's own copy of MathJax, which loads nothing from elsewhere.
 The check and the preview play the package from your computer. Your app
 sends your conversation to its model, as it does without this server.
 

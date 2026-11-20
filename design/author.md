@@ -94,7 +94,33 @@ text to the content check's rules, and `apps/skills` plays every example untrust
   Echo360 address stays an address, as the editor
   embeds it, and only where H5P.Video's own pattern for that host takes it, since an address none
   matches goes to its HTML5 player, which cannot play a page: a Short or a live stream is written
-  as its video's watch address, and another form on those hosts is refused by name.
+  as its video's watch address, and another form on those hosts is refused by name. A YouTube or
+  Vimeo address is asked of the host's oEmbed, which answers anyone, a page too (#218): an address
+  holds to its form only, and a made-up id built and showed a dead player. What a status means is
+  each host's own list (`answers` in `media.mjs`), as seen on real videos on 2026-11-20. YouTube:
+  400 for an id it never had and 404 for a video taken down, both a problem; 403 for a private
+  video, a note, since its owner can open it; 200 for one that asks a viewer's age; 401 was not
+  seen, is said to be embedding turned off, and is a note. Vimeo: 404 for no such video, a
+  private one, and an unlisted one given without the rest of its link, a problem that says so; a
+  video behind a password or let to some sites only answers 200 (Vimeo's help centre), and its
+  403 is Vimeo refusing the asker's network, so it says nothing.
+  - **Only the host's own answer counts.** A sandbox's proxy or a school's filter answers for the
+    host, and would otherwise refuse a build with no way round, or put a note on every video.
+    Both hosts send a status that is no video in a way of their own (`sends`): YouTube that
+    status's words alone ("Bad Request", "Forbidden", "Not Found", and "Unauthorized" expected
+    of the 401 that was not seen) under its JSON type, Vimeo a page of them ("404 Not Found",
+    `text/html`). A status that means something counts only when
+    it comes so, its own words and the host's type; a page of the box's own, the words under
+    another type as a small proxy sends them, or another status's words say nothing, as do any
+    other status, no network, and no answer in ten seconds, and the build goes on. A box that
+    copies both the words and the type would still be taken for the host: none was seen. If a
+    host changes how it answers, the check goes quiet, not wrong.
+  - **A host that does not answer costs ten seconds once.** Videos are asked one at a time, and
+    after the first with no answer that host is not asked again in that build; the other still
+    is. One video named twice is asked once. YouTube is asked by the video's watch address, since its oEmbed answers 404 for
+    the `/embed/` and `/v/` forms of a video it has.
+  - Panopto and Echo360 answer no one and are not asked. A read asks nothing. The tests never
+    ask: a setup file answers for both hosts (`tests/helpers/oembed.ts`).
   `build.test.ts` holds each accepted form to the patterns in H5P.Video's scripts. A package with
   media goes through the normalizer's `normalizeArchive`, stored and laid out to stream. An addon
   whose pattern the text matches, H5P.MathDisplay for LaTeX, is carried as a site with it

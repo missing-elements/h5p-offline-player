@@ -79,6 +79,8 @@ model may have written:
   name and then asks, so it guards against a mistaken or planted address, not
   a hostile network. A video on YouTube, Vimeo, Panopto or Echo360 is not
   downloaded: its address is kept, and the player loads it wherever it points.
+  A YouTube or Vimeo address is sent to that site's oEmbed endpoint, which says
+  whether it has the video.
 - The MCP server always builds so, in the folders the person gave it, else the
   app's roots, as they are given. Given none, it uses Desktop, Documents and
   Downloads, and never the home folder whole. It never writes over a file, and

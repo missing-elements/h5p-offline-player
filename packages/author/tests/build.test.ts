@@ -840,6 +840,75 @@ describe('media', () => {
     ])
   })
 
+  it('asks YouTube and Vimeo whether they have a hosted video, once each, and says what they answered (#218)', async () => {
+    const video = (path: string) => ({ content: { library: 'H5P.Video', params: { sources: { path } } } })
+    const column = (paths: string[]) => ({ ...META, type: 'H5P.Column', params: { content: paths.map(video) } })
+    const at = (i: number) => `params.content[${i}].content.params.sources.path`
+    const asked: string[] = []
+    const json = 'application/json; charset=UTF-8'
+    const page = 'text/html; charset=UTF-8'
+    // Each host's own answer for a status, as it sent it on 2026-11-20, by the video asked of:
+    // YouTube the status's words under its JSON type, Vimeo a page of them.
+    const answers: Record<string, [status: number, body: string, type: string]> = {
+      aaaaaaaaaaa: [400, 'Bad Request', json], bbbbbbbbbbb: [404, 'Not Found', json], ccccccccccc: [403, 'Forbidden', json], ddddddddddd: [401, 'Unauthorized', json],
+      eeeeeeeeeee: [500, 'Internal Server Error', json], '999999999': [404, '404 Not Found', page], '888888888': [403, '403 Forbidden', page],
+      // A box between the build and the host, answering for it: with a page of its own, with the
+      // status's words alone under its own type, as a small proxy does, and with another status's.
+      fffffffffff: [403, '<html><title>Blocked</title>This site is not allowed on this network.</html>', page], ggggggggggg: [403, 'Forbidden\n', 'text/plain; charset=utf-8'],
+      hhhhhhhhhhh: [404, 'Forbidden', json], '777777777': [404, '404 page not found', 'text/plain; charset=utf-8'], '666666666': [404, 'Not Found', page]
+    }
+    const fetch = async (input: string | URL | Request) => {
+      const url = String(input)
+      asked.push(url)
+      const [status, body, type] = Object.entries(answers).find(([id]) => url.includes(id))?.[1] ?? [200, '{}', json]
+      return new Response(body, { status, headers: { 'content-type': type } })
+    }
+    const youtube = (id: string) => `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}`
+    const vimeo = (address: string) => `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(address)}`
+
+    const { notes } = await build(column([
+      'https://www.youtube.com/embed/dQw4w9WgXcQ', 'https://youtu.be/dQw4w9WgXcQ', 'https://vimeo.com/channels/staffpicks/76979871',
+      'https://video.example.edu/Panopto/Pages/Viewer.aspx?id=0b6d3a5e', 'https://www.youtube.com/watch?v=ccccccccccc', 'https://www.youtube.com/watch?v=ddddddddddd',
+      'https://www.youtube.com/watch?v=eeeeeeeeeee', 'https://www.youtube.com/watch?v=fffffffffff', 'https://www.youtube.com/watch?v=ggggggggggg',
+      'https://www.youtube.com/watch?v=hhhhhhhhhhh', 'https://vimeo.com/888888888', 'https://vimeo.com/777777777', 'https://vimeo.com/666666666'
+    ]), { fetch })
+    // A YouTube video by its watch address, which its oEmbed answers for any form; once for the two
+    // forms of one video; Vimeo's as written; Panopto's not, since it answers no one.
+    expect(asked).toEqual([
+      youtube('dQw4w9WgXcQ'), vimeo('https://vimeo.com/channels/staffpicks/76979871'), youtube('ccccccccccc'), youtube('ddddddddddd'), youtube('eeeeeeeeeee'),
+      youtube('fffffffffff'), youtube('ggggggggggg'), youtube('hhhhhhhhhhh'), vimeo('https://vimeo.com/888888888'), vimeo('https://vimeo.com/777777777'), vimeo('https://vimeo.com/666666666')
+    ])
+    // A video nobody else can play yet is a note. Nothing is said of a status that means nothing
+    // for the host (a 500; Vimeo's 403, which refuses the asker's network), nor of one that is not
+    // sent as the host sends it: other words, another status's, or under another type.
+    expect(notes).toEqual([
+      { path: at(4), message: 'https://www.youtube.com/watch?v=ccccccccccc: YouTube says the video is private: nobody but its owner can play it until it is made public or unlisted (it answered 403)' },
+      { path: at(5), message: 'https://www.youtube.com/watch?v=ddddddddddd: YouTube would not say the video may be embedded, which is taken to mean its owner has turned embedding off: play it where it will be used (it answered 401)' }
+    ])
+    expect(await problems(column(['https://youtu.be/aaaaaaaaaaa', 'https://www.youtube.com/watch?v=bbbbbbbbbbb', 'https://vimeo.com/999999999']), { fetch })).toEqual([
+      `${at(0)}: https://youtu.be/aaaaaaaaaaa: YouTube has no video there: give https://www.youtube.com/watch?v= and the id of a public or unlisted video (it answered 400)`,
+      `${at(1)}: https://www.youtube.com/watch?v=bbbbbbbbbbb: YouTube has no video there any more: give https://www.youtube.com/watch?v= and the id of a public or unlisted video (it answered 404)`,
+      `${at(2)}: https://vimeo.com/999999999: Vimeo has no video there that others can play: give https://vimeo.com/ and the number of a public video, or all of an unlisted video's link, which has more after the number (it answered 404)`
+    ])
+
+    // With no network the build goes on, and asks each host once, not once a video.
+    const tried: string[] = []
+    const offline = async (input: string | URL | Request) => {
+      tried.push(new URL(String(input)).hostname)
+      throw new TypeError('fetch failed')
+    }
+    expect((await build(column(['https://youtu.be/aaaaaaaaaaa', 'https://vimeo.com/999999999', 'https://youtu.be/bbbbbbbbbbb', 'https://vimeo.com/888888888']), { fetch: offline })).notes).toEqual([])
+    expect(tried).toEqual(['www.youtube.com', 'vimeo.com'])
+    // And one host that does not answer leaves the other asked: its video that is not there is still refused.
+    const vimeoDown = async (input: string | URL | Request) => {
+      if (String(input).startsWith('https://vimeo.com/')) throw new TypeError('fetch failed')
+      return fetch(input)
+    }
+    expect(await problems(column(['https://vimeo.com/999999999', 'https://youtu.be/aaaaaaaaaaa']), { fetch: vimeoDown })).toEqual([
+      `${at(1)}: https://youtu.be/aaaaaaaaaaa: YouTube has no video there: give https://www.youtube.com/watch?v= and the id of a public or unlisted video (it answered 400)`
+    ])
+  })
+
   it('reads a video\'s and a recording\'s first bytes, and refuses one that is not what the field takes (#218)', async () => {
     await writeFile(join(dir, 'page.mp4'), '<!DOCTYPE html><title>clip</title>')
     await writeFile(join(dir, 'song.mp3'), 'not a recording at all')

@@ -86,7 +86,11 @@ What `params` takes is what H5P's editor would let an author save in the same fo
   and, where it gives one, its length, past which an Interactive Video's times are refused. The
   package is then laid out to stream, media stored and an mp4's index first. A YouTube, Vimeo,
   Panopto or Echo360 address stays where it is, if it is one H5P.Video plays: a Short's is taken
-  as its video's, and another address on those sites is refused. A download is given up once
+  as its video's, and another address on those sites is refused. A YouTube or Vimeo video is
+  asked of the site's oEmbed, which is sent the video's address: one the site has no video at is
+  refused, one YouTube says is private is a note, as is its 401, taken to mean that embedding is
+  turned off (not seen yet), and with no answer of the site's own in ten seconds, behind a proxy
+  that answers for it or with no network, the build goes on without one. A download is given up once
   nothing has arrived for a minute, however long it runs.
 - **Interface texts** (Check, Retry…): leave them out; they come from the libraries' translations,
   and the command lists what stayed English. A source may still set one by name.
@@ -233,7 +237,8 @@ const { output, source: built, builtWith, manifest, content, libraries, install,
 and throws a `SourceError` whose `problems` are `{ path, message }`; with `check` it builds and
 writes no package and takes no output (`buildPackage(source, undefined, { check: true })`), though a
 media file named by web address is still downloaded, to a temporary folder removed after; a video on
-YouTube, Vimeo, Panopto or Echo360 stays an address, as in a build. For a build run
+YouTube, Vimeo, Panopto or Echo360 stays an address, as in a build, a YouTube or Vimeo one asked
+of the site with the same `fetch`. For a build run
 on what a model wrote: `within` is a list of the folders the output and every local file the source
 names must be inside, on their real paths, and its problems then name no path but the one the
 source wrote. It does not cover a file named by web address, which is downloaded with the `fetch`

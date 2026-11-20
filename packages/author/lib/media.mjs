@@ -47,8 +47,13 @@ const under = (host, domains) => domains.some((domain) => host === domain || hos
  * an address by its own pattern for each host, and gives one no pattern matches to its HTML5
  * player, which cannot play a page. So `plays` takes only addresses H5P.Video 1.6's pattern for
  * the host takes as well, and any other address on the host (`on`, told by its name, with no
- * pattern to backtrack through its labels) is refused, naming the form.
- * @type {{ host: string, mime: string, plays: RegExp, on: (url: URL) => boolean, form: string }[]}
+ * pattern to backtrack through its labels) is refused, naming the form. `oembed` is where the
+ * host says whether it has the video, for the two hosts that answer anyone (#218), and `answers`
+ * what each status it answers there means, as seen on 2026-11-20: a problem (`gone`) or a note
+ * (`closed`), each with the words for it. A status not listed says nothing. `sends` is how the
+ * host itself sends such a status, its body and the type it gives it, by which its own answer is
+ * told from one a box in between gives for it (`#ask`).
+ * @type {{ host: string, mime: string, plays: RegExp, on: (url: URL) => boolean, form: string, oembed?: (address: string) => string, sends?: { type: string, body: (status: number) => string }, answers?: Record<number, { gone?: string, closed?: string }> }[]}
  */
 const HOSTED = [
   {
@@ -56,14 +61,41 @@ const HOSTED = [
     mime: 'video/Vimeo',
     plays: /^https?:\/\/(?:[\w-]+\.)*vimeo\.com\/(?:channels\/[A-Za-z_]+\/|groups\/[A-Za-z_]+\/videos\/)?\d/,
     on: (url) => under(url.hostname, ['vimeo.com']),
-    form: 'https://vimeo.com/ and the video\'s number'
+    form: 'https://vimeo.com/ and the video\'s number',
+    // Every form it plays, a channel's and a group's too, and an unlisted video's with its hash.
+    oembed: (address) => `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(address)}`,
+    // Its 404 is a page of the words alone.
+    sends: { type: 'text/html', body: (status) => `${status} ${STATUS_WORDS[status]}` },
+    // 404 for no such video, a private one, and an unlisted one asked of without the rest of its
+    // link (Vimeo's help centre). A video behind a password or let to some sites only answers
+    // 200, and a 403 is Vimeo refusing the asker's network, which says nothing of the video.
+    answers: {
+      404: { gone: 'has no video there that others can play: give https://vimeo.com/ and the number of a public video, or all of an unlisted video\'s link, which has more after the number' }
+    }
   },
   {
     host: 'YouTube',
     mime: 'video/YouTube',
     plays: /^https?:\/\/(?:[\w-]+\.)*(?:youtube\.com\/(?:watch\?(?:[^#\s]*&)?v=|embed\/|v\/)|youtu\.be\/)[\w-]{11}/i,
     on: (url) => under(url.hostname, ['youtube.com', 'youtube-nocookie.com', 'youtu.be']),
-    form: 'https://www.youtube.com/watch?v= and the video\'s id'
+    form: 'https://www.youtube.com/watch?v= and the video\'s id',
+    // Asked by its watch address: YouTube's oEmbed answers 404 for /embed/ and /v/ addresses of a
+    // video it has (2026-11-20).
+    oembed: (address) => {
+      const id = YOUTUBE_ID.exec(address)?.[1]
+      return id ? `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}` : ''
+    },
+    // The status's words alone, under the type of the answer it would have given.
+    sends: { type: 'application/json', body: (status) => STATUS_WORDS[status] },
+    // Seen: 400 for an id it never had, 404 for a video taken down, 403 for a private one, and
+    // 200 for one that asks a viewer's age. 401 was not seen: it is said to be a video whose
+    // owner has turned embedding off.
+    answers: {
+      400: { gone: 'has no video there: give https://www.youtube.com/watch?v= and the id of a public or unlisted video' },
+      404: { gone: 'has no video there any more: give https://www.youtube.com/watch?v= and the id of a public or unlisted video' },
+      403: { closed: 'says the video is private: nobody but its owner can play it until it is made public or unlisted' },
+      401: { closed: 'would not say the video may be embedded, which is taken to mean its owner has turned embedding off: play it where it will be used' }
+    }
   },
   {
     host: 'Panopto',
@@ -80,6 +112,21 @@ const HOSTED = [
     form: 'its H5P address, https://echo360.org/media/, the media\'s id and /h5p'
   }
 ]
+
+/** A YouTube video's id, in an address H5P.Video plays. */
+const YOUTUBE_ID = /(?:[?&]v=|\/embed\/|\/v\/|youtu\.be\/)([\w-]{11})/i
+
+/** How long a host may take to say whether it has a video, before the build goes on without it. */
+const ASK_MS = 10_000
+
+/**
+ * A status's words, which YouTube and Vimeo send alone with an answer that is no video ("Bad
+ * Request" under YouTube's JSON type, "404 Not Found" as Vimeo's page): each host's `sends`. A box
+ * between the build and the host, a sandbox's proxy or a school's filter, answers with a page of
+ * its own or under a type of its own, and so does Vimeo where it refuses the asker's network: none
+ * of those is the host speaking of the video.
+ */
+const STATUS_WORDS = /** @type {Record<number, string>} */ ({ 400: 'Bad Request', 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not Found' })
 
 /** A YouTube Short or live stream, by its video's id, which H5P.Video plays at the watch address. */
 const YOUTUBE_SHORT = /^https?:\/\/(?:[\w-]+\.)*youtube\.com\/(?:shorts|live)\/([\w-]{11})(?![\w-])/i
@@ -263,6 +310,10 @@ export class MediaStore {
     this.names = new Set()
     /** @type {Map<string, number>} a video's or a recording's length in seconds, by its path in the package, where its index gave one */
     this.lengths = new Map()
+    /** @type {Map<string, Promise<number>>} what a host answered of a video, by the address asked, so one video named twice is asked of once */
+    this.asked = new Map()
+    /** @type {Set<string>} the hosts that gave no answer at all, none of which is asked again in this build */
+    this.unanswered = new Set()
   }
 
   /**
@@ -293,7 +344,10 @@ export class MediaStore {
       const short = YOUTUBE_SHORT.exec(source)
       const address = short ? `https://www.youtube.com/watch?v=${short[1]}` : source
       const hosted = HOSTED.find(({ plays }) => plays.test(address))
-      if (hosted) return { path: address, mime: hosted.mime, copyright }
+      if (hosted) {
+        await this.#there(hosted, address, source, `${at}.path`, report, note)
+        return { path: address, mime: hosted.mime, copyright }
+      }
       const url = URL.canParse(address) ? new URL(address) : null
       const other = url ? HOSTED.find(({ on }) => on(url)) : undefined
       if (other) {
@@ -430,6 +484,62 @@ export class MediaStore {
       return null
     }
     return { from: found.file, extension, stem: name.slice(0, name.length - extension.length - 1) }
+  }
+
+  /**
+   * Whether a host has a video, asked of its oEmbed endpoint where it has one (#218): an address
+   * holds to its form only, so a made-up id built and showed a dead player. What an answer means
+   * is the host's own list (`answers`): a video that is not there is a problem, and one nobody
+   * else can play yet a note, since its owner can open it. Any other answer, one that is not the
+   * host's own (`#ask`), no network, or no answer in ten seconds says nothing either way, and the
+   * build goes on without it.
+   * @param {(typeof HOSTED)[number]} hosted
+   * @param {string} address as H5P.Video will play it
+   * @param {string} source as written
+   * @param {string} at
+   * @param {(path: string, message: string) => void} report
+   * @param {(path: string, message: string) => void} note
+   */
+  async #there(hosted, address, source, at, report, note) {
+    const ask = hosted.oembed?.(address)
+    if (!ask || !hosted.answers) return
+    let answer = this.asked.get(ask)
+    if (!answer) {
+      // One at a time, and a host that does not answer costs its ten seconds once, not a video.
+      if (this.unanswered.has(hosted.host)) return
+      answer = this.#ask(ask, hosted)
+      this.asked.set(ask, answer)
+    }
+    const status = await answer
+    if (status === 0) this.unanswered.add(hosted.host)
+    const meaning = hosted.answers[status]
+    if (meaning?.gone) report(at, `${source}: ${hosted.host} ${meaning.gone} (it answered ${status})`)
+    else if (meaning?.closed) note(at, `${source}: ${hosted.host} ${meaning.closed} (it answered ${status})`)
+  }
+
+  /**
+   * The status a host's oEmbed endpoint answers; 0 where it does not answer in time, and -1 where
+   * a status that would say something of the video is not sent as the host sends it (`sends`):
+   * that status's own words and nothing else, under the host's type.
+   * @param {string} url
+   * @param {(typeof HOSTED)[number]} hosted
+   * @returns {Promise<number>}
+   */
+  async #ask(url, hosted) {
+    try {
+      const response = await this.fetch(url, { signal: AbortSignal.timeout(ASK_MS) })
+      const { status } = response
+      if (!hosted.answers || !hosted.sends || !Object.hasOwn(hosted.answers, status)) {
+        await response.body?.cancel().catch(() => {})
+        return status
+      }
+      const type = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
+      const own = type === hosted.sends.type && (await response.text()).trim() === hosted.sends.body(status)
+      if (!own) await response.body?.cancel().catch(() => {})
+      return own ? status : -1
+    } catch {
+      return 0
+    }
   }
 
   /**

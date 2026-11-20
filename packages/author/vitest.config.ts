@@ -35,6 +35,7 @@ export default defineConfig({
           environment: 'node',
           include: ['tests/**/*.test.ts'],
           exclude: [...configDefaults.exclude, 'tests/browser/**'],
+          setupFiles: ['tests/helpers/oembed.ts'],
           // The package's limit, and no test's own (design/testing.md, #255). These tests build
           // packages from the library pack and write every content type's bundle, which a CI
           // runner does two to four times slower than a laptop: on vitest's 5 s a test, three
