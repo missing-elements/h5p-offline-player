@@ -9,9 +9,11 @@ import { faststartPlan } from './mp4.mjs'
 const READ_CHUNK = 1024 * 1024
 
 /**
- * @typedef {import('./mp4.mjs').Piece} Piece here a range of the source file, absolute positions,
- *   or literal bytes
- * @typedef {import('./mp4.mjs').FaststartPlan} FaststartPlan
+ * @typedef {{ start: number, end: number } | { bytes: Uint8Array }} Piece a range of the open
+ *   file, absolute positions in it, end exclusive, or literal bytes: where `faststartPlan`'s
+ *   ranges are counted from the media file's start, these have `base` added
+ * @typedef {Omit<import('./mp4.mjs').FaststartPlan, 'pieces'> & { pieces: Piece[] }} FaststartPlan
+ *   `faststartPlan`'s, its pieces positions in the open file
  */
 
 /**
@@ -21,7 +23,7 @@ const READ_CHUNK = 1024 * 1024
  * @param {import('node:fs/promises').FileHandle} file
  * @param {number} base where the media file starts within `file`
  * @param {number} size its length
- * @returns {Promise<FaststartPlan>}
+ * @returns {Promise<FaststartPlan>} its ranges absolute positions in `file`, for `readPieces`
  */
 export async function planFaststart(file, base, size) {
   // The media file's own bytes, never past its end: it may be a range of a larger file.

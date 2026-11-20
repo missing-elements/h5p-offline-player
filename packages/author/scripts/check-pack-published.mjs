@@ -59,8 +59,10 @@ const normalize = await versionOf('normalize')
 // The first with `faststartPlan` in `./mp4`. The range published is from packages/normalize's
 // version, so one below this would let the author install beside a normalizer without it.
 const NORMALIZER_FLOOR = [1, 5, 0]
-const [major, minor, patch] = normalize.split('.').map(Number)
-if (major === NORMALIZER_FLOOR[0] && (minor < NORMALIZER_FLOOR[1] || (minor === NORMALIZER_FLOOR[1] && patch < NORMALIZER_FLOOR[2]))) {
+const parts = normalize.split('.').map((/** @type {string} */ part) => Number.parseInt(part, 10))
+// The first part that differs decides, and a version that is no three numbers is below any.
+const differs = NORMALIZER_FLOOR.findIndex((floor, i) => parts[i] !== floor)
+if (differs !== -1 && !(parts[differs] > NORMALIZER_FLOOR[differs])) {
   console.error(`[normalize] packages/normalize is ${normalize}, and the page's build imports faststartPlan from its ./mp4, new in ${NORMALIZER_FLOOR.join('.')}: bump the normalizer to that, publish it, and publish the author package against it.`)
   process.exit(1)
 }
