@@ -48,7 +48,9 @@ more: `builtWith`, the content type and the pack's version of it. A source is bu
 often with a newer pack, and a build of one that names another version of its type says so: as a
 note where it builds, and with the problems where it does not, since a field may have changed
 since. That file is never written over either, but where it is the file being built, which is
-kept up to date.
+kept up to date. A quiz in the quiz format has no such field: built to a new name, it is kept
+beside the package as the source it was built as, and built from that file itself, the file
+stays as written.
 
 It is written for an AI agent and its tokens: the agent writes what only an author can know, and
 code writes everything that can be derived. The
@@ -264,8 +266,8 @@ inside those folders, on their real paths.
 
 A result's `builtWith` is the content type and the pack's version of it, `H5P.Blanks 1.14`, and
 its `source` the source as built, naming it: what to keep with the package, as the command line
-writes it beside one. `buildPackage` writes the package alone. Its `libraries` are the folders the package
-plays with, `install` those carried for an H5P site's upload check, and `coreApi` the newest H5P
+writes it beside one; `buildPackage` writes the package alone. A result's `libraries` are the
+folders the package plays with, `install` those carried for an H5P site's upload check, and `coreApi` the newest H5P
 core they ask for, `{ majorVersion, minorVersion }`, which a site needs to take the package;
 `coreApiLine(coreApi)` says it as the command line does. `missingForInstall(libraries)`
 is that check, over a package's `library.json` files: what a site with no library installed would

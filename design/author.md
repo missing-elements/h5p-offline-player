@@ -434,7 +434,10 @@ text to the content check's rules, and `apps/skills` plays every example untrust
     gives that file, not the one the chat wrote. It is never written over: a name that is taken
     stops the build before a package is made. The one exception is the file being built, the
     usual name of a source that was handed over, which is rewritten by a rename, and only where
-    what it names has changed. A quiz in the quiz format has no field for it and stays as written.
+    what it names has changed. A quiz in the quiz format has no field for it: what is kept
+    beside its package, by the command line and the MCP server alike, is the source it was
+    built as (`quizSource`), which builds the same package and takes the field; a quiz that is
+    itself the file being built stays as written.
   - `builtWith` is a field of `sourceSchema`, described as a build's to write, and left out of
     the fields a problem lists as a source's; one that is not a name and a version is a problem
     saying to leave it out. A read leaves it out: the next build writes it.
