@@ -50,7 +50,11 @@ export default defineConfig({
         test: {
           name: 'browser',
           include: ['tests/browser/**/*.test.ts'],
+          // This project's limit, longer than the Node one: a test here builds in Chromium and
+          // plays the result in the verifier. Named here because a project takes nothing from
+          // the other.
           testTimeout: 180_000,
+          hookTimeout: 180_000,
           browser: {
             enabled: true,
             headless: true,
