@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { planFaststart, readPieces } from '../lib/mp4-faststart.mjs'
+import { faststartPlan } from '../lib/mp4.mjs'
 import { atom, atomsIn, chunkOffsets, concat, findAtom, sampleMp4, stco, u32s } from './helpers/mp4'
 
 async function withFile<T>(bytes: Uint8Array, run: (file: Awaited<ReturnType<typeof open>>) => Promise<T>): Promise<T> {
@@ -114,6 +115,27 @@ describe('planFaststart', () => {
         expect(plan.detail).toMatch(reason)
         expect(await assemble(file, plan)).toEqual(bytes)
       })
+    }
+  })
+})
+
+describe('faststartPlan', () => {
+  it('lays out bytes held in memory as the faststart lays out a file, and leaves the bytes it read as they were', async () => {
+    const sample = sampleMp4()
+    const original = sample.bytes.slice()
+    // A read that hands back views of the bytes it holds, as a page reading a Blob's slices need not.
+    const read = async (offset: number, length: number) => sample.bytes.subarray(offset, Math.min(offset + length, sample.bytes.length))
+    const plan = await faststartPlan(read, sample.bytes.length)
+    expect(plan.status).toBe('moved')
+    const laid = concat(plan.pieces.map((piece) => ('bytes' in piece ? piece.bytes : sample.bytes.subarray(piece.start, piece.end))))
+    const fromFile = await withFile(sample.bytes, async (file) => assemble(file, await planFaststart(file, 0, sample.bytes.length)))
+    expect(laid).toEqual(fromFile)
+    expect(types(laid)).toEqual(['ftyp', 'free', 'moov', 'mdat'])
+    expect(sample.bytes).toEqual(original)
+
+    for (const bytes of [sampleMp4({ faststart: true }).bytes, new TextEncoder().encode('<!DOCTYPE html>')]) {
+      const left = await faststartPlan(async (offset, length) => bytes.subarray(offset, offset + length), bytes.length)
+      expect(left.pieces).toEqual([{ start: 0, end: bytes.length }])
     }
   })
 })

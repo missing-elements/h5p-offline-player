@@ -1,22 +1,10 @@
 /**
- * Moves an mp4's `moov` atom in front of its `mdat`, so a player can decode the first frame from
- * the first few hundred kilobytes instead of after the last byte. A remux, not a re-encode: the
- * only bytes that change are the chunk offset tables (`stco` / `co64`) inside `moov`, which
- * shift by the length of `moov` itself because `moov` now sits in front of the data they point
- * into. The same thing `qt-faststart` and `ffmpeg -movflags +faststart` do.
- *
- * Works on a range of an open file rather than on a buffer: the video may be a stored entry read
- * in place in the source archive, or an inflated copy in a temp file, and neither is loaded
- * whole. Only `moov` — a few megabytes at most — is read into memory, because it is rewritten.
+ * Moves an mp4's `moov` atom in front of its `mdat` in a range of an open file: the video may be
+ * a stored entry read in place in the source archive, or an inflated copy in a temp file, and
+ * neither is loaded whole. The plan is `faststartPlan`'s, in `mp4.mjs`, which a page runs on a
+ * `Blob` too; this gives it the file's bytes and reads the pieces it names.
  */
-import { formatBytes } from './format.mjs'
-import { topLevelAtoms } from './mp4.mjs'
-
-/** Atoms whose children hold the chunk offset tables. Nothing under any other branch does. */
-const CONTAINERS = new Set(['trak', 'mdia', 'minf', 'stbl'])
-
-/** Larger than any real index; a `moov` past this is a malformed file, and is left alone. */
-const MAX_MOOV_SIZE = 256 * 1024 * 1024
+import { faststartPlan } from './mp4.mjs'
 
 const READ_CHUNK = 1024 * 1024
 
@@ -41,57 +29,14 @@ const READ_CHUNK = 1024 * 1024
  * @returns {Promise<FaststartPlan>}
  */
 export async function planFaststart(file, base, size) {
-  /** @type {Piece[]} */
-  const identity = [{ start: base, end: base + size }]
-  /** @param {string} detail */
-  const skipped = (detail) => ({ status: /** @type {const} */ ('skipped'), detail, pieces: identity, size })
-
   // The media file's own bytes, never past its end: it may be a range of a larger file.
   const read = async (/** @type {number} */ offset, /** @type {number} */ length) => {
     const buffer = Buffer.alloc(Math.max(0, Math.min(length, size - offset)))
     await readExact(file, buffer, base + offset)
     return buffer
   }
-  // As far as a fragment, which says the file streams as it is, however many follow.
-  const atoms = await topLevelAtoms(read, size, 'moof')
-  if (!atoms) return skipped('not an ISO media file')
-  if (atoms.some((atom) => atom.type === 'moof')) return skipped('fragmented mp4, already streamable')
-
-  const moov = atoms.find((atom) => atom.type === 'moov')
-  const mdat = atoms.find((atom) => atom.type === 'mdat')
-  if (!moov) return skipped('no moov atom')
-  if (!mdat) return skipped('no mdat atom')
-  if (moov.offset < mdat.offset) {
-    return { status: 'already', detail: 'moov already precedes mdat', pieces: identity, size }
-  }
-  if (moov.size > MAX_MOOV_SIZE) return skipped('moov is implausibly large')
-
-  const moovBytes = Buffer.alloc(moov.size)
-  await readExact(file, moovBytes, base + moov.offset)
-
-  // Where a byte ends up once `moov` is lifted out from behind `mdat` and dropped in front of it:
-  // anything before `mdat` stays put, anything from `mdat` up to `moov` moves back by `moov`'s
-  // length, and anything after `moov` loses it in front and gains it behind, so does not move.
-  /** @param {number} position */
-  const shift = (position) => (position >= mdat.offset && position < moov.offset ? moov.size : 0)
-
-  const problem = patchChunkOffsets(moovBytes, moov.headerSize, moov.size, shift)
-  if (problem) return skipped(problem)
-
-  /** @type {Piece[]} */
-  const pieces = [
-    { start: base, end: base + mdat.offset },
-    { bytes: moovBytes },
-    { start: base + mdat.offset, end: base + moov.offset },
-    { start: base + moov.offset + moov.size, end: base + size }
-  ].filter((piece) => 'bytes' in piece || piece.end > piece.start)
-
-  return {
-    status: 'moved',
-    detail: `moov was behind ${formatBytes(moov.offset - mdat.offset)} of mdat`,
-    pieces,
-    size
-  }
+  const plan = await faststartPlan(read, size)
+  return { ...plan, pieces: plan.pieces.map((piece) => ('bytes' in piece ? piece : { start: base + piece.start, end: base + piece.end })) }
 }
 
 /**
@@ -115,73 +60,6 @@ export async function* readPieces(file, pieces) {
       position += length
     }
   }
-}
-
-/**
- * Walks the atoms between `start` and `end` inside `moov`, descending into the containers that
- * lead to sample tables, and adds `shift(offset)` to every chunk offset it finds. Any other
- * absolute position it knows of — `saio` — makes the file one it will not move. Returns a
- * reason where the table cannot be rewritten, `null` on success.
- *
- * @param {Buffer} moov
- * @param {number} start
- * @param {number} end
- * @param {(position: number) => number} shift
- * @returns {string | null}
- */
-function patchChunkOffsets(moov, start, end, shift) {
-  let position = start
-
-  while (position + 8 <= end) {
-    let atomSize = moov.readUInt32BE(position)
-    const type = moov.toString('latin1', position + 4, position + 8)
-    let headerSize = 8
-
-    if (atomSize === 1) {
-      if (position + 16 > end) return 'truncated atom inside moov'
-      atomSize = Number(moov.readBigUInt64BE(position + 8))
-      headerSize = 16
-    } else if (atomSize === 0) {
-      atomSize = end - position
-    }
-    if (atomSize < headerSize || position + atomSize > end) return 'malformed atom inside moov'
-
-    if (type === 'cmov') return 'compressed moov is not supported'
-    // Common Encryption keeps the offsets of its per-sample data in `saio`, and in a file that is
-    // not fragmented those are absolute file positions, like the chunk offsets. Moving `moov`
-    // without rewriting them would leave a protected video that can no longer be decrypted, so
-    // such a file is left as it was.
-    if (type === 'saio') return 'encrypted sample data (saio) is not supported'
-
-    if (CONTAINERS.has(type)) {
-      const problem = patchChunkOffsets(moov, position + headerSize, position + atomSize, shift)
-      if (problem) return problem
-    } else if (type === 'stco' || type === 'co64') {
-      const body = position + headerSize
-      const wide = type === 'co64'
-      const entrySize = wide ? 8 : 4
-      if (body + 8 > position + atomSize) return `truncated ${type}`
-      const count = moov.readUInt32BE(body + 4) // after the version and flags word
-      if (body + 8 + count * entrySize > position + atomSize) return `${type} claims more entries than it holds`
-
-      for (let index = 0; index < count; index++) {
-        const at = body + 8 + index * entrySize
-        if (wide) {
-          const offset = moov.readBigUInt64BE(at)
-          moov.writeBigUInt64BE(offset + BigInt(shift(Number(offset))), at)
-        } else {
-          const offset = moov.readUInt32BE(at)
-          const moved = offset + shift(offset)
-          if (moved > 0xffffffff) return 'a chunk offset would outgrow stco; the file needs co64'
-          moov.writeUInt32BE(moved, at)
-        }
-      }
-    }
-
-    position += atomSize
-  }
-
-  return null
 }
 
 /**

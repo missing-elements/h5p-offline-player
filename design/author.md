@@ -82,7 +82,9 @@ text to the content check's rules, and `apps/skills` plays every example untrust
   not take is refused (a video takes MP4, WebM and Ogg; a recording MP3, M4A, WAV, Ogg and WebM):
   a web page at an address that ends `.mp4`, as a wiki's file page or a share link answers, built
   and passed the verifier before (#218). An mp4's index is read through the normalizer's
-  `mp4Info`, the walk its faststart uses, in Node and on a page alike. No index to read is a
+  `mp4Info`, the walk its faststart uses, in Node and on a page alike, and on a page the index is
+  moved to the front by the normalizer's plan, `faststartPlan`, the file made of the given one's
+  slices and the rewritten index (#218, item 5). No index to read is a
   problem. Where the index lists tracks, no sound or no picture is a note, a silent video being
   one an author can mean, and so is HEVC. Where it gives a length, that holds an Interactive
   Video's times (`videoTimes`): a start, a bookmark or an end screen past the end is refused, an

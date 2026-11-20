@@ -24,8 +24,9 @@ packages/runtime/      the H5P core vendored at a commit (vendor/h5p-core/) and 
                        and the `finished` rule are bundled into it; l10n/ the core's strings
 packages/libraries/    the library pack: parts/ an archive per library and its index,
                        libraries.h5p the whole pack; committed, built by `pnpm libraries`
-packages/normalize/    the package rewriter: lib/normalize.mjs the policy, mp4-faststart.mjs the
-                       remux, zip-writer.mjs the zip writer, mp4.mjs what an MP4's index says
+packages/normalize/    the package rewriter: lib/normalize.mjs the policy, mp4.mjs what an MP4's
+                       index says and the remux's plan, mp4-faststart.mjs that plan over a file,
+                       zip-writer.mjs the zip writer
 packages/verify/       a package played headless (lib/verify.mjs) and in a browser
                        (lib/preview.mjs); lib/serve.mjs what both share, which the extension bundles
 packages/author/       a playable .h5p from a short source: lib/build.mjs both builds, node.mjs
