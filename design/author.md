@@ -92,7 +92,15 @@ text to the content check's rules, and `apps/skills` plays every example untrust
   Echo360 address stays an address, as the editor
   embeds it, and only where H5P.Video's own pattern for that host takes it, since an address none
   matches goes to its HTML5 player, which cannot play a page: a Short or a live stream is written
-  as its video's watch address, and another form on those hosts is refused by name.
+  as its video's watch address, and another form on those hosts is refused by name. A YouTube or
+  Vimeo address is asked of the host's oEmbed, which answers anyone, a page too (#218): an address
+  holds to its form only, and a made-up id built and showed a dead player. 400 or 404 is a
+  problem; 401 or 403, a private video or one its owner lets only some sites embed, a note, since
+  it may play where it will be used; anything else, no network, or no answer in ten seconds says
+  nothing, and the build goes on. YouTube is asked by the video's watch address, since its oEmbed
+  answers 404 for the `/embed/` and `/v/` forms of a video it has (2026-11-20); one video named
+  twice is asked once. Panopto and Echo360 answer no one and are not asked. The tests never ask:
+  a setup file answers for both hosts (`tests/helpers/oembed.ts`).
   `build.test.ts` holds each accepted form to the patterns in H5P.Video's scripts. A package with
   media goes through the normalizer's `normalizeArchive`, stored and laid out to stream. An addon
   whose pattern the text matches, H5P.MathDisplay for LaTeX, is carried as a site with it

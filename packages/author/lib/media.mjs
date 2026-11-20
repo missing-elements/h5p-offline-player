@@ -47,8 +47,9 @@ const under = (host, domains) => domains.some((domain) => host === domain || hos
  * an address by its own pattern for each host, and gives one no pattern matches to its HTML5
  * player, which cannot play a page. So `plays` takes only addresses H5P.Video 1.6's pattern for
  * the host takes as well, and any other address on the host (`on`, told by its name, with no
- * pattern to backtrack through its labels) is refused, naming the form.
- * @type {{ host: string, mime: string, plays: RegExp, on: (url: URL) => boolean, form: string }[]}
+ * pattern to backtrack through its labels) is refused, naming the form. `oembed` is where the
+ * host says whether it has the video, for the two hosts that answer anyone (#218).
+ * @type {{ host: string, mime: string, plays: RegExp, on: (url: URL) => boolean, form: string, oembed?: (address: string) => string }[]}
  */
 const HOSTED = [
   {
@@ -56,14 +57,22 @@ const HOSTED = [
     mime: 'video/Vimeo',
     plays: /^https?:\/\/(?:[\w-]+\.)*vimeo\.com\/(?:channels\/[A-Za-z_]+\/|groups\/[A-Za-z_]+\/videos\/)?\d/,
     on: (url) => under(url.hostname, ['vimeo.com']),
-    form: 'https://vimeo.com/ and the video\'s number'
+    form: 'https://vimeo.com/ and the video\'s number',
+    // Every form it plays, a channel's and a group's too, and an unlisted video's with its hash.
+    oembed: (address) => `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(address)}`
   },
   {
     host: 'YouTube',
     mime: 'video/YouTube',
     plays: /^https?:\/\/(?:[\w-]+\.)*(?:youtube\.com\/(?:watch\?(?:[^#\s]*&)?v=|embed\/|v\/)|youtu\.be\/)[\w-]{11}/i,
     on: (url) => under(url.hostname, ['youtube.com', 'youtube-nocookie.com', 'youtu.be']),
-    form: 'https://www.youtube.com/watch?v= and the video\'s id'
+    form: 'https://www.youtube.com/watch?v= and the video\'s id',
+    // Asked by its watch address: YouTube's oEmbed answers 404 for /embed/ and /v/ addresses of a
+    // video it has (2026-11-20).
+    oembed: (address) => {
+      const id = YOUTUBE_ID.exec(address)?.[1]
+      return id ? `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}` : ''
+    }
   },
   {
     host: 'Panopto',
@@ -80,6 +89,12 @@ const HOSTED = [
     form: 'its H5P address, https://echo360.org/media/, the media\'s id and /h5p'
   }
 ]
+
+/** A YouTube video's id, in an address H5P.Video plays. */
+const YOUTUBE_ID = /(?:[?&]v=|\/embed\/|\/v\/|youtu\.be\/)([\w-]{11})/i
+
+/** How long a host may take to say whether it has a video, before the build goes on without it. */
+const ASK_MS = 10_000
 
 /** A YouTube Short or live stream, by its video's id, which H5P.Video plays at the watch address. */
 const YOUTUBE_SHORT = /^https?:\/\/(?:[\w-]+\.)*youtube\.com\/(?:shorts|live)\/([\w-]{11})(?![\w-])/i
@@ -263,6 +278,8 @@ export class MediaStore {
     this.names = new Set()
     /** @type {Map<string, number>} a video's or a recording's length in seconds, by its path in the package, where its index gave one */
     this.lengths = new Map()
+    /** @type {Map<string, Promise<number>>} what a host answered of a video, by the address asked, so one video named twice is asked of once */
+    this.asked = new Map()
   }
 
   /**
@@ -293,7 +310,10 @@ export class MediaStore {
       const short = YOUTUBE_SHORT.exec(source)
       const address = short ? `https://www.youtube.com/watch?v=${short[1]}` : source
       const hosted = HOSTED.find(({ plays }) => plays.test(address))
-      if (hosted) return { path: address, mime: hosted.mime, copyright }
+      if (hosted) {
+        await this.#there(hosted, address, source, `${at}.path`, report, note)
+        return { path: address, mime: hosted.mime, copyright }
+      }
       const url = URL.canParse(address) ? new URL(address) : null
       const other = url ? HOSTED.find(({ on }) => on(url)) : undefined
       if (other) {
@@ -430,6 +450,50 @@ export class MediaStore {
       return null
     }
     return { from: found.file, extension, stem: name.slice(0, name.length - extension.length - 1) }
+  }
+
+  /**
+   * Whether a host has a video, asked of its oEmbed endpoint where it has one (#218): an address
+   * holds to its form only, so a made-up id built and showed a dead player. An address the host
+   * has no video at is a problem, and one it will not say anything of to anyone, a private video
+   * or one its owner lets only some sites embed, a note. Any other answer, no network, or no
+   * answer in ten seconds says nothing either way, and the build goes on without it.
+   * @param {(typeof HOSTED)[number]} hosted
+   * @param {string} address as H5P.Video will play it
+   * @param {string} source as written
+   * @param {string} at
+   * @param {(path: string, message: string) => void} report
+   * @param {(path: string, message: string) => void} note
+   */
+  async #there(hosted, address, source, at, report, note) {
+    const ask = hosted.oembed?.(address)
+    if (!ask) return
+    let answer = this.asked.get(ask)
+    if (!answer) {
+      answer = this.#ask(ask)
+      this.asked.set(ask, answer)
+    }
+    const status = await answer
+    if (status === 400 || status === 404) {
+      report(at, `${source}: ${hosted.host} has no video there (it answered ${status}): give ${hosted.form} of a public or unlisted video`)
+    } else if (status === 401 || status === 403) {
+      note(at, `${source}: ${hosted.host} would not say it may be played elsewhere (it answered ${status}): it may be private, or its owner may let only some sites embed it, so play it where it will be used`)
+    }
+  }
+
+  /**
+   * The status a host's oEmbed endpoint answers, or 0 where it does not answer in time.
+   * @param {string} url
+   * @returns {Promise<number>}
+   */
+  async #ask(url) {
+    try {
+      const response = await this.fetch(url, { signal: AbortSignal.timeout(ASK_MS) })
+      await response.body?.cancel().catch(() => {})
+      return response.status
+    } catch {
+      return 0
+    }
   }
 
   /**
