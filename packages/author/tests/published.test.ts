@@ -144,10 +144,22 @@ describe('the dependencies a package names by workspace:', () => {
   })
 
   it('share one wait: one that is missing leaves the next none of its own', async () => {
-    const { fetch, asked } = answers(404)
-    const results = await dependenciesServed(join(packages, 'a'), { until: Date.now() + 30, poll: 1, fetch })
-    expect(results.map(({ ok }) => ok)).toEqual([false, false])
-    expect(asked.filter((url) => url.includes('%2fc/')).length).toBeGreaterThan(1)
+    // A clock the requests move, 10 ms each, so the wait runs out at the fourth however busy the machine is.
+    let now = 1_000
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    const asked: string[] = []
+    const fetch = async (url: string) => {
+      asked.push(url)
+      now += 10
+      return { ok: false, status: 404, json: async () => ({}) }
+    }
+    try {
+      const results = await dependenciesServed(join(packages, 'a'), { until: 1_035, poll: 1, fetch })
+      expect(results.map(({ ok }) => ok)).toEqual([false, false])
+    } finally {
+      clock.mockRestore()
+    }
+    expect(asked.filter((url) => url.includes('%2fc/'))).toHaveLength(4)
     expect(asked.filter((url) => url.includes('%2fb/'))).toHaveLength(1)
   })
 

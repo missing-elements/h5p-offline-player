@@ -163,10 +163,12 @@ is on npm failed on one published moments before. Two kinds of check now wait wh
 
 Both ask again every 30 s after a 404, a server error, or a request that failed, timed out or
 could not be read. The checks in one script share one wait of `H5P_PUBLISH_WAIT` minutes, which
-`publish.yml` sets to 30, twice the longest seen. By hand and in a dry run it is 0: a 404 means npm
-does not serve the dependency, not published or still being processed, and the check says so at
-once. Any other failure stops the check, which says it could not tell rather than to publish. Each
-request, its body included, is cut at 30 s: one to npm hung for over 5 minutes.
+`publish.yml` sets to 30, twice the longest seen. By hand and in a dry run it is 0, and the check
+says at once what a 404 means. From npm, it does not serve the version: not published, or still
+being processed. From jsDelivr, the pack there has no `parts/index.json`. After any other failure
+the check stops and prints that the version could not be checked, which says nothing about whether
+it is there, and to run the publish again. Each request, its body included, is cut at 30 s: one to
+npm hung for over 5 minutes.
 
 A publish of the player runs its `prepublishOnly` (a check that the pack it names is on npm,
 typecheck, the unit suite and the build) so a broken tree cannot ship; the browser suite is left out because it needs an installed
