@@ -65,6 +65,13 @@ length in seconds, and each track's kind and codec. `read(offset, length)` gives
 fewer at its end, so it runs on a file in Node or a `Blob` in a page. It reads atoms' headers and a
 few small atoms, never the media.
 
+`faststartPlan(read, size)`, from the same module, is how the normalizer moves an mp4's index in
+front of its media: `{ status, detail, pieces, size }`, `status` `moved`, `already` or `skipped`,
+and `pieces` the output in order, each a range of the file (`{ start, end }`) or the rewritten index
+(`{ bytes }`). Only the index is read whole. On a page, a `Blob` of the pieces, the ranges as
+slices, is the file laid out to stream; the media are never copied. A file it does not understand
+is `skipped`, its one piece the whole file.
+
 Why deflated video cannot stream: the demo's
 [normalize page](https://github.com/missing-elements/h5p-toolkit/blob/main/apps/demo/demo/normalize.html).
 

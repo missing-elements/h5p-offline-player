@@ -1,3 +1,4 @@
+import { BlobReader, type FileEntry, Uint8ArrayWriter, ZipReader } from '@zip.js/zip.js'
 import { pack } from '@missing-elements/h5p-libraries/install'
 import { describe, expect, it } from 'vitest'
 import { commands } from 'vitest/browser'
@@ -90,6 +91,17 @@ describe('the build in a page', () => {
       })
       const built = await buildPackage(source(5), { libraries, files: { 'clip.mp4': clip } })
       expect(built.notes.filter(({ path }) => path.endsWith('.path'))).toEqual([{ path: 'params.interactiveVideo.video.files[0].path', message: 'clip.mp4 has no sound' }])
+      // Stored with its index first, as Node's build lays it out, and its CRC that of what is stored.
+      const reader = new ZipReader(new BlobReader(built.blob), { checkSignature: true })
+      try {
+        const entry = (await reader.getEntries()).find(each => each.filename === 'content/videos/clip.mp4') as FileEntry
+        const stored = await entry.getData(new Uint8ArrayWriter())
+        const text = new TextDecoder('latin1').decode(stored)
+        expect(entry.compressionMethod).toBe(0)
+        expect(stored.length).toBe(clip.size)
+        expect(text.indexOf('moov')).toBeGreaterThan(0)
+        expect(text.indexOf('moov')).toBeLessThan(text.indexOf('mdat'))
+      } finally { await reader.close() }
       await expect(buildPackage(source(40), { libraries, files: { 'clip.mp4': clip } })).rejects.toMatchObject({
         problems: [{ path: 'params.interactiveVideo.assets.interactions[0].duration', message: 'starts at 40 s, after the video ends at 30 s' }]
       })

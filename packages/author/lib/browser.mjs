@@ -1,5 +1,6 @@
 import { BlobReader, BlobWriter, ZipWriter } from '@zip.js/zip.js'
 import { crc32 } from '@missing-elements/h5p-normalize/crc32'
+import { faststartPlan } from '@missing-elements/h5p-normalize/mp4'
 import { packLibrariesIn } from '@missing-elements/h5p-offline-player/plan'
 import { composePackage, sourceOf, typeNames, writePackage } from './build.mjs'
 import { MediaStore } from './media.mjs'
@@ -16,8 +17,8 @@ export * from './core.mjs'
  * package comes back as a `Blob`, its media stored with their sizes and CRC in their local headers,
  * as embed's SCORM writer stores its entries since #92, so that the player reads each one's size
  * off its header on a host without `Range`, and before the libraries carried for an H5P site's
- * upload check, as Node's build lays them out. An mp4 goes in as it was given: moving its index to
- * the front is the normalizer's, which runs in Node. It needs a secure context, https, localhost or
+ * upload check, as Node's build lays them out. An mp4's or an m4a's index is moved to the front, as
+ * the normalizer does in Node, by its plan (#218). It needs a secure context, https, localhost or
  * a Tauri window, for `crypto.subtle` and `crypto.randomUUID`.
  */
 
@@ -127,6 +128,25 @@ function pageMedia(files) {
 }
 
 /**
+ * A stored video or recording laid out to stream, its index (`moov`) in front of its media, as
+ * Node's build lays it out through the normalizer (#218): by the normalizer's own plan
+ * (`faststartPlan`), made of the given file's slices and the rewritten index, so that no byte of
+ * the media is copied. Every file is asked of the plan, which tells an mp4 or an m4a by its first
+ * eight bytes and leaves any other file, and one with its index first already, as it is: no list
+ * of extensions is kept here beside the normalizer's.
+ * @param {Blob} blob
+ * @returns {Promise<Blob>}
+ */
+async function laidOut(blob) {
+  const read = async (/** @type {number} */ offset, /** @type {number} */ length) => new Uint8Array(await blob.slice(offset, offset + length).arrayBuffer())
+  const plan = await faststartPlan(read, blob.size)
+  if (plan.status !== 'moved') return blob
+  // The rewritten index is a copy of its own, over an ArrayBuffer, as a Blob takes it.
+  const parts = plan.pieces.map((piece) => ('bytes' in piece ? /** @type {Uint8Array<ArrayBuffer>} */ (piece.bytes) : blob.slice(piece.start, piece.end)))
+  return new Blob(parts, { type: blob.type })
+}
+
+/**
  * A `Blob`'s CRC-32, read as a stream.
  * @param {Blob} blob
  */
@@ -171,7 +191,8 @@ export async function buildPackage(input, options) {
     await writePackage(writer, built, pack, async () => {
       for (const item of media.files) {
         // Stored, its size and CRC in its local header: written into a stream, zip.js would put them in a descriptor after it.
-        await writer.add(`content/${item.name}`, new BlobReader(item.from), { passThrough: true, compressionMethod: 0, uncompressedSize: item.from.size, crc32: await crcOf(item.from) })
+        const file = await laidOut(item.from)
+        await writer.add(`content/${item.name}`, new BlobReader(file), { passThrough: true, compressionMethod: 0, uncompressedSize: file.size, crc32: await crcOf(file) })
       }
     })
     return {

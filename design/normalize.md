@@ -4,9 +4,12 @@
 deflated, non-faststart video, applied where it belongs: to the package, by whoever publishes it.
 It is its own package, `packages/normalize`, published as `@missing-elements/h5p-normalize` so that
 a publisher runs it with `npx` and needs no checkout: `lib/normalize.mjs` holds the policy,
-`lib/mp4-faststart.mjs` the remux and `lib/zip-writer.mjs` the output side; `bin/h5p-normalize.mjs`
+`lib/mp4.mjs` the remux's plan (`faststartPlan`, exported as `./mp4`, which h5p-author's page build
+runs on a `Blob`), `lib/mp4-faststart.mjs` that plan over a range of a file, and
+`lib/zip-writer.mjs` the output side; `bin/h5p-normalize.mjs`
 is the command. Its documented API is `normalizeArchive`, with `formatBytes` and
-`archiveFingerprint` re-exported, so the other modules stay free to change; the demo's content
+`archiveFingerprint` re-exported, and two entries a page takes too: `./crc32`, and `./mp4` with
+`mp4Info` and `faststartPlan` (docs/compatibility.md). The other modules stay free to change; the demo's content
 build and h5p-author's Node build are the callers in this repository. Its `prepublishOnly` runs its
 typecheck and tests, and its `prepack` copies the root LICENSE in. Five things about it that the
 code does not say by itself:

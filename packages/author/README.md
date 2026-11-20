@@ -379,9 +379,9 @@ const { blob, notes } = await buildPackage(source, { libraries, files: { 'volga.
   - `fetch`: for media named by web address.
 - Media go in after the content and stored, each with its size and CRC in the header in front of
   it, as the player reads them on a host without `Range`; the libraries carried for an H5P site's
-  upload check come after them, as in Node. An mp4 goes in as it was given. Moving its index to the
-  front, so that it starts before the whole file has arrived, is the normalizer's job, which runs
-  in Node: `npx @missing-elements/h5p-normalize@latest course.h5p`.
+  upload check come after them, as in Node. An mp4's or an m4a's index is moved to the front, as
+  the normalizer moves it in Node, so that it starts before the whole file has arrived: the file is
+  made of slices of the one given and the rewritten index, and the media are never copied.
 
 A page has two limits that Node does not:
 

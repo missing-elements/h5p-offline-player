@@ -2,8 +2,10 @@
  * An ISO media file, an mp4's or an m4a's, read by its atoms: where they are, and what its index
  * (`moov`) says of it. Through a `read(offset, length)` that gives fewer bytes at the file's end,
  * so it runs wherever the bytes are, a file in Node or a `Blob` on a page. Only atoms' headers and
- * a few small atoms are read: never the media, nor the index's tables.
+ * a few small atoms are read: never the media, nor the index's tables, but where the index is moved
+ * in front of the media (`faststartPlan`), which reads it whole to rewrite its chunk offsets.
  */
+import { formatBytes } from './format.mjs'
 
 /**
  * @typedef {(offset: number, length: number) => Promise<Uint8Array>} Read the file's bytes from an
@@ -165,4 +167,163 @@ async function trackOf(read, trak) {
   const handler = await textIn(read, hdlr, 8, 4)
   const codec = await textIn(read, stsd, 12, 4)
   return { kind: KINDS[handler] ?? 'other', codec }
+}
+
+/** Atoms whose children hold the chunk offset tables. Nothing under any other branch does. */
+const CONTAINERS = new Set(['trak', 'mdia', 'minf', 'stbl'])
+
+/** Larger than any real index; a `moov` past this is a malformed file, and is left alone. */
+const MAX_MOOV_SIZE = 256 * 1024 * 1024
+
+/**
+ * Deeper than the containers of a real index nest, which is four, `trak` to `stbl`: an index made
+ * of containers inside containers, as only a crafted file has, is left alone before the walk
+ * through it runs out of stack.
+ */
+const MAX_DEPTH = 8
+
+/**
+ * @typedef {{ start: number, end: number } | { bytes: Uint8Array }} Piece a range of the media
+ *   file, end exclusive, or literal bytes
+ *
+ * @typedef {object} FaststartPlan
+ * @property {'moved' | 'already' | 'skipped'} status
+ * @property {string} detail why, in words
+ * @property {Piece[]} pieces the output in order; the whole file when nothing moved
+ * @property {number} size the output length, always the input's
+ */
+
+/**
+ * How to lay an mp4 out with its index (`moov`) in front of its media (`mdat`), so that a player
+ * decodes the first frame from the first few hundred kilobytes instead of after the last byte. A
+ * remux, not a re-encode: the only bytes that change are the chunk offset tables (`stco`, `co64`)
+ * inside `moov`, which shift by its length, since it now sits in front of the data they point
+ * into: what `qt-faststart` and `ffmpeg -movflags +faststart` do. Only `moov`, a few megabytes at
+ * most, is read into memory; the rest is ranges of the file. So it runs wherever the bytes are: a
+ * range of a file in Node, as the normalizer's faststart, or a `Blob` on a page, whose slices are
+ * the ranges, as the author's build page lays out a video it stores.
+ *
+ * Never throws over content: a file that is no ISO media file, or one whose structure this does
+ * not understand, comes back `skipped`, with the input as its output.
+ * @param {Read} read
+ * @param {number} size the file's length
+ * @returns {Promise<FaststartPlan>}
+ */
+export async function faststartPlan(read, size) {
+  /** @type {Piece[]} */
+  const identity = [{ start: 0, end: size }]
+  /** @param {string} detail */
+  const skipped = (detail) => ({ status: /** @type {const} */ ('skipped'), detail, pieces: identity, size })
+
+  // As far as a fragment, which says the file streams as it is, however many follow.
+  const atoms = await topLevelAtoms(read, size, 'moof')
+  if (!atoms) return skipped('not an ISO media file')
+  if (atoms.some((atom) => atom.type === 'moof')) return skipped('fragmented mp4, already streamable')
+
+  const moov = atoms.find((atom) => atom.type === 'moov')
+  const mdat = atoms.find((atom) => atom.type === 'mdat')
+  if (!moov) return skipped('no moov atom')
+  if (!mdat) return skipped('no mdat atom')
+  if (moov.offset < mdat.offset) {
+    return { status: 'already', detail: 'moov already precedes mdat', pieces: identity, size }
+  }
+  if (moov.size > MAX_MOOV_SIZE) return skipped('moov is implausibly large')
+
+  const whole = await read(moov.offset, moov.size)
+  if (whole.length < moov.size) throw new Error(`Unexpected end of file at ${moov.offset + whole.length}`)
+  // A copy: a read may hand back a view of bytes it keeps, which are not this to change.
+  const index = new Uint8Array(whole)
+
+  // Where a byte ends up once `moov` is lifted out from behind `mdat` and dropped in front of it:
+  // anything before `mdat` stays put, anything from `mdat` up to `moov` moves back by `moov`'s
+  // length, and anything after `moov` loses it in front and gains it behind, so does not move.
+  /** @param {number} position */
+  const shift = (position) => (position >= mdat.offset && position < moov.offset ? moov.size : 0)
+
+  const problem = patchChunkOffsets(index, moov.headerSize, moov.size, shift)
+  if (problem) return skipped(problem)
+
+  /** @type {Piece[]} */
+  const pieces = [
+    { start: 0, end: mdat.offset },
+    { bytes: index },
+    { start: mdat.offset, end: moov.offset },
+    { start: moov.offset + moov.size, end: size }
+  ].filter((piece) => 'bytes' in piece || piece.end > piece.start)
+
+  return {
+    status: 'moved',
+    detail: `moov was behind ${formatBytes(moov.offset - mdat.offset)} of mdat`,
+    pieces,
+    size
+  }
+}
+
+/**
+ * Walks the atoms between `start` and `end` inside `moov`, descending into the containers that
+ * lead to sample tables, and adds `shift(offset)` to every chunk offset it finds. Any other
+ * absolute position it knows of, `saio`, makes the file one it will not move. Returns a reason
+ * where the table cannot be rewritten, `null` on success.
+ * @param {Uint8Array} moov
+ * @param {number} start
+ * @param {number} end
+ * @param {(position: number) => number} shift
+ * @param {number} [depth] how many containers deep `start` is
+ * @returns {string | null}
+ */
+function patchChunkOffsets(moov, start, end, shift, depth = 0) {
+  if (depth > MAX_DEPTH) return 'containers nested deeper than an index has'
+  const view = new DataView(moov.buffer, moov.byteOffset, moov.byteLength)
+  let position = start
+
+  while (position + 8 <= end) {
+    let atomSize = view.getUint32(position)
+    const type = ascii(moov.subarray(position + 4, position + 8))
+    let headerSize = 8
+
+    if (atomSize === 1) {
+      if (position + 16 > end) return 'truncated atom inside moov'
+      atomSize = Number(view.getBigUint64(position + 8))
+      headerSize = 16
+    } else if (atomSize === 0) {
+      atomSize = end - position
+    }
+    if (atomSize < headerSize || position + atomSize > end) return 'malformed atom inside moov'
+
+    if (type === 'cmov') return 'compressed moov is not supported'
+    // Common Encryption keeps the offsets of its per-sample data in `saio`, and in a file that is
+    // not fragmented those are absolute file positions, like the chunk offsets. Moving `moov`
+    // without rewriting them would leave a protected video that can no longer be decrypted, so
+    // such a file is left as it was.
+    if (type === 'saio') return 'encrypted sample data (saio) is not supported'
+
+    if (CONTAINERS.has(type)) {
+      const problem = patchChunkOffsets(moov, position + headerSize, position + atomSize, shift, depth + 1)
+      if (problem) return problem
+    } else if (type === 'stco' || type === 'co64') {
+      const body = position + headerSize
+      const wide = type === 'co64'
+      const entrySize = wide ? 8 : 4
+      if (body + 8 > position + atomSize) return `truncated ${type}`
+      const count = view.getUint32(body + 4) // after the version and flags word
+      if (body + 8 + count * entrySize > position + atomSize) return `${type} claims more entries than it holds`
+
+      for (let index = 0; index < count; index++) {
+        const at = body + 8 + index * entrySize
+        if (wide) {
+          const offset = view.getBigUint64(at)
+          view.setBigUint64(at, offset + BigInt(shift(Number(offset))))
+        } else {
+          const offset = view.getUint32(at)
+          const moved = offset + shift(offset)
+          if (moved > 0xffffffff) return 'a chunk offset would outgrow stco; the file needs co64'
+          view.setUint32(at, moved)
+        }
+      }
+    }
+
+    position += atomSize
+  }
+
+  return null
 }
